@@ -32,6 +32,7 @@ import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { commerceRouter } from "./routers/commerce";
 import { inventoryRouter } from "./routers/inventory";
 import { payrollRouter } from "./routers/payroll";
+import { backupRouter } from "./routers/backups";
 import { sdk } from "./_core/sdk";
 import { verifyPassword } from "./passwords";
 
@@ -116,6 +117,7 @@ export const appRouter = router({
   commerce: commerceRouter,
   inventory: inventoryRouter,
   payroll: payrollRouter,
+  backups: backupRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {

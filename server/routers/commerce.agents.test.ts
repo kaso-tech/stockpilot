@@ -17,8 +17,10 @@ describe("commerce agents et vendeurs", () => {
   beforeEach(() => {
     inserts.length = 0; updates.length = 0;
     const credential = { id: 71, userId: 30, username: "vendeur.test", passwordHash: "salt:hash" };
+    const sourceAgent = { id: 20, name: "Awa Agent", type: "sales_agent", email: "awa@example.test", phone: null, active: true };
+    const sourceSeller = { id: 30, name: "Vendeur Test", email: "vendeur@example.test", role: "seller", active: true };
     const profiles = [{ id: 51, beneficiaryType: "agent" as const, beneficiaryId: 20, ...remuneration }, { id: 52, beneficiaryType: "user" as const, beneficiaryId: 30, ...remuneration }];
-    const rowsFor = (table: unknown) => table === sellerCredentials ? [credential] : table === remunerationProfiles ? profiles : [];
+    const rowsFor = (table: unknown) => table === sellerCredentials ? [credential] : table === remunerationProfiles ? profiles : table === agents ? [sourceAgent] : table === users ? [sourceSeller] : [];
     const db: any = {
       insert: (table: unknown) => ({ values: async (values: unknown) => { inserts.push({ table, values }); return [{ insertId: table === agents ? 20 : table === users ? 30 : 1 }]; } }),
       update: (table: unknown) => ({ set: (values: unknown) => ({ where: async () => { updates.push({ table, values }); } }) }),
@@ -51,5 +53,15 @@ describe("commerce agents et vendeurs", () => {
     expect(updates.find(item => item.table === sellerCredentials)?.values).toMatchObject({ username: "vendeur.modifie" });
     expect(updates.find(item => item.table === users && (item.values as any).active === false)?.values).toEqual({ active: false });
     expect(inserts.filter(item => item.table === auditLogs)).toHaveLength(3);
+  });
+
+  it("convertit un agent en vendeur puis un vendeur en agent tout en désactivant l’ancien profil", async () => {
+    const caller = commerceRouter.createCaller(adminContext());
+    await caller.agents.convertToSeller({ id: 20, username: "awa.vendeuse", password: "Awa!2026", remuneration });
+    await caller.agents.convertSellerToAgent({ id: 30, type: "cashier", phone: "+22670000000", remuneration });
+    expect(inserts.find(item => item.table === users)?.values).toMatchObject({ name: "Awa Agent", role: "seller", active: true });
+    expect(inserts.find(item => item.table === sellerCredentials)?.values).toMatchObject({ username: "awa.vendeuse" });
+    expect(inserts.filter(item => item.table === agents).map(item => item.values)).toEqual(expect.arrayContaining([expect.objectContaining({ name: "Vendeur Test", type: "cashier" })]));
+    expect(updates.filter(item => (item.values as any).active === false)).toHaveLength(2);
   });
 });

@@ -8,6 +8,6 @@ describe("formatCurrency", () => {
     setActiveCurrency("USD");
     expect(formatCurrency(123456)).toMatch(/\$/);
     setActiveCurrency("XOF");
-    expect(formatCurrency(123456)).toMatch(/CFA|F\s?CFA/);
+    expect(formatCurrency(123456)).toMatch(/FCFA/);
   });
 });

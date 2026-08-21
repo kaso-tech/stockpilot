@@ -95,3 +95,30 @@
 - [x] Remplacer les libellés XOF par FCFA dans toute l’interface concernée.
 - [x] Vérifier les liens, la navigation mobile et l’absence de références Utilisateurs.
 - [x] Actualiser le serveur puis revalider les pages dédiées, FCFA et l’absence de références Utilisateurs.
+- [x] Définir les archives de sauvegarde, leur conservation et la restauration contrôlée des données métier.
+- [x] Ajouter l’export local et l’import de restauration des sauvegardes.
+- [x] Ajouter une planification quotidienne par défaut, ajustable par l’administrateur.
+- [ ] Connecter et valider Google Drive pour les copies cloud lorsque les secrets OAuth seront fournis.
+- [x] Créer une page de sauvegarde avec historique, exécution manuelle et paramètres de fréquence.
+- [x] Tester la création, le téléchargement, la restauration et la planification des sauvegardes.
+- [x] Finaliser l’interface et les tests de sauvegarde locale, avec Google Drive explicitement en attente.
+- [x] Permettre à l’administrateur de modifier le type d’un agent existant.
+- [x] Ajouter un retour explicite vers l’index Paramètres sur chaque page de réglage dédiée.
+- [x] Créer une page dédiée aux réglages POS et à l’impression ticket.
+- [x] Ajouter un historique lisible des changements de paramètres.
+- [x] Remplacer tous les libellés visibles XOF par FCFA, y compris dans les montants et réglages.
+- [x] Ajouter des tests d’intégration couvrant création d’archive, téléchargement et politique de rétention.
+- [x] Ajouter un test d’intégration de restauration d’archive avec garde-fou de confirmation.
+- [x] Ajouter des tests du callback planifié de sauvegarde et de la configuration Heartbeat.
+- [x] Vérifier le flux de sauvegarde locale sur mobile et desktop, avec un parcours E2E complet.
+- [x] Tester la génération de lien de téléchargement et la suppression des archives au-delà de la rétention.
+- [x] Tester le garde-fou de confirmation RESTAURER au niveau du routeur de sauvegarde.
+- [x] Tester le callback planifié et les actions d’activation, de mise à jour et de suspension Heartbeat.
+- [x] Étendre le parcours E2E de sauvegarde au téléchargement et confirmer son comportement sur mobile.
+- [x] Tester la génération réelle d’un lien de téléchargement par le routeur de sauvegarde.
+- [x] Tester le rejet API d’une restauration sans confirmation RESTAURER.
+- [x] Tester la mise à jour d’une tâche Heartbeat existante après changement de fréquence.
+- [x] Exécuter un parcours E2E mobile interactif de sauvegarde, restauration et planification.
+- [x] Tester la génération réelle du lien signé de téléchargement depuis le service de stockage.
+- [x] Exécuter un parcours mobile avec les vraies routes de sauvegarde, sans interception complète des API.
+- [x] Exécuter un parcours mobile réel de création, téléchargement et planification, sans restauration destructive.

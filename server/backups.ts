@@ -1,0 +1,122 @@
+import {
+  agentPayments, agents, auditLogs, backupArchives, customers, inventoryItems,
+  inventorySessions, products, remunerationProfiles, saleCommissions, saleItems,
+  saleSettings, sales, sellerCredentials, stockAlerts, stockMovements, suppliers, users,
+} from "../drizzle/schema";
+import { desc, eq } from "drizzle-orm";
+import { getDb } from "./db";
+import { storageGetSignedUrl, storagePut } from "./storage";
+
+type Trigger = "manual" | "scheduled";
+type SnapshotSource = { name: string; table: any };
+
+const snapshotSources: SnapshotSource[] = [
+  { name: "users", table: users }, { name: "sellerCredentials", table: sellerCredentials },
+  { name: "suppliers", table: suppliers }, { name: "products", table: products },
+  { name: "customers", table: customers }, { name: "agents", table: agents },
+  { name: "remunerationProfiles", table: remunerationProfiles }, { name: "saleSettings", table: saleSettings },
+  { name: "sales", table: sales }, { name: "saleItems", table: saleItems },
+  { name: "saleCommissions", table: saleCommissions }, { name: "agentPayments", table: agentPayments },
+  { name: "inventorySessions", table: inventorySessions }, { name: "inventoryItems", table: inventoryItems },
+  { name: "stockMovements", table: stockMovements }, { name: "stockAlerts", table: stockAlerts },
+  { name: "auditLogs", table: auditLogs },
+];
+
+const restoreDeleteOrder = [...snapshotSources].reverse();
+
+export type BackupPayload = {
+  schemaVersion: 1;
+  exportedAt: string;
+  source: "StockPilot";
+  tables: Record<string, unknown[]>;
+};
+
+async function dbOrThrow() {
+  const db = await getDb();
+  if (!db) throw new Error("Base de données indisponible.");
+  return db;
+}
+
+function backupFilename(now = new Date()) {
+  return `stockpilot-backup-${now.toISOString().replace(/[:.]/g, "-")}.json`;
+}
+
+export async function createBackupSnapshot(actorUserId: number | null, trigger: Trigger) {
+  const db = await dbOrThrow();
+  const tableEntries = await Promise.all(snapshotSources.map(async source => [source.name, await db.select().from(source.table)] as const));
+  const tables = Object.fromEntries(tableEntries) as Record<string, unknown[]>;
+  const payload: BackupPayload = { schemaVersion: 1, exportedAt: new Date().toISOString(), source: "StockPilot", tables };
+  const content = JSON.stringify(payload, null, 2);
+  const buffer = Buffer.from(content, "utf8");
+  const filename = backupFilename();
+  const stored = await storagePut(`backups/${filename}`, buffer, "application/json");
+  const recordCount = Object.values(tables).reduce((sum, rows) => sum + rows.length, 0);
+  const result = await db.insert(backupArchives).values({ filename, trigger, storageKey: stored.key, storageUrl: stored.url, sizeBytes: buffer.byteLength, recordCount, createdByUserId: actorUserId });
+  return { id: Number(result[0].insertId), filename, storageUrl: stored.url, sizeBytes: buffer.byteLength, recordCount, payload };
+}
+
+export async function getBackupDownloadUrl(archiveId: number) {
+  const db = await dbOrThrow();
+  const archive = (await db.select().from(backupArchives).where(eq(backupArchives.id, archiveId)).limit(1))[0];
+  if (!archive?.storageKey) throw new Error("Archive introuvable.");
+  return storageGetSignedUrl(archive.storageKey);
+}
+
+export async function listBackups(limit = 30) {
+  const db = await dbOrThrow();
+  return db.select().from(backupArchives).orderBy(desc(backupArchives.createdAt)).limit(limit);
+}
+
+export async function applyRetentionPolicy<T extends { id: number }>(archives: T[], retentionCount: number, remove: (id: number) => Promise<void>) {
+  for (const stale of archives.slice(retentionCount)) await remove(stale.id);
+}
+
+export function assertRestoreConfirmation(confirmation: string) {
+  if (confirmation !== "RESTAURER") throw new Error("La confirmation RESTAURER est requise pour restaurer une archive.");
+}
+
+export async function runBackupWithStatus(actorUserId: number | null, trigger: Trigger, retentionCount = 14) {
+  const db = await dbOrThrow();
+  try {
+    const archive = await createBackupSnapshot(actorUserId, trigger);
+    const { backupSettings } = await import("../drizzle/schema");
+    const settings = (await db.select().from(backupSettings).limit(1))[0];
+    if (settings) await db.update(backupSettings).set({ lastBackupAt: new Date(), lastBackupStatus: "success", lastBackupError: null }).where(eq(backupSettings.id, settings.id));
+    if (settings?.googleDriveRefreshTokenEncrypted) await (await import("./googleDrive")).syncArchiveToGoogleDrive(archive.id);
+    const archives = await listBackups(Math.max(retentionCount + 20, 50));
+    await applyRetentionPolicy(archives, retentionCount, async id => { await db.delete(backupArchives).where(eq(backupArchives.id, id)); });
+    return archive;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Échec inconnu de la sauvegarde.";
+    const { backupSettings } = await import("../drizzle/schema");
+    const settings = (await db.select().from(backupSettings).limit(1))[0];
+    if (settings) await db.update(backupSettings).set({ lastBackupStatus: "failed", lastBackupError: message }).where(eq(backupSettings.id, settings.id));
+    await db.insert(backupArchives).values({ filename: backupFilename(), trigger, status: "failed", createdByUserId: actorUserId, error: message });
+    throw error;
+  }
+}
+
+export function parseBackupPayload(dataUrl: string): BackupPayload {
+  const match = dataUrl.match(/^data:application\/json;base64,([A-Za-z0-9+/=]+)$/);
+  if (!match) throw new Error("Le fichier de sauvegarde doit être un JSON StockPilot valide.");
+  const content = Buffer.from(match[1], "base64").toString("utf8");
+  const payload = JSON.parse(content) as BackupPayload;
+  if (payload.schemaVersion !== 1 || payload.source !== "StockPilot" || !payload.tables || typeof payload.tables !== "object") {
+    throw new Error("La structure de la sauvegarde est invalide ou non prise en charge.");
+  }
+  return payload;
+}
+
+export async function restoreBackupPayload(payload: BackupPayload, actorUserId: number) {
+  const db = await dbOrThrow();
+  await db.transaction(async tx => {
+    for (const source of restoreDeleteOrder) await tx.delete(source.table);
+    for (const source of snapshotSources) {
+      const rows = payload.tables[source.name];
+      if (Array.isArray(rows) && rows.length > 0) await tx.insert(source.table).values(rows as any);
+    }
+  });
+  const restoredCount = Object.values(payload.tables).reduce((sum, rows) => sum + (Array.isArray(rows) ? rows.length : 0), 0);
+  await db.insert(auditLogs).values({ actorUserId, action: "Restauration", entityType: "Sauvegarde", entityId: null, detail: `Sauvegarde ${payload.exportedAt} restaurée (${restoredCount} enregistrements)` });
+  return { restoredCount };
+}

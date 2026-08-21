@@ -15,13 +15,15 @@ import Inventories from "./pages/Inventories";
 import Movements from "./pages/Movements";
 import PointOfSale from "./pages/PointOfSale";
 import Products from "./pages/Products";
-import SalesSettings from "./pages/SalesSettings";
 import Suppliers from "./pages/Suppliers";
 import AuditLog from "./pages/AuditLog";
 import SettingsIndex from "./pages/SettingsIndex";
 import SettingsAppearance from "./pages/SettingsAppearance";
 import SettingsCurrency from "./pages/SettingsCurrency";
 import SettingsIdentity from "./pages/SettingsIdentity";
+import Backups from "./pages/Backups";
+import SettingsPos from "./pages/SettingsPos";
+import SettingsHistory from "./pages/SettingsHistory";
 
 function Router() {
   return (
@@ -33,11 +35,13 @@ function Router() {
         <Route path={"/factures"} component={Invoices} />
         <Route path={"/inventaires"} component={Inventories} />
         <Route path={"/agents"} component={Agents} />
-        <Route path={"/parametres-ventes"} component={SalesSettings} />
         <Route path={"/parametres"} component={SettingsIndex} />
         <Route path={"/parametres/apparence"} component={SettingsAppearance} />
         <Route path={"/parametres/devise"} component={SettingsCurrency} />
         <Route path={"/parametres/identite"} component={SettingsIdentity} />
+        <Route path={"/parametres/pos"} component={SettingsPos} />
+        <Route path={"/parametres/historique"} component={SettingsHistory} />
+        <Route path={"/sauvegardes"} component={Backups} />
         <Route path={"/produits"} component={Products} />
         <Route path={"/mouvements"} component={Movements} />
         <Route path={"/fournisseurs"} component={Suppliers} />

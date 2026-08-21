@@ -34,6 +34,7 @@ import {
   ChevronDown,
   ClipboardList,
   ClipboardCheck,
+  DatabaseBackup,
   LayoutDashboard,
   LogOut,
   PackageSearch,
@@ -58,8 +59,8 @@ const menuItems = [
   { icon: ClipboardCheck, label: "Inventaires", path: "/inventaires" },
   { icon: Truck, label: "Fournisseurs", path: "/fournisseurs" },
   { icon: UsersRound, label: "Agents & paie", path: "/agents" },
-  { icon: Settings2, label: "Réglages vente", path: "/parametres-ventes" },
   { icon: SlidersHorizontal, label: "Paramètres", path: "/parametres" },
+  { icon: DatabaseBackup, label: "Sauvegardes", path: "/sauvegardes" },
   { icon: TriangleAlert, label: "Alertes", path: "/alertes" },
   { icon: ClipboardList, label: "Journal", path: "/journal" },
 ];

@@ -101,6 +101,9 @@ export const saleSettings = mysqlTable("saleSettings", {
   companyPhone: varchar("companyPhone", { length: 50 }),
   companyEmail: varchar("companyEmail", { length: 320 }),
   companyFooter: text("companyFooter"),
+  ticketHeader: varchar("ticketHeader", { length: 160 }).notNull().default("Merci de votre achat"),
+  ticketFooter: varchar("ticketFooter", { length: 240 }).notNull().default("À bientôt"),
+  ticketWidthMm: mysqlEnum("ticketWidthMm", ["58", "80"]).notNull().default("80"),
   updatedByUserId: int("updatedByUserId"),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -211,6 +214,41 @@ export const auditLogs = mysqlTable("auditLogs", {
   entityType: varchar("entityType", { length: 80 }).notNull(),
   entityId: varchar("entityId", { length: 80 }),
   detail: text("detail"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const backupSettings = mysqlTable("backupSettings", {
+  id: int("id").autoincrement().primaryKey(),
+  automaticEnabled: boolean("automaticEnabled").notNull().default(true),
+  frequencyHours: int("frequencyHours").notNull().default(24),
+  retentionCount: int("retentionCount").notNull().default(14),
+  scheduleCronTaskUid: varchar("scheduleCronTaskUid", { length: 65 }).unique(),
+  scheduleNextAt: timestamp("scheduleNextAt"),
+  googleDriveFolderId: varchar("googleDriveFolderId", { length: 180 }),
+  googleDriveAccessTokenEncrypted: text("googleDriveAccessTokenEncrypted"),
+  googleDriveRefreshTokenEncrypted: text("googleDriveRefreshTokenEncrypted"),
+  googleDriveTokenExpiresAt: timestamp("googleDriveTokenExpiresAt"),
+  googleDriveOauthState: varchar("googleDriveOauthState", { length: 120 }),
+  lastBackupAt: timestamp("lastBackupAt"),
+  lastBackupStatus: mysqlEnum("lastBackupStatus", ["idle", "success", "failed"]).notNull().default("idle"),
+  lastBackupError: text("lastBackupError"),
+  updatedByUserId: int("updatedByUserId"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const backupArchives = mysqlTable("backupArchives", {
+  id: int("id").autoincrement().primaryKey(),
+  filename: varchar("filename", { length: 220 }).notNull(),
+  trigger: mysqlEnum("trigger", ["manual", "scheduled"]).notNull(),
+  status: mysqlEnum("status", ["completed", "failed"]).notNull().default("completed"),
+  storageKey: text("storageKey"),
+  storageUrl: text("storageUrl"),
+  sizeBytes: int("sizeBytes").notNull().default(0),
+  recordCount: int("recordCount").notNull().default(0),
+  googleDriveFileId: varchar("googleDriveFileId", { length: 180 }),
+  googleDriveUrl: text("googleDriveUrl"),
+  createdByUserId: int("createdByUserId"),
+  error: text("error"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
