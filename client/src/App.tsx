@@ -6,9 +6,15 @@ import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Alerts from "./pages/Alerts";
+import Agents from "./pages/Agents";
+import Customers from "./pages/Customers";
 import Home from "./pages/Home";
+import Invoices from "./pages/Invoices";
+import Inventories from "./pages/Inventories";
 import Movements from "./pages/Movements";
+import PointOfSale from "./pages/PointOfSale";
 import Products from "./pages/Products";
+import SalesSettings from "./pages/SalesSettings";
 import Suppliers from "./pages/Suppliers";
 import AuditLog from "./pages/AuditLog";
 import UserManagement from "./pages/UserManagement";
@@ -18,6 +24,12 @@ function Router() {
     <DashboardLayout>
       <Switch>
         <Route path={"/"} component={Home} />
+        <Route path={"/pos"} component={PointOfSale} />
+        <Route path={"/clients"} component={Customers} />
+        <Route path={"/factures"} component={Invoices} />
+        <Route path={"/inventaires"} component={Inventories} />
+        <Route path={"/agents"} component={Agents} />
+        <Route path={"/parametres-ventes"} component={SalesSettings} />
         <Route path={"/produits"} component={Products} />
         <Route path={"/mouvements"} component={Movements} />
         <Route path={"/fournisseurs"} component={Suppliers} />

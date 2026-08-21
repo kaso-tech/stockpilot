@@ -30,9 +30,14 @@ import {
   Boxes,
   ChevronDown,
   ClipboardList,
+  ClipboardCheck,
   LayoutDashboard,
   LogOut,
   PackageSearch,
+  ReceiptText,
+  ShoppingCart,
+  UsersRound,
+  Settings2,
   ShieldCheck,
   Truck,
   TriangleAlert,
@@ -42,9 +47,14 @@ import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Vue d’ensemble", path: "/" },
+  { icon: ShoppingCart, label: "Point de vente", path: "/pos" },
+  { icon: ReceiptText, label: "Factures", path: "/factures" },
   { icon: PackageSearch, label: "Produits", path: "/produits" },
   { icon: ArrowLeftRight, label: "Mouvements", path: "/mouvements" },
+  { icon: ClipboardCheck, label: "Inventaires", path: "/inventaires" },
   { icon: Truck, label: "Fournisseurs", path: "/fournisseurs" },
+  { icon: UsersRound, label: "Agents & paie", path: "/agents" },
+  { icon: Settings2, label: "Réglages vente", path: "/parametres-ventes" },
   { icon: TriangleAlert, label: "Alertes", path: "/alertes" },
   { icon: ClipboardList, label: "Journal", path: "/journal" },
   { icon: ShieldCheck, label: "Utilisateurs", path: "/utilisateurs" },
@@ -95,7 +105,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const isMobile = useIsMobile();
   const visibleMenuItems = user?.role === "admin"
     ? menuItems
-    : menuItems.filter(item => item.path === "/" || item.path === "/mouvements");
+    : menuItems.filter(item => item.path === "/" || item.path === "/pos" || item.path === "/factures" || item.path === "/mouvements");
   const activeMenuItem = visibleMenuItems.find(item => item.path === location) ?? visibleMenuItems[0];
   const initials = (user?.name || user?.email || "U").slice(0, 2).toUpperCase();
 

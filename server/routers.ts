@@ -22,6 +22,9 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { COOKIE_NAME } from "@shared/const";
+import { commerceRouter } from "./routers/commerce";
+import { inventoryRouter } from "./routers/inventory";
+import { payrollRouter } from "./routers/payroll";
 
 const productInput = z.object({
   reference: z.string().trim().min(2).max(80),
@@ -29,6 +32,8 @@ const productInput = z.object({
   category: z.string().trim().min(2).max(100),
   unit: z.string().trim().min(1).max(30),
   purchasePriceCents: z.number().int().min(0),
+  retailPriceCents: z.number().int().min(0),
+  wholesalePriceCents: z.number().int().min(0),
   quantity: z.number().int().min(0),
   minimumQuantity: z.number().int().min(0),
   supplierId: z.number().int().positive().nullable(),
@@ -99,6 +104,9 @@ async function syncStockAlert(productId: number) {
 
 export const appRouter = router({
   system: systemRouter,
+  commerce: commerceRouter,
+  inventory: inventoryRouter,
+  payroll: payrollRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -244,13 +252,13 @@ export const appRouter = router({
 
   users: router({
     list: adminProcedure.query(() => listUsers()),
-    updateRole: adminProcedure.input(z.object({ id: z.number().int().positive(), role: z.enum(["admin", "user"]) })).mutation(async ({ ctx, input }) => {
+    updateRole: adminProcedure.input(z.object({ id: z.number().int().positive(), role: z.enum(["admin", "seller"]) })).mutation(async ({ ctx, input }) => {
       if (ctx.user.id === input.id && input.role !== "admin") {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Vous ne pouvez pas retirer votre propre rôle administrateur." });
       }
       const db = await requireDb();
       await db.update(users).set({ role: input.role }).where(and(eq(users.id, input.id)));
-      await createAudit(ctx.user.id, "Rôle modifié", "Utilisateur", input.id, `Rôle défini sur ${input.role === "admin" ? "administrateur" : "opérateur"}`);
+      await createAudit(ctx.user.id, "Rôle modifié", "Utilisateur", input.id, `Rôle défini sur ${input.role === "admin" ? "administrateur" : "vendeur"}`);
       return { success: true };
     }),
   }),

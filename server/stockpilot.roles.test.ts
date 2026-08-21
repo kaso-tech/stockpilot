@@ -10,7 +10,7 @@ function createOperatorContext(): TrpcContext {
       name: "Opérateur de test",
       email: "operator@example.test",
       loginMethod: "manus",
-      role: "user",
+      role: "seller",
       createdAt: new Date(),
       updatedAt: new Date(),
       lastSignedIn: new Date(),

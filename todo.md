@@ -16,3 +16,15 @@
 - [x] Afficher un historique détaillé des approvisionnements sur chaque fiche fournisseur.
 - [x] Ajouter des tests Vitest des règles métier de mouvement et d’alerte de stock.
 - [x] Afficher l’historique complet des approvisionnements par fournisseur, sans tronquer les entrées liées.
+- [x] Définir les rôles admin, vendeur, agent commercial et caissier avec leurs capacités d’authentification.
+- [x] Étendre les produits avec prix d’achat, prix de vente détail et prix de vente gros.
+- [x] Ajouter les clients ordinaires et grossistes avec application automatique de la grille tarifaire.
+- [x] Créer le point de vente, les ventes et les factures imprimables avec rattachement des agents.
+- [x] Créer les inventaires et les ajustements de stock issus du comptage.
+- [x] Ajouter les paramètres d’affectation par défaut des agents sur une vente.
+- [x] Créer les règles de rémunération fixe, commission sur chiffre d’affaires et commission sur bénéfice net.
+- [x] Créer le suivi des rémunérations dues et des paiements des agents.
+- [x] Étendre les tests métier aux prix, commissions, ventes et effets de stock.
+- [x] Calculer et afficher le solde de rémunération dû par bénéficiaire sur une période de paie explicite.
+- [x] Ajouter des tests couvrant les scénarios de vente et d’inventaire de bout en bout.
+- [x] Tester de bout en bout la validation d’un inventaire, l’ajustement du stock et le mouvement associé.
