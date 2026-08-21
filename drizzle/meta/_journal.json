@@ -1,5 +1,27 @@
 {
   "version": "7",
   "dialect": "mysql",
-  "entries": []
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1787331180095,
+      "tag": "0000_breezy_warbound",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1787331387384,
+      "tag": "0001_breezy_madame_web",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1787331463973,
+      "tag": "0002_adorable_argent",
+      "breakpoints": true
+    }
+  ]
 }

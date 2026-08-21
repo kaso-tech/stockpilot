@@ -1,0 +1,18 @@
+# Project TODO
+
+- [x] Définir le modèle de données pour les produits, fournisseurs, mouvements, alertes et journal d’audit.
+- [x] Mettre en place les procédures métier sécurisées et les contrôles de rôles admin/opérateur.
+- [x] Ajouter un modèle persistant d’alertes de stock avec statut, seuil et horodatage.
+- [x] Construire le tableau de bord sombre avec indicateurs, tendances, alertes et mouvements récents.
+- [x] Créer le catalogue de produits avec recherche, filtres et opérations d’ajout, modification et suppression.
+- [x] Créer la gestion des mouvements d’entrée, sortie et ajustement avec traçabilité.
+- [x] Créer la gestion des fournisseurs et leur historique d’approvisionnements.
+- [x] Afficher les alertes de seuil minimum et les notifications visuelles associées.
+- [x] Créer le journal horodaté des opérations et l’écran de gestion des utilisateurs.
+- [x] Garantir une interface responsive avec sidebar et navigation mobile.
+- [x] Écrire et exécuter des tests automatisés des règles métier.
+- [x] Vérifier le rendu desktop et mobile, puis corriger les défauts relevés.
+- [x] Ajouter des filtres métier au catalogue par catégorie, fournisseur et statut de seuil.
+- [x] Afficher un historique détaillé des approvisionnements sur chaque fiche fournisseur.
+- [x] Ajouter des tests Vitest des règles métier de mouvement et d’alerte de stock.
+- [x] Afficher l’historique complet des approvisionnements par fournisseur, sans tronquer les entrées liées.
