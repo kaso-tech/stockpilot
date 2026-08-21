@@ -68,3 +68,8 @@
 - [x] Vérifier le parcours Paramètres complet et la présence du logo configuré dans l’aperçu de facture.
 - [x] Vérifier l’upload via le formulaire Paramètres et la persistance réelle de l’identité sauvegardée jusqu’à la facture.
 - [x] Vérifier en intégration que le logo et les coordonnées sauvegardés sont relus par les procédures de réglages.
+- [x] Ajouter le stockage sécurisé d’une image de signature ou de cachet.
+- [x] Ajouter le chargement de signature ou cachet dans les paramètres d’entreprise.
+- [x] Afficher la signature ou le cachet sur le format d’impression A4 uniquement.
+- [x] Tester l’upload, la persistance et l’exclusion du ticket de caisse.
+- [x] Vérifier la relecture intégrée de la signature sauvegardée et son absence dans le ticket de caisse.

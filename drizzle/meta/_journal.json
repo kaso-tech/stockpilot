@@ -50,6 +50,13 @@
       "when": 1787345757560,
       "tag": "0006_tired_tarot",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1787346677955,
+      "tag": "0007_brave_invisible_woman",
+      "breakpoints": true
     }
   ]
 }

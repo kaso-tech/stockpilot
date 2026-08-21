@@ -15,7 +15,7 @@ describe("persistance de l’identité entreprise", () => {
   let stored: Record<string, unknown> | null;
   beforeEach(() => {
     stored = null;
-    vi.mocked(storagePut).mockResolvedValue({ key: "company/1/logo.png", url: "/manus-storage/company/1/logo.png" });
+    vi.mocked(storagePut).mockImplementation(async key => key.includes("signature") ? { key: "company/1/signature.png", url: "/manus-storage/company/1/signature.png" } : { key: "company/1/logo.png", url: "/manus-storage/company/1/logo.png" });
     const db: any = {
       select: () => ({ from: () => ({ limit: async () => stored ? [stored] : [] }) }),
       insert: (table: unknown) => ({ values: async (values: Record<string, unknown>) => { if (table === saleSettings) stored = { id: 1, ...values }; return [{ insertId: 1 }]; } }),
@@ -27,7 +27,8 @@ describe("persistance de l’identité entreprise", () => {
     const caller = commerceRouter.createCaller(adminContext());
     await caller.settings.save({ defaultSalesAgentId: null, defaultCashierId: null, requireSalesAgent: false, requireCashier: false, currency: "XOF", companyName: "Bati Pro", companyAddress: "Ouagadougou, Koulouba", companyPhone: "+226 70 00 00 00", companyEmail: "contact@batipro.test", companyFooter: "NIF : BF-TEST" });
     await caller.settings.uploadLogo({ dataUrl: "data:image/png;base64,iVBORw0KGgo=", filename: "logo.png" });
+    await caller.settings.uploadSignature({ dataUrl: "data:image/png;base64,iVBORw0KGgo=", filename: "signature.png" });
     const reloaded = await caller.settings.get();
-    expect(reloaded).toMatchObject({ companyName: "Bati Pro", companyAddress: "Ouagadougou, Koulouba", companyPhone: "+226 70 00 00 00", companyEmail: "contact@batipro.test", companyFooter: "NIF : BF-TEST", companyLogoUrl: "/manus-storage/company/1/logo.png" });
+    expect(reloaded).toMatchObject({ companyName: "Bati Pro", companyAddress: "Ouagadougou, Koulouba", companyPhone: "+226 70 00 00 00", companyEmail: "contact@batipro.test", companyFooter: "NIF : BF-TEST", companyLogoUrl: "/manus-storage/company/1/logo.png", companySignatureUrl: "/manus-storage/company/1/signature.png" });
   });
 });

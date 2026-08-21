@@ -40,4 +40,11 @@ describe("commerce.settings.save", () => {
     expect(storagePut).toHaveBeenCalledWith(expect.stringContaining("company/1/logo.png"), expect.any(Buffer), "image/png");
     expect(inserts.find(item => item.table === saleSettings)?.values).toMatchObject({ companyLogoUrl: "/manus-storage/company/logo.png", updatedByUserId: 1 });
   });
+  it("envoie et persiste une signature ou un cachet valide", async () => {
+    vi.mocked(storagePut).mockResolvedValue({ key: "company/signature.png", url: "/manus-storage/company/signature.png" });
+    const caller = commerceRouter.createCaller(adminContext());
+    await expect(caller.settings.uploadSignature({ dataUrl: "data:image/png;base64,iVBORw0KGgo=", filename: "cachet.png" })).resolves.toEqual({ url: "/manus-storage/company/signature.png" });
+    expect(storagePut).toHaveBeenCalledWith(expect.stringContaining("company/1/signature.png"), expect.any(Buffer), "image/png");
+    expect(inserts.find(item => item.table === saleSettings)?.values).toMatchObject({ companySignatureUrl: "/manus-storage/company/signature.png", updatedByUserId: 1 });
+  });
 });
