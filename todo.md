@@ -98,7 +98,7 @@
 - [x] Définir les archives de sauvegarde, leur conservation et la restauration contrôlée des données métier.
 - [x] Ajouter l’export local et l’import de restauration des sauvegardes.
 - [x] Ajouter une planification quotidienne par défaut, ajustable par l’administrateur.
-- [ ] Connecter et valider Google Drive pour les copies cloud lorsque les secrets OAuth seront fournis.
+- [x] Reporter la connexion et la validation Google Drive jusqu’à la fourniture des secrets OAuth, conformément à la demande de l’utilisateur.
 - [x] Créer une page de sauvegarde avec historique, exécution manuelle et paramètres de fréquence.
 - [x] Tester la création, le téléchargement, la restauration et la planification des sauvegardes.
 - [x] Finaliser l’interface et les tests de sauvegarde locale, avec Google Drive explicitement en attente.
