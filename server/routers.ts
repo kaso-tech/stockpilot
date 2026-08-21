@@ -3,7 +3,13 @@ import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import {
   auditLogs,
+  agentPayments,
+  customers,
+  inventorySessions,
   products,
+  remunerationProfiles,
+  saleCommissions,
+  sales,
   stockAlerts,
   stockMovements,
   suppliers,
@@ -118,12 +124,26 @@ export const appRouter = router({
 
   dashboard: router({
     get: protectedProcedure.query(async () => {
-      const [productRows, movements] = await Promise.all([listProducts(), listMovements(250)]);
+      const db = await requireDb();
+      const [productRows, movements, saleRows, customerRows, inventories, profiles, commissions, payments] = await Promise.all([listProducts(), listMovements(250), db.select().from(sales), db.select().from(customers), db.select().from(inventorySessions), db.select().from(remunerationProfiles), db.select().from(saleCommissions), db.select().from(agentPayments)]);
       const lowStock = productRows.filter(product => product.quantity <= product.minimumQuantity);
       const totalValueCents = productRows.reduce(
         (sum, product) => sum + product.quantity * product.purchasePriceCents,
         0,
       );
+      const today = new Date().toISOString().slice(0, 10);
+      const month = today.slice(0, 7);
+      const paidSales = saleRows.filter(sale => sale.status === "paid");
+      const monthlySales = paidSales.filter(sale => sale.createdAt.toISOString().slice(0, 7) === month);
+      const todaySales = paidSales.filter(sale => sale.createdAt.toISOString().slice(0, 10) === today);
+      const monthlyRevenueCents = monthlySales.reduce((sum, sale) => sum + sale.totalCents, 0);
+      const monthlyMarginCents = monthlySales.reduce((sum, sale) => sum + sale.netProfitCents, 0);
+      const duePayrollCents = profiles.reduce((sum, profile) => {
+        const commissionCents = commissions.filter(item => item.beneficiaryType === profile.beneficiaryType && item.beneficiaryId === profile.beneficiaryId && item.createdAt.toISOString().slice(0, 7) === month).reduce((total, item) => total + item.commissionCents, 0);
+        const fixedCents = profile.remunerationMode === "commission" ? 0 : profile.fixedMonthlyCents;
+        const paidCents = payments.filter(item => item.beneficiaryType === profile.beneficiaryType && item.beneficiaryId === profile.beneficiaryId && item.periodLabel === month).reduce((total, item) => total + item.amountCents, 0);
+        return sum + Math.max(0, fixedCents + commissionCents - paidCents);
+      }, 0);
       const dayKeys = Array.from({ length: 7 }, (_, index) => {
         const date = new Date();
         date.setDate(date.getDate() - (6 - index));
@@ -137,16 +157,27 @@ export const appRouter = router({
           exits: daily.filter(movement => movement.type === "exit").reduce((sum, movement) => sum + Math.abs(movement.quantity), 0),
         };
       });
+      const salesTrend = dayKeys.map(day => ({ day, revenueCents: paidSales.filter(sale => sale.createdAt.toISOString().slice(0, 10) === day).reduce((sum, sale) => sum + sale.totalCents, 0), invoices: paidSales.filter(sale => sale.createdAt.toISOString().slice(0, 10) === day).length }));
+      const customerMap = new Map(customerRows.map(customer => [customer.id, customer]));
       return {
         summary: {
           totalValueCents,
           productCount: productRows.length,
           activeAlerts: lowStock.length,
           movementCount: movements.length,
+          monthlyRevenueCents,
+          monthlyMarginCents,
+          monthlyInvoiceCount: monthlySales.length,
+          todayRevenueCents: todaySales.reduce((sum, sale) => sum + sale.totalCents, 0),
+          averageBasketCents: monthlySales.length ? Math.round(monthlyRevenueCents / monthlySales.length) : 0,
+          duePayrollCents,
+          draftInventories: inventories.filter(inventory => inventory.status === "draft").length,
         },
         lowStock: lowStock.slice(0, 6),
         recentMovements: movements.slice(0, 6),
         trend,
+        salesTrend,
+        recentSales: paidSales.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 5).map(sale => ({ id: sale.id, invoiceNumber: sale.invoiceNumber, totalCents: sale.totalCents, netProfitCents: sale.netProfitCents, createdAt: sale.createdAt, customerName: customerMap.get(sale.customerId)?.name ?? "Client", customerType: customerMap.get(sale.customerId)?.type ?? "ordinary" })),
       };
     }),
   }),

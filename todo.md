@@ -28,3 +28,6 @@
 - [x] Calculer et afficher le solde de rémunération dû par bénéficiaire sur une période de paie explicite.
 - [x] Ajouter des tests couvrant les scénarios de vente et d’inventaire de bout en bout.
 - [x] Tester de bout en bout la validation d’un inventaire, l’ajustement du stock et le mouvement associé.
+- [x] Définir et calculer les indicateurs de chiffre d’affaires, marge, factures, stock, inventaires et paie.
+- [x] Reconcevoir le tableau de bord en cockpit commercial avec priorités et actions rapides.
+- [x] Vérifier le rendu responsive du nouveau tableau de bord et les données agrégées.
