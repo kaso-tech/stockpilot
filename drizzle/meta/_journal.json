@@ -43,6 +43,13 @@
       "when": 1787341773556,
       "tag": "0005_huge_dark_phoenix",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1787345757560,
+      "tag": "0006_tired_tarot",
+      "breakpoints": true
     }
   ]
 }

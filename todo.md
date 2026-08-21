@@ -60,3 +60,11 @@
 - [x] Ajouter un choix de format d’impression A4 ou ticket de caisse.
 - [x] Construire une mise en page détaillée A4 et une mise en page compacte pour ticket.
 - [x] Tester les deux formats d’impression dans le navigateur.
+- [x] Ajouter les réglages de logo, raison sociale, adresse, téléphone, e-mail et mentions d’entreprise.
+- [x] Permettre à l’administrateur de modifier l’identité de l’entreprise depuis les paramètres.
+- [x] Afficher l’identité configurée sur les impressions A4 et ticket de caisse.
+- [x] Tester la sauvegarde et le rendu de l’identité entreprise sur les factures.
+- [x] Corriger la route de l’onglet Paramètres afin de rendre le formulaire d’identité accessible.
+- [x] Vérifier le parcours Paramètres complet et la présence du logo configuré dans l’aperçu de facture.
+- [x] Vérifier l’upload via le formulaire Paramètres et la persistance réelle de l’identité sauvegardée jusqu’à la facture.
+- [x] Vérifier en intégration que le logo et les coordonnées sauvegardés sont relus par les procédures de réglages.

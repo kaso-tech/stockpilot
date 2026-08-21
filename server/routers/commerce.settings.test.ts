@@ -3,8 +3,10 @@ import { auditLogs, saleSettings } from "../../drizzle/schema";
 import type { TrpcContext } from "../_core/context";
 
 vi.mock("../db", () => ({ getDb: vi.fn() }));
+vi.mock("../storage", () => ({ storagePut: vi.fn() }));
 
 import { getDb } from "../db";
+import { storagePut } from "../storage";
 import { commerceRouter } from "./commerce";
 
 const mockedGetDb = vi.mocked(getDb);
@@ -25,5 +27,17 @@ describe("commerce.settings.save", () => {
     await expect(caller.settings.save({ defaultSalesAgentId: null, defaultCashierId: null, requireSalesAgent: false, requireCashier: false, currency })).resolves.toEqual({ success: true });
     expect(inserts.find(item => item.table === saleSettings)?.values).toMatchObject({ currency, updatedByUserId: 1 });
     expect(inserts.find(item => item.table === auditLogs)?.values).toMatchObject({ action: "Paramètres mis à jour" });
+  });
+  it("enregistre l’identité de l’entreprise destinée aux factures", async () => {
+    const caller = commerceRouter.createCaller(adminContext());
+    await caller.settings.save({ defaultSalesAgentId: null, defaultCashierId: null, requireSalesAgent: false, requireCashier: false, currency: "XOF", companyName: "Bati Pro", companyLogoUrl: "/manus-storage/company/logo.png", companyAddress: "Ouagadougou, Koulouba", companyPhone: "+226 70 00 00 00", companyEmail: "contact@batipro.test", companyFooter: "NIF : BF-TEST" });
+    expect(inserts.find(item => item.table === saleSettings)?.values).toMatchObject({ companyName: "Bati Pro", companyLogoUrl: "/manus-storage/company/logo.png", companyAddress: "Ouagadougou, Koulouba", companyPhone: "+226 70 00 00 00", companyEmail: "contact@batipro.test", companyFooter: "NIF : BF-TEST" });
+  });
+  it("envoie et persiste un logo d’entreprise valide", async () => {
+    vi.mocked(storagePut).mockResolvedValue({ key: "company/logo.png", url: "/manus-storage/company/logo.png" });
+    const caller = commerceRouter.createCaller(adminContext());
+    await expect(caller.settings.uploadLogo({ dataUrl: "data:image/png;base64,iVBORw0KGgo=", filename: "logo.png" })).resolves.toEqual({ url: "/manus-storage/company/logo.png" });
+    expect(storagePut).toHaveBeenCalledWith(expect.stringContaining("company/1/logo.png"), expect.any(Buffer), "image/png");
+    expect(inserts.find(item => item.table === saleSettings)?.values).toMatchObject({ companyLogoUrl: "/manus-storage/company/logo.png", updatedByUserId: 1 });
   });
 });

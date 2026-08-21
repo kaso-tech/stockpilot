@@ -91,6 +91,12 @@ export const saleSettings = mysqlTable("saleSettings", {
   requireSalesAgent: boolean("requireSalesAgent").notNull().default(false),
   requireCashier: boolean("requireCashier").notNull().default(false),
   currency: mysqlEnum("currency", ["USD", "EUR", "XOF"]).notNull().default("XOF"),
+  companyName: varchar("companyName", { length: 200 }).notNull().default("StockPilot"),
+  companyLogoUrl: text("companyLogoUrl"),
+  companyAddress: text("companyAddress"),
+  companyPhone: varchar("companyPhone", { length: 50 }),
+  companyEmail: varchar("companyEmail", { length: 320 }),
+  companyFooter: text("companyFooter"),
   updatedByUserId: int("updatedByUserId"),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
