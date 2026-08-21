@@ -1,0 +1,1 @@
+ALTER TABLE `saleSettings` ADD `currency` enum('USD','EUR','XOF') DEFAULT 'XOF' NOT NULL;

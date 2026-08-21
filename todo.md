@@ -31,3 +31,12 @@
 - [x] Définir et calculer les indicateurs de chiffre d’affaires, marge, factures, stock, inventaires et paie.
 - [x] Reconcevoir le tableau de bord en cockpit commercial avec priorités et actions rapides.
 - [x] Vérifier le rendu responsive du nouveau tableau de bord et les données agrégées.
+- [x] Créer un onglet Paramètres accessible aux administrateurs.
+- [x] Ajouter les thèmes sombre et clair bleu à l’application.
+- [x] Ajouter une préférence de devise USD, EUR ou XOF et l’appliquer aux montants affichés.
+- [x] Tester la persistance et le rendu des préférences sur desktop et mobile.
+- [x] Vérifier le thème clair bleu et les devises USD, EUR et XOF dans l’interface après bascule.
+- [x] Vérifier la conservation du thème et de la devise après rechargement de l’application.
+- [x] Ajouter un test d’intégration du parcours Paramètres couvrant thème, USD, EUR, XOF et conservation après rechargement.
+- [x] Corriger et faire réussir le test navigateur du parcours Paramètres avec thème et devise persistants.
+- [x] Exécuter un parcours E2E utilisateur complet : clics sur thèmes et devises, sauvegarde puis rechargement avec montants mis à jour.

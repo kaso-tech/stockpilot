@@ -1,8 +1,10 @@
+let activeCurrency = (typeof window !== "undefined" ? localStorage.getItem("stockpilot_currency") : null) || "XOF";
+export function setActiveCurrency(currency: "USD" | "EUR" | "XOF") { activeCurrency = currency; }
 export function formatCurrency(cents: number) {
   return new Intl.NumberFormat("fr-FR", {
     style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 0,
+    currency: activeCurrency,
+    maximumFractionDigits: activeCurrency === "XOF" ? 0 : 2,
   }).format(cents / 100);
 }
 

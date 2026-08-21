@@ -1,0 +1,20 @@
+import { chromium } from "playwright";
+
+const expectedCurrency = process.env.STOCKPILOT_CURRENCY || "XOF";
+const browser = await chromium.launch({ headless: true, executablePath: "/usr/bin/chromium", args: ["--no-sandbox"] });
+const page = await browser.newPage();
+await page.route("**/api/trpc/**", route => route.abort());
+await page.goto("http://localhost:3000/parametres", { waitUntil: "domcontentloaded" });
+await page.evaluate(currency => { localStorage.setItem("theme", "light"); localStorage.setItem("stockpilot_currency", currency); }, expectedCurrency);
+await page.reload({ waitUntil: "domcontentloaded" });
+if (await page.locator("html").evaluate(node => node.classList.contains("dark"))) throw new Error("Le thème clair n’a pas été appliqué.");
+const storedAfterFirstReload = await page.evaluate(() => localStorage.getItem("stockpilot_currency"));
+if (storedAfterFirstReload !== expectedCurrency) throw new Error(`La devise ${expectedCurrency} n’est pas conservée (valeur obtenue : ${storedAfterFirstReload}).`);
+await page.reload({ waitUntil: "domcontentloaded" });
+if (await page.locator("html").evaluate(node => node.classList.contains("dark"))) throw new Error("Le thème clair n’est pas conservé après rechargement.");
+if (await page.evaluate(() => localStorage.getItem("stockpilot_currency")) !== expectedCurrency) throw new Error(`La devise ${expectedCurrency} n’est pas conservée après rechargement.`);
+await page.evaluate(() => localStorage.setItem("theme", "dark"));
+await page.reload({ waitUntil: "domcontentloaded" });
+if (!(await page.locator("html").evaluate(node => node.classList.contains("dark")))) throw new Error("Le thème sombre n’a pas été restauré.");
+await browser.close();
+console.log(`Préférences navigateur vérifiées : thème clair/sombre et devise ${expectedCurrency} persistants.`);

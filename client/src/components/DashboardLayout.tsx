@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/sidebar";
 import { startLogin } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
+import { usePreferences } from "@/contexts/PreferencesContext";
 import {
   ArrowLeftRight,
   Boxes,
@@ -38,6 +39,7 @@ import {
   ShoppingCart,
   UsersRound,
   Settings2,
+  SlidersHorizontal,
   ShieldCheck,
   Truck,
   TriangleAlert,
@@ -55,6 +57,7 @@ const menuItems = [
   { icon: Truck, label: "Fournisseurs", path: "/fournisseurs" },
   { icon: UsersRound, label: "Agents & paie", path: "/agents" },
   { icon: Settings2, label: "Réglages vente", path: "/parametres-ventes" },
+  { icon: SlidersHorizontal, label: "Paramètres", path: "/parametres" },
   { icon: TriangleAlert, label: "Alertes", path: "/alertes" },
   { icon: ClipboardList, label: "Journal", path: "/journal" },
   { icon: ShieldCheck, label: "Utilisateurs", path: "/utilisateurs" },
@@ -99,6 +102,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
 function DashboardShell({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
+  const { currency } = usePreferences();
   const [location, setLocation] = useLocation();
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
@@ -195,7 +199,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
             </div>
           </header>
         )}
-        <main className="min-h-screen bg-[radial-gradient(circle_at_80%_-5%,rgba(34,211,238,0.05),transparent_24%),linear-gradient(rgba(255,255,255,0.012)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.012)_1px,transparent_1px)] bg-[size:auto,44px_44px,44px_44px] p-4 sm:p-6 lg:p-8">{children}</main>
+        <main key={currency} className="min-h-screen bg-[radial-gradient(circle_at_80%_-5%,rgba(34,211,238,0.05),transparent_24%),linear-gradient(rgba(255,255,255,0.012)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.012)_1px,transparent_1px)] bg-[size:auto,44px_44px,44px_44px] p-4 sm:p-6 lg:p-8">{children}</main>
       </SidebarInset>
     </>
   );

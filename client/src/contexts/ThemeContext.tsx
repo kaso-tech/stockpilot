@@ -1,10 +1,12 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { readPreference, writePreference } from "@/lib/preferenceStorage";
 
 type Theme = "light" | "dark";
 
 interface ThemeContextType {
   theme: Theme;
   toggleTheme?: () => void;
+  setTheme: (theme: Theme) => void;
   switchable: boolean;
 }
 
@@ -21,10 +23,9 @@ export function ThemeProvider({
   defaultTheme = "light",
   switchable = false,
 }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(() => {
+  const [theme, setThemeState] = useState<Theme>(() => {
     if (switchable) {
-      const stored = localStorage.getItem("theme");
-      return (stored as Theme) || defaultTheme;
+      return readPreference(typeof window === "undefined" ? undefined : localStorage, "theme", ["light", "dark"], defaultTheme);
     }
     return defaultTheme;
   });
@@ -38,18 +39,18 @@ export function ThemeProvider({
     }
 
     if (switchable) {
-      localStorage.setItem("theme", theme);
+      writePreference(typeof window === "undefined" ? undefined : localStorage, "theme", theme);
     }
   }, [theme, switchable]);
 
   const toggleTheme = switchable
     ? () => {
-        setTheme(prev => (prev === "light" ? "dark" : "light"));
+        setThemeState(prev => (prev === "light" ? "dark" : "light"));
       }
     : undefined;
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme, switchable }}>
+    <ThemeContext.Provider value={{ theme, setTheme: setThemeState, toggleTheme, switchable }}>
       {children}
     </ThemeContext.Provider>
   );

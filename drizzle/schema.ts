@@ -80,6 +80,7 @@ export const saleSettings = mysqlTable("saleSettings", {
   defaultCashierId: int("defaultCashierId"),
   requireSalesAgent: boolean("requireSalesAgent").notNull().default(false),
   requireCashier: boolean("requireCashier").notNull().default(false),
+  currency: mysqlEnum("currency", ["USD", "EUR", "XOF"]).notNull().default("XOF"),
   updatedByUserId: int("updatedByUserId"),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

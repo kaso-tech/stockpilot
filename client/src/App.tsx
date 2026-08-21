@@ -5,6 +5,7 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { PreferencesProvider } from "./contexts/PreferencesContext";
 import Alerts from "./pages/Alerts";
 import Agents from "./pages/Agents";
 import Customers from "./pages/Customers";
@@ -18,6 +19,7 @@ import SalesSettings from "./pages/SalesSettings";
 import Suppliers from "./pages/Suppliers";
 import AuditLog from "./pages/AuditLog";
 import UserManagement from "./pages/UserManagement";
+import Settings from "./pages/Settings";
 
 function Router() {
   return (
@@ -30,6 +32,7 @@ function Router() {
         <Route path={"/inventaires"} component={Inventories} />
         <Route path={"/agents"} component={Agents} />
         <Route path={"/parametres-ventes"} component={SalesSettings} />
+        <Route path={"/parametres"} component={Settings} />
         <Route path={"/produits"} component={Products} />
         <Route path={"/mouvements"} component={Movements} />
         <Route path={"/fournisseurs"} component={Suppliers} />
@@ -51,12 +54,9 @@ function Router() {
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider
-        defaultTheme="dark"
-      >
+      <ThemeProvider defaultTheme="dark" switchable>
         <TooltipProvider>
-          <Toaster />
-          <Router />
+          <PreferencesProvider><Toaster /><Router /></PreferencesProvider>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>
