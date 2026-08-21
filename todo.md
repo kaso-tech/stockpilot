@@ -81,3 +81,8 @@
 - [x] Répartir les réglages Apparence, Devise et Identité dans des sous-onglets de la page Paramètres.
 - [x] Conserver les opérations d’enregistrement et de téléversement dans chaque sous-onglet.
 - [x] Vérifier la navigation responsive des sous-onglets Paramètres.
+- [x] Remplacer les sous-onglets horizontaux par des liens verticaux de catégories.
+- [x] Conserver le contenu et les actions de chaque catégorie dans la navigation verticale.
+- [x] Vérifier le comportement responsive des liens verticaux sur mobile et ordinateur.
+- [x] Vérifier visuellement les liens verticaux Paramètres sur mobile et corriger tout débordement éventuel.
+- [x] Actualiser le serveur puis reconfirmer l’absence d’erreur runtime et le rendu mobile des liens verticaux.
