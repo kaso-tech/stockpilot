@@ -18,6 +18,10 @@ await page.route("**/api/trpc/**", async route => {
   await route.fulfill({ contentType: "application/json", body: JSON.stringify(paths.map(path => ({ result: { data: { json: value(path) } } }))) });
 });
 await page.goto("http://localhost:3000/parametres", { waitUntil: "domcontentloaded" });
+await page.getByRole("tab", { name: "Devise" }).click();
+await page.getByText("Franc CFA", { exact: true }).waitFor();
+await page.getByRole("tab", { name: "Identité & impression" }).click();
+await page.getByText("Identité et impression", { exact: true }).waitFor();
 await page.locator('input[type="file"]').first().setInputFiles({ name: "batipro.svg", mimeType: "image/svg+xml", buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="#00bcd4"/></svg>') });
 await page.waitForFunction(() => document.body.textContent?.includes("Logo enregistré."));
 await page.locator('input[type="file"]').nth(1).setInputFiles({ name: "cachet.svg", mimeType: "image/svg+xml", buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="80" height="40"><text x="0" y="30">OK</text></svg>') });

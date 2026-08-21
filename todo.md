@@ -78,3 +78,6 @@
 - [x] Afficher la mention et l’alignement configuré uniquement sur les factures A4.
 - [x] Tester les réglages d’accord et d’alignement ainsi que l’exclusion du ticket.
 - [x] Appliquer visuellement l’alignement gauche, centre ou droite dans l’aperçu A4 de la facture.
+- [x] Répartir les réglages Apparence, Devise et Identité dans des sous-onglets de la page Paramètres.
+- [x] Conserver les opérations d’enregistrement et de téléversement dans chaque sous-onglet.
+- [x] Vérifier la navigation responsive des sous-onglets Paramètres.
