@@ -1,0 +1,2 @@
+ALTER TABLE `saleSettings` ADD `companyAgreementLabel` varchar(120) DEFAULT 'Bon pour accord' NOT NULL;--> statement-breakpoint
+ALTER TABLE `saleSettings` ADD `companySignatureAlignment` enum('left','center','right') DEFAULT 'right' NOT NULL;

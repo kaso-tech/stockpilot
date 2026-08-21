@@ -95,6 +95,8 @@ export const saleSettings = mysqlTable("saleSettings", {
   companyLogoUrl: text("companyLogoUrl"),
   companySignatureUrl: text("companySignatureUrl"),
   companySignatureLabel: varchar("companySignatureLabel", { length: 120 }).notNull().default("Signature & cachet"),
+  companyAgreementLabel: varchar("companyAgreementLabel", { length: 120 }).notNull().default("Bon pour accord"),
+  companySignatureAlignment: mysqlEnum("companySignatureAlignment", ["left", "center", "right"]).notNull().default("right"),
   companyAddress: text("companyAddress"),
   companyPhone: varchar("companyPhone", { length: 50 }),
   companyEmail: varchar("companyEmail", { length: 320 }),

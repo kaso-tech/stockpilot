@@ -30,8 +30,8 @@ describe("commerce.settings.save", () => {
   });
   it("enregistre l’identité de l’entreprise destinée aux factures", async () => {
     const caller = commerceRouter.createCaller(adminContext());
-    await caller.settings.save({ defaultSalesAgentId: null, defaultCashierId: null, requireSalesAgent: false, requireCashier: false, currency: "XOF", companyName: "Bati Pro", companyLogoUrl: "/manus-storage/company/logo.png", companyAddress: "Ouagadougou, Koulouba", companyPhone: "+226 70 00 00 00", companyEmail: "contact@batipro.test", companyFooter: "NIF : BF-TEST" });
-    expect(inserts.find(item => item.table === saleSettings)?.values).toMatchObject({ companyName: "Bati Pro", companyLogoUrl: "/manus-storage/company/logo.png", companyAddress: "Ouagadougou, Koulouba", companyPhone: "+226 70 00 00 00", companyEmail: "contact@batipro.test", companyFooter: "NIF : BF-TEST" });
+    await caller.settings.save({ defaultSalesAgentId: null, defaultCashierId: null, requireSalesAgent: false, requireCashier: false, currency: "XOF", companyName: "Bati Pro", companyLogoUrl: "/manus-storage/company/logo.png", companyAgreementLabel: "Bon pour accord signé", companySignatureAlignment: "center", companyAddress: "Ouagadougou, Koulouba", companyPhone: "+226 70 00 00 00", companyEmail: "contact@batipro.test", companyFooter: "NIF : BF-TEST" });
+    expect(inserts.find(item => item.table === saleSettings)?.values).toMatchObject({ companyName: "Bati Pro", companyLogoUrl: "/manus-storage/company/logo.png", companyAgreementLabel: "Bon pour accord signé", companySignatureAlignment: "center", companyAddress: "Ouagadougou, Koulouba", companyPhone: "+226 70 00 00 00", companyEmail: "contact@batipro.test", companyFooter: "NIF : BF-TEST" });
   });
   it("envoie et persiste un logo d’entreprise valide", async () => {
     vi.mocked(storagePut).mockResolvedValue({ key: "company/logo.png", url: "/manus-storage/company/logo.png" });

@@ -3,7 +3,7 @@ import { chromium } from "playwright";
 const admin = { id: 1, openId: "admin-invoice-e2e", name: "Admin", email: "admin@example.test", loginMethod: "manus", role: "admin", active: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), lastSignedIn: new Date().toISOString() };
 const sale = { id: 91, invoiceNumber: "FAC-TEST-00091", customerName: "Client test", customerType: "ordinary", sellerName: "Vendeur test", totalCents: 12500, createdAt: new Date().toISOString() };
 const detail = { sale: { ...sale, status: "paid", sellerUserId: 3, paymentMethod: "cash", subtotalCents: 12500 }, customer: { id: 5, name: "Client test", type: "ordinary" }, items: [{ id: 1, productName: "Article test", quantity: 2, unitPriceCents: 6250, lineTotalCents: 12500 }], commissions: [], participants: { seller: { id: 3, name: "Vendeur test", role: "Vendeur" }, salesAgent: { id: 4, name: "Agent test", role: "Agent commercial" }, cashier: { id: 5, name: "Caissier test", role: "Caissier" } } };
-const identity = { companyName: "Bati Pro", companyLogoUrl: null, companySignatureUrl: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4MCIgaGVpZ2h0PSI0MCI+PHRleHQgeD0iMCIgeT0iMzAiPk9LPC90ZXh0Pjwvc3ZnPg==", companySignatureLabel: "Signature approuvée", companyAddress: "Ouagadougou, Koulouba", companyPhone: "+226 70 00 00 00", companyEmail: "contact@batipro.test", companyFooter: "NIF : BF-TEST", currency: "XOF" };
+const identity = { companyName: "Bati Pro", companyLogoUrl: null, companySignatureUrl: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4MCIgaGVpZ2h0PSI0MCI+PHRleHQgeD0iMCIgeT0iMzAiPk9LPC90ZXh0Pjwvc3ZnPg==", companySignatureLabel: "Signature approuvée", companyAgreementLabel: "Bon pour accord signé", companySignatureAlignment: "center", companyAddress: "Ouagadougou, Koulouba", companyPhone: "+226 70 00 00 00", companyEmail: "contact@batipro.test", companyFooter: "NIF : BF-TEST", currency: "XOF" };
 const browser = await chromium.launch({ headless: true, executablePath: "/usr/bin/chromium", args: ["--no-sandbox"] });
 const context = await browser.newContext();
 await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: "http://localhost:3000" });
@@ -19,6 +19,8 @@ await page.locator("#invoice-print").getByText("Caissier test", { exact: true })
 await page.locator("#invoice-print").getByText("Bati Pro", { exact: true }).waitFor();
 await page.locator("#invoice-print").getByText("NIF : BF-TEST", { exact: true }).waitFor();
 await page.locator("#invoice-print").getByText("Signature approuvée", { exact: true }).waitFor();
+await page.locator("#invoice-print").getByText("Bon pour accord signé", { exact: true }).waitFor();
+if (await page.locator("#invoice-print .a4-signature").getAttribute("data-signature-align") !== "center") throw new Error("L’alignement centré de signature n’est pas appliqué.");
 if (await page.locator('#invoice-print img[alt="Signature ou cachet Bati Pro"]').count() !== 1) throw new Error("La signature n’est pas affichée dans l’aperçu A4.");
 await page.getByRole("button", { name: "Aperçu" }).click();
 await page.getByRole("heading", { name: "Aperçu de facture" }).waitFor();

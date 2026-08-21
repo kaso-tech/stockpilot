@@ -73,3 +73,8 @@
 - [x] Afficher la signature ou le cachet sur le format d’impression A4 uniquement.
 - [x] Tester l’upload, la persistance et l’exclusion du ticket de caisse.
 - [x] Vérifier la relecture intégrée de la signature sauvegardée et son absence dans le ticket de caisse.
+- [x] Ajouter un réglage d’affichage de la mention Bon pour accord sur facture A4.
+- [x] Ajouter un réglage d’alignement gauche, centre ou droite de la signature ou du cachet.
+- [x] Afficher la mention et l’alignement configuré uniquement sur les factures A4.
+- [x] Tester les réglages d’accord et d’alignement ainsi que l’exclusion du ticket.
+- [x] Appliquer visuellement l’alignement gauche, centre ou droite dans l’aperçu A4 de la facture.
