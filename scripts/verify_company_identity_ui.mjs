@@ -18,6 +18,11 @@ await page.route("**/api/trpc/**", async route => {
   await route.fulfill({ contentType: "application/json", body: JSON.stringify(paths.map(path => ({ result: { data: { json: value(path) } } }))) });
 });
 await page.goto("http://localhost:3000/parametres", { waitUntil: "domcontentloaded" });
+const settingsSearch = page.getByRole("textbox", { name: "Rechercher un paramètre" });
+await settingsSearch.fill("cachet");
+await page.getByRole("link", { name: "Identité & impression" }).waitFor();
+if (await page.getByRole("link", { name: "Devise" }).count() !== 0) throw new Error("La recherche ne filtre pas les rubriques de paramètres.");
+await settingsSearch.fill("");
 await page.getByRole("link", { name: "Devise" }).click();
 await page.getByText("Franc CFA", { exact: true }).waitFor();
 await page.getByRole("link", { name: "Identité & impression" }).click();

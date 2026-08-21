@@ -86,3 +86,6 @@
 - [x] Vérifier le comportement responsive des liens verticaux sur mobile et ordinateur.
 - [x] Vérifier visuellement les liens verticaux Paramètres sur mobile et corriger tout débordement éventuel.
 - [x] Actualiser le serveur puis reconfirmer l’absence d’erreur runtime et le rendu mobile des liens verticaux.
+- [x] Ajouter une barre de recherche au-dessus des liens verticaux de paramètres.
+- [x] Filtrer les rubriques et mots-clés de réglages, avec un état sans résultat utile.
+- [x] Tester la recherche de paramètres sur desktop et mobile.
