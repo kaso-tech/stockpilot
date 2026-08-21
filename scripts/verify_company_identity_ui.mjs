@@ -18,15 +18,13 @@ await page.route("**/api/trpc/**", async route => {
   await route.fulfill({ contentType: "application/json", body: JSON.stringify(paths.map(path => ({ result: { data: { json: value(path) } } }))) });
 });
 await page.goto("http://localhost:3000/parametres", { waitUntil: "domcontentloaded" });
-const settingsSearch = page.getByRole("textbox", { name: "Rechercher un paramètre" });
-await settingsSearch.fill("cachet");
 await page.getByRole("link", { name: "Identité & impression" }).waitFor();
-if (await page.getByRole("link", { name: "Devise" }).count() !== 0) throw new Error("La recherche ne filtre pas les rubriques de paramètres.");
-await settingsSearch.fill("");
 await page.getByRole("link", { name: "Devise" }).click();
 await page.getByText("Franc CFA", { exact: true }).waitFor();
+await page.getByRole("button", { name: "FCFA Franc CFA FCFA" }).waitFor();
+await page.goto("http://localhost:3000/parametres", { waitUntil: "domcontentloaded" });
 await page.getByRole("link", { name: "Identité & impression" }).click();
-await page.getByText("Identité et impression", { exact: true }).waitFor();
+await page.getByRole("heading", { name: "Identité & impression" }).waitFor();
 await page.locator('input[type="file"]').first().setInputFiles({ name: "batipro.svg", mimeType: "image/svg+xml", buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="#00bcd4"/></svg>') });
 await page.waitForFunction(() => document.body.textContent?.includes("Logo enregistré."));
 await page.locator('input[type="file"]').nth(1).setInputFiles({ name: "cachet.svg", mimeType: "image/svg+xml", buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="80" height="40"><text x="0" y="30">OK</text></svg>') });

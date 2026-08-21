@@ -89,3 +89,9 @@
 - [x] Ajouter une barre de recherche au-dessus des liens verticaux de paramètres.
 - [x] Filtrer les rubriques et mots-clés de réglages, avec un état sans résultat utile.
 - [x] Tester la recherche de paramètres sur desktop et mobile.
+- [x] Créer des pages dédiées pour Apparence, Devise et Identité & impression.
+- [x] Réduire la page Paramètres à un index de liens vers ces pages.
+- [x] Supprimer l’entrée Utilisateurs du menu et retirer ses routes et composants dépendants.
+- [x] Remplacer les libellés XOF par FCFA dans toute l’interface concernée.
+- [x] Vérifier les liens, la navigation mobile et l’absence de références Utilisateurs.
+- [x] Actualiser le serveur puis revalider les pages dédiées, FCFA et l’absence de références Utilisateurs.

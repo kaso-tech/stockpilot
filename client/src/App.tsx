@@ -18,8 +18,10 @@ import Products from "./pages/Products";
 import SalesSettings from "./pages/SalesSettings";
 import Suppliers from "./pages/Suppliers";
 import AuditLog from "./pages/AuditLog";
-import UserManagement from "./pages/UserManagement";
-import Settings from "./pages/Settings";
+import SettingsIndex from "./pages/SettingsIndex";
+import SettingsAppearance from "./pages/SettingsAppearance";
+import SettingsCurrency from "./pages/SettingsCurrency";
+import SettingsIdentity from "./pages/SettingsIdentity";
 
 function Router() {
   return (
@@ -32,13 +34,15 @@ function Router() {
         <Route path={"/inventaires"} component={Inventories} />
         <Route path={"/agents"} component={Agents} />
         <Route path={"/parametres-ventes"} component={SalesSettings} />
-        <Route path={"/parametres"} component={Settings} />
+        <Route path={"/parametres"} component={SettingsIndex} />
+        <Route path={"/parametres/apparence"} component={SettingsAppearance} />
+        <Route path={"/parametres/devise"} component={SettingsCurrency} />
+        <Route path={"/parametres/identite"} component={SettingsIdentity} />
         <Route path={"/produits"} component={Products} />
         <Route path={"/mouvements"} component={Movements} />
         <Route path={"/fournisseurs"} component={Suppliers} />
         <Route path={"/alertes"} component={Alerts} />
         <Route path={"/journal"} component={AuditLog} />
-        <Route path={"/utilisateurs"} component={UserManagement} />
         <Route path={"/404"} component={NotFound} />
         <Route component={NotFound} />
       </Switch>

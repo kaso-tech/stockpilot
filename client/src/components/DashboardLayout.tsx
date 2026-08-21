@@ -42,7 +42,6 @@ import {
   UsersRound,
   Settings2,
   SlidersHorizontal,
-  ShieldCheck,
   Truck,
   TriangleAlert,
 } from "lucide-react";
@@ -63,7 +62,6 @@ const menuItems = [
   { icon: SlidersHorizontal, label: "Paramètres", path: "/parametres" },
   { icon: TriangleAlert, label: "Alertes", path: "/alertes" },
   { icon: ClipboardList, label: "Journal", path: "/journal" },
-  { icon: ShieldCheck, label: "Utilisateurs", path: "/utilisateurs" },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
