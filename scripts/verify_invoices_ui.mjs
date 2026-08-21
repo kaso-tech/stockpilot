@@ -1,0 +1,25 @@
+import { chromium } from "playwright";
+
+const admin = { id: 1, openId: "admin-invoice-e2e", name: "Admin", email: "admin@example.test", loginMethod: "manus", role: "admin", active: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), lastSignedIn: new Date().toISOString() };
+const sale = { id: 91, invoiceNumber: "FAC-TEST-00091", customerName: "Client test", customerType: "ordinary", sellerName: "Vendeur test", totalCents: 12500, createdAt: new Date().toISOString() };
+const detail = { sale: { ...sale, status: "paid", sellerUserId: 3, paymentMethod: "cash", subtotalCents: 12500 }, customer: { id: 5, name: "Client test", type: "ordinary" }, items: [{ id: 1, productName: "Article test", quantity: 2, unitPriceCents: 6250, lineTotalCents: 12500 }], commissions: [], participants: { seller: { id: 3, name: "Vendeur test", role: "Vendeur" }, salesAgent: { id: 4, name: "Agent test", role: "Agent commercial" }, cashier: { id: 5, name: "Caissier test", role: "Caissier" } } };
+const browser = await chromium.launch({ headless: true, executablePath: "/usr/bin/chromium", args: ["--no-sandbox"] });
+const context = await browser.newContext();
+await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: "http://localhost:3000" });
+const page = await context.newPage();
+await page.addInitScript(() => { window.print = () => { document.body.dataset.invoicePrinted = "yes"; }; });
+await page.route("**/api/trpc/**", async route => { const paths = route.request().url().split("/api/trpc/")[1].split("?")[0].split(","); const value = path => path === "auth.me" ? admin : path === "commerce.sales.list" ? [sale] : path === "commerce.sales.detail" ? detail : []; await route.fulfill({ contentType: "application/json", body: JSON.stringify(paths.map(path => ({ result: { data: { json: value(path) } } }))) }); });
+await page.goto("http://localhost:3000/factures", { waitUntil: "domcontentloaded" });
+await page.getByText("FAC-TEST-00091", { exact: true }).click();
+await page.getByText("Article test", { exact: true }).waitFor();
+await page.locator("#invoice-print").getByText("Vendeur test", { exact: true }).waitFor();
+await page.locator("#invoice-print").getByText("Agent test", { exact: true }).waitFor();
+await page.locator("#invoice-print").getByText("Caissier test", { exact: true }).waitFor();
+await page.getByRole("button", { name: "Lien" }).click();
+if (!(await page.evaluate(() => navigator.clipboard.readText())).includes("facture=91")) throw new Error("Le lien de partage ne cible pas la facture sélectionnée.");
+await page.getByRole("button", { name: "Partager" }).click();
+if (!(await page.evaluate(() => navigator.clipboard.readText())).includes("facture=91")) throw new Error("Le partage ne propose pas le lien contrôlé.");
+await page.getByRole("button", { name: "Imprimer" }).click();
+if (await page.locator("body").evaluate(node => node.dataset.invoicePrinted) !== "yes") throw new Error("L’impression de facture n’a pas été déclenchée.");
+await browser.close();
+console.log("Parcours E2E Factures validé : aperçu, partage sécurisé et impression.");

@@ -189,3 +189,14 @@ html:not(.dark) main { background-color: #eff6ff !important; background-image: r
 html:not(.dark) .commercial-hero { background: linear-gradient(110deg, #d8f3fa, #ffffff) !important; border-color: rgba(0, 123, 139, .22) !important; }
 html:not(.dark) .commercial-hero .text-cyan-200, html:not(.dark) .commercial-hero .text-cyan-100 { color: #007b8b !important; }
 html:not(.dark) .commercial-hero .bg-black\/10 { background-color: rgba(255, 255, 255, .72) !important; border-color: rgba(0, 123, 139, .14) !important; }
+
+@media print {
+  body * { visibility: hidden !important; }
+  #invoice-print, #invoice-print * { visibility: visible !important; }
+  #invoice-print { position: absolute; inset: 0; width: 100%; padding: 28px; color: #111827 !important; background: #fff !important; }
+  #invoice-print .text-white, #invoice-print .text-slate-100, #invoice-print .text-slate-200 { color: #111827 !important; }
+  #invoice-print .text-slate-500, #invoice-print .text-slate-400 { color: #475569 !important; }
+  #invoice-print .text-cyan-200, #invoice-print .text-cyan-300 { color: #007b8b !important; }
+  #invoice-print .border-white\/\[0\.07\] { border-color: #dbe3ea !important; }
+  .no-print { display: none !important; }
+}

@@ -47,3 +47,10 @@
 - [x] Tester les règles de création, mise à jour et suppression des agents enrichis.
 - [x] Couvrir les mutations de création, mise à jour et désactivation des agents et vendeurs.
 - [x] Couvrir la connexion vendeur valide, le mot de passe invalide et la désactivation du compte.
+- [x] Ajouter un aperçu détaillé de facture avec lignes, client, agents et totaux.
+- [x] Ajouter un partage de facture avec lien contrôlé ou copie de lien.
+- [x] Ajouter une impression de facture avec une mise en page dédiée.
+- [x] Tester les actions d’aperçu, de partage et d’impression des factures.
+- [x] Renvoyer les noms et rôles du vendeur, agent commercial et caissier dans le détail de facture.
+- [x] Afficher les intervenants de vente clairement dans l’aperçu et l’impression de facture.
+- [x] Couvrir par test le détail de facture avec intervenants et total.
