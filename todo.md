@@ -40,3 +40,10 @@
 - [x] Ajouter un test d’intégration du parcours Paramètres couvrant thème, USD, EUR, XOF et conservation après rechargement.
 - [x] Corriger et faire réussir le test navigateur du parcours Paramètres avec thème et devise persistants.
 - [x] Exécuter un parcours E2E utilisateur complet : clics sur thèmes et devises, sauvegarde puis rechargement avec montants mis à jour.
+- [x] Permettre à l’administrateur de créer un agent de type vendeur avec identifiants de connexion.
+- [x] Configurer le salaire et les commissions directement à la création de tout agent.
+- [x] Ajouter la modification et la suppression sécurisée des agents et vendeurs.
+- [x] Rendre les champs de rémunération conditionnels au système sélectionné.
+- [x] Tester les règles de création, mise à jour et suppression des agents enrichis.
+- [x] Couvrir les mutations de création, mise à jour et désactivation des agents et vendeurs.
+- [x] Couvrir la connexion vendeur valide, le mot de passe invalide et la désactivation du compte.

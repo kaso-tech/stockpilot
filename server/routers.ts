@@ -10,6 +10,7 @@ import {
   remunerationProfiles,
   saleCommissions,
   sales,
+  sellerCredentials,
   stockAlerts,
   stockMovements,
   suppliers,
@@ -27,10 +28,12 @@ import { resultingStock, signedMovementQuantity } from "./stockRules";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { COOKIE_NAME } from "@shared/const";
+import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { commerceRouter } from "./routers/commerce";
 import { inventoryRouter } from "./routers/inventory";
 import { payrollRouter } from "./routers/payroll";
+import { sdk } from "./_core/sdk";
+import { verifyPassword } from "./passwords";
 
 const productInput = z.object({
   reference: z.string().trim().min(2).max(80),
@@ -118,6 +121,14 @@ export const appRouter = router({
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+      return { success: true } as const;
+    }),
+    localLogin: publicProcedure.input(z.object({ username: z.string().trim().min(3), password: z.string().min(1) })).mutation(async ({ ctx, input }) => {
+      const db = await requireDb();
+      const row = (await db.select({ openId: users.openId, name: users.name, active: users.active, passwordHash: sellerCredentials.passwordHash }).from(sellerCredentials).innerJoin(users, eq(sellerCredentials.userId, users.id)).where(eq(sellerCredentials.username, input.username)).limit(1))[0];
+      if (!row || !row.active || !(await verifyPassword(input.password, row.passwordHash))) throw new TRPCError({ code: "UNAUTHORIZED", message: "Identifiants vendeur incorrects." });
+      const token = await sdk.createSessionToken(row.openId, { name: row.name || input.username, expiresInMs: ONE_YEAR_MS });
+      ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: ONE_YEAR_MS });
       return { success: true } as const;
     }),
   }),

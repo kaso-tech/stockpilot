@@ -1,17 +1,21 @@
 import { TRPCError } from "@trpc/server";
 import { desc, eq, inArray } from "drizzle-orm";
+import { randomUUID } from "crypto";
 import { z } from "zod";
 import {
-  agents, auditLogs, customers, products, remunerationProfiles, saleCommissions,
+  agents, auditLogs, customers, products, remunerationProfiles, saleCommissions, sellerCredentials,
   saleItems, sales, saleSettings, stockAlerts, stockMovements, users,
 } from "../../drizzle/schema";
 import { commissionCents, priceForCustomer } from "../commerceRules";
 import { getDb } from "../db";
 import { adminProcedure, protectedProcedure, router } from "../_core/trpc";
 import { resultingStock, signedMovementQuantity } from "../stockRules";
+import { hashPassword } from "../passwords";
 
 const customerInput = z.object({ name: z.string().trim().min(2).max(180), type: z.enum(["ordinary", "wholesale"]), contactName: z.string().trim().max(160).nullable(), email: z.string().trim().email().max(320).nullable(), phone: z.string().trim().max(50).nullable(), address: z.string().trim().max(1000).nullable() });
 const agentInput = z.object({ name: z.string().trim().min(2).max(160), type: z.enum(["sales_agent", "cashier"]), email: z.string().trim().email().max(320).nullable(), phone: z.string().trim().max(50).nullable(), active: z.boolean() });
+const remunerationInput = z.object({ remunerationMode: z.enum(["fixed", "commission", "fixed_plus_commission"]), fixedMonthlyCents: z.number().int().min(0), commissionBasis: z.enum(["revenue", "net_profit"]), rateBasisPoints: z.number().int().min(0).max(10000), active: z.boolean() });
+const sellerInput = z.object({ name: z.string().trim().min(2).max(160), email: z.string().trim().email().max(320).nullable(), username: z.string().trim().min(3).max(80).regex(/^[a-zA-Z0-9._-]+$/), password: z.string().min(8).max(128), remuneration: remunerationInput });
 
 async function dbOrThrow() {
   const db = await getDb();
@@ -38,8 +42,15 @@ export const commerceRouter = router({
   }),
   agents: router({
     list: protectedProcedure.query(async () => (await dbOrThrow()).select().from(agents).orderBy(agents.name)),
-    create: adminProcedure.input(agentInput).mutation(async ({ ctx, input }) => { const db = await dbOrThrow(); const result = await db.insert(agents).values(input); const id = Number(result[0].insertId); await audit(ctx.user.id, "Création", "Agent", id, `Agent ${input.name} créé`); return { id }; }),
-    update: adminProcedure.input(agentInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await dbOrThrow(); const { id, ...data } = input; await db.update(agents).set(data).where(eq(agents.id, id)); await audit(ctx.user.id, "Modification", "Agent", id, `Agent ${data.name} modifié`); return { success: true }; }),
+    create: adminProcedure.input(agentInput.extend({ remuneration: remunerationInput })).mutation(async ({ ctx, input }) => { const db = await dbOrThrow(); const { remuneration, ...agentData } = input; const result = await db.insert(agents).values(agentData); const id = Number(result[0].insertId); await db.insert(remunerationProfiles).values({ beneficiaryType: "agent", beneficiaryId: id, ...remuneration }); await audit(ctx.user.id, "Création", "Agent", id, `Agent ${input.name} créé avec rémunération`); return { id }; }),
+    update: adminProcedure.input(agentInput.extend({ id: z.number().int().positive(), remuneration: remunerationInput })).mutation(async ({ ctx, input }) => { const db = await dbOrThrow(); const { id, remuneration, ...data } = input; await db.update(agents).set(data).where(eq(agents.id, id)); const profile = (await db.select().from(remunerationProfiles)).find(item => item.beneficiaryType === "agent" && item.beneficiaryId === id); if (profile) await db.update(remunerationProfiles).set(remuneration).where(eq(remunerationProfiles.id, profile.id)); else await db.insert(remunerationProfiles).values({ beneficiaryType: "agent", beneficiaryId: id, ...remuneration }); await audit(ctx.user.id, "Modification", "Agent", id, `Agent ${data.name} modifié`); return { success: true }; }),
+    remove: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await dbOrThrow(); await db.update(agents).set({ active: false }).where(eq(agents.id, input.id)); await audit(ctx.user.id, "Suppression", "Agent", input.id, "Agent désactivé et conservé dans l’historique"); return { success: true }; }),
+  }),
+  sellers: router({
+    list: adminProcedure.query(async () => { const db = await dbOrThrow(); return db.select({ id: users.id, name: users.name, email: users.email, active: users.active, username: sellerCredentials.username }).from(users).innerJoin(sellerCredentials, eq(sellerCredentials.userId, users.id)).where(eq(users.role, "seller")).orderBy(users.name); }),
+    create: adminProcedure.input(sellerInput).mutation(async ({ ctx, input }) => { const db = await dbOrThrow(); const openId = `local_seller_${randomUUID()}`; try { const result = await db.insert(users).values({ openId, name: input.name, email: input.email, loginMethod: "password", role: "seller", active: true }); const userId = Number(result[0].insertId); await db.insert(sellerCredentials).values({ userId, username: input.username, passwordHash: await hashPassword(input.password) }); await db.insert(remunerationProfiles).values({ beneficiaryType: "user", beneficiaryId: userId, ...input.remuneration }); await audit(ctx.user.id, "Création", "Vendeur", userId, `Vendeur ${input.name} créé avec identifiant ${input.username}`); return { id: userId }; } catch (error) { throw new TRPCError({ code: "CONFLICT", message: "Ce nom d’utilisateur est déjà utilisé.", cause: error }); } }),
+    update: adminProcedure.input(sellerInput.extend({ id: z.number().int().positive(), password: z.string().min(8).max(128).optional() })).mutation(async ({ ctx, input }) => { const db = await dbOrThrow(); const { id, username, password, remuneration, ...userData } = input; await db.update(users).set({ name: userData.name, email: userData.email }).where(eq(users.id, id)); const credential = (await db.select().from(sellerCredentials).where(eq(sellerCredentials.userId, id)).limit(1))[0]; if (!credential) throw new TRPCError({ code: "NOT_FOUND", message: "Identifiants vendeur introuvables." }); const credentialData: { username: string; passwordHash?: string } = { username }; if (password) credentialData.passwordHash = await hashPassword(password); await db.update(sellerCredentials).set(credentialData).where(eq(sellerCredentials.id, credential.id)); const profile = (await db.select().from(remunerationProfiles)).find(item => item.beneficiaryType === "user" && item.beneficiaryId === id); if (profile) await db.update(remunerationProfiles).set(remuneration).where(eq(remunerationProfiles.id, profile.id)); else await db.insert(remunerationProfiles).values({ beneficiaryType: "user", beneficiaryId: id, ...remuneration }); await audit(ctx.user.id, "Modification", "Vendeur", id, `Vendeur ${input.name} modifié`); return { success: true }; }),
+    remove: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { if (ctx.user.id === input.id) throw new TRPCError({ code: "BAD_REQUEST", message: "Vous ne pouvez pas désactiver votre propre compte." }); const db = await dbOrThrow(); await db.update(users).set({ active: false }).where(eq(users.id, input.id)); await audit(ctx.user.id, "Suppression", "Vendeur", input.id, "Vendeur désactivé et conservé dans l’historique"); return { success: true }; }),
   }),
   settings: router({
     get: protectedProcedure.query(async () => { const db = await dbOrThrow(); return (await db.select().from(saleSettings).limit(1))[0] ?? null; }),

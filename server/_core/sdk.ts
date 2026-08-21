@@ -311,6 +311,10 @@ class SDKServer {
       throw ForbiddenError("User not found");
     }
 
+    if (!user.active) {
+      throw ForbiddenError("User account is inactive");
+    }
+
     await db.upsertUser({
       openId: user.openId,
       lastSignedIn: signedInAt,

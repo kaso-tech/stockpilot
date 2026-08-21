@@ -2,6 +2,8 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { trpc } from "@/lib/trpc";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,6 +47,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { useLocation } from "wouter";
+import { useState } from "react";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 
 const menuItems = [
@@ -65,6 +68,9 @@ const menuItems = [
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { loading, user } = useAuth();
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const sellerLogin = trpc.auth.localLogin.useMutation({ onSuccess: () => window.location.reload() });
 
   if (loading) return <DashboardLayoutSkeleton />;
 
@@ -81,13 +87,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <p className="text-xs text-slate-400">Operations workspace</p>
             </div>
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">Accédez à votre espace stock</h1>
-          <p className="mt-3 text-sm leading-6 text-slate-400">
-            Connectez-vous pour piloter les niveaux de stock, les mouvements et les approvisionnements de votre organisation.
-          </p>
-          <Button onClick={() => startLogin()} className="mt-8 h-11 w-full bg-cyan-400 text-slate-950 hover:bg-cyan-300">
-            Se connecter
-          </Button>
+          <h1 className="text-2xl font-semibold tracking-tight">Accédez à votre espace commercial</h1>
+          <Button onClick={() => startLogin()} className="mt-6 h-11 w-full bg-cyan-400 text-slate-950 hover:bg-cyan-300">Connexion administrateur</Button>
+          <div className="my-6 flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500"><span className="h-px flex-1 bg-white/10" />ou vendeur<span className="h-px flex-1 bg-white/10" /></div>
+          <form onSubmit={event => { event.preventDefault(); sellerLogin.mutate({ username, password }); }} className="space-y-3"><Input value={username} onChange={event => setUsername(event.target.value)} placeholder="Nom d’utilisateur" autoComplete="username" className="border-white/10 bg-white/[0.04]" /><Input value={password} onChange={event => setPassword(event.target.value)} placeholder="Mot de passe" type="password" autoComplete="current-password" className="border-white/10 bg-white/[0.04]" /><Button type="submit" disabled={sellerLogin.isPending || !username || !password} variant="outline" className="h-10 w-full border-white/10 text-slate-200">{sellerLogin.isPending ? "Connexion…" : "Se connecter comme vendeur"}</Button>{sellerLogin.error && <p className="text-center text-xs text-rose-300">{sellerLogin.error.message}</p>}</form>
         </div>
       </div>
     );
