@@ -54,3 +54,6 @@
 - [x] Renvoyer les noms et rôles du vendeur, agent commercial et caissier dans le détail de facture.
 - [x] Afficher les intervenants de vente clairement dans l’aperçu et l’impression de facture.
 - [x] Couvrir par test le détail de facture avec intervenants et total.
+- [x] Corriger le déclenchement de l’impression de facture dans le navigateur.
+- [x] Remplacer la copie de lien par une ouverture d’aperçu de facture dédiée.
+- [x] Tester l’impression et l’ouverture de l’aperçu depuis le registre de factures.
