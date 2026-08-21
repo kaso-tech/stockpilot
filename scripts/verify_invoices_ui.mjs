@@ -7,7 +7,7 @@ const browser = await chromium.launch({ headless: true, executablePath: "/usr/bi
 const context = await browser.newContext();
 await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: "http://localhost:3000" });
 const page = await context.newPage();
-await page.addInitScript(() => { window.open = () => ({ document: { write: () => undefined, close: () => undefined }, focus: () => undefined, print: () => { document.body.dataset.invoicePrinted = "yes"; }, close: () => undefined }); });
+await page.addInitScript(() => { window.open = () => ({ document: { write: html => { document.body.dataset.printFormat = html.includes("80mm auto") ? "ticket" : "a4"; }, close: () => undefined }, focus: () => undefined, print: () => { document.body.dataset.invoicePrinted = "yes"; }, close: () => undefined }); });
 await page.route("**/api/trpc/**", async route => { const paths = route.request().url().split("/api/trpc/")[1].split("?")[0].split(","); const value = path => path === "auth.me" ? admin : path === "commerce.sales.list" ? [sale] : path === "commerce.sales.detail" ? detail : []; await route.fulfill({ contentType: "application/json", body: JSON.stringify(paths.map(path => ({ result: { data: { json: value(path) } } }))) }); });
 await page.goto("http://localhost:3000/factures", { waitUntil: "domcontentloaded" });
 await page.getByText("FAC-TEST-00091", { exact: true }).click();
@@ -21,7 +21,12 @@ await page.getByRole("dialog").getByText("Article test", { exact: true }).waitFo
 await page.keyboard.press("Escape");
 await page.getByRole("button", { name: "Partager" }).click();
 if (!(await page.evaluate(() => navigator.clipboard.readText())).includes("facture=91")) throw new Error("Le partage ne propose pas le lien contrôlé.");
-await page.getByRole("button", { name: "Imprimer" }).click();
+await page.getByRole("button", { name: "Imprimer A4" }).click();
 await page.waitForFunction(() => document.body.dataset.invoicePrinted === "yes");
+if (await page.locator("body").evaluate(node => node.dataset.printFormat) !== "a4") throw new Error("Le format A4 n’a pas été préparé pour l’impression.");
+await page.locator("body").evaluate(node => { delete node.dataset.invoicePrinted; });
+await page.getByRole("button", { name: "Ticket caisse" }).click();
+await page.waitForFunction(() => document.body.dataset.invoicePrinted === "yes");
+if (await page.locator("body").evaluate(node => node.dataset.printFormat) !== "ticket") throw new Error("Le format ticket n’a pas été préparé pour l’impression.");
 await browser.close();
 console.log("Parcours E2E Factures validé : aperçu, partage sécurisé et impression.");

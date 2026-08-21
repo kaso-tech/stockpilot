@@ -57,3 +57,6 @@
 - [x] Corriger le déclenchement de l’impression de facture dans le navigateur.
 - [x] Remplacer la copie de lien par une ouverture d’aperçu de facture dédiée.
 - [x] Tester l’impression et l’ouverture de l’aperçu depuis le registre de factures.
+- [x] Ajouter un choix de format d’impression A4 ou ticket de caisse.
+- [x] Construire une mise en page détaillée A4 et une mise en page compacte pour ticket.
+- [x] Tester les deux formats d’impression dans le navigateur.
