@@ -240,3 +240,7 @@
 - [x] Corriger la courbe Dynamique des ventes pour afficher la devise FCFA active.
 - [x] Ajouter des préférences pour afficher ou masquer les éléments du tableau de bord.
 - [x] Tester les validations facture, la devise et les préférences sur desktop et mobile.
+- [x] Préremplir dans l’encaissement les agents déjà sélectionnés à la création de facture, tout en autorisant leur modification.
+- [x] Enregistrer les préférences du tableau de bord par utilisateur authentifié.
+- [x] Ajouter une réinitialisation des sections et des vues préconfigurées adaptées aux rôles.
+- [x] Tester le préremplissage, les préférences personnelles et les rendus desktop/mobile.

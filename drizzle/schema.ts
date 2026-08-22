@@ -13,6 +13,13 @@ export const users = mysqlTable("users", {
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
 });
 
+export const userDashboardPreferences = mysqlTable("userDashboardPreferences", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique(),
+  preferencesJson: text("preferencesJson").notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 export const sellerCredentials = mysqlTable("sellerCredentials", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull().unique(),

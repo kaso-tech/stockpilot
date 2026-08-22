@@ -56,7 +56,7 @@ export const transactionsRouter = router({
   createDraft: protectedProcedure.input(z.object({ channel: z.enum(["pos", "invoice"]), customerId: z.number().int().positive().nullable(), note: z.string().trim().max(1000).nullable(), items: z.array(itemInput).min(1), invoiceDiscount: discountInput.default({ type: "none", value: 0 }) }).merge(agentSelection)).mutation(async ({ ctx, input }) => {
     if (input.channel === "invoice" && !input.customerId) throw new TRPCError({ code: "BAD_REQUEST", message: "Un client est obligatoire pour créer une facture." });
     const db = await dbOrThrow();
-    let created: { id: number; invoiceNumber: string; totalCents: number } | null = null;
+    let created: { id: number; invoiceNumber: string; totalCents: number; salesAgentId: number | null; cashierId: number | null } | null = null;
     await db.transaction(async tx => {
       const customer = input.customerId ? (await tx.select().from(customers).where(eq(customers.id, input.customerId)).limit(1))[0] : null;
       if (input.customerId && !customer) throw new TRPCError({ code: "NOT_FOUND", message: "Client introuvable." });
@@ -76,7 +76,7 @@ export const transactionsRouter = router({
       const saleId = Number(result[0].insertId);
       for (const line of lines) await tx.insert(saleItems).values({ saleId, productId: line.product.id, productName: line.product.name, productReference: line.product.reference, quantity: line.quantity, unitPriceCents: line.unitPriceCents, purchasePriceCents: line.product.purchasePriceCents, discountType: line.discount.type, discountValue: line.discount.value, discountCents: line.lineDiscountCents, lineSubtotalCents: line.lineSubtotalCents, lineTotalCents: line.lineTotalCents, lineCostCents: line.lineCostCents });
       await tx.insert(auditLogs).values({ actorUserId: ctx.user.id, action: "Document créé", entityType: input.channel === "pos" ? "Ticket POS" : "Facture", entityId: String(saleId), detail: `${number} enregistré en attente d’encaissement` });
-      created = { id: saleId, invoiceNumber: number, totalCents };
+      created = { id: saleId, invoiceNumber: number, totalCents, salesAgentId: assigned.salesAgentId, cashierId: assigned.cashierId };
     });
     return created!;
   }),

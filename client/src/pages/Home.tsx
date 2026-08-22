@@ -3,12 +3,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { readDashboardPreferences } from "@/lib/dashboardPreferences";
+import { dashboardPreferencesForRole, normalizeDashboardPreferences } from "@/lib/dashboardPreferences";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
 import { Activity, ArrowRight, BellRing, Boxes, CircleDollarSign, ClipboardCheck, PackagePlus, ReceiptText, ShoppingCart, Target, TrendingUp, WalletCards } from "lucide-react";
 import { Area, AreaChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 
 const tooltipStyle = { background: "#131a26", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", color: "#e2e8f0", fontSize: "12px" };
@@ -20,7 +20,10 @@ export default function Home() {
   const isAdmin = user?.role === "admin";
   const [, setLocation] = useLocation();
   const { data, isLoading } = trpc.dashboard.get.useQuery();
-  const [preferences] = useState(() => readDashboardPreferences());
+  const { data: savedPreferences } = trpc.dashboardPreferences.get.useQuery();
+  const role = user?.role === "seller" ? "seller" : "admin";
+  const [preferences, setPreferences] = useState(() => dashboardPreferencesForRole(role));
+  useEffect(() => { try { setPreferences(savedPreferences?.preferencesJson ? normalizeDashboardPreferences(JSON.parse(savedPreferences.preferencesJson), role) : dashboardPreferencesForRole(role)); } catch { setPreferences(dashboardPreferencesForRole(role)); } }, [savedPreferences?.preferencesJson, role]);
   const summary = data?.summary;
   const metrics = [
     { label: "Chiffre d’affaires", value: formatCurrency(summary?.monthlyRevenueCents ?? 0), detail: "Cumul sur le mois", icon: TrendingUp, tone: "cyan" },

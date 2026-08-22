@@ -18,6 +18,7 @@ import {
   stockAlerts,
   stockMovements,
   suppliers,
+  userDashboardPreferences,
   users,
 } from "../drizzle/schema";
 import {
@@ -144,6 +145,21 @@ export const appRouter = router({
       const token = await sdk.createSessionToken(row.openId, { name: row.name || input.username, expiresInMs: ONE_YEAR_MS });
       ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: ONE_YEAR_MS });
       return { success: true } as const;
+    }),
+  }),
+
+  dashboardPreferences: router({
+    get: protectedProcedure.query(async ({ ctx }) => {
+      const db = await requireDb();
+      const row = (await db.select().from(userDashboardPreferences).where(eq(userDashboardPreferences.userId, ctx.user.id)).limit(1))[0];
+      return { preferencesJson: row?.preferencesJson ?? null };
+    }),
+    save: protectedProcedure.input(z.object({ preferencesJson: z.string().min(2).max(2000) })).mutation(async ({ ctx, input }) => {
+      const db = await requireDb();
+      try { JSON.parse(input.preferencesJson); } catch { throw new TRPCError({ code: "BAD_REQUEST", message: "Préférences de tableau de bord invalides." }); }
+      const current = (await db.select().from(userDashboardPreferences).where(eq(userDashboardPreferences.userId, ctx.user.id)).limit(1))[0];
+      if (current) await db.update(userDashboardPreferences).set({ preferencesJson: input.preferencesJson }).where(eq(userDashboardPreferences.id, current.id)); else await db.insert(userDashboardPreferences).values({ userId: ctx.user.id, preferencesJson: input.preferencesJson });
+      return { success: true };
     }),
   }),
 
