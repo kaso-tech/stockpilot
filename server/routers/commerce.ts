@@ -12,6 +12,7 @@ import { adminProcedure, protectedProcedure, router } from "../_core/trpc";
 import { resultingStock, signedMovementQuantity } from "../stockRules";
 import { hashPassword } from "../passwords";
 import { storagePut } from "../storage";
+import { customerCanBeRemoved } from "../customerRules";
 
 const customerInput = z.object({ name: z.string().trim().min(2).max(180), type: z.enum(["ordinary", "wholesale"]), contactName: z.string().trim().max(160).nullable(), email: z.string().trim().email().max(320).nullable(), phone: z.string().trim().max(50).nullable(), address: z.string().trim().max(1000).nullable() });
 const agentInput = z.object({ name: z.string().trim().min(2).max(160), type: z.enum(["sales_agent", "cashier"]), email: z.string().trim().email().max(320).nullable(), phone: z.string().trim().max(50).nullable(), active: z.boolean() });
@@ -41,6 +42,7 @@ export const commerceRouter = router({
     list: protectedProcedure.query(async () => (await dbOrThrow()).select().from(customers).orderBy(customers.name)),
     create: adminProcedure.input(customerInput).mutation(async ({ ctx, input }) => { const db = await dbOrThrow(); const result = await db.insert(customers).values(input); const id = Number(result[0].insertId); await audit(ctx.user.id, "Création", "Client", id, `Client ${input.name} créé`); return { id }; }),
     update: adminProcedure.input(customerInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await dbOrThrow(); const { id, ...data } = input; await db.update(customers).set(data).where(eq(customers.id, id)); await audit(ctx.user.id, "Modification", "Client", id, `Client ${data.name} modifié`); return { success: true }; }),
+    remove: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await dbOrThrow(); const current = (await db.select().from(customers).where(eq(customers.id, input.id)).limit(1))[0]; if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Client introuvable." }); const invoices = await db.select({ id: sales.id }).from(sales).where(eq(sales.customerId, input.id)).limit(1); if (!customerCanBeRemoved(invoices.length)) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Ce client est lié à des factures et ne peut pas être supprimé." }); await db.delete(customers).where(eq(customers.id, input.id)); await audit(ctx.user.id, "Suppression", "Client", input.id, `Client ${current.name} supprimé`); return { success: true }; }),
   }),
   agents: router({
     list: protectedProcedure.query(async () => (await dbOrThrow()).select().from(agents).orderBy(agents.name)),

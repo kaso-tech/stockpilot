@@ -231,3 +231,6 @@
 - [x] Compacter les cartes de la liste des fournisseurs.
 - [x] Rendre les cartes fournisseurs cliquables et afficher leurs détails complets.
 - [x] Vérifier le panneau fournisseur et le rendu desktop/mobile.
+- [x] Ajouter la suppression sécurisée des clients sans compromettre l’historique commercial.
+- [x] Ajouter les actions créer, modifier et supprimer dans la liste des clients.
+- [x] Tester la gestion des clients, les autorisations et les rendus desktop/mobile.
