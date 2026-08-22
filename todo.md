@@ -331,3 +331,4 @@
 - [x] Tester l’application du format de prix et préparer l’archive actuelle du projet.
 - [x] Simplifier le catalogue en cartes de liste produit minimalistes et cliquables.
 - [x] Vérifier la densité et la lisibilité des cartes produit sur desktop et mobile.
+- [x] Aligner les filtres du catalogue Produits sur une ligne avec repli responsive sur mobile.
