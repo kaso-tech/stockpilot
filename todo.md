@@ -267,3 +267,5 @@
 - [x] Permettre d’activer indépendamment les paliers détail, grossiste ou les deux.
 - [x] Appliquer le palier approprié selon le type de client dans le POS et les factures.
 - [x] Tester les paliers séparés pour les clients détail et grossistes sur desktop et mobile.
+- [x] Ajouter un bouton pour dupliquer les paliers détail vers la section grossiste.
+- [x] Vérifier la duplication des paliers sur desktop et mobile.
