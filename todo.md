@@ -174,3 +174,5 @@
 - [x] Afficher un indicateur de stock faible dans les lignes du panier POS.
 - [x] Ajouter un raccourci clavier accessible pour ouvrir l’encaissement POS.
 - [x] Tester les nouveaux contrôles de panier sur desktop et mobile.
+- [x] Afficher un indicateur de stock faible dans la grille des produits du POS avant l’ajout au panier.
+- [x] Vérifier le rendu de l’indicateur de stock faible sur desktop et mobile.
