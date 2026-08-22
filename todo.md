@@ -364,3 +364,9 @@
 - [x] Déplacer les actions de la fiche bon de commande en bas de page.
 - [x] Afficher le retour vers le fournisseur uniquement après réception complète du bon.
 - [x] Vérifier la fiche bon de commande sur desktop et mobile.
+- [x] Auditer les données et composants existants de bon de commande.
+- [x] Créer une page professionnelle de liste de bons de commande avec filtres et cartes cliquables.
+- [x] Ajouter une création de bon de commande depuis cette page.
+- [x] Ajouter l’onglet Bons de commande au menu latéral et relier les détails.
+- [x] Tester le parcours bons de commande sur desktop et mobile.
+- [x] Ajouter une barre de recherche et des filtres par fournisseur et statut dans la liste des bons de commande.

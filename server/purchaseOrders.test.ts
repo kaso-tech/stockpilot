@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { auditLogs, products, purchaseOrderItems, purchaseOrders, stockMovements } from "../drizzle/schema";
+import { auditLogs, products, purchaseOrderItems, purchaseOrders, stockMovements, suppliers } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
 
 vi.mock("./db", () => ({ getDb: vi.fn() }));
@@ -23,6 +23,22 @@ describe("purchaseOrders.listBySupplier", () => {
     expect(result).toHaveLength(1);
     expect(result[0]).toMatchObject({ orderNumber: "BC-2026-001", totalCents: 54000 });
     expect(result[0]?.items).toMatchObject([{ productName: "Produit A", quantity: 6 }]);
+  });
+});
+
+describe("purchaseOrders.list", () => {
+  beforeEach(() => {
+    const orders = [{ id: 10, orderNumber: "BC-2026-002", supplierId: 4, status: "sent", totalCents: 72000, notes: null, createdAt: new Date("2026-08-23") }];
+    const items = [{ id: 2, purchaseOrderId: 10, productId: 13, productName: "Produit B", productReference: "SKU-B", unit: "pièce", quantity: 4, receivedQuantity: 1, purchasePriceCents: 18000, lineTotalCents: 72000 }];
+    const supplierRows = [{ id: 4, name: "Fournisseur B" }];
+    const rows = new Map<unknown, unknown[]>([[purchaseOrders, orders], [purchaseOrderItems, items], [suppliers, supplierRows]]);
+    const db: any = { select: () => ({ from: (table: unknown) => { const values = rows.get(table) ?? []; return { orderBy: async () => values, then: (resolve: (value: unknown[]) => unknown) => resolve([...values]) }; } }) };
+    mockedGetDb.mockResolvedValue(db);
+  });
+  it("retourne chaque bon avec son fournisseur et ses lignes", async () => {
+    const result = await appRouter.createCaller(context()).purchaseOrders.list();
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ orderNumber: "BC-2026-002", supplier: { name: "Fournisseur B" }, items: [{ productName: "Produit B", receivedQuantity: 1 }] });
   });
 });
 

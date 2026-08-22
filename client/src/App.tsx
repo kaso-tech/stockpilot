@@ -21,6 +21,7 @@ import ProductDetail from "./pages/ProductDetail";
 import Suppliers from "./pages/Suppliers";
 import SupplierDetail from "./pages/SupplierDetail";
 import PurchaseOrderDetail from "./pages/PurchaseOrderDetail";
+import PurchaseOrders from "./pages/PurchaseOrders";
 import AuditLog from "./pages/AuditLog";
 import SettingsIndex from "./pages/SettingsIndex";
 import SettingsAppearance from "./pages/SettingsAppearance";
@@ -61,6 +62,7 @@ function Router() {
         <Route path={"/categories"} component={Categories} />
         <Route path={"/unites"} component={Units} />
         <Route path={"/mouvements"} component={Movements} />
+        <Route path={"/bons-commande"} component={PurchaseOrders} />
         <Route path={"/bons-commande/:id"} component={PurchaseOrderDetail} />
         <Route path={"/fournisseurs/:id"} component={SupplierDetail} />
         <Route path={"/fournisseurs"} component={Suppliers} />

@@ -358,6 +358,19 @@ export const appRouter = router({
   }),
 
   purchaseOrders: router({
+    list: protectedProcedure.query(async () => {
+      const db = await requireDb();
+      const [orders, rows, supplierRows] = await Promise.all([
+        db.select().from(purchaseOrders).orderBy(desc(purchaseOrders.createdAt)),
+        db.select().from(purchaseOrderItems),
+        db.select().from(suppliers),
+      ]);
+      return orders.map(order => ({
+        ...order,
+        supplier: supplierRows.find(supplier => supplier.id === order.supplierId) ?? null,
+        items: rows.filter(item => item.purchaseOrderId === order.id),
+      }));
+    }),
     listBySupplier: protectedProcedure.input(z.object({ supplierId: z.number().int().positive() })).query(async ({ input }) => {
       const db = await requireDb();
       const orders = await db.select().from(purchaseOrders).where(eq(purchaseOrders.supplierId, input.supplierId)).orderBy(desc(purchaseOrders.createdAt));
