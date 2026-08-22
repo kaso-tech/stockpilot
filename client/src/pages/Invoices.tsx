@@ -126,7 +126,14 @@ export default function Invoices() {
         <Button onClick={() => setLocation("/factures/nouvelle")} className="bg-primary text-primary-foreground hover:bg-primary/90"><Plus className="mr-2 h-4 w-4" />Créer une facture</Button>
       </header>
 
-      <Card>
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {isLoading ? <Card className="md:col-span-2 xl:col-span-3"><CardContent className="py-12 text-center text-sm text-muted-foreground">Chargement…</CardContent></Card> : invoices.length ? invoices.map(invoice => {
+          const remaining = Math.max(0, invoice.totalCents - invoice.amountPaidCents);
+          return <button key={invoice.id} type="button" onClick={() => setLocation(`/factures/${invoice.id}`)} className="group flex min-w-0 flex-col gap-4 rounded-2xl border border-white/[0.07] bg-[#111722] p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary/45 hover:bg-[#141e2d]"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate font-semibold text-slate-100">{invoice.invoiceNumber}</p><p className="mt-1 text-xs text-slate-500">{formatDate(invoice.createdAt, true)}</p></div><StatusBadge status={invoice.status} /></div><div className="min-w-0"><p className="truncate text-sm text-slate-300">{invoice.customerName || "Client comptoir"}</p><p className="mt-1 text-xs text-slate-500">{remaining > 0 ? `Solde : ${formatCurrency(remaining)}` : "Règlement complet"}</p></div><div className="flex items-end justify-between gap-3 border-t border-white/[0.07] pt-3"><div><p className="text-xs text-slate-500">Total</p><p className="mt-1 font-semibold text-cyan-300">{formatCurrency(invoice.totalCents)}</p></div><Eye className="h-4 w-4 text-slate-600 transition group-hover:text-primary" /></div></button>;
+        }) : <Card className="md:col-span-2 xl:col-span-3"><CardContent className="py-16 text-center text-sm text-muted-foreground">Aucune facture créée.</CardContent></Card>}
+      </section>
+
+      <Card className="hidden">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-left text-sm">
@@ -165,18 +172,18 @@ export default function Invoices() {
   );
 }
 
-function StatusBadge({ status }: { status: Invoice["status"] }) {
+export function StatusBadge({ status }: { status: Invoice["status"] }) {
   const map = { paid: ["Payée", "bg-emerald-500/10 text-emerald-600"], partial: ["Partielle", "bg-amber-500/10 text-amber-600"], draft: ["À encaisser", "bg-slate-500/10 text-slate-500"], void: ["Remboursée / annulée", "bg-rose-500/10 text-rose-600"] } as const;
   return <Badge className={`border-0 ${map[status][1]}`}>{map[status][0]}</Badge>;
 }
 
-function InvoiceDocument({ detail, identity }: { detail: any; identity: any }) {
+export function InvoiceDocument({ detail, identity }: { detail: any; identity: any }) {
   const customer = detail.customer;
   const lineDiscounts = detail.items.reduce((sum: number, item: any) => sum + (item.discountCents || 0), 0);
   return <article><header className="row"><div><p className="muted">{identity?.companyName || "StockPilot"}</p><h2>Facture {detail.sale.invoiceNumber}</h2><p className="muted">{formatDate(detail.sale.createdAt, true)}</p></div><StatusBadge status={detail.sale.status} /></header><section className="line row"><div><p className="muted">Facturé à</p><p><b>{customer?.name || "Client comptoir"}</b></p>{detail.sale.deliveryAddress && <p className="muted">Livraison : {detail.sale.deliveryAddress}</p>}</div><div className="text-right"><p className="muted">Total encaissé</p><p><b>{formatCurrency(detail.sale.amountPaidCents || 0)} / {formatCurrency(detail.sale.totalCents)}</b></p></div></section><section className="line space-y-3">{detail.items.map((item: any) => <div className="row" key={item.id}><div><b>{item.productName}</b><p className="muted">{item.quantity} × {formatCurrency(item.unitPriceCents)}</p></div><b>{formatCurrency(item.lineTotalCents)}</b></div>)}</section><section className="line space-y-1">{lineDiscounts > 0 && <div className="row muted"><span>Remises lignes</span><span>-{formatCurrency(lineDiscounts)}</span></div>}<div className="row"><span>Total</span><b>{formatCurrency(detail.sale.totalCents)}</b></div></section><section className={`a4-only signature ${identity?.companySignatureAlignment || "right"}`}><p className="muted">{identity?.companyAgreementLabel || "Bon pour accord"}</p>{identity?.companySignatureUrl && <img src={identity.companySignatureUrl} alt="Signature ou cachet" />}</section></article>;
 }
 
-function createInvoicePdf(detail: any, identity: any) {
+export function createInvoicePdf(detail: any, identity: any) {
   const doc = new jsPDF({ unit: "pt", format: "a4" }); let y = 56;
   doc.setFontSize(20); doc.setTextColor(0, 123, 139); doc.text(identity?.companyName || "StockPilot", 44, y); y += 26;
   doc.setFontSize(13); doc.setTextColor(15, 23, 42); doc.text(`Facture ${detail.sale.invoiceNumber}`, 44, y); y += 18;
@@ -189,4 +196,4 @@ function createInvoicePdf(detail: any, identity: any) {
   y += 18; doc.setFontSize(12); doc.setTextColor(15, 23, 42); doc.text(`Total : ${formatCurrency(detail.sale.totalCents)}`, 552, y, { align: "right" });
   return new File([doc.output("blob")], `${detail.sale.invoiceNumber}.pdf`, { type: "application/pdf" });
 }
-function downloadFile(file: File) { const url = URL.createObjectURL(file); const link = document.createElement("a"); link.href = url; link.download = file.name; link.click(); URL.revokeObjectURL(url); }
+export function downloadFile(file: File) { const url = URL.createObjectURL(file); const link = document.createElement("a"); link.href = url; link.download = file.name; link.click(); URL.revokeObjectURL(url); }

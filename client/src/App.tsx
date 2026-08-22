@@ -14,6 +14,7 @@ import Customers from "./pages/Customers";
 import CustomerDetail from "./pages/CustomerDetail";
 import Home from "./pages/Home";
 import Invoices from "./pages/Invoices";
+import InvoiceDetail from "./pages/InvoiceDetail";
 import InvoiceCreate from "./pages/InvoiceCreate";
 import Inventories from "./pages/Inventories";
 import Movements from "./pages/Movements";
@@ -47,8 +48,9 @@ function Router() {
         <Route path={"/pos"} component={PointOfSale} />
         <Route path={"/clients/:id"} component={CustomerDetail} />
         <Route path={"/clients"} component={Customers} />
-        <Route path={"/factures"} component={Invoices} />
         <Route path={"/factures/nouvelle"} component={InvoiceCreate} />
+        <Route path={"/factures/:id"} component={InvoiceDetail} />
+        <Route path={"/factures"} component={Invoices} />
         <Route path={"/inventaires"} component={Inventories} />
         <Route path={"/agents/:beneficiaryType/:id"} component={AgentDetail} />
         <Route path={"/agents"} component={Agents} />

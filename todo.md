@@ -403,3 +403,7 @@
 - [x] Créer une fiche professionnelle d’agent avec historiques, commissions, statistiques et actions.
 - [x] Ajouter les contacts directs Appeler, Message, WhatsApp et E-mail depuis la fiche agent.
 - [x] Tester les parcours facture et agents sur desktop et mobile.
+- [x] Auditer le registre de factures, l’aperçu et les actions existantes.
+- [x] Créer une fiche professionnelle de facture avec détails, paiements, intervenants et actions.
+- [x] Transformer la liste des factures en cartes cliquables vers leur fiche dédiée.
+- [x] Tester les actions et la navigation de facture sur desktop et mobile.
