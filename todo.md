@@ -395,3 +395,5 @@
 - [x] Vérifier les bornes de stock et la saisie de quantité sur desktop et mobile.
 - [x] Afficher une alerte discrète lorsque la quantité de ligne atteint le stock disponible maximum.
 - [x] Vérifier l’alerte de stock maximum sur desktop et mobile.
+- [x] Ajouter un lien de fiche produit directement dans l’alerte de stock maximum.
+- [x] Vérifier l’ouverture de la fiche produit depuis l’alerte.
