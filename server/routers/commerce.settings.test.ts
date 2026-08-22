@@ -38,6 +38,11 @@ describe("commerce.settings.save", () => {
     await caller.settings.save({ defaultSalesAgentId: null, defaultCashierId: null, requireSalesAgent: true, requireCashier: false, currency: "XOF", ticketHeader: "Bienvenue chez Bati Pro", ticketFooter: "Merci et à bientôt", ticketWidthMm: "58" });
     expect(inserts.find(item => item.table === saleSettings)?.values).toMatchObject({ requireSalesAgent: true, ticketHeader: "Bienvenue chez Bati Pro", ticketFooter: "Merci et à bientôt", ticketWidthMm: "58" });
   });
+  it("enregistre l’activation indépendante des moyens de paiement", async () => {
+    const caller = commerceRouter.createCaller(adminContext());
+    await caller.settings.save({ defaultSalesAgentId: null, defaultCashierId: null, requireSalesAgent: false, requireCashier: false, currency: "XOF", paymentCashEnabled: true, paymentMobileMoneyEnabled: false, paymentCardEnabled: true, paymentBankTransferEnabled: false, paymentCreditEnabled: false });
+    expect(inserts.find(item => item.table === saleSettings)?.values).toMatchObject({ paymentCashEnabled: true, paymentMobileMoneyEnabled: false, paymentCardEnabled: true, paymentBankTransferEnabled: false, paymentCreditEnabled: false });
+  });
   it("envoie et persiste un logo d’entreprise valide", async () => {
     vi.mocked(storagePut).mockResolvedValue({ key: "company/logo.png", url: "/manus-storage/company/logo.png" });
     const caller = commerceRouter.createCaller(adminContext());

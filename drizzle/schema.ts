@@ -104,6 +104,11 @@ export const saleSettings = mysqlTable("saleSettings", {
   ticketHeader: varchar("ticketHeader", { length: 160 }).notNull().default("Merci de votre achat"),
   ticketFooter: varchar("ticketFooter", { length: 240 }).notNull().default("À bientôt"),
   ticketWidthMm: mysqlEnum("ticketWidthMm", ["58", "80"]).notNull().default("80"),
+  paymentCashEnabled: boolean("paymentCashEnabled").notNull().default(true),
+  paymentCardEnabled: boolean("paymentCardEnabled").notNull().default(true),
+  paymentMobileMoneyEnabled: boolean("paymentMobileMoneyEnabled").notNull().default(true),
+  paymentBankTransferEnabled: boolean("paymentBankTransferEnabled").notNull().default(true),
+  paymentCreditEnabled: boolean("paymentCreditEnabled").notNull().default(true),
   updatedByUserId: int("updatedByUserId"),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

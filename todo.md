@@ -143,3 +143,10 @@
 - [x] Vérifier les montants exacts des remises ligne, facture et total dans l’aperçu et l’impression A4.
 - [x] Relancer le parcours E2E mobile complet après les dernières améliorations de remises et d’impression.
 - [x] Vérifier sur mobile l’aperçu de facture avec les montants exacts des remises ligne et facture.
+- [ ] Refaire le panier POS en feuille montante mobile inspirée du modèle fourni, avec liste, quantités, total et action d’encaissement.
+- [x] Imposer le règlement intégral dans l’encaissement POS et conserver Intégral/Partiel uniquement pour les factures.
+- [x] Ne présélectionner aucun moyen de paiement dans les écrans d’encaissement.
+- [x] Auto-remplir le montant restant sur les moyens de paiement sélectionnés en règlement intégral, sans auto-remplissage partiel.
+- [x] Désactiver la validation lorsque la répartition intégrale ne correspond pas exactement au total à encaisser.
+- [x] Ajouter l’activation ou désactivation des moyens de paiement dans les réglages POS.
+- [ ] Tester les règlements POS et facture, la répartition automatique et les moyens de paiement désactivés sur desktop et mobile.
