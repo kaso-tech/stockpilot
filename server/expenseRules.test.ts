@@ -17,10 +17,10 @@ describe("expense rules", () => {
     expect(expenseBreakdownByCategory(rows, "2026-08")).toEqual([{ category: "rent", amountCents: 35_000 }, { category: "energy", amountCents: 8_000 }]);
   });
 
-  it("maps paid salaries and commissions to the salary expense category", () => {
+  it("isolate paid salaries and commissions in the agent-payments chart segment", () => {
     const rows = agentPaymentExpenseRows([{ amountCents: 18_000, paidAt: new Date("2026-08-15T12:00:00Z") }, { amountCents: 9_000, paidAt: new Date("2026-07-15T12:00:00Z") }]);
     expect(monthlyExpenseTotalCents(rows, "2026-08")).toBe(18_000);
-    expect(expenseBreakdownByCategory(rows, "2026-08")).toEqual([{ category: "salary", amountCents: 18_000 }]);
+    expect(expenseBreakdownByCategory(rows, "2026-08")).toEqual([{ category: "agent_payments", amountCents: 18_000 }]);
   });
 
   it("reports budget consumption, remaining amount and overrun", () => {

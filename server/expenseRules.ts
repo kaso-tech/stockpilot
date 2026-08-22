@@ -10,7 +10,7 @@ export function monthlyExpenseTotalCents(rows: Array<{ amountCents: number; spen
 }
 
 export function agentPaymentExpenseRows(rows: Array<{ amountCents: number; paidAt: Date }>) {
-  return rows.map(row => ({ category: "salary", amountCents: row.amountCents, spentAt: row.paidAt }));
+  return rows.map(row => ({ category: "agent_payments", amountCents: row.amountCents, spentAt: row.paidAt }));
 }
 
 export function expenseBreakdownByCategory(rows: Array<{ category: string; amountCents: number; spentAt: Date }>, yearMonth: string) {

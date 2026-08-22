@@ -234,3 +234,5 @@
 - [x] Ajouter la suppression sécurisée des clients sans compromettre l’historique commercial.
 - [x] Ajouter les actions créer, modifier et supprimer dans la liste des clients.
 - [x] Tester la gestion des clients, les autorisations et les rendus desktop/mobile.
+- [x] Inclure les paiements agents comme segment dédié dans le graphique de répartition des dépenses.
+- [x] Vérifier les montants, libellés et couleurs du graphique sur desktop et mobile.
