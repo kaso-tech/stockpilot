@@ -24,3 +24,17 @@ export function downloadCsv(filename: string, headers: string[], rows: Array<Arr
 }
 
 export async function readCsvFile(file: File) { if (!file.name.toLowerCase().endsWith(".csv")) throw new Error("Sélectionnez un fichier CSV."); return parseCsv(await file.text()); }
+
+export function parsePriceTiers(value: string | undefined) {
+  if (!value?.trim()) return [];
+  const seen = new Set<number>();
+  return value.split("|").map(part => {
+    const [threshold, price] = part.split(":").map(item => item.trim());
+    const minQuantity = Number(threshold);
+    const unitPriceCents = Math.round(Number(price.replace(",", ".")) * 100);
+    if (!Number.isInteger(minQuantity) || minQuantity < 2 || !Number.isFinite(unitPriceCents) || unitPriceCents < 0 || seen.has(minQuantity)) throw new Error("Paliers invalides : utilisez par exemple 5:115000|10:110000.");
+    seen.add(minQuantity); return { minQuantity, unitPriceCents };
+  }).sort((left, right) => left.minQuantity - right.minQuantity);
+}
+
+export function formatPriceTiers(tiers: Array<{ minQuantity: number; unitPriceCents: number }> | undefined) { return (tiers || []).map(tier => `${tier.minQuantity}:${tier.unitPriceCents / 100}`).join("|"); }

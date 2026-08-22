@@ -277,3 +277,7 @@
 - [x] Ajouter un centre d’export CSV pour les produits, fournisseurs et clients.
 - [x] Ajouter un import CSV validé des produits, fournisseurs et clients.
 - [x] Tester les formats CSV, les validations et les contrôles desktop/mobile.
+- [x] Importer les paliers détail et grossiste depuis le fichier CSV Produits.
+- [x] Ajouter le téléchargement de modèles CSV vides pour produits, fournisseurs et clients.
+- [x] Afficher un aperçu des données CSV et exiger une validation avant import.
+- [x] Tester les paliers CSV, les modèles et l’aperçu sur desktop et mobile.
