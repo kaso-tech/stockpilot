@@ -329,3 +329,5 @@
 - [x] Harmoniser le header et ses contrôles avec le thème sombre.
 - [x] Ajouter des réglages de séparateur de chiffres et d’arrondi pour les prix.
 - [x] Tester l’application du format de prix et préparer l’archive actuelle du projet.
+- [x] Simplifier le catalogue en cartes de liste produit minimalistes et cliquables.
+- [x] Vérifier la densité et la lisibilité des cartes produit sur desktop et mobile.
