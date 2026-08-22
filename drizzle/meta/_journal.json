@@ -204,6 +204,13 @@
       "when": 1787419998112,
       "tag": "0028_careless_tarantula",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "5",
+      "when": 1787429374725,
+      "tag": "0029_next_boomerang",
+      "breakpoints": true
     }
   ]
 }

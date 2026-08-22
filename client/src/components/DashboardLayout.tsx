@@ -134,7 +134,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     { icon: LayoutDashboard, label: "Mon tableau de bord", path: "/parametres/tableau-de-bord" },
   ];
   const visibleMenuItems = user?.role === "admin" ? menuItems : sellerMenuItems;
-  const activeMenuItem = visibleMenuItems.find(item => item.path === location || (item.path === "/produits" && location.startsWith("/produits/"))) ?? visibleMenuItems[0];
+  const activeMenuItem = visibleMenuItems.find(item => item.path === location || (item.path === "/produits" && location.startsWith("/produits/")) || (item.path === "/fournisseurs" && location.startsWith("/fournisseurs/"))) ?? visibleMenuItems[0];
   const initials = (user?.name || user?.email || "U").slice(0, 2).toUpperCase();
   const isAdmin = user?.role === "admin";
   const canRunBackup = Boolean(user);

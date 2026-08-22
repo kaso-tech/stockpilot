@@ -13,6 +13,8 @@ import {
   products,
   productPriceTiers,
   remunerationProfiles,
+  purchaseOrderItems,
+  purchaseOrders,
   saleCommissions,
   saleItems,
   saleSettings,
@@ -340,6 +342,53 @@ export const appRouter = router({
       await db.update(suppliers).set(values).where(eq(suppliers.id, id));
       await createAudit(ctx.user.id, "Modification", "Fournisseur", id, `Fournisseur ${values.name} modifié`);
       return { success: true };
+    }),
+    remove: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      const db = await requireDb();
+      const supplier = (await db.select().from(suppliers).where(eq(suppliers.id, input.id)).limit(1))[0];
+      if (!supplier) throw new TRPCError({ code: "NOT_FOUND", message: "Fournisseur introuvable." });
+      const linkedProduct = await db.select({ id: products.id }).from(products).where(eq(products.supplierId, input.id)).limit(1);
+      if (linkedProduct.length) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Ce fournisseur est rattaché à des produits. Détachez-les avant suppression." });
+      const linkedOrder = await db.select({ id: purchaseOrders.id }).from(purchaseOrders).where(eq(purchaseOrders.supplierId, input.id)).limit(1);
+      if (linkedOrder.length) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Ce fournisseur possède un historique de bons de commande et ne peut pas être supprimé." });
+      await db.delete(suppliers).where(eq(suppliers.id, input.id));
+      await createAudit(ctx.user.id, "Suppression", "Fournisseur", input.id, `Fournisseur ${supplier.name} supprimé`);
+      return { success: true };
+    }),
+  }),
+
+  purchaseOrders: router({
+    listBySupplier: protectedProcedure.input(z.object({ supplierId: z.number().int().positive() })).query(async ({ input }) => {
+      const db = await requireDb();
+      const orders = await db.select().from(purchaseOrders).where(eq(purchaseOrders.supplierId, input.supplierId)).orderBy(desc(purchaseOrders.createdAt));
+      if (!orders.length) return [];
+      const rows = await db.select().from(purchaseOrderItems);
+      return orders.map(order => ({ ...order, items: rows.filter(item => item.purchaseOrderId === order.id) }));
+    }),
+    create: adminProcedure.input(z.object({
+      supplierId: z.number().int().positive(),
+      notes: z.string().trim().max(2000).nullable().optional(),
+      items: z.array(z.object({ productId: z.number().int().positive(), quantity: z.number().int().positive() })).min(1).max(100),
+    })).mutation(async ({ ctx, input }) => {
+      const db = await requireDb();
+      const supplier = (await db.select().from(suppliers).where(eq(suppliers.id, input.supplierId)).limit(1))[0];
+      if (!supplier) throw new TRPCError({ code: "NOT_FOUND", message: "Fournisseur introuvable." });
+      const catalog = await db.select().from(products);
+      const selected = input.items.map(item => {
+        const product = catalog.find(value => value.id === item.productId);
+        if (!product || product.supplierId !== input.supplierId) throw new TRPCError({ code: "BAD_REQUEST", message: "Chaque produit doit être rattaché à ce fournisseur." });
+        return { product, quantity: item.quantity, lineTotalCents: item.quantity * product.purchasePriceCents };
+      });
+      const totalCents = selected.reduce((sum, item) => sum + item.lineTotalCents, 0);
+      const orderNumber = `BC-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+      const orderId = await db.transaction(async tx => {
+        const result = await tx.insert(purchaseOrders).values({ orderNumber, supplierId: input.supplierId, totalCents, notes: input.notes ?? null, createdByUserId: ctx.user.id });
+        const id = Number(result[0].insertId);
+        await tx.insert(purchaseOrderItems).values(selected.map(item => ({ purchaseOrderId: id, productId: item.product.id, productName: item.product.name, productReference: item.product.reference, unit: item.product.unit, quantity: item.quantity, purchasePriceCents: item.product.purchasePriceCents, lineTotalCents: item.lineTotalCents })));
+        return id;
+      });
+      await createAudit(ctx.user.id, "Création", "Bon de commande", orderId, `Bon ${orderNumber} créé pour ${supplier.name}`);
+      return { id: orderId, orderNumber, totalCents };
     }),
   }),
 

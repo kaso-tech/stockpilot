@@ -43,6 +43,31 @@ export const suppliers = mysqlTable("suppliers", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+export const purchaseOrders = mysqlTable("purchaseOrders", {
+  id: int("id").autoincrement().primaryKey(),
+  orderNumber: varchar("orderNumber", { length: 60 }).notNull().unique(),
+  supplierId: int("supplierId").notNull(),
+  status: mysqlEnum("status", ["draft", "sent", "received", "cancelled"]).notNull().default("draft"),
+  totalCents: int("totalCents").notNull().default(0),
+  notes: text("notes"),
+  createdByUserId: int("createdByUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const purchaseOrderItems = mysqlTable("purchaseOrderItems", {
+  id: int("id").autoincrement().primaryKey(),
+  purchaseOrderId: int("purchaseOrderId").notNull(),
+  productId: int("productId").notNull(),
+  productName: varchar("productName", { length: 200 }).notNull(),
+  productReference: varchar("productReference", { length: 80 }).notNull(),
+  unit: varchar("unit", { length: 30 }).notNull(),
+  quantity: int("quantity").notNull(),
+  purchasePriceCents: int("purchasePriceCents").notNull(),
+  lineTotalCents: int("lineTotalCents").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
 export const products = mysqlTable("products", {
   id: int("id").autoincrement().primaryKey(),
   reference: varchar("reference", { length: 80 }).notNull().unique(),

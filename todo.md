@@ -337,3 +337,8 @@
 - [x] Corriger l’aperçu de format des prix pour qu’il suive exactement les réglages sélectionnés.
 - [x] Placer la recherche du catalogue au-dessus des filtres de tri.
 - [x] Donner aux filtres de tri des largeurs égales et stables sur leur ligne responsive.
+- [x] Auditer la fiche fournisseur actuelle, les produits associés et l’historique de commandes.
+- [x] Remplacer la fenêtre fournisseur par une page professionnelle dédiée avec actions Modifier et Supprimer.
+- [x] Ajouter les boutons Appeler, Message, WhatsApp et Mail selon les coordonnées disponibles.
+- [x] Afficher les produits liés, leur sélection et la création directe d’un bon de commande.
+- [x] Tester le parcours fournisseur sur desktop et mobile.

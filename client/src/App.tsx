@@ -19,6 +19,7 @@ import PointOfSale from "./pages/PointOfSale";
 import Products from "./pages/Products";
 import ProductDetail from "./pages/ProductDetail";
 import Suppliers from "./pages/Suppliers";
+import SupplierDetail from "./pages/SupplierDetail";
 import AuditLog from "./pages/AuditLog";
 import SettingsIndex from "./pages/SettingsIndex";
 import SettingsAppearance from "./pages/SettingsAppearance";
@@ -59,6 +60,7 @@ function Router() {
         <Route path={"/categories"} component={Categories} />
         <Route path={"/unites"} component={Units} />
         <Route path={"/mouvements"} component={Movements} />
+        <Route path={"/fournisseurs/:id"} component={SupplierDetail} />
         <Route path={"/fournisseurs"} component={Suppliers} />
         <Route path={"/alertes"} component={Alerts} />
         <Route path={"/journal"} component={AuditLog} />
