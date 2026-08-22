@@ -9,6 +9,10 @@ export function monthlyExpenseTotalCents(rows: Array<{ amountCents: number; spen
   return expenseTotalCents(rows.filter(row => row.spentAt.toISOString().slice(0, 7) === yearMonth));
 }
 
+export function agentPaymentExpenseRows(rows: Array<{ amountCents: number; paidAt: Date }>) {
+  return rows.map(row => ({ category: "salary", amountCents: row.amountCents, spentAt: row.paidAt }));
+}
+
 export function expenseBreakdownByCategory(rows: Array<{ category: string; amountCents: number; spentAt: Date }>, yearMonth: string) {
   const totals = new Map<string, number>();
   for (const row of rows) {

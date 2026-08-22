@@ -213,3 +213,7 @@
 - [x] Appliquer un fond blanc au header avec des contrôles à contraste élevé.
 - [x] Afficher un compteur de notifications rouge ou orange visible et accessible.
 - [x] Vérifier le header sur desktop et mobile.
+- [x] Intégrer les paiements de salaires et de commissions des agents aux dépenses mensuelles.
+- [x] Inclure les paiements agents dans le bénéfice net, le budget et les rapports par catégorie.
+- [x] Identifier clairement les dépenses d’agents dans le tableau de bord et les rapports.
+- [x] Tester les agrégats de paiements agents sur desktop et mobile.

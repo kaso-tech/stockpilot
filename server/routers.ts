@@ -37,7 +37,7 @@ import { payrollRouter } from "./routers/payroll";
 import { backupRouter } from "./routers/backups";
 import { transactionsRouter } from "./routers/transactions";
 import { expensesRouter } from "./routers/expenses";
-import { budgetComparison, expenseBreakdownByCategory, monthlyExpenseTotalCents, operatingNetProfitCents } from "./expenseRules";
+import { agentPaymentExpenseRows, budgetComparison, expenseBreakdownByCategory, monthlyExpenseTotalCents, operatingNetProfitCents } from "./expenseRules";
 import { sdk } from "./_core/sdk";
 import { verifyPassword } from "./passwords";
 
@@ -158,7 +158,10 @@ export const appRouter = router({
       const todaySales = paidSales.filter(sale => sale.createdAt.toISOString().slice(0, 10) === today);
       const monthlyRevenueCents = monthlySales.reduce((sum, sale) => sum + sale.totalCents, 0);
       const monthlyMarginCents = monthlySales.reduce((sum, sale) => sum + sale.netProfitCents, 0);
-      const monthlyExpenseCents = monthlyExpenseTotalCents(expenseRows, month);
+      const agentExpenseRows = agentPaymentExpenseRows(payments);
+      const monthlyManualExpenseCents = monthlyExpenseTotalCents(expenseRows, month);
+      const monthlyAgentPaymentCents = monthlyExpenseTotalCents(agentExpenseRows, month);
+      const monthlyExpenseCents = monthlyManualExpenseCents + monthlyAgentPaymentCents;
       const monthlyOperatingProfitCents = operatingNetProfitCents(monthlyMarginCents, monthlyExpenseCents);
       const currentBudget = budgetRows.find(budget => budget.yearMonth === month);
       const expenseBudget = budgetComparison(currentBudget?.amountCents ?? null, monthlyExpenseCents, currentBudget?.warningPercent ?? 80);
@@ -193,7 +196,9 @@ export const appRouter = router({
           monthlyMarginCents,
           monthlyExpenseCents,
           monthlyOperatingProfitCents,
-          expenseBreakdown: expenseBreakdownByCategory(expenseRows, month),
+          expenseBreakdown: expenseBreakdownByCategory([...expenseRows, ...agentExpenseRows], month),
+          monthlyManualExpenseCents,
+          monthlyAgentPaymentCents,
           expenseBudget,
           monthlyInvoiceCount: monthlySales.length,
           todayRevenueCents: todaySales.reduce((sum, sale) => sum + sale.totalCents, 0),

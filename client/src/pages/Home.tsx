@@ -17,14 +17,14 @@ export default function Home() {
   const { user } = useAuth(); const isAdmin = user?.role === "admin"; const [, setLocation] = useLocation(); const { data, isLoading } = trpc.dashboard.get.useQuery(); const summary = data?.summary;
   const metrics = [
     { label: "Chiffre d’affaires", value: formatCurrency(summary?.monthlyRevenueCents ?? 0), detail: "Cumul sur le mois", icon: TrendingUp, tone: "cyan" },
-    { label: "Bénéfice net", value: formatCurrency(summary?.monthlyOperatingProfitCents ?? 0), detail: `Marge − dépenses (${formatCurrency(summary?.monthlyExpenseCents ?? 0)})`, icon: CircleDollarSign, tone: "emerald" },
+    { label: "Bénéfice net", value: formatCurrency(summary?.monthlyOperatingProfitCents ?? 0), detail: `Marge − dépenses (${formatCurrency(summary?.monthlyExpenseCents ?? 0)}, dont paie ${formatCurrency(summary?.monthlyAgentPaymentCents ?? 0)})`, icon: CircleDollarSign, tone: "emerald" },
     { label: "Factures émises", value: String(summary?.monthlyInvoiceCount ?? 0), detail: `Panier moyen ${formatCurrency(summary?.averageBasketCents ?? 0)}`, icon: ReceiptText, tone: "violet" },
     { label: "Valeur de stock", value: formatCurrency(summary?.totalValueCents ?? 0), detail: `${summary?.productCount ?? 0} références actives`, icon: Boxes, tone: "amber" },
   ];
   const priorities = [
     { label: "Stock critique", count: summary?.activeAlerts ?? 0, detail: "référence(s) au seuil", icon: BellRing, path: "/alertes", tone: "amber" },
     { label: "Inventaires ouverts", count: summary?.draftInventories ?? 0, detail: "session(s) à finaliser", icon: ClipboardCheck, path: "/inventaires", tone: "violet" },
-    ...(isAdmin ? [{ label: "Paie à régler", count: summary?.duePayrollCents ?? 0, detail: "solde de la période", icon: WalletCards, path: "/agents", tone: "cyan", currency: true }, { label: "Dépenses du mois", count: summary?.monthlyExpenseCents ?? 0, detail: "charges d’exploitation", icon: WalletCards, path: "/depenses", tone: "amber", currency: true }] : []),
+    ...(isAdmin ? [{ label: "Paie à régler", count: summary?.duePayrollCents ?? 0, detail: "solde de la période", icon: WalletCards, path: "/agents", tone: "cyan", currency: true }, { label: "Dépenses du mois", count: summary?.monthlyExpenseCents ?? 0, detail: `dont paie ${formatCurrency(summary?.monthlyAgentPaymentCents ?? 0)}`, icon: WalletCards, path: "/depenses", tone: "amber", currency: true }] : []),
   ];
   const colors: Record<string, string> = { cyan: "bg-cyan-400/10 text-cyan-300 ring-cyan-400/15", emerald: "bg-emerald-400/10 text-emerald-300 ring-emerald-400/15", violet: "bg-violet-400/10 text-violet-300 ring-violet-400/15", amber: "bg-amber-400/10 text-amber-300 ring-amber-400/15" };
 

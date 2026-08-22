@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { budgetComparison, expenseBreakdownByCategory, expenseTotalCents, monthlyExpenseTotalCents, operatingNetProfitCents } from "./expenseRules";
+import { agentPaymentExpenseRows, budgetComparison, expenseBreakdownByCategory, expenseTotalCents, monthlyExpenseTotalCents, operatingNetProfitCents } from "./expenseRules";
 
 describe("expense rules", () => {
   it("adds operating expenses and deducts them from the gross margin", () => {
@@ -15,6 +15,12 @@ describe("expense rules", () => {
   it("groups current-month expenses by category for the dashboard chart", () => {
     const rows = [{ category: "rent", amountCents: 30_000, spentAt: new Date("2026-08-01T12:00:00Z") }, { category: "energy", amountCents: 8_000, spentAt: new Date("2026-08-10T12:00:00Z") }, { category: "rent", amountCents: 5_000, spentAt: new Date("2026-08-20T12:00:00Z") }, { category: "rent", amountCents: 99_000, spentAt: new Date("2026-07-20T12:00:00Z") }];
     expect(expenseBreakdownByCategory(rows, "2026-08")).toEqual([{ category: "rent", amountCents: 35_000 }, { category: "energy", amountCents: 8_000 }]);
+  });
+
+  it("maps paid salaries and commissions to the salary expense category", () => {
+    const rows = agentPaymentExpenseRows([{ amountCents: 18_000, paidAt: new Date("2026-08-15T12:00:00Z") }, { amountCents: 9_000, paidAt: new Date("2026-07-15T12:00:00Z") }]);
+    expect(monthlyExpenseTotalCents(rows, "2026-08")).toBe(18_000);
+    expect(expenseBreakdownByCategory(rows, "2026-08")).toEqual([{ category: "salary", amountCents: 18_000 }]);
   });
 
   it("reports budget consumption, remaining amount and overrun", () => {
