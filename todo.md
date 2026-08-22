@@ -187,3 +187,6 @@
 - [x] Ajouter un aperçu de facture en temps réel dans les paramètres d’apparence.
 - [x] Appliquer la couleur principale sélectionnée aux éléments d’accent de l’aperçu.
 - [x] Vérifier l’aperçu de facture sur desktop et mobile.
+- [x] Ajouter un bouton de bascule entre aperçu A4 et aperçu ticket de caisse.
+- [x] Adapter le contenu et les proportions de l’aperçu au format ticket.
+- [x] Vérifier les deux aperçus sur desktop et mobile.
