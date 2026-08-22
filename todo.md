@@ -358,3 +358,6 @@
 - [x] Transformer l’historique fournisseur en cartes de bons cliquables.
 - [x] Créer une fiche détaillée de bon avec dates, lignes, statuts et actions complètes.
 - [x] Tester les parcours bon de commande sur desktop et mobile.
+- [x] Aligner les actions Modifier et Supprimer en haut à droite de la carte fournisseur.
+- [x] Placer les informations complémentaires juste sous les coordonnées fournisseur.
+- [x] Vérifier la mise en page de la fiche fournisseur sur desktop et mobile.
