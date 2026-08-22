@@ -178,3 +178,6 @@
 - [x] Vérifier le rendu de l’indicateur de stock faible sur desktop et mobile.
 - [x] Ajouter un filtre de grille pour n’afficher que les produits en stock faible au POS.
 - [x] Tester le filtre de stock faible combiné à la recherche sur desktop et mobile.
+- [x] Générer une liste d’achats fournisseur à partir des produits filtrés en stock faible.
+- [x] Calculer les quantités à commander pour atteindre le seuil minimal de chaque produit.
+- [x] Vérifier la liste d’achats fournisseur sur desktop et mobile.
