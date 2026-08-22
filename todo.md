@@ -391,3 +391,5 @@
 - [x] Vérifier les parcours client et facture sur desktop et mobile.
 - [x] Ajouter les boutons − et + autour de la quantité dans chaque ligne de facture.
 - [x] Respecter les limites de stock et vérifier le rendu responsive des contrôles.
+- [x] Ajouter la saisie manuelle de quantité entre les boutons − et +.
+- [x] Vérifier les bornes de stock et la saisie de quantité sur desktop et mobile.
