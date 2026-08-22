@@ -315,3 +315,7 @@
 - [x] Mettre en file d’attente les actions compatibles hors connexion et les synchroniser au retour du réseau.
 - [x] Afficher l’état de connexion et les actions en attente de synchronisation.
 - [x] Tester les parcours de consultation, vente et synchronisation hors ligne sur desktop et mobile.
+- [x] Auditer les données d’encaissement hors connexion et la structure du reçu provisoire.
+- [x] Permettre l’encaissement partiel des factures dans la file d’attente hors connexion.
+- [x] Imprimer un reçu provisoire clairement identifié pour les ventes POS hors connexion.
+- [x] Tester la synchronisation, le statut partiel et l’impression provisoire sur desktop et mobile.

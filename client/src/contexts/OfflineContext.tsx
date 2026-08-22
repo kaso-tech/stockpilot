@@ -6,10 +6,10 @@ import type { AppRouter } from "../../../server/routers";
 import { useAuth } from "@/_core/hooks/useAuth";
 
 type Discount = { type: "none" | "percent" | "fixed"; value: number };
-type Payment = { method: "cash" | "card" | "mobile_money" | "bank_transfer" | "credit"; amountCents: number };
-export type OfflinePosDraft = { channel: "pos"; customerId: null; salesAgentId: null; cashierId: null; salesAgentSelectionMade: boolean; cashierSelectionMade: boolean; note: null; invoiceDiscount: Discount; items: Array<{ productId: number; quantity: number; discount: Discount }> };
+export type OfflinePayment = { method: "cash" | "card" | "mobile_money" | "bank_transfer" | "credit"; amountCents: number };
+export type OfflinePosDraft = { channel: "pos"; customerId: null; salesAgentId: null; cashierId: null; salesAgentSelectionMade: boolean; cashierSelectionMade: boolean; note: null; invoiceDiscount: Discount; items: Array<{ productId: number; productName: string; productReference: string; unitPriceCents: number; lineTotalCents: number; quantity: number; discount: Discount }> };
 export type OfflineInvoiceDraft = { channel: "invoice"; customerId: number; salesAgentId: number | null; cashierId: number | null; salesAgentSelectionMade: boolean; cashierSelectionMade: boolean; note: null; invoiceDiscount: Discount; items: Array<{ productId: number; quantity: number; manualUnitPriceCents: number | null; discount: Discount }> };
-type OfflineCheckout = { settlementMode: "full"; payments: Payment[]; salesAgentId: number | null; cashierId: number | null; note: null };
+export type OfflineCheckout = { settlementMode: "full" | "partial"; payments: OfflinePayment[]; salesAgentId: number | null; cashierId: number | null; note: null };
 export type OfflineSale = { id: string; ownerUserId: number; kind: "pos_sale" | "invoice_draft"; createdAt: number; status: "pending" | "syncing" | "failed"; error?: string; draft: OfflinePosDraft | OfflineInvoiceDraft; checkout?: OfflineCheckout };
 
 const queueKey = "stockpilot_offline_sales_v1";
@@ -34,7 +34,7 @@ function authHeaders() {
 
 const syncClient = createTRPCProxyClient<AppRouter>({ links: [httpBatchLink({ url: "/api/trpc", transformer: superjson, headers: authHeaders, fetch: (input, init) => globalThis.fetch(input, { ...(init ?? {}), credentials: "include" }) })] });
 
-type OfflineContextValue = { isOnline: boolean; sales: OfflineSale[]; pendingCount: number; pendingProductQuantities: Record<number, number>; queuePosSale: (draft: OfflinePosDraft, checkout: OfflineCheckout) => void; queueInvoiceDraft: (draft: OfflineInvoiceDraft) => void; syncNow: () => Promise<void> };
+type OfflineContextValue = { isOnline: boolean; sales: OfflineSale[]; pendingCount: number; pendingProductQuantities: Record<number, number>; queuePosSale: (draft: OfflinePosDraft, checkout: OfflineCheckout) => void; queueInvoiceDraft: (draft: OfflineInvoiceDraft) => void; queueInvoiceSale: (draft: OfflineInvoiceDraft, checkout: OfflineCheckout) => void; syncNow: () => Promise<void> };
 const OfflineContext = createContext<OfflineContextValue | null>(null);
 
 export function OfflineProvider({ children }: { children: ReactNode }) {
@@ -51,6 +51,11 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
     if (!user) throw new Error("Connectez-vous avant d’enregistrer une facture hors connexion.");
     const id = globalThis.crypto?.randomUUID?.() ?? `offline-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     commit([...readQueue(), { id, ownerUserId: user.id, kind: "invoice_draft", createdAt: Date.now(), status: "pending", draft }]);
+  }, [commit, user]);
+  const queueInvoiceSale = useCallback((draft: OfflineInvoiceDraft, checkout: OfflineCheckout) => {
+    if (!user) throw new Error("Connectez-vous avant d’enregistrer une facture hors connexion.");
+    const id = globalThis.crypto?.randomUUID?.() ?? `offline-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    commit([...readQueue(), { id, ownerUserId: user.id, kind: "invoice_draft", createdAt: Date.now(), status: "pending", draft, checkout }]);
   }, [commit, user]);
   const syncNow = useCallback(async () => {
     if (!navigator.onLine) return;
@@ -83,7 +88,7 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
   }, [syncNow]);
   const accountSales = useMemo(() => sales.filter(sale => sale.ownerUserId === user?.id), [sales, user?.id]);
   const pendingProductQuantities = useMemo(() => accountSales.reduce<Record<number, number>>((totals, sale) => { if (sale.kind !== "pos_sale" || sale.status === "failed") return totals; for (const item of sale.draft.items) totals[item.productId] = (totals[item.productId] ?? 0) + item.quantity; return totals; }, {}), [accountSales]);
-  const value = useMemo(() => ({ isOnline, sales: accountSales, pendingCount: accountSales.length, pendingProductQuantities, queuePosSale, queueInvoiceDraft, syncNow }), [accountSales, isOnline, pendingProductQuantities, queueInvoiceDraft, queuePosSale, syncNow]);
+  const value = useMemo(() => ({ isOnline, sales: accountSales, pendingCount: accountSales.length, pendingProductQuantities, queuePosSale, queueInvoiceDraft, queueInvoiceSale, syncNow }), [accountSales, isOnline, pendingProductQuantities, queueInvoiceDraft, queueInvoiceSale, queuePosSale, syncNow]);
   return <OfflineContext.Provider value={value}>{children}</OfflineContext.Provider>;
 }
 
