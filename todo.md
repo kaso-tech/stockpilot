@@ -209,3 +209,7 @@
 - [x] Ajouter un en-tête professionnel global avec action de sauvegarde manuelle.
 - [x] Ajouter un centre de notifications avec compteur numérique et liste d’alertes métier.
 - [x] Tester la sauvegarde, les notifications et le rendu responsive de l’en-tête.
+- [x] Afficher le header global sur desktop et mobile sans condition de largeur cachante.
+- [x] Appliquer un fond blanc au header avec des contrôles à contraste élevé.
+- [x] Afficher un compteur de notifications rouge ou orange visible et accessible.
+- [x] Vérifier le header sur desktop et mobile.
