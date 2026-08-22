@@ -281,3 +281,7 @@
 - [x] Ajouter le téléchargement de modèles CSV vides pour produits, fournisseurs et clients.
 - [x] Afficher un aperçu des données CSV et exiger une validation avant import.
 - [x] Tester les paliers CSV, les modèles et l’aperçu sur desktop et mobile.
+- [x] Réduire et centrer l’écran d’encaissement.
+- [x] Afficher les agents définis par défaut en lecture seule lors de l’encaissement.
+- [x] Exiger un choix explicite d’agent ou de l’option « Aucun » pour les sélecteurs non définis par défaut.
+- [x] Tester les sélections d’agents et l’encaissement sur desktop et mobile.
