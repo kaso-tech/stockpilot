@@ -13,7 +13,7 @@ function chain(values: unknown[]) { return Object.assign(values, { then: (resolv
 describe("purchaseOrders.listBySupplier", () => {
   beforeEach(() => {
     const orders = [{ id: 9, orderNumber: "BC-2026-001", supplierId: 4, status: "draft", totalCents: 54000, notes: "Réassort", createdAt: new Date("2026-08-22") }];
-    const items = [{ id: 1, purchaseOrderId: 9, productId: 12, productName: "Produit A", productReference: "SKU-A", unit: "pièce", quantity: 6, purchasePriceCents: 9000, lineTotalCents: 54000 }];
+    const items = [{ id: 1, purchaseOrderId: 9, productId: 12, productName: "Produit A", productReference: "SKU-A", unit: "pièce", quantity: 6, receivedQuantity: 0, purchasePriceCents: 9000, lineTotalCents: 54000 }];
     const rows = new Map<unknown, unknown[]>([[purchaseOrders, orders], [purchaseOrderItems, items]]);
     const db: any = { select: () => ({ from: (table: unknown) => { const values = rows.get(table) ?? []; return { where: () => chain(values), orderBy: async () => values, then: (resolve: (value: unknown[]) => unknown) => resolve([...values]) }; } }) };
     mockedGetDb.mockResolvedValue(db);
@@ -28,7 +28,7 @@ describe("purchaseOrders.listBySupplier", () => {
 
 describe("purchaseOrders transitions", () => {
   const order = { id: 9, orderNumber: "BC-2026-001", supplierId: 4, status: "draft", totalCents: 54000, notes: null, createdAt: new Date("2026-08-22") };
-  const item = { id: 1, purchaseOrderId: 9, productId: 12, productName: "Produit A", productReference: "SKU-A", unit: "pièce", quantity: 6, purchasePriceCents: 9000, lineTotalCents: 54000 };
+  const item = { id: 1, purchaseOrderId: 9, productId: 12, productName: "Produit A", productReference: "SKU-A", unit: "pièce", quantity: 6, receivedQuantity: 0, purchasePriceCents: 9000, lineTotalCents: 54000 };
   let productUpdates: unknown[];
   let stockRows: unknown[];
   beforeEach(() => {
@@ -46,10 +46,14 @@ describe("purchaseOrders transitions", () => {
     const result = await appRouter.createCaller(context()).purchaseOrders.markSent({ id: 9 });
     expect(result).toEqual({ success: true, status: "sent" });
   });
-  it("réceptionne une seule fois le bon et crée l’entrée de stock", async () => {
-    const result = await appRouter.createCaller(context()).purchaseOrders.receive({ id: 9 });
-    expect(result).toEqual({ success: true, alreadyReceived: false, status: "received" });
-    expect(productUpdates).toContainEqual({ quantity: 9 });
-    expect(stockRows).toContainEqual(expect.objectContaining({ productId: 12, supplierId: 4, type: "entry", quantity: 6, previousQuantity: 3, resultingQuantity: 9 }));
+  it("réceptionne partiellement le bon et crée l’entrée de stock correspondante", async () => {
+    const result = await appRouter.createCaller(context()).purchaseOrders.receive({ id: 9, lines: [{ id: 1, quantity: 2 }] });
+    expect(result).toEqual({ success: true, alreadyReceived: false, status: "sent", complete: false });
+    expect(productUpdates).toContainEqual({ quantity: 5 });
+    expect(stockRows).toContainEqual(expect.objectContaining({ productId: 12, supplierId: 4, type: "entry", quantity: 2, previousQuantity: 3, resultingQuantity: 5 }));
+  });
+  it("annule le bon avec un motif explicite", async () => {
+    const result = await appRouter.createCaller(context()).purchaseOrders.cancel({ id: 9, reason: "Délai fournisseur dépassé" });
+    expect(result).toEqual({ success: true, status: "cancelled" });
   });
 });

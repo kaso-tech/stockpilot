@@ -394,35 +394,56 @@ export const appRouter = router({
       const db = await requireDb();
       const order = (await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, input.id)).limit(1))[0];
       if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Bon de commande introuvable." });
-      if (order.status === "received") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Un bon reçu ne peut plus être marqué comme envoyé." });
+      if (order.status === "received" || order.status === "cancelled") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Ce bon ne peut plus être marqué comme envoyé." });
       if (order.status !== "sent") {
         await db.update(purchaseOrders).set({ status: "sent" }).where(eq(purchaseOrders.id, input.id));
         await createAudit(ctx.user.id, "Envoi", "Bon de commande", input.id, `Bon ${order.orderNumber} marqué comme envoyé`);
       }
       return { success: true, status: "sent" as const };
     }),
-    receive: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+    cancel: adminProcedure.input(z.object({ id: z.number().int().positive(), reason: z.string().trim().min(3).max(2000) })).mutation(async ({ ctx, input }) => {
+      const db = await requireDb();
+      const order = (await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, input.id)).limit(1))[0];
+      if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Bon de commande introuvable." });
+      if (order.status === "received") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Un bon entièrement reçu ne peut pas être annulé." });
+      await db.update(purchaseOrders).set({ status: "cancelled", cancellationReason: input.reason, cancelledAt: new Date() }).where(eq(purchaseOrders.id, input.id));
+      await createAudit(ctx.user.id, "Annulation", "Bon de commande", input.id, `Bon ${order.orderNumber} annulé : ${input.reason}`);
+      return { success: true, status: "cancelled" as const };
+    }),
+    receive: adminProcedure.input(z.object({ id: z.number().int().positive(), lines: z.array(z.object({ id: z.number().int().positive(), quantity: z.number().int().positive() })).min(1).max(100) })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
       const order = (await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, input.id)).limit(1))[0];
       if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Bon de commande introuvable." });
       if (order.status === "cancelled") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Un bon annulé ne peut pas être réceptionné." });
+      if (order.status === "received") return { success: true, alreadyReceived: true, status: "received" as const };
       const items = await db.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, input.id));
       if (!items.length) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Ce bon ne contient aucun produit à réceptionner." });
+      const requestedByItemId = new Map(input.lines.map(line => [line.id, line.quantity]));
+      if (requestedByItemId.size !== input.lines.length) throw new TRPCError({ code: "BAD_REQUEST", message: "Une ligne ne peut être réceptionnée qu’une seule fois dans la même opération." });
+      for (const line of input.lines) {
+        const item = items.find(value => value.id === line.id);
+        if (!item) throw new TRPCError({ code: "BAD_REQUEST", message: "Une ligne sélectionnée n’appartient pas à ce bon." });
+        if (line.quantity > item.quantity - item.receivedQuantity) throw new TRPCError({ code: "BAD_REQUEST", message: `La quantité reçue dépasse le reliquat de ${item.productName}.` });
+      }
       const result = await db.transaction(async tx => {
-        const statusUpdate = await tx.update(purchaseOrders).set({ status: "received" }).where(and(eq(purchaseOrders.id, input.id), ne(purchaseOrders.status, "received")));
-        const affected = Number((statusUpdate as unknown as Array<{ affectedRows?: number }>)[0]?.affectedRows ?? 0);
-        if (!affected) return { alreadyReceived: true };
-        for (const item of items) {
+        for (const item of items.filter(value => requestedByItemId.has(value.id))) {
+          const receivedNow = requestedByItemId.get(item.id) ?? 0;
           const product = (await tx.select().from(products).where(eq(products.id, item.productId)).limit(1))[0];
           if (!product) throw new TRPCError({ code: "NOT_FOUND", message: `Produit ${item.productName} introuvable.` });
-          const resultingQuantity = product.quantity + item.quantity;
+          const resultingQuantity = product.quantity + receivedNow;
           await tx.update(products).set({ quantity: resultingQuantity }).where(eq(products.id, product.id));
-          await tx.insert(stockMovements).values({ productId: product.id, supplierId: order.supplierId, type: "entry", quantity: item.quantity, previousQuantity: product.quantity, resultingQuantity, reason: `Réception du bon ${order.orderNumber}`, createdByUserId: ctx.user.id });
+          const quantityUpdate = await tx.update(purchaseOrderItems).set({ receivedQuantity: item.receivedQuantity + receivedNow }).where(and(eq(purchaseOrderItems.id, item.id), eq(purchaseOrderItems.receivedQuantity, item.receivedQuantity)));
+          const affected = Number((quantityUpdate as unknown as Array<{ affectedRows?: number }>)[0]?.affectedRows ?? 0);
+          if (!affected) throw new TRPCError({ code: "CONFLICT", message: "Ce bon a été modifié. Actualisez la page avant de poursuivre." });
+          await tx.insert(stockMovements).values({ productId: product.id, supplierId: order.supplierId, type: "entry", quantity: receivedNow, previousQuantity: product.quantity, resultingQuantity, reason: `Réception partielle du bon ${order.orderNumber}`, createdByUserId: ctx.user.id });
         }
-        return { alreadyReceived: false };
+        const complete = items.every(item => item.receivedQuantity + (requestedByItemId.get(item.id) ?? 0) >= item.quantity);
+        const status = complete ? "received" : "sent";
+        await tx.update(purchaseOrders).set({ status, receivedAt: complete ? new Date() : null }).where(eq(purchaseOrders.id, input.id));
+        return { status, complete };
       });
-      if (!result.alreadyReceived) await createAudit(ctx.user.id, "Réception", "Bon de commande", input.id, `Bon ${order.orderNumber} réceptionné et stock mis à jour`);
-      return { success: true, alreadyReceived: result.alreadyReceived, status: "received" as const };
+      await createAudit(ctx.user.id, "Réception", "Bon de commande", input.id, `${result.complete ? "Réception complète" : "Réception partielle"} du bon ${order.orderNumber}`);
+      return { success: true, alreadyReceived: false, status: result.status, complete: result.complete };
     }),
   }),
 

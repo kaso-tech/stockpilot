@@ -347,3 +347,8 @@
 - [x] Afficher et mettre à jour les statuts en attente, envoyé et reçu des bons de commande.
 - [x] Valider la réception d’un bon pour créer les entrées de stock de manière idempotente.
 - [x] Tester le partage, les badges de statut et la réception de marchandises sur desktop et mobile.
+- [x] Auditer les lignes de bon, les réceptions et le rendu de partage actuel.
+- [x] Permettre une réception partielle par ligne avec calcul des quantités restantes.
+- [x] Ajouter l’annulation motivée d’un bon de commande avec traçabilité.
+- [x] Générer un PDF du bon de commande et le préparer pour le partage e-mail.
+- [x] Tester les réceptions partielles, l’annulation et le PDF de bon sur desktop et mobile.
