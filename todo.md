@@ -176,3 +176,5 @@
 - [x] Tester les nouveaux contrôles de panier sur desktop et mobile.
 - [x] Afficher un indicateur de stock faible dans la grille des produits du POS avant l’ajout au panier.
 - [x] Vérifier le rendu de l’indicateur de stock faible sur desktop et mobile.
+- [x] Ajouter un filtre de grille pour n’afficher que les produits en stock faible au POS.
+- [x] Tester le filtre de stock faible combiné à la recherche sur desktop et mobile.
