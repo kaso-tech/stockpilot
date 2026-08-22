@@ -6,9 +6,12 @@ import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
 import { startLogin } from "./const";
+import { persistOfflineQueryCache, restoreOfflineQueryCache } from "./lib/offlineCache";
 import "./index.css";
 
 const queryClient = new QueryClient();
+restoreOfflineQueryCache(queryClient);
+persistOfflineQueryCache(queryClient);
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;

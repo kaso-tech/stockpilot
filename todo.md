@@ -310,3 +310,8 @@
 - [x] Appliquer ou compléter les protections vendeur pour annulation, remboursement, correction de stock et coût d’achat.
 - [x] Afficher des messages explicites lorsque l’action sensible est bloquée au vendeur.
 - [x] Tester individuellement chaque autorisation et blocage vendeur.
+- [x] Auditer les écrans, données et mutations à rendre utilisables hors connexion.
+- [x] Installer l’application comme PWA et mettre en cache l’interface ainsi que les données essentielles.
+- [x] Mettre en file d’attente les actions compatibles hors connexion et les synchroniser au retour du réseau.
+- [x] Afficher l’état de connexion et les actions en attente de synchronisation.
+- [x] Tester les parcours de consultation, vente et synchronisation hors ligne sur desktop et mobile.

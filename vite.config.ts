@@ -5,6 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { defineConfig, type Plugin, type ViteDevServer } from "vite";
 import { vitePluginManusRuntime } from "vite-plugin-manus-runtime";
+import { VitePWA } from "vite-plugin-pwa";
 
 // =============================================================================
 // Manus Debug Collector - Vite Plugin
@@ -150,7 +151,35 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
+const plugins = [
+  react(),
+  tailwindcss(),
+  jsxLocPlugin(),
+  vitePluginManusRuntime(),
+  vitePluginManusDebugCollector(),
+  VitePWA({
+    registerType: "autoUpdate",
+    injectRegister: "auto",
+    manifest: {
+      name: "StockPilot Pro",
+      short_name: "StockPilot",
+      description: "Gestion professionnelle des stocks, ventes et factures.",
+      lang: "fr",
+      start_url: "/",
+      scope: "/",
+      display: "standalone",
+      theme_color: "#007B8B",
+      background_color: "#09111d",
+    },
+    workbox: {
+      clientsClaim: true,
+      skipWaiting: true,
+      navigateFallback: "/index.html",
+      cleanupOutdatedCaches: true,
+    },
+    devOptions: { enabled: true },
+  }),
+];
 
 export default defineConfig({
   plugins,

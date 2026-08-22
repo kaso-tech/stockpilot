@@ -163,6 +163,7 @@ export const saleSettings = mysqlTable("saleSettings", {
 export const sales = mysqlTable("sales", {
   id: int("id").autoincrement().primaryKey(),
   invoiceNumber: varchar("invoiceNumber", { length: 60 }).notNull().unique(),
+  offlineOperationId: varchar("offlineOperationId", { length: 80 }).unique(),
   channel: mysqlEnum("channel", ["pos", "invoice"]).notNull().default("invoice"),
   customerId: int("customerId"),
   sellerUserId: int("sellerUserId").notNull(),
@@ -210,6 +211,7 @@ export const expenseBudgets = mysqlTable("expenseBudgets", {
 export const salePayments = mysqlTable("salePayments", {
   id: int("id").autoincrement().primaryKey(),
   saleId: int("saleId").notNull(),
+  offlineOperationId: varchar("offlineOperationId", { length: 80 }).unique(),
   method: mysqlEnum("method", ["cash", "card", "mobile_money", "bank_transfer", "credit"]).notNull(),
   amountCents: int("amountCents").notNull(),
   createdByUserId: int("createdByUserId").notNull(),

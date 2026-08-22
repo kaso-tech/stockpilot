@@ -8,6 +8,16 @@ type UseAuthOptions = {
   redirectPath?: string;
 };
 
+function offlineUser() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem("manus-runtime-user-info");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function useAuth(options?: UseAuthOptions) {
   // Login is started via startLogin() in the effect below, only when we actually
   // navigate — never during render. startLogin() mints a one-time nonce + writes
@@ -51,15 +61,14 @@ export function useAuth(options?: UseAuthOptions) {
   }, [logoutMutation, utils]);
 
   const state = useMemo(() => {
-    localStorage.setItem(
-      "manus-runtime-user-info",
-      JSON.stringify(meQuery.data)
-    );
+    if (meQuery.data) localStorage.setItem("manus-runtime-user-info", JSON.stringify(meQuery.data));
+    const cachedUser = !navigator.onLine ? offlineUser() : null;
+    const user = meQuery.data ?? cachedUser;
     return {
-      user: meQuery.data ?? null,
-      loading: meQuery.isLoading || logoutMutation.isPending,
+      user,
+      loading: (meQuery.isLoading && !user) || logoutMutation.isPending,
       error: meQuery.error ?? logoutMutation.error ?? null,
-      isAuthenticated: Boolean(meQuery.data),
+      isAuthenticated: Boolean(user),
     };
   }, [
     meQuery.data,
