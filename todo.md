@@ -202,3 +202,7 @@
 - [x] Comparer les dépenses mensuelles au budget avec consommé, restant et dépassement.
 - [x] Ajouter le réglage de budget et le panneau de suivi dans le tableau de bord.
 - [x] Tester les calculs, les seuils et les rendus desktop/mobile du budget.
+- [x] Joindre et consulter un justificatif sécurisé pour chaque dépense.
+- [x] Générer un rapport mensuel de dépenses détaillé par catégorie.
+- [x] Définir des alertes de budget à l’approche et au dépassement du plafond mensuel.
+- [x] Tester le stockage, le rapport, les alertes et les parcours desktop/mobile.

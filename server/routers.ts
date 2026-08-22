@@ -160,7 +160,8 @@ export const appRouter = router({
       const monthlyMarginCents = monthlySales.reduce((sum, sale) => sum + sale.netProfitCents, 0);
       const monthlyExpenseCents = monthlyExpenseTotalCents(expenseRows, month);
       const monthlyOperatingProfitCents = operatingNetProfitCents(monthlyMarginCents, monthlyExpenseCents);
-      const expenseBudget = budgetComparison(budgetRows.find(budget => budget.yearMonth === month)?.amountCents ?? null, monthlyExpenseCents);
+      const currentBudget = budgetRows.find(budget => budget.yearMonth === month);
+      const expenseBudget = budgetComparison(currentBudget?.amountCents ?? null, monthlyExpenseCents, currentBudget?.warningPercent ?? 80);
       const duePayrollCents = profiles.reduce((sum, profile) => {
         const commissionCents = commissions.filter(item => item.beneficiaryType === profile.beneficiaryType && item.beneficiaryId === profile.beneficiaryId && item.createdAt.toISOString().slice(0, 7) === month).reduce((total, item) => total + item.commissionCents, 0);
         const fixedCents = profile.remunerationMode === "commission" ? 0 : profile.fixedMonthlyCents;

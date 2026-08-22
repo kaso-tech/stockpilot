@@ -18,7 +18,7 @@ describe("expense rules", () => {
   });
 
   it("reports budget consumption, remaining amount and overrun", () => {
-    expect(budgetComparison(100_000, 70_000)).toMatchObject({ configured: true, remainingCents: 30_000, percentUsed: 70, exceeded: false });
-    expect(budgetComparison(100_000, 125_000)).toMatchObject({ remainingCents: -25_000, percentUsed: 125, exceeded: true });
+    expect(budgetComparison(100_000, 70_000, 70)).toMatchObject({ configured: true, remainingCents: 30_000, percentUsed: 70, warningReached: true, exceeded: false });
+    expect(budgetComparison(100_000, 125_000)).toMatchObject({ remainingCents: -25_000, percentUsed: 125, warningReached: true, exceeded: true });
   });
 });
