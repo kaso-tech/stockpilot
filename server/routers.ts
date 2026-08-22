@@ -5,6 +5,7 @@ import {
   auditLogs,
   agentPayments,
   customers,
+  expenseBudgets,
   expenses,
   inventorySessions,
   products,
@@ -36,7 +37,7 @@ import { payrollRouter } from "./routers/payroll";
 import { backupRouter } from "./routers/backups";
 import { transactionsRouter } from "./routers/transactions";
 import { expensesRouter } from "./routers/expenses";
-import { expenseBreakdownByCategory, monthlyExpenseTotalCents, operatingNetProfitCents } from "./expenseRules";
+import { budgetComparison, expenseBreakdownByCategory, monthlyExpenseTotalCents, operatingNetProfitCents } from "./expenseRules";
 import { sdk } from "./_core/sdk";
 import { verifyPassword } from "./passwords";
 
@@ -144,7 +145,7 @@ export const appRouter = router({
   dashboard: router({
     get: protectedProcedure.query(async () => {
       const db = await requireDb();
-      const [productRows, movements, saleRows, customerRows, inventories, profiles, commissions, payments, expenseRows] = await Promise.all([listProducts(), listMovements(250), db.select().from(sales), db.select().from(customers), db.select().from(inventorySessions), db.select().from(remunerationProfiles), db.select().from(saleCommissions), db.select().from(agentPayments), db.select().from(expenses)]);
+      const [productRows, movements, saleRows, customerRows, inventories, profiles, commissions, payments, expenseRows, budgetRows] = await Promise.all([listProducts(), listMovements(250), db.select().from(sales), db.select().from(customers), db.select().from(inventorySessions), db.select().from(remunerationProfiles), db.select().from(saleCommissions), db.select().from(agentPayments), db.select().from(expenses), db.select().from(expenseBudgets)]);
       const lowStock = productRows.filter(product => product.quantity <= product.minimumQuantity);
       const totalValueCents = productRows.reduce(
         (sum, product) => sum + product.quantity * product.purchasePriceCents,
@@ -159,6 +160,7 @@ export const appRouter = router({
       const monthlyMarginCents = monthlySales.reduce((sum, sale) => sum + sale.netProfitCents, 0);
       const monthlyExpenseCents = monthlyExpenseTotalCents(expenseRows, month);
       const monthlyOperatingProfitCents = operatingNetProfitCents(monthlyMarginCents, monthlyExpenseCents);
+      const expenseBudget = budgetComparison(budgetRows.find(budget => budget.yearMonth === month)?.amountCents ?? null, monthlyExpenseCents);
       const duePayrollCents = profiles.reduce((sum, profile) => {
         const commissionCents = commissions.filter(item => item.beneficiaryType === profile.beneficiaryType && item.beneficiaryId === profile.beneficiaryId && item.createdAt.toISOString().slice(0, 7) === month).reduce((total, item) => total + item.commissionCents, 0);
         const fixedCents = profile.remunerationMode === "commission" ? 0 : profile.fixedMonthlyCents;
@@ -191,6 +193,7 @@ export const appRouter = router({
           monthlyExpenseCents,
           monthlyOperatingProfitCents,
           expenseBreakdown: expenseBreakdownByCategory(expenseRows, month),
+          expenseBudget,
           monthlyInvoiceCount: monthlySales.length,
           todayRevenueCents: todaySales.reduce((sum, sale) => sum + sale.totalCents, 0),
           averageBasketCents: monthlySales.length ? Math.round(monthlyRevenueCents / monthlySales.length) : 0,

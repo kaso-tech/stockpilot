@@ -148,6 +148,15 @@ export const expenses = mysqlTable("expenses", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+export const expenseBudgets = mysqlTable("expenseBudgets", {
+  id: int("id").autoincrement().primaryKey(),
+  yearMonth: varchar("yearMonth", { length: 7 }).notNull().unique(),
+  amountCents: int("amountCents").notNull(),
+  updatedByUserId: int("updatedByUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 export const salePayments = mysqlTable("salePayments", {
   id: int("id").autoincrement().primaryKey(),
   saleId: int("saleId").notNull(),

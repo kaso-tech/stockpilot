@@ -1,6 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
-import { auditLogs, expenses } from "../../drizzle/schema";
+import { auditLogs, expenseBudgets, expenses } from "../../drizzle/schema";
 import { expenseCategories } from "../expenseRules";
 import { getDb } from "../db";
 import { adminProcedure, router } from "../_core/trpc";
@@ -20,6 +20,20 @@ async function dbOrThrow() {
 }
 
 export const expensesRouter = router({
+  budget: router({
+    get: adminProcedure.input(z.object({ yearMonth: z.string().regex(/^\d{4}-\d{2}$/) })).query(async ({ input }) => {
+      const db = await dbOrThrow();
+      return (await db.select().from(expenseBudgets).where(eq(expenseBudgets.yearMonth, input.yearMonth)).limit(1))[0] ?? null;
+    }),
+    save: adminProcedure.input(z.object({ yearMonth: z.string().regex(/^\d{4}-\d{2}$/), amountCents: z.number().int().min(0) })).mutation(async ({ ctx, input }) => {
+      const db = await dbOrThrow();
+      const current = (await db.select().from(expenseBudgets).where(eq(expenseBudgets.yearMonth, input.yearMonth)).limit(1))[0];
+      if (current) await db.update(expenseBudgets).set({ amountCents: input.amountCents, updatedByUserId: ctx.user.id }).where(eq(expenseBudgets.id, current.id));
+      else await db.insert(expenseBudgets).values({ ...input, updatedByUserId: ctx.user.id });
+      await db.insert(auditLogs).values({ actorUserId: ctx.user.id, action: "Budget dépenses", entityType: "Budget", entityId: input.yearMonth, detail: `Budget mensuel fixé à ${input.amountCents} centimes` });
+      return { success: true };
+    }),
+  }),
   list: adminProcedure.query(async () => {
     const db = await dbOrThrow();
     return db.select().from(expenses).orderBy(desc(expenses.spentAt), desc(expenses.id));

@@ -21,3 +21,9 @@ export function expenseBreakdownByCategory(rows: Array<{ category: string; amoun
 export function operatingNetProfitCents(grossMarginCents: number, expenseCents: number) {
   return grossMarginCents - expenseCents;
 }
+
+export function budgetComparison(budgetCents: number | null, spentCents: number) {
+  if (budgetCents === null) return { configured: false, budgetCents: 0, spentCents, remainingCents: 0, percentUsed: 0, exceeded: false };
+  const remainingCents = budgetCents - spentCents;
+  return { configured: true, budgetCents, spentCents, remainingCents, percentUsed: budgetCents === 0 ? (spentCents > 0 ? 100 : 0) : Math.round((spentCents / budgetCents) * 100), exceeded: remainingCents < 0 };
+}

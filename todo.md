@@ -198,3 +198,7 @@
 - [x] Agréger les dépenses mensuelles par catégorie pour alimenter le tableau de bord.
 - [x] Ajouter un graphique circulaire des dépenses avec légende, montants et pourcentages.
 - [x] Vérifier le graphique et son état vide sur desktop et mobile.
+- [x] Définir et enregistrer un budget mensuel de dépenses.
+- [x] Comparer les dépenses mensuelles au budget avec consommé, restant et dépassement.
+- [x] Ajouter le réglage de budget et le panneau de suivi dans le tableau de bord.
+- [x] Tester les calculs, les seuils et les rendus desktop/mobile du budget.
