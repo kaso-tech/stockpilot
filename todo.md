@@ -133,3 +133,13 @@
 - [x] Couvrir en E2E un encaissement POS intégral et une facture avec encaissement partiel.
 - [x] Couvrir sur mobile l’ouverture du panier, l’encaissement et l’ajout produit facturé par recherche et scan.
 - [x] Couvrir en E2E mobile la recherche de produit puis l’ajout par scan dans le sélecteur de facture.
+- [x] Ajouter des remises par ligne et par facture aux calculs de vente, totaux et impressions.
+- [x] Ajouter un lecteur de code-barres par caméra mobile avec repli vers la saisie manuelle.
+- [x] Permettre l’encaissement différé depuis les factures au statut partiel ou à encaisser.
+- [x] Tester les remises, le scan et les encaissements différés sur desktop et mobile.
+- [x] Valider en E2E desktop les remises, le repli scan manuel/caméra et l’encaissement différé.
+- [x] Vérifier en E2E les totaux remisés dans l’aperçu et l’impression de facture.
+- [x] Relancer les validations desktop et mobile après l’extension des couvertures de vente.
+- [x] Vérifier les montants exacts des remises ligne, facture et total dans l’aperçu et l’impression A4.
+- [x] Relancer le parcours E2E mobile complet après les dernières améliorations de remises et d’impression.
+- [x] Vérifier sur mobile l’aperçu de facture avec les montants exacts des remises ligne et facture.

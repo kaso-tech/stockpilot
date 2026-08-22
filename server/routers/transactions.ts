@@ -7,9 +7,11 @@ import { getDb } from "../db";
 import { protectedProcedure, router } from "../_core/trpc";
 import { resultingStock, signedMovementQuantity } from "../stockRules";
 import { settlementResult } from "../transactionRules";
+import { discountCents, type DiscountType } from "../discountRules";
 
 const paymentMethod = z.enum(["cash", "card", "mobile_money", "bank_transfer", "credit"]);
-const itemInput = z.object({ productId: z.number().int().positive(), quantity: z.number().int().positive() });
+const discountInput = z.object({ type: z.enum(["none", "percent", "fixed"]), value: z.number().int().min(0) });
+const itemInput = z.object({ productId: z.number().int().positive(), quantity: z.number().int().positive(), discount: discountInput.default({ type: "none", value: 0 }) });
 const paymentInput = z.object({ method: paymentMethod, amountCents: z.number().int().positive() });
 const agentSelection = z.object({ salesAgentId: z.number().int().positive().nullable(), cashierId: z.number().int().positive().nullable() });
 
@@ -47,7 +49,7 @@ export const transactionsRouter = router({
     const customerNames = new Map(customerRows.map(customer => [customer.id, customer.name]));
     return rows.map(row => ({ ...row, customerName: row.customerId ? customerNames.get(row.customerId) ?? null : null }));
   }),
-  createDraft: protectedProcedure.input(z.object({ channel: z.enum(["pos", "invoice"]), customerId: z.number().int().positive().nullable(), note: z.string().trim().max(1000).nullable(), items: z.array(itemInput).min(1) }).merge(agentSelection)).mutation(async ({ ctx, input }) => {
+  createDraft: protectedProcedure.input(z.object({ channel: z.enum(["pos", "invoice"]), customerId: z.number().int().positive().nullable(), note: z.string().trim().max(1000).nullable(), items: z.array(itemInput).min(1), invoiceDiscount: discountInput.default({ type: "none", value: 0 }) }).merge(agentSelection)).mutation(async ({ ctx, input }) => {
     if (input.channel === "invoice" && !input.customerId) throw new TRPCError({ code: "BAD_REQUEST", message: "Un client est obligatoire pour créer une facture." });
     const db = await dbOrThrow();
     let created: { id: number; invoiceNumber: string; totalCents: number } | null = null;
@@ -57,14 +59,17 @@ export const transactionsRouter = router({
       const productIds = input.items.map(item => item.productId);
       const productRows = await tx.select().from(products).where(inArray(products.id, productIds));
       if (productRows.length !== productIds.length) throw new TRPCError({ code: "NOT_FOUND", message: "Un produit est introuvable." });
-      const lines = input.items.map(item => { const product = productRows.find((row: any) => row.id === item.productId)!; const unitPriceCents = priceForCustomer(customer?.type ?? "ordinary", product.retailPriceCents, product.wholesalePriceCents); return { product, quantity: item.quantity, unitPriceCents, lineTotalCents: unitPriceCents * item.quantity, lineCostCents: product.purchasePriceCents * item.quantity }; });
-      const totalCents = lines.reduce((sum, line) => sum + line.lineTotalCents, 0);
+      const lines = input.items.map(item => { const product = productRows.find((row: any) => row.id === item.productId)!; const unitPriceCents = priceForCustomer(customer?.type ?? "ordinary", product.retailPriceCents, product.wholesalePriceCents); const lineSubtotalCents = unitPriceCents * item.quantity; const lineDiscountCents = discountCents(lineSubtotalCents, item.discount.type as DiscountType, item.discount.value); return { product, quantity: item.quantity, unitPriceCents, lineSubtotalCents, lineDiscountCents, discount: item.discount, lineTotalCents: lineSubtotalCents - lineDiscountCents, lineCostCents: product.purchasePriceCents * item.quantity }; });
+      const subtotalCents = lines.reduce((sum, line) => sum + line.lineSubtotalCents, 0);
+      const lineNetCents = lines.reduce((sum, line) => sum + line.lineTotalCents, 0);
+      const invoiceDiscountCents = discountCents(lineNetCents, input.invoiceDiscount.type as DiscountType, input.invoiceDiscount.value);
+      const totalCents = lineNetCents - invoiceDiscountCents;
       const totalCostCents = lines.reduce((sum, line) => sum + line.lineCostCents, 0);
       const assigned = await validateAgents(tx, input);
       const number = invoiceNumber(input.channel);
-      const result = await tx.insert(sales).values({ invoiceNumber: number, channel: input.channel, customerId: customer?.id ?? null, sellerUserId: ctx.user.id, ...assigned, paymentMethod: "cash", amountPaidCents: 0, subtotalCents: totalCents, totalCents, totalCostCents, netProfitCents: totalCents - totalCostCents, note: input.note, status: "draft" });
+      const result = await tx.insert(sales).values({ invoiceNumber: number, channel: input.channel, customerId: customer?.id ?? null, sellerUserId: ctx.user.id, ...assigned, paymentMethod: "cash", amountPaidCents: 0, subtotalCents, invoiceDiscountType: input.invoiceDiscount.type, invoiceDiscountValue: input.invoiceDiscount.value, invoiceDiscountCents, totalCents, totalCostCents, netProfitCents: totalCents - totalCostCents, note: input.note, status: "draft" });
       const saleId = Number(result[0].insertId);
-      for (const line of lines) await tx.insert(saleItems).values({ saleId, productId: line.product.id, productName: line.product.name, productReference: line.product.reference, quantity: line.quantity, unitPriceCents: line.unitPriceCents, purchasePriceCents: line.product.purchasePriceCents, lineTotalCents: line.lineTotalCents, lineCostCents: line.lineCostCents });
+      for (const line of lines) await tx.insert(saleItems).values({ saleId, productId: line.product.id, productName: line.product.name, productReference: line.product.reference, quantity: line.quantity, unitPriceCents: line.unitPriceCents, purchasePriceCents: line.product.purchasePriceCents, discountType: line.discount.type, discountValue: line.discount.value, discountCents: line.lineDiscountCents, lineSubtotalCents: line.lineSubtotalCents, lineTotalCents: line.lineTotalCents, lineCostCents: line.lineCostCents });
       await tx.insert(auditLogs).values({ actorUserId: ctx.user.id, action: "Document créé", entityType: input.channel === "pos" ? "Ticket POS" : "Facture", entityId: String(saleId), detail: `${number} enregistré en attente d’encaissement` });
       created = { id: saleId, invoiceNumber: number, totalCents };
     });

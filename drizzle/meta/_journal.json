@@ -85,6 +85,13 @@
       "when": 1787357070372,
       "tag": "0011_goofy_korath",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1787358180940,
+      "tag": "0012_gray_xorn",
+      "breakpoints": true
     }
   ]
 }

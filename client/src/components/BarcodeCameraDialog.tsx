@@ -1,0 +1,13 @@
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Camera, RefreshCw } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+
+export function BarcodeCameraDialog({ open, onOpenChange, onDetected }: { open: boolean; onOpenChange: (open: boolean) => void; onDetected: (code: string) => void }) {
+  const videoRef = useRef<HTMLVideoElement>(null); const [message, setMessage] = useState("Initialisation de la caméra…"); const [retry, setRetry] = useState(0);
+  useEffect(() => { if (!open) return; let stream: MediaStream | null = null; let timer: number | undefined; let active = true;
+    const start = async () => { try { const Detector = (window as any).BarcodeDetector; if (!Detector) { setMessage("La lecture automatique n’est pas disponible sur ce navigateur. Utilisez la saisie manuelle."); return; } stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false }); if (!videoRef.current) return; videoRef.current.srcObject = stream; await videoRef.current.play(); setMessage("Cadrez le code-barres dans la caméra."); const detector = new Detector({ formats: ["code_128", "code_39", "ean_13", "ean_8", "upc_a", "upc_e", "qr_code"] }); const scan = async () => { if (!active || !videoRef.current) return; try { const results = await detector.detect(videoRef.current); const value = results?.[0]?.rawValue; if (value) { onDetected(value); onOpenChange(false); return; } } catch { /* attendre l’image suivante */ } timer = window.setTimeout(scan, 250); }; scan(); } catch { setMessage("Impossible d’accéder à la caméra. Vérifiez les autorisations ou utilisez la saisie manuelle."); } };
+    start(); return () => { active = false; if (timer) window.clearTimeout(timer); stream?.getTracks().forEach(track => track.stop()); };
+  }, [open, onDetected, onOpenChange, retry]);
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-w-md"><DialogHeader><DialogTitle>Scanner un code-barres</DialogTitle></DialogHeader><div className="overflow-hidden rounded-2xl bg-black"><video ref={videoRef} className="aspect-[3/4] w-full object-cover" muted playsInline /></div><p className="text-sm text-muted-foreground">{message}</p><Button variant="outline" onClick={() => setRetry(current => current + 1)}><RefreshCw className="mr-2 h-4 w-4" />Réessayer la caméra</Button><p className="text-xs text-muted-foreground">Le scan reste possible par saisie manuelle si votre navigateur ne prend pas en charge cette fonction.</p></DialogContent></Dialog>;
+}
