@@ -393,3 +393,5 @@
 - [x] Respecter les limites de stock et vérifier le rendu responsive des contrôles.
 - [x] Ajouter la saisie manuelle de quantité entre les boutons − et +.
 - [x] Vérifier les bornes de stock et la saisie de quantité sur desktop et mobile.
+- [x] Afficher une alerte discrète lorsque la quantité de ligne atteint le stock disponible maximum.
+- [x] Vérifier l’alerte de stock maximum sur desktop et mobile.
