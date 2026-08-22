@@ -259,3 +259,7 @@
 - [x] Afficher une action rapide depuis les alertes de stock pour réapprovisionner les produits concernés.
 - [x] Harmoniser les toasts de réussite pour les principales actions métier, dont produits et factures.
 - [x] Tester les alertes et notifications sur desktop et mobile.
+- [x] Permettre de définir un seuil d’alerte de stock personnalisé pour chaque produit.
+- [x] Ajouter une fiche produit avec historique détaillé des entrées et sorties de stock.
+- [x] Générer un bon de commande de réapprovisionnement depuis une alerte de stock bas.
+- [x] Tester les seuils, l’historique et le bon de commande sur desktop et mobile.
