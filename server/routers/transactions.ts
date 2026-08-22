@@ -6,7 +6,7 @@ import { commissionCents, priceForCustomer } from "../commerceRules";
 import { getDb } from "../db";
 import { protectedProcedure, router } from "../_core/trpc";
 import { resultingStock, signedMovementQuantity } from "../stockRules";
-import { settlementResult } from "../transactionRules";
+import { assertPaymentMethodsEnabled, settlementResult } from "../transactionRules";
 import { discountCents, type DiscountType } from "../discountRules";
 
 const paymentMethod = z.enum(["cash", "card", "mobile_money", "bank_transfer", "credit"]);
@@ -14,7 +14,6 @@ const discountInput = z.object({ type: z.enum(["none", "percent", "fixed"]), val
 const itemInput = z.object({ productId: z.number().int().positive(), quantity: z.number().int().positive(), discount: discountInput.default({ type: "none", value: 0 }) });
 const paymentInput = z.object({ method: paymentMethod, amountCents: z.number().int().positive() });
 const agentSelection = z.object({ salesAgentId: z.number().int().positive().nullable(), cashierId: z.number().int().positive().nullable() });
-const paymentSettingKey = { cash: "paymentCashEnabled", card: "paymentCardEnabled", mobile_money: "paymentMobileMoneyEnabled", bank_transfer: "paymentBankTransferEnabled", credit: "paymentCreditEnabled" } as const;
 
 async function dbOrThrow() {
   const db = await getDb();
@@ -86,7 +85,7 @@ export const transactionsRouter = router({
       const remainingBefore = sale.totalCents - sale.amountPaidCents;
       if (sale.channel === "pos" && input.settlementMode !== "full") throw new TRPCError({ code: "BAD_REQUEST", message: "Le POS requiert un règlement intégral." });
       const settings = (await tx.select().from(saleSettings).limit(1))[0];
-      if (input.payments.some(payment => settings && !settings[paymentSettingKey[payment.method]])) throw new TRPCError({ code: "BAD_REQUEST", message: "Un moyen de paiement sélectionné est désactivé dans les réglages." });
+      try { assertPaymentMethodsEnabled(input.payments.map(payment => payment.method), settings); } catch (error) { throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "Moyen de paiement invalide." }); }
       let settlement: ReturnType<typeof settlementResult>;
       try { settlement = settlementResult(remainingBefore, input.settlementMode, input.payments.map(payment => payment.amountCents)); } catch (error) { throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "Règlement invalide." }); }
       const assigned = await validateAgents(tx, input);

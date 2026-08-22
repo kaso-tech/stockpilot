@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { settlementResult } from "./transactionRules";
+import { assertPaymentMethodsEnabled, settlementResult } from "./transactionRules";
 
 describe("settlementResult", () => {
   it("valide un règlement intégral avec plusieurs moyens", () => {
@@ -11,5 +11,9 @@ describe("settlementResult", () => {
   it("rejette un règlement intégral incomplet et un dépassement", () => {
     expect(() => settlementResult(12500, "full", [12000])).toThrow("totalité");
     expect(() => settlementResult(12500, "partial", [13000])).toThrow("dépasse");
+  });
+  it("rejette un moyen de paiement désactivé dans les réglages", () => {
+    expect(() => assertPaymentMethodsEnabled(["cash", "mobile_money"], { paymentCashEnabled: true, paymentMobileMoneyEnabled: false })).toThrow("désactivé");
+    expect(() => assertPaymentMethodsEnabled(["cash"], { paymentCashEnabled: true })).not.toThrow();
   });
 });

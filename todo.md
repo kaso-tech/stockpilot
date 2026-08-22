@@ -143,10 +143,15 @@
 - [x] Vérifier les montants exacts des remises ligne, facture et total dans l’aperçu et l’impression A4.
 - [x] Relancer le parcours E2E mobile complet après les dernières améliorations de remises et d’impression.
 - [x] Vérifier sur mobile l’aperçu de facture avec les montants exacts des remises ligne et facture.
-- [ ] Refaire le panier POS en feuille montante mobile inspirée du modèle fourni, avec liste, quantités, total et action d’encaissement.
+- [x] Refaire le panier POS en feuille montante mobile inspirée du modèle fourni, avec liste, quantités, total et action d’encaissement.
 - [x] Imposer le règlement intégral dans l’encaissement POS et conserver Intégral/Partiel uniquement pour les factures.
 - [x] Ne présélectionner aucun moyen de paiement dans les écrans d’encaissement.
 - [x] Auto-remplir le montant restant sur les moyens de paiement sélectionnés en règlement intégral, sans auto-remplissage partiel.
 - [x] Désactiver la validation lorsque la répartition intégrale ne correspond pas exactement au total à encaisser.
 - [x] Ajouter l’activation ou désactivation des moyens de paiement dans les réglages POS.
-- [ ] Tester les règlements POS et facture, la répartition automatique et les moyens de paiement désactivés sur desktop et mobile.
+- [x] Tester les règlements POS et facture, la répartition automatique et les moyens de paiement désactivés sur desktop et mobile.
+- [x] Exécuter un test navigateur desktop et mobile couvrant POS intégral, facture partielle, répartition multiple, total incohérent et moyens désactivés.
+- [x] Ajouter un test d’intégration serveur prouvant le rejet d’un moyen de paiement désactivé lors de l’encaissement.
+- [x] Exécuter un test navigateur desktop et mobile couvrant facture partielle, répartition sur plusieurs moyens, blocage d’un total incohérent et masquage des moyens désactivés.
+- [x] Ajouter un test d’intégration de transactions.checkout prouvant le rejet BAD_REQUEST d’un moyen désactivé configuré dans saleSettings.
+- [x] Exécuter un test navigateur mobile couvrant la répartition multi-moyens, le blocage du total incohérent et le masquage d’un moyen désactivé dans l’encaissement facture.

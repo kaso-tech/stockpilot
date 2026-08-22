@@ -1,4 +1,12 @@
 export type SettlementMode = "full" | "partial";
+export type PaymentMethod = "cash" | "card" | "mobile_money" | "bank_transfer" | "credit";
+export type PaymentMethodSettings = { paymentCashEnabled?: boolean; paymentCardEnabled?: boolean; paymentMobileMoneyEnabled?: boolean; paymentBankTransferEnabled?: boolean; paymentCreditEnabled?: boolean };
+
+const paymentSettingKey: Record<PaymentMethod, keyof PaymentMethodSettings> = { cash: "paymentCashEnabled", card: "paymentCardEnabled", mobile_money: "paymentMobileMoneyEnabled", bank_transfer: "paymentBankTransferEnabled", credit: "paymentCreditEnabled" };
+
+export function assertPaymentMethodsEnabled(methods: PaymentMethod[], settings: PaymentMethodSettings | null | undefined) {
+  if (methods.some(method => settings?.[paymentSettingKey[method]] === false)) throw new Error("Un moyen de paiement sélectionné est désactivé dans les réglages.");
+}
 
 export function settlementResult(remainingCents: number, mode: SettlementMode, paymentAmounts: number[]) {
   const paidCents = paymentAmounts.reduce((sum, amount) => sum + Math.max(0, amount), 0);
