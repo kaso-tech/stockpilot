@@ -41,6 +41,29 @@ async function listSales(limit = 100) {
 export const commerceRouter = router({
   customers: router({
     list: protectedProcedure.query(async () => (await dbOrThrow()).select().from(customers).orderBy(customers.name)),
+    invoiceContext: protectedProcedure.input(z.object({ id: z.number().int().positive() })).query(async ({ input }) => {
+      const db = await dbOrThrow();
+      const customer = (await db.select().from(customers).where(eq(customers.id, input.id)).limit(1))[0];
+      if (!customer) throw new TRPCError({ code: "NOT_FOUND", message: "Client introuvable." });
+      const saleRows = await db.select({ id: sales.id, status: sales.status, createdAt: sales.createdAt, deliveryAddress: sales.deliveryAddress }).from(sales).where(eq(sales.customerId, input.id)).orderBy(desc(sales.createdAt)).limit(100);
+      const completedSales = saleRows.filter(sale => sale.status !== "void");
+      const saleIds = completedSales.map(sale => sale.id);
+      const items = saleIds.length ? await db.select().from(saleItems).where(inArray(saleItems.saleId, saleIds)) : [];
+      const productIds = Array.from(new Set(items.map(item => item.productId)));
+      const productRows = productIds.length ? await db.select().from(products).where(inArray(products.id, productIds)) : [];
+      const saleDates = new Map(completedSales.map(sale => [sale.id, sale.createdAt]));
+      const grouped = new Map<number, { productId: number; purchaseCount: number; quantity: number; lastBoughtAt: Date; product: typeof productRows[number] }>();
+      for (const item of items) {
+        const product = productRows.find(row => row.id === item.productId);
+        const lastBoughtAt = saleDates.get(item.saleId);
+        if (!product || !lastBoughtAt || product.quantity <= 0) continue;
+        const current = grouped.get(item.productId);
+        if (current) { current.purchaseCount += 1; current.quantity += item.quantity; if (lastBoughtAt > current.lastBoughtAt) current.lastBoughtAt = lastBoughtAt; }
+        else grouped.set(item.productId, { productId: product.id, purchaseCount: 1, quantity: item.quantity, lastBoughtAt, product });
+      }
+      const suggestions = Array.from(grouped.values()).sort((a, b) => b.purchaseCount - a.purchaseCount || b.lastBoughtAt.getTime() - a.lastBoughtAt.getTime()).slice(0, 6).map(item => ({ productId: item.productId, name: item.product.name, reference: item.product.reference, availableQuantity: item.product.quantity, purchaseCount: item.purchaseCount, quantity: item.quantity, lastBoughtAt: item.lastBoughtAt }));
+      return { deliveryAddress: completedSales.find(sale => sale.deliveryAddress?.trim())?.deliveryAddress ?? customer.address ?? null, suggestions };
+    }),
     get: protectedProcedure.input(z.object({ id: z.number().int().positive() })).query(async ({ input }) => {
       const db = await dbOrThrow();
       const customer = (await db.select().from(customers).where(eq(customers.id, input.id)).limit(1))[0];

@@ -379,3 +379,7 @@
 - [x] Ajouter une action Nouvelle facture depuis la fiche client.
 - [x] Préremplir et verrouiller la sélection du client dans le flux de création de facture.
 - [x] Tester l’ouverture d’une facture préremplie depuis une fiche client.
+- [x] Auditer les données d’adresse et les historiques de vente réutilisables à la facture.
+- [x] Préremplir l’adresse de livraison du client dans la création de facture.
+- [x] Suggérer les produits réellement achetés par le client et permettre leur ajout rapide.
+- [x] Tester la livraison préremplie et les suggestions produits sur desktop et mobile.

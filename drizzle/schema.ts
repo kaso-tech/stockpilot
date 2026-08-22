@@ -210,6 +210,7 @@ export const sales = mysqlTable("sales", {
   totalCostCents: int("totalCostCents").notNull(),
   netProfitCents: int("netProfitCents").notNull(),
   note: text("note"),
+  deliveryAddress: text("deliveryAddress"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   voidedAt: timestamp("voidedAt"),
 });
