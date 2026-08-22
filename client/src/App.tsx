@@ -9,6 +9,7 @@ import { PreferencesProvider } from "./contexts/PreferencesContext";
 import { OfflineProvider } from "./contexts/OfflineContext";
 import Alerts from "./pages/Alerts";
 import Agents from "./pages/Agents";
+import AgentDetail from "./pages/AgentDetail";
 import Customers from "./pages/Customers";
 import CustomerDetail from "./pages/CustomerDetail";
 import Home from "./pages/Home";
@@ -49,6 +50,7 @@ function Router() {
         <Route path={"/factures"} component={Invoices} />
         <Route path={"/factures/nouvelle"} component={InvoiceCreate} />
         <Route path={"/inventaires"} component={Inventories} />
+        <Route path={"/agents/:beneficiaryType/:id"} component={AgentDetail} />
         <Route path={"/agents"} component={Agents} />
         <Route path={"/parametres"} component={SettingsIndex} />
         <Route path={"/parametres/apparence"} component={SettingsAppearance} />

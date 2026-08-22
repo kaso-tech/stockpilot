@@ -18,5 +18,6 @@ export function calculateDiscount(subtotalCents: number, discount: DiscountForm)
 }
 
 export function DiscountEditor({ value, onChange, label = "Remise", compact = false }: { value: DiscountForm; onChange: (next: DiscountForm) => void; label?: string; compact?: boolean }) {
+  if (label === "Remise ligne") return null;
   return <div className={compact ? "flex items-center gap-2" : "grid gap-2 sm:grid-cols-[150px_1fr] sm:items-end"}><div className="space-y-1"><Label className="text-xs">{label}</Label><Select value={value.type} onValueChange={(type: DiscountForm["type"]) => onChange({ type, value: type === "none" ? "" : value.value })}><SelectTrigger className="h-9"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Aucune</SelectItem><SelectItem value="percent">Pourcentage</SelectItem><SelectItem value="fixed">Montant</SelectItem></SelectContent></Select></div>{value.type !== "none" && <div className="space-y-1"><Label className="text-xs">{value.type === "percent" ? "Taux (%)" : "Montant (FCFA)"}</Label><Input className="h-9" type="number" min="0" max={value.type === "percent" ? "100" : undefined} value={value.value} onChange={event => onChange({ ...value, value: event.target.value })} /></div>}</div>;
 }

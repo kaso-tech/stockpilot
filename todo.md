@@ -397,3 +397,9 @@
 - [x] Vérifier l’alerte de stock maximum sur desktop et mobile.
 - [x] Ajouter un lien de fiche produit directement dans l’alerte de stock maximum.
 - [x] Vérifier l’ouverture de la fiche produit depuis l’alerte.
+- [x] Auditer les remises de facture et les données agent disponibles.
+- [x] Retirer la remise par ligne de la création de facture.
+- [x] Transformer la liste Agents en cartes compactes et cliquables.
+- [x] Créer une fiche professionnelle d’agent avec historiques, commissions, statistiques et actions.
+- [x] Ajouter les contacts directs Appeler, Message, WhatsApp et E-mail depuis la fiche agent.
+- [x] Tester les parcours facture et agents sur desktop et mobile.
