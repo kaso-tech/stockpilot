@@ -155,3 +155,10 @@
 - [x] Exécuter un test navigateur desktop et mobile couvrant facture partielle, répartition sur plusieurs moyens, blocage d’un total incohérent et masquage des moyens désactivés.
 - [x] Ajouter un test d’intégration de transactions.checkout prouvant le rejet BAD_REQUEST d’un moyen désactivé configuré dans saleSettings.
 - [x] Exécuter un test navigateur mobile couvrant la répartition multi-moyens, le blocage du total incohérent et le masquage d’un moyen désactivé dans l’encaissement facture.
+- [x] Générer un reçu POS détaillé après un encaissement réussi et déclencher automatiquement son impression.
+- [x] Tester le reçu POS et son impression automatique sur desktop et mobile.
+- [x] Exécuter un test navigateur desktop validant l’ouverture, le contenu détaillé et l’impression automatique du reçu POS.
+- [x] Exécuter un test navigateur mobile validant le reçu POS automatique et le repli si la fenêtre est bloquée.
+- [x] Ajouter un test unitaire du générateur HTML de reçu POS et de son déclenchement d’impression.
+- [x] Exécuter un test navigateur desktop du flux POS complet déclenchant le reçu depuis l’interface après encaissement.
+- [x] Exécuter un test navigateur mobile du flux POS complet et du repli quand la fenêtre d’impression est bloquée.
