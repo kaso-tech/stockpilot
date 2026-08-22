@@ -299,3 +299,7 @@
 - [x] Protéger côté serveur les annulations, remboursements, corrections de stock et modifications de coût d’achat par vendeur.
 - [x] Afficher les contrôles et refus explicites dans les écrans de vente et paramètres.
 - [x] Tester les seuils, les autorisations et les parcours desktop/mobile.
+- [x] Retirer le champ Autre référence des formulaires Clients et Fournisseurs.
+- [x] Compacter les cartes de la liste Clients.
+- [x] Ajouter une fiche client complète accessible au clic sur une carte.
+- [x] Tester les formulaires et le détail client sur desktop et mobile.
