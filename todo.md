@@ -170,3 +170,7 @@
 - [x] Reproduire le panier POS flottant ouvert et ancré en bas de page selon le modèle fourni.
 - [x] Limiter sur mobile la zone des articles du panier à trois lignes visibles avec défilement au-delà.
 - [x] Vérifier l’ajout, les quantités, le total et l’encaissement du panier sur desktop et mobile.
+- [x] Ajouter un bouton pour réduire ou réouvrir le panier flottant POS.
+- [x] Afficher un indicateur de stock faible dans les lignes du panier POS.
+- [x] Ajouter un raccourci clavier accessible pour ouvrir l’encaissement POS.
+- [x] Tester les nouveaux contrôles de panier sur desktop et mobile.
