@@ -389,3 +389,5 @@
 - [x] Déplacer le bouton Nouvelle facture auprès des contacts client.
 - [x] Remplacer le champ Prix manuel par une édition directe du prix affiché dans chaque ligne de facture.
 - [x] Vérifier les parcours client et facture sur desktop et mobile.
+- [x] Ajouter les boutons − et + autour de la quantité dans chaque ligne de facture.
+- [x] Respecter les limites de stock et vérifier le rendu responsive des contrôles.
