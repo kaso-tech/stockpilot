@@ -251,3 +251,7 @@
 - [x] Ajouter recherche et filtres de tri dans la gestion des clients.
 - [x] Ajouter au tableau de bord un widget de factures impayées et d’activité récente des clients.
 - [x] Tester les validations, confirmations, filtres et le widget sur desktop et mobile.
+- [x] Ajouter un scanner de code-barres à la création et à la modification d’un produit.
+- [x] Créer une gestion administrable des unités de mesure.
+- [x] Remplacer le champ Unité du produit par un sélecteur d’unités administrables.
+- [x] Tester le scan, les unités et la fiche produit sur desktop et mobile.

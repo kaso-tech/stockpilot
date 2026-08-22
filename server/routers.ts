@@ -9,6 +9,7 @@ import {
   expenses,
   inventorySessions,
   productCategories,
+  productUnits,
   products,
   productPriceTiers,
   remunerationProfiles,
@@ -67,6 +68,7 @@ const supplierInput = z.object({
   phone: z.string().trim().max(50).nullable(),
 });
 const categoryInput = z.object({ name: z.string().trim().min(2).max(100) });
+const unitInput = z.object({ name: z.string().trim().min(1).max(30).regex(/^[A-Za-zÀ-ÖØ-öø-ÿ0-9\s'-]+$/, "Caractères non autorisés") });
 
 async function requireDb() {
   const db = await getDb();
@@ -275,6 +277,13 @@ export const appRouter = router({
     create: adminProcedure.input(categoryInput).mutation(async ({ ctx, input }) => { const db = await requireDb(); try { const result = await db.insert(productCategories).values(input); const id = Number(result[0].insertId); await createAudit(ctx.user.id, "Création", "Catégorie", id, `Catégorie ${input.name} créée`); return { id }; } catch (error) { throw new TRPCError({ code: "CONFLICT", message: "Cette catégorie existe déjà.", cause: error }); } }),
     update: adminProcedure.input(categoryInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await requireDb(); const current = (await db.select().from(productCategories).where(eq(productCategories.id, input.id)).limit(1))[0]; if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Catégorie introuvable." }); try { await db.transaction(async tx => { await tx.update(productCategories).set({ name: input.name }).where(eq(productCategories.id, input.id)); await tx.update(products).set({ category: input.name }).where(eq(products.category, current.name)); }); await createAudit(ctx.user.id, "Modification", "Catégorie", input.id, `Catégorie ${current.name} renommée en ${input.name}`); return { success: true }; } catch (error) { throw new TRPCError({ code: "CONFLICT", message: "Cette catégorie existe déjà.", cause: error }); } }),
     remove: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await requireDb(); const current = (await db.select().from(productCategories).where(eq(productCategories.id, input.id)).limit(1))[0]; if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Catégorie introuvable." }); const usedBy = await db.select({ id: products.id }).from(products).where(eq(products.category, current.name)).limit(1); if (!categoryCanBeRemoved(usedBy.length)) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Cette catégorie est utilisée par des produits et ne peut pas être supprimée." }); await db.delete(productCategories).where(eq(productCategories.id, input.id)); await createAudit(ctx.user.id, "Suppression", "Catégorie", input.id, `Catégorie ${current.name} supprimée`); return { success: true }; }),
+  }),
+
+  units: router({
+    list: protectedProcedure.query(async () => (await requireDb()).select().from(productUnits).orderBy(productUnits.name)),
+    create: adminProcedure.input(unitInput).mutation(async ({ ctx, input }) => { const db = await requireDb(); try { const result = await db.insert(productUnits).values(input); const id = Number(result[0].insertId); await createAudit(ctx.user.id, "Création", "Unité", id, `Unité ${input.name} créée`); return { id }; } catch (error) { throw new TRPCError({ code: "CONFLICT", message: "Cette unité existe déjà.", cause: error }); } }),
+    update: adminProcedure.input(unitInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await requireDb(); const current = (await db.select().from(productUnits).where(eq(productUnits.id, input.id)).limit(1))[0]; if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Unité introuvable." }); try { await db.transaction(async tx => { await tx.update(productUnits).set({ name: input.name }).where(eq(productUnits.id, input.id)); await tx.update(products).set({ unit: input.name }).where(eq(products.unit, current.name)); }); await createAudit(ctx.user.id, "Modification", "Unité", input.id, `Unité ${current.name} renommée en ${input.name}`); return { success: true }; } catch (error) { throw new TRPCError({ code: "CONFLICT", message: "Cette unité existe déjà.", cause: error }); } }),
+    remove: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await requireDb(); const current = (await db.select().from(productUnits).where(eq(productUnits.id, input.id)).limit(1))[0]; if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Unité introuvable." }); const usedBy = await db.select({ id: products.id }).from(products).where(eq(products.unit, current.name)).limit(1); if (usedBy.length) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Cette unité est utilisée par des produits et ne peut pas être supprimée." }); await db.delete(productUnits).where(eq(productUnits.id, input.id)); await createAudit(ctx.user.id, "Suppression", "Unité", input.id, `Unité ${current.name} supprimée`); return { success: true }; }),
   }),
 
   suppliers: router({

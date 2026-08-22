@@ -25,6 +25,7 @@ import SettingsIdentity from "./pages/SettingsIdentity";
 import Backups from "./pages/Backups";
 import Expenses from "./pages/Expenses";
 import Categories from "./pages/Categories";
+import Units from "./pages/Units";
 import SettingsPos from "./pages/SettingsPos";
 import SettingsHistory from "./pages/SettingsHistory";
 import SettingsDashboard from "./pages/SettingsDashboard";
@@ -51,6 +52,7 @@ function Router() {
         <Route path={"/depenses"} component={Expenses} />
         <Route path={"/produits"} component={Products} />
         <Route path={"/categories"} component={Categories} />
+        <Route path={"/unites"} component={Units} />
         <Route path={"/mouvements"} component={Movements} />
         <Route path={"/fournisseurs"} component={Suppliers} />
         <Route path={"/alertes"} component={Alerts} />

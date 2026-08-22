@@ -72,6 +72,13 @@ export const productCategories = mysqlTable("productCategories", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+export const productUnits = mysqlTable("productUnits", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 30 }).notNull().unique(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 export const customers = mysqlTable("customers", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 180 }).notNull(),
