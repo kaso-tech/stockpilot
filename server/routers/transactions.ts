@@ -8,12 +8,13 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { resultingStock, signedMovementQuantity } from "../stockRules";
 import { assertPaymentMethodsEnabled, settlementResult } from "../transactionRules";
 import { discountCents, type DiscountType } from "../discountRules";
+import { assertExplicitInvoiceAgentChoice } from "../agentSelectionRules";
 
 const paymentMethod = z.enum(["cash", "card", "mobile_money", "bank_transfer", "credit"]);
 const discountInput = z.object({ type: z.enum(["none", "percent", "fixed"]), value: z.number().int().min(0) });
 const itemInput = z.object({ productId: z.number().int().positive(), quantity: z.number().int().positive(), discount: discountInput.default({ type: "none", value: 0 }) });
 const paymentInput = z.object({ method: paymentMethod, amountCents: z.number().int().positive() });
-const agentSelection = z.object({ salesAgentId: z.number().int().positive().nullable(), cashierId: z.number().int().positive().nullable() });
+const agentSelection = z.object({ salesAgentId: z.number().int().positive().nullable(), cashierId: z.number().int().positive().nullable(), salesAgentSelectionMade: z.boolean().optional().default(false), cashierSelectionMade: z.boolean().optional().default(false) });
 
 async function dbOrThrow() {
   const db = await getDb();
@@ -26,10 +27,13 @@ function invoiceNumber(channel: "pos" | "invoice") {
   return `${prefix}-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-${Date.now().toString().slice(-7)}`;
 }
 
-async function validateAgents(tx: any, selected: { salesAgentId: number | null; cashierId: number | null }) {
+async function validateAgents(tx: any, selected: { salesAgentId: number | null; cashierId: number | null; salesAgentSelectionMade?: boolean; cashierSelectionMade?: boolean }, channel?: "pos" | "invoice") {
   const settings = (await tx.select().from(saleSettings).limit(1))[0];
   const salesAgentId = selected.salesAgentId ?? settings?.defaultSalesAgentId ?? null;
   const cashierId = selected.cashierId ?? settings?.defaultCashierId ?? null;
+  if (channel === "invoice") {
+    try { assertExplicitInvoiceAgentChoice({ requiresSalesAgentChoice: !settings?.defaultSalesAgentId, requiresCashierChoice: !settings?.defaultCashierId, salesAgentSelectionMade: selected.salesAgentSelectionMade ?? false, cashierSelectionMade: selected.cashierSelectionMade ?? false }); } catch (error) { throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "Sélectionnez les intervenants." }); }
+  }
   if (settings?.requireSalesAgent && !salesAgentId) throw new TRPCError({ code: "BAD_REQUEST", message: "Un agent commercial est requis." });
   if (settings?.requireCashier && !cashierId) throw new TRPCError({ code: "BAD_REQUEST", message: "Un caissier est requis." });
   const ids = [salesAgentId, cashierId].filter((id): id is number => id !== null);
@@ -66,7 +70,7 @@ export const transactionsRouter = router({
       const invoiceDiscountCents = discountCents(lineNetCents, input.invoiceDiscount.type as DiscountType, input.invoiceDiscount.value);
       const totalCents = lineNetCents - invoiceDiscountCents;
       const totalCostCents = lines.reduce((sum, line) => sum + line.lineCostCents, 0);
-      const assigned = await validateAgents(tx, input);
+      const assigned = await validateAgents(tx, input, input.channel);
       const number = invoiceNumber(input.channel);
       const result = await tx.insert(sales).values({ invoiceNumber: number, channel: input.channel, customerId: customer?.id ?? null, sellerUserId: ctx.user.id, ...assigned, paymentMethod: "cash", amountPaidCents: 0, subtotalCents, invoiceDiscountType: input.invoiceDiscount.type, invoiceDiscountValue: input.invoiceDiscount.value, invoiceDiscountCents, totalCents, totalCostCents, netProfitCents: totalCents - totalCostCents, note: input.note, status: "draft" });
       const saleId = Number(result[0].insertId);

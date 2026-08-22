@@ -236,3 +236,7 @@
 - [x] Tester la gestion des clients, les autorisations et les rendus desktop/mobile.
 - [x] Inclure les paiements agents comme segment dédié dans le graphique de répartition des dépenses.
 - [x] Vérifier les montants, libellés et couleurs du graphique sur desktop et mobile.
+- [x] Exiger explicitement la sélection d’un agent à la création de facture sans présélectionner « Aucun ».
+- [x] Corriger la courbe Dynamique des ventes pour afficher la devise FCFA active.
+- [x] Ajouter des préférences pour afficher ou masquer les éléments du tableau de bord.
+- [x] Tester les validations facture, la devise et les préférences sur desktop et mobile.

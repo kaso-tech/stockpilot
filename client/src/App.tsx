@@ -27,6 +27,7 @@ import Expenses from "./pages/Expenses";
 import Categories from "./pages/Categories";
 import SettingsPos from "./pages/SettingsPos";
 import SettingsHistory from "./pages/SettingsHistory";
+import SettingsDashboard from "./pages/SettingsDashboard";
 
 function Router() {
   return (
@@ -44,6 +45,7 @@ function Router() {
         <Route path={"/parametres/devise"} component={SettingsCurrency} />
         <Route path={"/parametres/identite"} component={SettingsIdentity} />
         <Route path={"/parametres/pos"} component={SettingsPos} />
+        <Route path={"/parametres/tableau-de-bord"} component={SettingsDashboard} />
         <Route path={"/parametres/historique"} component={SettingsHistory} />
         <Route path={"/sauvegardes"} component={Backups} />
         <Route path={"/depenses"} component={Expenses} />
