@@ -43,15 +43,17 @@
 }
 
 :root {
-  --primary: var(--color-blue-700);
-  --primary-foreground: var(--color-blue-50);
-  --sidebar-primary: var(--color-blue-600);
-  --sidebar-primary-foreground: var(--color-blue-50);
-  --chart-1: var(--color-blue-300);
-  --chart-2: var(--color-blue-500);
-  --chart-3: var(--color-blue-600);
-  --chart-4: var(--color-blue-700);
-  --chart-5: var(--color-blue-800);
+  --app-primary: #007B8B;
+  --app-primary-foreground: #FFFFFF;
+  --primary: var(--app-primary);
+  --primary-foreground: var(--app-primary-foreground);
+  --sidebar-primary: var(--app-primary);
+  --sidebar-primary-foreground: var(--app-primary-foreground);
+  --chart-1: color-mix(in srgb, var(--app-primary), white 55%);
+  --chart-2: color-mix(in srgb, var(--app-primary), white 25%);
+  --chart-3: var(--app-primary);
+  --chart-4: color-mix(in srgb, var(--app-primary), black 20%);
+  --chart-5: color-mix(in srgb, var(--app-primary), black 38%);
   --radius: 0.65rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.235 0.015 65);
@@ -69,20 +71,20 @@
   --destructive-foreground: oklch(0.985 0 0);
   --border: oklch(0.92 0.004 286.32);
   --input: oklch(0.92 0.004 286.32);
-  --ring: oklch(0.623 0.214 259.815);
+  --ring: var(--app-primary);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.235 0.015 65);
   --sidebar-accent: oklch(0.967 0.001 286.375);
   --sidebar-accent-foreground: oklch(0.141 0.005 285.823);
   --sidebar-border: oklch(0.92 0.004 286.32);
-  --sidebar-ring: oklch(0.623 0.214 259.815);
+  --sidebar-ring: var(--app-primary);
 }
 
 .dark {
-  --primary: oklch(0.84 0.13 195);
-  --primary-foreground: oklch(0.17 0.02 245);
-  --sidebar-primary: oklch(0.84 0.13 195);
-  --sidebar-primary-foreground: oklch(0.17 0.02 245);
+  --primary: var(--app-primary);
+  --primary-foreground: var(--app-primary-foreground);
+  --sidebar-primary: var(--app-primary);
+  --sidebar-primary-foreground: var(--app-primary-foreground);
   --background: oklch(0.12 0.012 255);
   --foreground: oklch(0.93 0.01 255);
   --card: oklch(0.17 0.015 255);
@@ -99,8 +101,8 @@
   --destructive-foreground: oklch(0.99 0 0);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 14%);
-  --ring: oklch(0.84 0.13 195);
-  --chart-1: oklch(0.84 0.13 195);
+  --ring: var(--app-primary);
+  --chart-1: var(--app-primary);
   --chart-2: oklch(0.76 0.14 285);
   --chart-3: oklch(0.78 0.15 150);
   --chart-4: oklch(0.82 0.15 80);
@@ -110,7 +112,7 @@
   --sidebar-accent: oklch(0.22 0.02 255);
   --sidebar-accent-foreground: oklch(0.96 0.01 255);
   --sidebar-border: oklch(1 0 0 / 8%);
-  --sidebar-ring: oklch(0.84 0.13 195);
+  --sidebar-ring: var(--app-primary);
 }
 
 @layer base {
@@ -184,11 +186,18 @@ html:not(.dark) .text-white, html:not(.dark) .text-slate-100 { color: #0b2545 !i
 html:not(.dark) .text-slate-200 { color: #1e3a5f !important; }
 html:not(.dark) .text-slate-300, html:not(.dark) .text-slate-400 { color: #466581 !important; }
 html:not(.dark) .text-slate-500, html:not(.dark) .text-slate-600 { color: #63809d !important; }
-html:not(.dark) .border-white\/10, html:not(.dark) .border-white\/\[0\.07\], html:not(.dark) .border-white\/\[0\.06\] { border-color: rgba(0, 123, 139, 0.15) !important; }
-html:not(.dark) main { background-color: #eff6ff !important; background-image: radial-gradient(circle at 80% -5%, rgba(0,123,139,.10), transparent 25%), linear-gradient(rgba(0,123,139,.045) 1px, transparent 1px), linear-gradient(90deg, rgba(0,123,139,.045) 1px, transparent 1px) !important; }
-html:not(.dark) .commercial-hero { background: linear-gradient(110deg, #d8f3fa, #ffffff) !important; border-color: rgba(0, 123, 139, .22) !important; }
-html:not(.dark) .commercial-hero .text-cyan-200, html:not(.dark) .commercial-hero .text-cyan-100 { color: #007b8b !important; }
-html:not(.dark) .commercial-hero .bg-black\/10 { background-color: rgba(255, 255, 255, .72) !important; border-color: rgba(0, 123, 139, .14) !important; }
+html:not(.dark) .border-white\/10, html:not(.dark) .border-white\/\[0\.07\], html:not(.dark) .border-white\/\[0\.06\] { border-color: color-mix(in srgb, var(--app-primary), transparent 85%) !important; }
+html:not(.dark) main { background-color: #eff6ff !important; background-image: radial-gradient(circle at 80% -5%, color-mix(in srgb, var(--app-primary), transparent 90%), transparent 25%), linear-gradient(color-mix(in srgb, var(--app-primary), transparent 95%) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--app-primary), transparent 95%) 1px, transparent 1px) !important; }
+html:not(.dark) .commercial-hero { background: linear-gradient(110deg, color-mix(in srgb, var(--app-primary), white 86%), #ffffff) !important; border-color: color-mix(in srgb, var(--app-primary), transparent 78%) !important; }
+html:not(.dark) .commercial-hero .text-cyan-200, html:not(.dark) .commercial-hero .text-cyan-100 { color: var(--app-primary) !important; }
+html:not(.dark) .commercial-hero .bg-black\/10 { background-color: rgba(255, 255, 255, .72) !important; border-color: color-mix(in srgb, var(--app-primary), transparent 86%) !important; }
+
+:is(.bg-cyan-400, .bg-cyan-500, .bg-\[\#007B8B\], .bg-\[\#00cbe6\]) { background-color: var(--app-primary) !important; color: var(--app-primary-foreground) !important; }
+:is(.text-cyan-200, .text-cyan-300, .text-cyan-400, .text-\[\#007B8B\], .text-\[\#00bcd4\]) { color: var(--app-primary) !important; }
+:is(.border-cyan-400, .border-cyan-500, .border-\[\#007B8B\]) { border-color: var(--app-primary) !important; }
+:is(.bg-cyan-400\/10, .bg-cyan-400\/15, .bg-cyan-400\/20, .bg-\[\#00bcd4\]\/\[0\.06\], .bg-\[\#00bcd4\]\/\[0\.07\]) { background-color: color-mix(in srgb, var(--app-primary), transparent 90%) !important; }
+:is(.border-\[\#00bcd4\]\/20, .border-\[\#00bcd4\]\/40, .border-cyan-300\/20) { border-color: color-mix(in srgb, var(--app-primary), transparent 75%) !important; }
+:is(.hover\:bg-cyan-300:hover, .hover\:bg-\[\#006a78\]:hover, .hover\:bg-\[\#006976\]:hover, .hover\:bg-\[\#66ddea\]:hover) { background-color: color-mix(in srgb, var(--app-primary), black 14%) !important; }
 
 @media (max-width: 639px) {
   .fixed.inset-y-0.right-0.z-40.w-full.max-w-md {

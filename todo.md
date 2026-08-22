@@ -181,3 +181,6 @@
 - [x] Générer une liste d’achats fournisseur à partir des produits filtrés en stock faible.
 - [x] Calculer les quantités à commander pour atteindre le seuil minimal de chaque produit.
 - [x] Vérifier la liste d’achats fournisseur sur desktop et mobile.
+- [x] Harmoniser les boutons des pages Paramètres avec les actions principales de l’application.
+- [x] Ajouter un réglage de couleur principale appliqué globalement aux boutons, badges et icônes.
+- [x] Vérifier le changement de couleur sur les thèmes clair et sombre, desktop et mobile.

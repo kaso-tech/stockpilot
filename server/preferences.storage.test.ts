@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readPreference, writePreference } from "../client/src/lib/preferenceStorage";
+import { normalizePrimaryColor, primaryForeground } from "../client/src/lib/primaryColor";
 
 function memoryStorage() {
   const values = new Map<string, string>();
@@ -19,5 +20,11 @@ describe("persistance des préférences", () => {
     const storage = memoryStorage();
     writePreference(storage as Storage, "theme", "violet");
     expect(readPreference(storage as Storage, "theme", ["light", "dark"], "dark")).toBe("dark");
+  });
+  it("normalise une couleur principale et préserve le contraste du texte", () => {
+    expect(normalizePrimaryColor("#6d28d9")).toBe("#6D28D9");
+    expect(normalizePrimaryColor("violet")).toBe("#007B8B");
+    expect(primaryForeground("#FDE047")).toBe("#102030");
+    expect(primaryForeground("#007B8B")).toBe("#FFFFFF");
   });
 });

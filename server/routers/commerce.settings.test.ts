@@ -38,6 +38,11 @@ describe("commerce.settings.save", () => {
     await caller.settings.save({ defaultSalesAgentId: null, defaultCashierId: null, requireSalesAgent: true, requireCashier: false, currency: "XOF", ticketHeader: "Bienvenue chez Bati Pro", ticketFooter: "Merci et à bientôt", ticketWidthMm: "58" });
     expect(inserts.find(item => item.table === saleSettings)?.values).toMatchObject({ requireSalesAgent: true, ticketHeader: "Bienvenue chez Bati Pro", ticketFooter: "Merci et à bientôt", ticketWidthMm: "58" });
   });
+  it("enregistre une couleur principale hexadécimale pour l’application", async () => {
+    const caller = commerceRouter.createCaller(adminContext());
+    await caller.settings.save({ defaultSalesAgentId: null, defaultCashierId: null, requireSalesAgent: false, requireCashier: false, currency: "XOF", primaryColor: "#6D28D9" });
+    expect(inserts.find(item => item.table === saleSettings)?.values).toMatchObject({ primaryColor: "#6D28D9" });
+  });
   it("enregistre l’activation indépendante des moyens de paiement", async () => {
     const caller = commerceRouter.createCaller(adminContext());
     await caller.settings.save({ defaultSalesAgentId: null, defaultCashierId: null, requireSalesAgent: false, requireCashier: false, currency: "XOF", paymentCashEnabled: true, paymentMobileMoneyEnabled: false, paymentCardEnabled: true, paymentBankTransferEnabled: false, paymentCreditEnabled: false });

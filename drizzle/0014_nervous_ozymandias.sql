@@ -1,0 +1,1 @@
+ALTER TABLE `saleSettings` ADD `primaryColor` varchar(7) DEFAULT '#007B8B' NOT NULL;

@@ -91,6 +91,7 @@ export const saleSettings = mysqlTable("saleSettings", {
   requireSalesAgent: boolean("requireSalesAgent").notNull().default(false),
   requireCashier: boolean("requireCashier").notNull().default(false),
   currency: mysqlEnum("currency", ["USD", "EUR", "XOF"]).notNull().default("XOF"),
+  primaryColor: varchar("primaryColor", { length: 7 }).notNull().default("#007B8B"),
   companyName: varchar("companyName", { length: 200 }).notNull().default("StockPilot"),
   companyLogoUrl: text("companyLogoUrl"),
   companySignatureUrl: text("companySignatureUrl"),
