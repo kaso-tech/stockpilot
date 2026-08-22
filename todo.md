@@ -334,3 +334,4 @@
 - [x] Aligner les filtres du catalogue Produits sur une ligne avec repli responsive sur mobile.
 - [x] Adapter automatiquement le header au thème clair ou sombre sélectionné.
 - [x] Vérifier le header dans les deux thèmes sur desktop et mobile.
+- [x] Corriger l’aperçu de format des prix pour qu’il suive exactement les réglages sélectionnés.
