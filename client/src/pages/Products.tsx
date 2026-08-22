@@ -45,8 +45,8 @@ export default function Products() {
   }), [products, query, filterCategory, filterSupplier, filterStatus]);
   const hasFilters = Boolean(query) || filterCategory !== "all" || filterSupplier !== "all" || filterStatus !== "all";
   const refresh = () => { utils.products.list.invalidate(); utils.dashboard.get.invalidate(); };
-  const create = trpc.products.create.useMutation({ onSuccess: () => { refresh(); toast.success("Produit créé."); }, onError: error => toast.error(error.message) });
-  const update = trpc.products.update.useMutation({ onSuccess: () => { refresh(); toast.success("Produit mis à jour."); }, onError: error => toast.error(error.message) });
+  const create = trpc.products.create.useMutation({ onSuccess: () => { refresh(); close(); toast.success("Produit créé.", { description: "La référence est disponible dans le catalogue et le point de vente." }); }, onError: error => toast.error(error.message) });
+  const update = trpc.products.update.useMutation({ onSuccess: () => { refresh(); close(); toast.success("Produit mis à jour.", { description: "Les niveaux de stock et tarifs ont été actualisés." }); }, onError: error => toast.error(error.message) });
   const remove = trpc.products.remove.useMutation({ onSuccess: () => { refresh(); toast.success("Produit supprimé."); }, onError: error => toast.error(error.message) });
 
   const reset = () => { setForm(emptyProduct); setEditingId(null); };

@@ -74,7 +74,7 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider defaultTheme="dark" switchable>
         <TooltipProvider>
-          <PreferencesProvider><Toaster /><Router /></PreferencesProvider>
+          <PreferencesProvider><Toaster richColors closeButton position="top-right" /><Router /></PreferencesProvider>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

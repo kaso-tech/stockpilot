@@ -255,3 +255,7 @@
 - [x] Créer une gestion administrable des unités de mesure.
 - [x] Remplacer le champ Unité du produit par un sélecteur d’unités administrables.
 - [x] Tester le scan, les unités et la fiche produit sur desktop et mobile.
+- [x] Renforcer les alertes de niveaux de stock bas dans le tableau de bord.
+- [x] Afficher une action rapide depuis les alertes de stock pour réapprovisionner les produits concernés.
+- [x] Harmoniser les toasts de réussite pour les principales actions métier, dont produits et factures.
+- [x] Tester les alertes et notifications sur desktop et mobile.
