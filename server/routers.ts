@@ -49,6 +49,7 @@ import { categoryCanBeRemoved } from "./categoryRules";
 const productInput = z.object({
   reference: z.string().trim().min(2).max(80),
   name: z.string().trim().min(2).max(200),
+  description: z.string().trim().max(2000).nullable(),
   category: z.string().trim().min(2).max(100),
   unit: z.string().trim().min(1).max(30),
   purchasePriceCents: z.number().int().min(0),

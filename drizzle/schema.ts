@@ -47,6 +47,7 @@ export const products = mysqlTable("products", {
   id: int("id").autoincrement().primaryKey(),
   reference: varchar("reference", { length: 80 }).notNull().unique(),
   name: varchar("name", { length: 200 }).notNull(),
+  description: text("description"),
   category: varchar("category", { length: 100 }).notNull(),
   unit: varchar("unit", { length: 30 }).notNull().default("unité"),
   purchasePriceCents: int("purchasePriceCents").notNull().default(0),

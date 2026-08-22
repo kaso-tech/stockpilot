@@ -273,3 +273,7 @@
 - [x] Ajouter les champs Numéro fiscal et Notes aux clients et fournisseurs.
 - [x] Réorganiser les formulaires selon l’ordre demandé et clarifier Autre référence.
 - [x] Tester les formulaires et fiches clients-fournisseurs sur desktop et mobile.
+- [x] Ajouter un champ Description aux produits et l’afficher dans leur fiche détaillée.
+- [x] Ajouter un centre d’export CSV pour les produits, fournisseurs et clients.
+- [x] Ajouter un import CSV validé des produits, fournisseurs et clients.
+- [x] Tester les formats CSV, les validations et les contrôles desktop/mobile.

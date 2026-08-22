@@ -29,6 +29,7 @@ import Units from "./pages/Units";
 import SettingsPos from "./pages/SettingsPos";
 import SettingsHistory from "./pages/SettingsHistory";
 import SettingsDashboard from "./pages/SettingsDashboard";
+import DataExchange from "./pages/DataExchange";
 
 function Router() {
   return (
@@ -57,6 +58,7 @@ function Router() {
         <Route path={"/fournisseurs"} component={Suppliers} />
         <Route path={"/alertes"} component={Alerts} />
         <Route path={"/journal"} component={AuditLog} />
+        <Route path={"/donnees"} component={DataExchange} />
         <Route path={"/404"} component={NotFound} />
         <Route component={NotFound} />
       </Switch>

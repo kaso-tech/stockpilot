@@ -71,6 +71,7 @@ const menuItems = [
   { icon: Truck, label: "Fournisseurs", path: "/fournisseurs" },
   { icon: UsersRound, label: "Agents & paie", path: "/agents" },
   { icon: WalletCards, label: "Dépenses", path: "/depenses" },
+  { icon: Archive, label: "Import & export", path: "/donnees" },
   { icon: SlidersHorizontal, label: "Paramètres", path: "/parametres" },
   { icon: DatabaseBackup, label: "Sauvegardes", path: "/sauvegardes" },
   { icon: TriangleAlert, label: "Alertes", path: "/alertes" },

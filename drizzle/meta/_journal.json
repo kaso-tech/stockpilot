@@ -183,6 +183,13 @@
       "when": 1787407711406,
       "tag": "0025_many_sentinel",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "5",
+      "when": 1787408837997,
+      "tag": "0026_secret_wind_dancer",
+      "breakpoints": true
     }
   ]
 }
