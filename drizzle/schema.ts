@@ -111,12 +111,14 @@ export const saleSettings = mysqlTable("saleSettings", {
 export const sales = mysqlTable("sales", {
   id: int("id").autoincrement().primaryKey(),
   invoiceNumber: varchar("invoiceNumber", { length: 60 }).notNull().unique(),
-  customerId: int("customerId").notNull(),
+  channel: mysqlEnum("channel", ["pos", "invoice"]).notNull().default("invoice"),
+  customerId: int("customerId"),
   sellerUserId: int("sellerUserId").notNull(),
   salesAgentId: int("salesAgentId"),
   cashierId: int("cashierId"),
-  status: mysqlEnum("status", ["paid", "void"]).notNull().default("paid"),
+  status: mysqlEnum("status", ["draft", "partial", "paid", "void"]).notNull().default("draft"),
   paymentMethod: mysqlEnum("paymentMethod", ["cash", "card", "mobile_money", "bank_transfer", "credit"]).notNull().default("cash"),
+  amountPaidCents: int("amountPaidCents").notNull().default(0),
   subtotalCents: int("subtotalCents").notNull(),
   totalCents: int("totalCents").notNull(),
   totalCostCents: int("totalCostCents").notNull(),
@@ -124,6 +126,15 @@ export const sales = mysqlTable("sales", {
   note: text("note"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   voidedAt: timestamp("voidedAt"),
+});
+
+export const salePayments = mysqlTable("salePayments", {
+  id: int("id").autoincrement().primaryKey(),
+  saleId: int("saleId").notNull(),
+  method: mysqlEnum("method", ["cash", "card", "mobile_money", "bank_transfer", "credit"]).notNull(),
+  amountCents: int("amountCents").notNull(),
+  createdByUserId: int("createdByUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
 export const saleItems = mysqlTable("saleItems", {

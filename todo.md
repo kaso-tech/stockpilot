@@ -122,3 +122,14 @@
 - [x] Tester la génération réelle du lien signé de téléchargement depuis le service de stockage.
 - [x] Exécuter un parcours mobile avec les vraies routes de sauvegarde, sans interception complète des API.
 - [x] Exécuter un parcours mobile réel de création, téléchargement et planification, sans restauration destructive.
+- [x] Séparer les parcours POS, création de facture et encaissement dans l’interface et les services métier.
+- [x] Ajouter le règlement intégral ou partiel avec moyen de paiement et solde restant.
+- [x] Construire un écran d’encaissement commun avec total, paiements, agents, validation et annulation.
+- [x] Refaire le POS sans client obligatoire, avec panier flottant et accès direct à l’encaissement.
+- [x] Refaire la création de facture avec client obligatoire, agents et actions Enregistrer, Imprimer, Encaisser, Annuler.
+- [x] Ajouter un sélecteur de produits par recherche et action de scan à la création de facture.
+- [x] Tester les flux POS, facture, encaissement intégral et partiel sur desktop et mobile.
+- [x] Déclencher réellement l’impression A4 après le bouton Imprimer de la création de facture.
+- [x] Couvrir en E2E un encaissement POS intégral et une facture avec encaissement partiel.
+- [x] Couvrir sur mobile l’ouverture du panier, l’encaissement et l’ajout produit facturé par recherche et scan.
+- [x] Couvrir en E2E mobile la recherche de produit puis l’ajout par scan dans le sélecteur de facture.

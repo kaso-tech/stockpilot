@@ -11,6 +11,7 @@ import Agents from "./pages/Agents";
 import Customers from "./pages/Customers";
 import Home from "./pages/Home";
 import Invoices from "./pages/Invoices";
+import InvoiceCreate from "./pages/InvoiceCreate";
 import Inventories from "./pages/Inventories";
 import Movements from "./pages/Movements";
 import PointOfSale from "./pages/PointOfSale";
@@ -33,6 +34,7 @@ function Router() {
         <Route path={"/pos"} component={PointOfSale} />
         <Route path={"/clients"} component={Customers} />
         <Route path={"/factures"} component={Invoices} />
+        <Route path={"/factures/nouvelle"} component={InvoiceCreate} />
         <Route path={"/inventaires"} component={Inventories} />
         <Route path={"/agents"} component={Agents} />
         <Route path={"/parametres"} component={SettingsIndex} />

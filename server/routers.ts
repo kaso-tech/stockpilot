@@ -33,6 +33,7 @@ import { commerceRouter } from "./routers/commerce";
 import { inventoryRouter } from "./routers/inventory";
 import { payrollRouter } from "./routers/payroll";
 import { backupRouter } from "./routers/backups";
+import { transactionsRouter } from "./routers/transactions";
 import { sdk } from "./_core/sdk";
 import { verifyPassword } from "./passwords";
 
@@ -118,6 +119,7 @@ export const appRouter = router({
   inventory: inventoryRouter,
   payroll: payrollRouter,
   backups: backupRouter,
+  transactions: transactionsRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -190,7 +192,7 @@ export const appRouter = router({
         recentMovements: movements.slice(0, 6),
         trend,
         salesTrend,
-        recentSales: paidSales.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 5).map(sale => ({ id: sale.id, invoiceNumber: sale.invoiceNumber, totalCents: sale.totalCents, netProfitCents: sale.netProfitCents, createdAt: sale.createdAt, customerName: customerMap.get(sale.customerId)?.name ?? "Client", customerType: customerMap.get(sale.customerId)?.type ?? "ordinary" })),
+        recentSales: paidSales.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 5).map(sale => { const customer = sale.customerId ? customerMap.get(sale.customerId) : undefined; return { id: sale.id, invoiceNumber: sale.invoiceNumber, totalCents: sale.totalCents, netProfitCents: sale.netProfitCents, createdAt: sale.createdAt, customerName: customer?.name ?? "Vente comptoir", customerType: customer?.type ?? "ordinary" }; }),
       };
     }),
   }),
