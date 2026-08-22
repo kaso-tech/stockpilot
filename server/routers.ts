@@ -8,6 +8,7 @@ import {
   expenseBudgets,
   expenses,
   inventorySessions,
+  productCategories,
   products,
   productPriceTiers,
   remunerationProfiles,
@@ -41,6 +42,7 @@ import { expensesRouter } from "./routers/expenses";
 import { agentPaymentExpenseRows, budgetComparison, expenseBreakdownByCategory, monthlyExpenseTotalCents, operatingNetProfitCents } from "./expenseRules";
 import { sdk } from "./_core/sdk";
 import { verifyPassword } from "./passwords";
+import { categoryCanBeRemoved } from "./categoryRules";
 
 const productInput = z.object({
   reference: z.string().trim().min(2).max(80),
@@ -62,6 +64,7 @@ const supplierInput = z.object({
   email: z.string().trim().email().max(320).nullable(),
   phone: z.string().trim().max(50).nullable(),
 });
+const categoryInput = z.object({ name: z.string().trim().min(2).max(100) });
 
 async function requireDb() {
   const db = await getDb();
@@ -247,6 +250,13 @@ export const appRouter = router({
       await createAudit(ctx.user.id, "Suppression", "Produit", input.id, "Produit supprimé");
       return { success: true };
     }),
+  }),
+
+  categories: router({
+    list: protectedProcedure.query(async () => (await requireDb()).select().from(productCategories).orderBy(productCategories.name)),
+    create: adminProcedure.input(categoryInput).mutation(async ({ ctx, input }) => { const db = await requireDb(); try { const result = await db.insert(productCategories).values(input); const id = Number(result[0].insertId); await createAudit(ctx.user.id, "Création", "Catégorie", id, `Catégorie ${input.name} créée`); return { id }; } catch (error) { throw new TRPCError({ code: "CONFLICT", message: "Cette catégorie existe déjà.", cause: error }); } }),
+    update: adminProcedure.input(categoryInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await requireDb(); const current = (await db.select().from(productCategories).where(eq(productCategories.id, input.id)).limit(1))[0]; if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Catégorie introuvable." }); try { await db.transaction(async tx => { await tx.update(productCategories).set({ name: input.name }).where(eq(productCategories.id, input.id)); await tx.update(products).set({ category: input.name }).where(eq(products.category, current.name)); }); await createAudit(ctx.user.id, "Modification", "Catégorie", input.id, `Catégorie ${current.name} renommée en ${input.name}`); return { success: true }; } catch (error) { throw new TRPCError({ code: "CONFLICT", message: "Cette catégorie existe déjà.", cause: error }); } }),
+    remove: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await requireDb(); const current = (await db.select().from(productCategories).where(eq(productCategories.id, input.id)).limit(1))[0]; if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Catégorie introuvable." }); const usedBy = await db.select({ id: products.id }).from(products).where(eq(products.category, current.name)).limit(1); if (!categoryCanBeRemoved(usedBy.length)) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Cette catégorie est utilisée par des produits et ne peut pas être supprimée." }); await db.delete(productCategories).where(eq(productCategories.id, input.id)); await createAudit(ctx.user.id, "Suppression", "Catégorie", input.id, `Catégorie ${current.name} supprimée`); return { success: true }; }),
   }),
 
   suppliers: router({

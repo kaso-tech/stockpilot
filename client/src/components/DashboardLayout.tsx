@@ -61,6 +61,7 @@ const menuItems = [
   { icon: ShoppingCart, label: "Point de vente", path: "/pos" },
   { icon: ReceiptText, label: "Factures", path: "/factures" },
   { icon: PackageSearch, label: "Produits", path: "/produits" },
+  { icon: Boxes, label: "Catégories", path: "/categories" },
   { icon: ArrowLeftRight, label: "Mouvements", path: "/mouvements" },
   { icon: ClipboardCheck, label: "Inventaires", path: "/inventaires" },
   { icon: Truck, label: "Fournisseurs", path: "/fournisseurs" },

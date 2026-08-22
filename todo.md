@@ -224,3 +224,7 @@
 - [x] Appliquer le palier au seuil le plus élevé sans dépasser la quantité vendue, quel que soit le type de client.
 - [x] Afficher le palier retenu dans le POS et la création de facture.
 - [x] Tester les règles de prix, la configuration produit, le POS et les factures sur desktop et mobile.
+- [x] Créer une gestion administrateur des catégories avec création, modification et suppression protégée.
+- [x] Ajouter une page Catégories et son accès depuis la navigation.
+- [x] Remplacer le champ texte Catégorie des produits par un sélecteur de catégories administrables.
+- [x] Tester les catégories, les produits et les rendus desktop/mobile.
