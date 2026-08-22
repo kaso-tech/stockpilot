@@ -246,3 +246,8 @@
 - [x] Tester le préremplissage, les préférences personnelles et les rendus desktop/mobile.
 - [x] Ajouter une entrée Clients clairement visible dans le menu latéral.
 - [x] Vérifier l’accès Clients sur desktop et mobile.
+- [x] Ajouter un champ Autre référence alphanumérique aux clients et aux fournisseurs.
+- [x] Ajouter une confirmation modale avant la suppression d’un client ou d’une facture.
+- [x] Ajouter recherche et filtres de tri dans la gestion des clients.
+- [x] Ajouter au tableau de bord un widget de factures impayées et d’activité récente des clients.
+- [x] Tester les validations, confirmations, filtres et le widget sur desktop et mobile.

@@ -53,6 +53,14 @@ export const transactionsRouter = router({
     const customerNames = new Map(customerRows.map(customer => [customer.id, customer.name]));
     return rows.map(row => ({ ...row, customerName: row.customerId ? customerNames.get(row.customerId) ?? null : null }));
   }),
+  removeDraft: protectedProcedure.input(z.object({ saleId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+    const db = await dbOrThrow();
+    const sale = (await db.select().from(sales).where(eq(sales.id, input.saleId)).limit(1))[0];
+    if (!sale || sale.channel !== "invoice") throw new TRPCError({ code: "NOT_FOUND", message: "Facture introuvable." });
+    if (sale.status !== "draft" || sale.amountPaidCents > 0) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Seules les factures non encaissées peuvent être supprimées." });
+    await db.transaction(async tx => { await tx.delete(saleItems).where(eq(saleItems.saleId, sale.id)); await tx.delete(sales).where(eq(sales.id, sale.id)); await tx.insert(auditLogs).values({ actorUserId: ctx.user.id, action: "Suppression", entityType: "Facture", entityId: String(sale.id), detail: `Facture ${sale.invoiceNumber} supprimée avant encaissement` }); });
+    return { success: true };
+  }),
   createDraft: protectedProcedure.input(z.object({ channel: z.enum(["pos", "invoice"]), customerId: z.number().int().positive().nullable(), note: z.string().trim().max(1000).nullable(), items: z.array(itemInput).min(1), invoiceDiscount: discountInput.default({ type: "none", value: 0 }) }).merge(agentSelection)).mutation(async ({ ctx, input }) => {
     if (input.channel === "invoice" && !input.customerId) throw new TRPCError({ code: "BAD_REQUEST", message: "Un client est obligatoire pour créer une facture." });
     const db = await dbOrThrow();

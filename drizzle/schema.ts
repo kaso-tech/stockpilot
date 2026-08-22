@@ -32,6 +32,7 @@ export const sellerCredentials = mysqlTable("sellerCredentials", {
 export const suppliers = mysqlTable("suppliers", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 160 }).notNull().unique(),
+  otherReference: varchar("otherReference", { length: 80 }),
   contactName: varchar("contactName", { length: 160 }),
   email: varchar("email", { length: 320 }),
   phone: varchar("phone", { length: 50 }),
@@ -74,6 +75,7 @@ export const productCategories = mysqlTable("productCategories", {
 export const customers = mysqlTable("customers", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 180 }).notNull(),
+  otherReference: varchar("otherReference", { length: 80 }),
   type: mysqlEnum("type", ["ordinary", "wholesale"]).notNull().default("ordinary"),
   contactName: varchar("contactName", { length: 160 }),
   email: varchar("email", { length: 320 }),
