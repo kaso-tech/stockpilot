@@ -370,3 +370,5 @@
 - [x] Ajouter l’onglet Bons de commande au menu latéral et relier les détails.
 - [x] Tester le parcours bons de commande sur desktop et mobile.
 - [x] Ajouter une barre de recherche et des filtres par fournisseur et statut dans la liste des bons de commande.
+- [x] Préserver l’origine d’ouverture d’un bon pour adapter son bouton Retour.
+- [x] Vérifier les retours depuis la liste Bons de commande et depuis la fiche fournisseur.
