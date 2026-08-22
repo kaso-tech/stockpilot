@@ -342,3 +342,8 @@
 - [x] Ajouter les boutons Appeler, Message, WhatsApp et Mail selon les coordonnées disponibles.
 - [x] Afficher les produits liés, leur sélection et la création directe d’un bon de commande.
 - [x] Tester le parcours fournisseur sur desktop et mobile.
+- [x] Auditer les bons de commande et les règles d’entrée de stock existantes.
+- [x] Ajouter le partage d’un bon de commande par WhatsApp et e-mail.
+- [x] Afficher et mettre à jour les statuts en attente, envoyé et reçu des bons de commande.
+- [x] Valider la réception d’un bon pour créer les entrées de stock de manière idempotente.
+- [x] Tester le partage, les badges de statut et la réception de marchandises sur desktop et mobile.

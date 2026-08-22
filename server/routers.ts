@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, ne } from "drizzle-orm";
 import { z } from "zod";
 import {
   auditLogs,
@@ -389,6 +389,40 @@ export const appRouter = router({
       });
       await createAudit(ctx.user.id, "Création", "Bon de commande", orderId, `Bon ${orderNumber} créé pour ${supplier.name}`);
       return { id: orderId, orderNumber, totalCents };
+    }),
+    markSent: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      const db = await requireDb();
+      const order = (await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, input.id)).limit(1))[0];
+      if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Bon de commande introuvable." });
+      if (order.status === "received") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Un bon reçu ne peut plus être marqué comme envoyé." });
+      if (order.status !== "sent") {
+        await db.update(purchaseOrders).set({ status: "sent" }).where(eq(purchaseOrders.id, input.id));
+        await createAudit(ctx.user.id, "Envoi", "Bon de commande", input.id, `Bon ${order.orderNumber} marqué comme envoyé`);
+      }
+      return { success: true, status: "sent" as const };
+    }),
+    receive: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      const db = await requireDb();
+      const order = (await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, input.id)).limit(1))[0];
+      if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Bon de commande introuvable." });
+      if (order.status === "cancelled") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Un bon annulé ne peut pas être réceptionné." });
+      const items = await db.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, input.id));
+      if (!items.length) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Ce bon ne contient aucun produit à réceptionner." });
+      const result = await db.transaction(async tx => {
+        const statusUpdate = await tx.update(purchaseOrders).set({ status: "received" }).where(and(eq(purchaseOrders.id, input.id), ne(purchaseOrders.status, "received")));
+        const affected = Number((statusUpdate as unknown as Array<{ affectedRows?: number }>)[0]?.affectedRows ?? 0);
+        if (!affected) return { alreadyReceived: true };
+        for (const item of items) {
+          const product = (await tx.select().from(products).where(eq(products.id, item.productId)).limit(1))[0];
+          if (!product) throw new TRPCError({ code: "NOT_FOUND", message: `Produit ${item.productName} introuvable.` });
+          const resultingQuantity = product.quantity + item.quantity;
+          await tx.update(products).set({ quantity: resultingQuantity }).where(eq(products.id, product.id));
+          await tx.insert(stockMovements).values({ productId: product.id, supplierId: order.supplierId, type: "entry", quantity: item.quantity, previousQuantity: product.quantity, resultingQuantity, reason: `Réception du bon ${order.orderNumber}`, createdByUserId: ctx.user.id });
+        }
+        return { alreadyReceived: false };
+      });
+      if (!result.alreadyReceived) await createAudit(ctx.user.id, "Réception", "Bon de commande", input.id, `Bon ${order.orderNumber} réceptionné et stock mis à jour`);
+      return { success: true, alreadyReceived: result.alreadyReceived, status: "received" as const };
     }),
   }),
 
