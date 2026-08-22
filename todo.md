@@ -206,3 +206,6 @@
 - [x] Générer un rapport mensuel de dépenses détaillé par catégorie.
 - [x] Définir des alertes de budget à l’approche et au dépassement du plafond mensuel.
 - [x] Tester le stockage, le rapport, les alertes et les parcours desktop/mobile.
+- [x] Ajouter un en-tête professionnel global avec action de sauvegarde manuelle.
+- [x] Ajouter un centre de notifications avec compteur numérique et liste d’alertes métier.
+- [x] Tester la sauvegarde, les notifications et le rendu responsive de l’en-tête.

@@ -30,11 +30,15 @@ import { useIsMobile } from "@/hooks/useMobile";
 import { usePreferences } from "@/contexts/PreferencesContext";
 import {
   ArrowLeftRight,
+  Archive,
+  Bell,
   Boxes,
   ChevronDown,
+  CircleAlert,
   ClipboardList,
   ClipboardCheck,
   DatabaseBackup,
+  Loader2,
   WalletCards,
   LayoutDashboard,
   LogOut,
@@ -49,6 +53,7 @@ import {
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { useState } from "react";
+import { toast } from "sonner";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 
 const menuItems = [
@@ -116,6 +121,16 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     : menuItems.filter(item => item.path === "/" || item.path === "/pos" || item.path === "/factures" || item.path === "/mouvements");
   const activeMenuItem = visibleMenuItems.find(item => item.path === location) ?? visibleMenuItems[0];
   const initials = (user?.name || user?.email || "U").slice(0, 2).toUpperCase();
+  const isAdmin = user?.role === "admin";
+  const { data: dashboard } = trpc.dashboard.get.useQuery(undefined, { enabled: isAdmin, refetchInterval: 60_000 });
+  const { data: backups } = trpc.backups.get.useQuery(undefined, { enabled: isAdmin, refetchInterval: 60_000 });
+  const runBackup = trpc.backups.runNow.useMutation({ onSuccess: archive => toast.success(`Sauvegarde ${archive.filename} créée.`), onError: error => toast.error(error.message) });
+  const notifications: Array<{ id: string; title: string; detail: string; tone: "amber" | "violet" | "rose"; path: string }> = [];
+  if (dashboard?.lowStock?.length) notifications.push({ id: "stock", title: "Stock critique", detail: `${dashboard.lowStock.length} produit(s) au seuil minimum`, tone: "amber", path: "/alertes" });
+  if ((dashboard?.summary?.duePayrollCents ?? 0) > 0) notifications.push({ id: "payroll", title: "Paie à régler", detail: `${dashboard?.summary?.duePayrollCents ?? 0} centimes restent à payer`, tone: "violet", path: "/agents" });
+  if (dashboard?.summary?.expenseBudget?.exceeded) notifications.push({ id: "budget-over", title: "Budget dépassé", detail: "Les dépenses ont dépassé le plafond mensuel.", tone: "rose", path: "/depenses" });
+  else if (dashboard?.summary?.expenseBudget?.warningReached) notifications.push({ id: "budget-warning", title: "Seuil budget atteint", detail: "Le seuil d’alerte des dépenses est atteint.", tone: "amber", path: "/depenses" });
+  if (backups?.settings.lastBackupStatus === "failed") notifications.push({ id: "backup", title: "Sauvegarde à vérifier", detail: backups.settings.lastBackupError || "La dernière sauvegarde a échoué.", tone: "rose", path: "/sauvegardes" });
 
   return (
     <>
@@ -194,6 +209,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       </Sidebar>
 
       <SidebarInset className="min-w-0 bg-[#090c13] text-slate-100">
+        <header className="sticky top-0 z-30 hidden h-16 items-center justify-between border-b border-white/[0.07] bg-[#090c13]/92 px-6 backdrop-blur lg:flex"><div className="flex min-w-0 items-center gap-2 text-sm text-slate-400"><activeMenuItem.icon className="h-4 w-4 text-primary" /><span className="truncate font-medium text-slate-200">{activeMenuItem.label}</span></div><HeaderActions isAdmin={isAdmin} pending={runBackup.isPending} onBackup={() => runBackup.mutate()} notifications={notifications} onNotification={setLocation} /></header>
         {isMobile && (
           <header className="sticky top-0 z-40 flex h-16 items-center gap-3 border-b border-white/[0.07] bg-[#090c13]/95 px-4 backdrop-blur">
             <SidebarTrigger className="h-9 w-9 rounded-lg border border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.08]" />
@@ -201,10 +217,17 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
               <activeMenuItem.icon className="h-4 w-4 shrink-0 text-cyan-300" />
               <span className="truncate text-sm font-semibold">{activeMenuItem.label}</span>
             </div>
+            <div className="ml-auto"><HeaderActions isAdmin={isAdmin} compact pending={runBackup.isPending} onBackup={() => runBackup.mutate()} notifications={notifications} onNotification={setLocation} /></div>
           </header>
         )}
         <main key={currency} className="min-h-screen bg-[radial-gradient(circle_at_80%_-5%,rgba(34,211,238,0.05),transparent_24%),linear-gradient(rgba(255,255,255,0.012)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.012)_1px,transparent_1px)] bg-[size:auto,44px_44px,44px_44px] p-4 sm:p-6 lg:p-8">{children}</main>
       </SidebarInset>
     </>
   );
+}
+
+function HeaderActions({ isAdmin, compact = false, pending, onBackup, notifications, onNotification }: { isAdmin: boolean; compact?: boolean; pending: boolean; onBackup: () => void; notifications: Array<{ id: string; title: string; detail: string; tone: "amber" | "violet" | "rose"; path: string }>; onNotification: (path: string) => void }) {
+  const counter = notifications.length > 9 ? "9+" : String(notifications.length);
+  const tones = { amber: "bg-amber-400/10 text-amber-300", violet: "bg-violet-400/10 text-violet-300", rose: "bg-rose-400/10 text-rose-300" };
+  return <div className="flex items-center gap-2">{isAdmin && <Button onClick={onBackup} disabled={pending} size={compact ? "icon" : "sm"} className="h-9 bg-primary text-primary-foreground hover:bg-primary/90" aria-label="Créer une sauvegarde maintenant">{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className={`h-4 w-4 ${compact ? "" : "mr-2"}`} />}{!compact && (pending ? "Sauvegarde…" : "Sauvegarder")}</Button>}<DropdownMenu><DropdownMenuTrigger asChild><Button size="icon" variant="outline" className="relative h-9 w-9 border-white/10 bg-white/[0.035] text-slate-200 hover:bg-white/[0.08]" aria-label={`${notifications.length} notification(s)`}><Bell className="h-4 w-4" />{notifications.length > 0 && <span className="absolute -right-1.5 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[9px] font-bold leading-none text-primary-foreground">{counter}</span>}</Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-[340px] border-white/10 bg-[#141b27] p-0 text-slate-100"><DropdownMenuLabel className="flex items-center justify-between px-4 py-3"><span>Notifications</span><span className="text-xs font-normal text-slate-500">{notifications.length ? `${notifications.length} à consulter` : "Tout est à jour"}</span></DropdownMenuLabel><DropdownMenuSeparator className="bg-white/10" />{notifications.length ? <div className="max-h-[360px] overflow-y-auto py-1">{notifications.map(notification => <DropdownMenuItem key={notification.id} onClick={() => onNotification(notification.path)} className="cursor-pointer items-start gap-3 px-4 py-3 focus:bg-white/[0.06]"><span className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg ${tones[notification.tone]}`}><CircleAlert className="h-4 w-4" /></span><span className="min-w-0"><span className="block text-sm font-medium text-slate-100">{notification.title}</span><span className="mt-0.5 block text-xs leading-relaxed text-slate-500">{notification.detail}</span></span></DropdownMenuItem>)}</div> : <div className="px-5 py-9 text-center"><Bell className="mx-auto h-5 w-5 text-slate-600" /><p className="mt-2 text-sm text-slate-300">Aucune notification</p><p className="mt-1 text-xs text-slate-500">Les alertes importantes apparaîtront ici.</p></div>}</DropdownMenuContent></DropdownMenu></div>;
 }
