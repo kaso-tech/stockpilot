@@ -167,3 +167,6 @@
 - [x] Tester les deux modes de rattachement sur la création de facture, desktop et mobile.
 - [x] Afficher en lecture seule les agents par défaut appliqués lors de la création de facture.
 - [x] Vérifier le rendu desktop et mobile des rattachements affichés en lecture seule.
+- [x] Reproduire le panier POS flottant ouvert et ancré en bas de page selon le modèle fourni.
+- [x] Limiter sur mobile la zone des articles du panier à trois lignes visibles avec défilement au-delà.
+- [x] Vérifier l’ajout, les quantités, le total et l’encaissement du panier sur desktop et mobile.
