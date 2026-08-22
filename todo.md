@@ -162,3 +162,6 @@
 - [x] Ajouter un test unitaire du générateur HTML de reçu POS et de son déclenchement d’impression.
 - [x] Exécuter un test navigateur desktop du flux POS complet déclenchant le reçu depuis l’interface après encaissement.
 - [x] Exécuter un test navigateur mobile du flux POS complet et du repli quand la fenêtre d’impression est bloquée.
+- [x] Ajouter un mode de rattachement distinct pour le caissier et l’agent commercial : compte par défaut ou choix au comptoir.
+- [x] Masquer les sélecteurs d’agents de la création de facture lorsqu’un compte par défaut est configuré.
+- [x] Tester les deux modes de rattachement sur la création de facture, desktop et mobile.
