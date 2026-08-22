@@ -25,7 +25,7 @@ describe("commerce.sales.create", () => {
     inserted.length = 0; updates.length = 0;
     const customer = { id: 11, name: "Client détail", type: "ordinary" as const };
     const product = { id: 21, reference: "SKU-21", name: "Article", unit: "unité", quantity: 10, minimumQuantity: 3, purchasePriceCents: 600, retailPriceCents: 1000, wholesalePriceCents: 800 };
-    const tiers = [{ productId: 21, minQuantity: 5, unitPriceCents: 850 }];
+    const tiers = [{ productId: 21, customerType: "retail" as const, minQuantity: 5, unitPriceCents: 850 }];
     const profile = { id: 1, beneficiaryType: "user" as const, beneficiaryId: 7, remunerationMode: "commission" as const, fixedMonthlyCents: 0, commissionBasis: "revenue" as const, rateBasisPoints: 500, active: true };
     const tx: any = {
       select: () => ({ from: (table: unknown) => {

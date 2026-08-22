@@ -1,0 +1,1 @@
+ALTER TABLE `productPriceTiers` ADD `customerType` enum('retail','wholesale') DEFAULT 'retail' NOT NULL;

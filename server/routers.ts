@@ -58,7 +58,9 @@ const productInput = z.object({
   minimumQuantity: z.number().int().min(0),
   supplierId: z.number().int().positive().nullable(),
   priceTiers: z.array(z.object({ minQuantity: z.number().int().min(2), unitPriceCents: z.number().int().min(0) })).max(12).default([]),
-}).superRefine((input, ctx) => { const seen = new Set<number>(); for (const tier of input.priceTiers) { if (seen.has(tier.minQuantity)) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Chaque seuil de quantité doit être unique." }); seen.add(tier.minQuantity); } });
+  retailPriceTiers: z.array(z.object({ minQuantity: z.number().int().min(2), unitPriceCents: z.number().int().min(0) })).max(12).default([]),
+  wholesalePriceTiers: z.array(z.object({ minQuantity: z.number().int().min(2), unitPriceCents: z.number().int().min(0) })).max(12).default([]),
+}).superRefine((input, ctx) => { for (const [label, tiers] of [["détail", input.retailPriceTiers.length ? input.retailPriceTiers : input.priceTiers], ["grossiste", input.wholesalePriceTiers]] as const) { const seen = new Set<number>(); for (const tier of tiers) { if (seen.has(tier.minQuantity)) ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Chaque seuil ${label} doit être unique.` }); seen.add(tier.minQuantity); } } });
 
 const supplierInput = z.object({
   name: z.string().trim().min(2).max(160),
@@ -245,8 +247,9 @@ export const appRouter = router({
     create: adminProcedure.input(productInput).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
       try {
-        const { priceTiers, ...productData } = input;
-        const productId = await db.transaction(async tx => { const result = await tx.insert(products).values(productData); const id = Number(result[0].insertId); if (priceTiers.length) await tx.insert(productPriceTiers).values(priceTiers.map(tier => ({ ...tier, productId: id }))); return id; });
+        const { priceTiers, retailPriceTiers, wholesalePriceTiers, ...productData } = input;
+        const retailTiers = retailPriceTiers.length ? retailPriceTiers : priceTiers;
+        const productId = await db.transaction(async tx => { const result = await tx.insert(products).values(productData); const id = Number(result[0].insertId); const tiers = [...retailTiers.map(tier => ({ ...tier, productId: id, customerType: "retail" as const })), ...wholesalePriceTiers.map(tier => ({ ...tier, productId: id, customerType: "wholesale" as const }))]; if (tiers.length) await tx.insert(productPriceTiers).values(tiers); return id; });
         await syncStockAlert(productId);
         await createAudit(ctx.user.id, "Création", "Produit", productId, `Produit ${input.reference} créé`);
         return { success: true, id: productId };
@@ -256,8 +259,9 @@ export const appRouter = router({
     }),
     update: adminProcedure.input(productInput.safeExtend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
-      const { id, priceTiers, ...values } = input;
-      await db.transaction(async tx => { await tx.update(products).set(values).where(eq(products.id, id)); await tx.delete(productPriceTiers).where(eq(productPriceTiers.productId, id)); if (priceTiers.length) await tx.insert(productPriceTiers).values(priceTiers.map(tier => ({ ...tier, productId: id }))); });
+      const { id, priceTiers, retailPriceTiers, wholesalePriceTiers, ...values } = input;
+      const retailTiers = retailPriceTiers.length ? retailPriceTiers : priceTiers;
+      await db.transaction(async tx => { await tx.update(products).set(values).where(eq(products.id, id)); await tx.delete(productPriceTiers).where(eq(productPriceTiers.productId, id)); const tiers = [...retailTiers.map(tier => ({ ...tier, productId: id, customerType: "retail" as const })), ...wholesalePriceTiers.map(tier => ({ ...tier, productId: id, customerType: "wholesale" as const }))]; if (tiers.length) await tx.insert(productPriceTiers).values(tiers); });
       await syncStockAlert(id);
       await createAudit(ctx.user.id, "Modification", "Produit", id, `Produit ${values.reference} modifié`);
       return { success: true };

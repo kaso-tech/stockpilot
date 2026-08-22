@@ -54,7 +54,7 @@ export default function PointOfSale() {
   const lines = cart.map(item => {
     const product = products.find(value => value.id === item.productId);
     if (!product) return null;
-    const pricing = priceForQuantityTier(product.retailPriceCents, item.quantity, product.priceTiers);
+    const pricing = priceForQuantityTier(product.retailPriceCents, item.quantity, product.retailPriceTiers ?? product.priceTiers);
     const subtotalCents = pricing.unitPriceCents * item.quantity;
     const discountCents = calculateDiscount(subtotalCents, item.discount);
     const { remainingAfterSale, isLowStock: lineIsLowStock } = stockAfterCartSelection(product.quantity, item.quantity, product.minimumQuantity);

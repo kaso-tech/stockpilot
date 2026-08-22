@@ -263,3 +263,7 @@
 - [x] Ajouter une fiche produit avec historique détaillé des entrées et sorties de stock.
 - [x] Générer un bon de commande de réapprovisionnement depuis une alerte de stock bas.
 - [x] Tester les seuils, l’historique et le bon de commande sur desktop et mobile.
+- [x] Séparer les paliers de quantité détail et grossiste dans le modèle produit.
+- [x] Permettre d’activer indépendamment les paliers détail, grossiste ou les deux.
+- [x] Appliquer le palier approprié selon le type de client dans le POS et les factures.
+- [x] Tester les paliers séparés pour les clients détail et grossistes sur desktop et mobile.

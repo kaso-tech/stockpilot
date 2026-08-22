@@ -59,6 +59,7 @@ export const products = mysqlTable("products", {
 export const productPriceTiers = mysqlTable("productPriceTiers", {
   id: int("id").autoincrement().primaryKey(),
   productId: int("productId").notNull(),
+  customerType: mysqlEnum("customerType", ["retail", "wholesale"]).notNull().default("retail"),
   minQuantity: int("minQuantity").notNull(),
   unitPriceCents: int("unitPriceCents").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

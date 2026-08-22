@@ -60,7 +60,12 @@ export async function listProducts() {
   const db = await getDb();
   if (!db) return [];
   const [rows, tiers] = await Promise.all([db.select().from(products).orderBy(products.name), db.select().from(productPriceTiers)]);
-  return rows.map(product => ({ ...product, priceTiers: tiers.filter(tier => tier.productId === product.id).sort((left, right) => left.minQuantity - right.minQuantity) }));
+  return rows.map(product => {
+    const productTiers = tiers.filter(tier => tier.productId === product.id).sort((left, right) => left.minQuantity - right.minQuantity);
+    const retailPriceTiers = productTiers.filter(tier => tier.customerType === "retail");
+    const wholesalePriceTiers = productTiers.filter(tier => tier.customerType === "wholesale");
+    return { ...product, priceTiers: retailPriceTiers, retailPriceTiers, wholesalePriceTiers };
+  });
 }
 
 export async function listSuppliers() {
