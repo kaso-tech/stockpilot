@@ -50,6 +50,7 @@ import {
   SlidersHorizontal,
   Truck,
   TriangleAlert,
+  UserRound,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { useState } from "react";
@@ -60,6 +61,7 @@ const menuItems = [
   { icon: LayoutDashboard, label: "Vue d’ensemble", path: "/" },
   { icon: ShoppingCart, label: "Point de vente", path: "/pos" },
   { icon: ReceiptText, label: "Factures", path: "/factures" },
+  { icon: UserRound, label: "Clients", path: "/clients" },
   { icon: PackageSearch, label: "Produits", path: "/produits" },
   { icon: Boxes, label: "Catégories", path: "/categories" },
   { icon: ArrowLeftRight, label: "Mouvements", path: "/mouvements" },

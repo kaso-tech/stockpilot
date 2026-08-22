@@ -244,3 +244,5 @@
 - [x] Enregistrer les préférences du tableau de bord par utilisateur authentifié.
 - [x] Ajouter une réinitialisation des sections et des vues préconfigurées adaptées aux rôles.
 - [x] Tester le préremplissage, les préférences personnelles et les rendus desktop/mobile.
+- [x] Ajouter une entrée Clients clairement visible dans le menu latéral.
+- [x] Vérifier l’accès Clients sur desktop et mobile.
