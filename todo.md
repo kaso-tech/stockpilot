@@ -386,3 +386,6 @@
 - [x] Auditer les actions et le rendu existants sur la fiche facture.
 - [x] Ajouter la génération PDF, l’impression et l’envoi e-mail des factures créées.
 - [x] Tester les actions rapides facture sur desktop et mobile.
+- [x] Déplacer le bouton Nouvelle facture auprès des contacts client.
+- [x] Remplacer le champ Prix manuel par une édition directe du prix affiché dans chaque ligne de facture.
+- [x] Vérifier les parcours client et facture sur desktop et mobile.
