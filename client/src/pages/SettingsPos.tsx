@@ -36,6 +36,9 @@ export default function SettingsPos() {
   const [sellerCanSellBelowPrice, setSellerCanSellBelowPrice] = useState(false);
   const [sellerMaxDiscountPercent, setSellerMaxDiscountPercent] = useState(0);
   const [sellerCanCancelInvoice, setSellerCanCancelInvoice] = useState(false);
+  const [sellerCanRefund, setSellerCanRefund] = useState(false);
+  const [sellerCanCorrectStock, setSellerCanCorrectStock] = useState(false);
+  const [sellerCanEditPurchasePrice, setSellerCanEditPurchasePrice] = useState(false);
 
   useEffect(() => {
     if (!settings) return;
@@ -55,6 +58,9 @@ export default function SettingsPos() {
     setSellerCanSellBelowPrice(settings.sellerCanSellBelowPrice ?? false);
     setSellerMaxDiscountPercent(settings.sellerMaxDiscountPercent ?? 0);
     setSellerCanCancelInvoice(settings.sellerCanCancelInvoice ?? false);
+    setSellerCanRefund(settings.sellerCanRefund ?? false);
+    setSellerCanCorrectStock(settings.sellerCanCorrectStock ?? false);
+    setSellerCanEditPurchasePrice(settings.sellerCanEditPurchasePrice ?? false);
   }, [settings]);
 
   const save = trpc.commerce.settings.save.useMutation({
@@ -82,9 +88,9 @@ export default function SettingsPos() {
     sellerCanSellBelowPrice,
     sellerMaxDiscountPercent,
     sellerCanCancelInvoice,
-    sellerCanRefund: false,
-    sellerCanCorrectStock: false,
-    sellerCanEditPurchasePrice: false,
+    sellerCanRefund,
+    sellerCanCorrectStock,
+    sellerCanEditPurchasePrice,
   });
 
   return <div className="mx-auto max-w-4xl space-y-6">
@@ -95,7 +101,7 @@ export default function SettingsPos() {
       <Card className="border-white/[0.07] bg-[#111722]"><CardContent className="space-y-5 p-6"><div className="flex items-center gap-3"><ReceiptText className="h-5 w-5 text-primary" /><h2 className="font-semibold text-slate-100">Ticket de caisse</h2></div><Field label="Largeur"><Select value={ticketWidthMm} onValueChange={value => setTicketWidthMm(value as "58" | "80")}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="58">58 mm</SelectItem><SelectItem value="80">80 mm</SelectItem></SelectContent></Select></Field><Field label="En-tête du ticket"><Input value={ticketHeader} onChange={event => setTicketHeader(event.target.value)} maxLength={160} /></Field><Field label="Pied du ticket"><Input value={ticketFooter} onChange={event => setTicketFooter(event.target.value)} maxLength={240} /></Field></CardContent></Card>
       <Card className="border-white/[0.07] bg-[#111722]"><CardContent className="space-y-5 p-6"><div className="flex items-center gap-3"><Settings2 className="h-5 w-5 text-primary" /><h2 className="font-semibold text-slate-100">Moyens de paiement</h2></div><Toggle label="Espèces" checked={paymentCashEnabled} onChange={setPaymentCashEnabled} /><Toggle label="Mobile money" checked={paymentMobileMoneyEnabled} onChange={setPaymentMobileMoneyEnabled} /><Toggle label="Carte" checked={paymentCardEnabled} onChange={setPaymentCardEnabled} /><Toggle label="Virement" checked={paymentBankTransferEnabled} onChange={setPaymentBankTransferEnabled} /><Toggle label="Crédit" checked={paymentCreditEnabled} onChange={setPaymentCreditEnabled} /></CardContent></Card>
     </div>
-    <Card className="border-primary/20 bg-primary/[0.04]"><CardContent className="space-y-5 p-6"><div className="flex items-center gap-3"><ShieldCheck className="h-5 w-5 text-primary" /><div><h2 className="font-semibold text-slate-100">Actions sensibles des vendeurs</h2><p className="mt-1 text-sm text-slate-400">Les règles sont vérifiées côté serveur avant l’enregistrement d’une facture.</p></div></div><div className="grid gap-1 sm:grid-cols-2"><Toggle label="Autoriser un prix différent du tarif" checked={sellerCanOverridePrice} onChange={setSellerCanOverridePrice} /><Toggle label="Autoriser un prix inférieur au tarif" checked={sellerCanSellBelowPrice} onChange={setSellerCanSellBelowPrice} /><Toggle label="Autoriser l’annulation d’une facture non encaissée" checked={sellerCanCancelInvoice} onChange={setSellerCanCancelInvoice} /></div><Field label="Remise maximale autorisée au vendeur (%)"><Input type="number" min={0} max={100} value={sellerMaxDiscountPercent} onChange={event => setSellerMaxDiscountPercent(Math.max(0, Math.min(100, Number(event.target.value) || 0)))} /></Field><div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-4 text-sm text-slate-400">Le remboursement, la correction de stock et la modification du coût d’achat restent réservés aux administrateurs.</div></CardContent></Card>
+    <Card className="border-primary/20 bg-primary/[0.04]"><CardContent className="space-y-5 p-6"><div className="flex items-center gap-3"><ShieldCheck className="h-5 w-5 text-primary" /><div><h2 className="font-semibold text-slate-100">Actions sensibles des vendeurs</h2><p className="mt-1 text-sm text-slate-400">Chaque autorisation est contrôlée côté serveur et enregistrée dans le journal d’activité.</p></div></div><div className="grid gap-1 sm:grid-cols-2"><Toggle label="Autoriser un prix différent du tarif" checked={sellerCanOverridePrice} onChange={setSellerCanOverridePrice} /><Toggle label="Autoriser un prix inférieur au tarif" checked={sellerCanSellBelowPrice} onChange={setSellerCanSellBelowPrice} /><Toggle label="Autoriser l’annulation d’une facture non encaissée" checked={sellerCanCancelInvoice} onChange={setSellerCanCancelInvoice} /><Toggle label="Autoriser le remboursement d’une facture encaissée" checked={sellerCanRefund} onChange={setSellerCanRefund} /><Toggle label="Autoriser la correction de stock" checked={sellerCanCorrectStock} onChange={setSellerCanCorrectStock} /><Toggle label="Autoriser la modification du coût d’achat" checked={sellerCanEditPurchasePrice} onChange={setSellerCanEditPurchasePrice} /></div><Field label="Remise maximale autorisée au vendeur (%)"><Input type="number" min={0} max={100} value={sellerMaxDiscountPercent} onChange={event => setSellerMaxDiscountPercent(Math.max(0, Math.min(100, Number(event.target.value) || 0)))} /></Field><div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-4 text-sm text-slate-400">La correction vendeur est limitée à un ajustement sans fournisseur. Le remboursement réintègre le stock, annule les commissions liées et laisse une trace dans le journal.</div></CardContent></Card>
     <Button onClick={saveSettings} disabled={save.isPending} className="bg-primary text-primary-foreground hover:bg-primary/90">{save.isPending ? "Enregistrement…" : "Enregistrer les réglages POS"}</Button>
   </div>;
 }

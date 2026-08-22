@@ -122,8 +122,9 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
   const isMobile = useIsMobile();
+  const { data: sellerPermissions } = trpc.commerce.settings.get.useQuery(undefined, { enabled: user?.role === "seller" });
   const sellerMenuItems = [
-    ...menuItems.filter(item => item.path === "/" || item.path === "/pos" || item.path === "/factures" || item.path === "/clients" || item.path === "/mouvements"),
+    ...menuItems.filter(item => item.path === "/" || item.path === "/pos" || item.path === "/factures" || item.path === "/clients" || item.path === "/mouvements" || (item.path === "/produits" && sellerPermissions?.sellerCanEditPurchasePrice)),
     { icon: Settings2, label: "Apparence", path: "/parametres/apparence" },
     { icon: LayoutDashboard, label: "Mon tableau de bord", path: "/parametres/tableau-de-bord" },
   ];

@@ -14,6 +14,7 @@ import {
   productPriceTiers,
   remunerationProfiles,
   saleCommissions,
+  saleSettings,
   sales,
   sellerCredentials,
   stockAlerts,
@@ -45,6 +46,7 @@ import { agentPaymentExpenseRows, budgetComparison, expenseBreakdownByCategory, 
 import { sdk } from "./_core/sdk";
 import { verifyPassword } from "./passwords";
 import { categoryCanBeRemoved } from "./categoryRules";
+import { assertSellerSensitiveAction } from "./sellerActionRules";
 
 const productInput = z.object({
   reference: z.string().trim().min(2).max(80),
@@ -269,6 +271,18 @@ export const appRouter = router({
       await createAudit(ctx.user.id, "Modification", "Produit", id, `Produit ${values.reference} modifié`);
       return { success: true };
     }),
+    updatePurchasePrice: protectedProcedure.input(z.object({ id: z.number().int().positive(), purchasePriceCents: z.number().int().min(0) })).mutation(async ({ ctx, input }) => {
+      const db = await requireDb();
+      const product = (await db.select().from(products).where(eq(products.id, input.id)).limit(1))[0];
+      if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Produit introuvable." });
+      if (ctx.user.role === "seller") {
+        const settings = (await db.select().from(saleSettings).limit(1))[0];
+        try { assertSellerSensitiveAction(settings, "purchase_price"); } catch (error) { throw new TRPCError({ code: "FORBIDDEN", message: error instanceof Error ? error.message : "Modification du coût d’achat non autorisée." }); }
+      }
+      await db.update(products).set({ purchasePriceCents: input.purchasePriceCents }).where(eq(products.id, product.id));
+      await createAudit(ctx.user.id, "Coût d’achat modifié", "Produit", product.id, `${product.reference} : ${product.purchasePriceCents} → ${input.purchasePriceCents} centimes`);
+      return { success: true };
+    }),
     remove: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
       const movement = await db.select({ id: stockMovements.id }).from(stockMovements).where(eq(stockMovements.productId, input.id)).limit(1);
@@ -313,7 +327,7 @@ export const appRouter = router({
 
   movements: router({
     list: protectedProcedure.query(() => listMovements()),
-    create: adminProcedure.input(z.object({
+    create: protectedProcedure.input(z.object({
       productId: z.number().int().positive(),
       supplierId: z.number().int().positive().nullable(),
       type: z.enum(["entry", "exit", "adjustment"]),
@@ -321,6 +335,11 @@ export const appRouter = router({
       reason: z.string().trim().min(3).max(255),
     })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
+      if (ctx.user.role === "seller") {
+        if (input.type !== "adjustment" || input.supplierId !== null) throw new TRPCError({ code: "FORBIDDEN", message: "Un vendeur ne peut enregistrer qu’une correction de stock sans fournisseur." });
+        const settings = (await db.select().from(saleSettings).limit(1))[0];
+        try { assertSellerSensitiveAction(settings, "stock_correction"); } catch (error) { throw new TRPCError({ code: "FORBIDDEN", message: error instanceof Error ? error.message : "Correction de stock non autorisée." }); }
+      }
       await db.transaction(async tx => {
         const row = await tx.select().from(products).where(eq(products.id, input.productId)).limit(1);
         const product = row[0];

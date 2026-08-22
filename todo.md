@@ -306,3 +306,7 @@
 - [x] Autoriser les vendeurs à consulter le registre des mouvements de stock.
 - [x] Masquer ou désactiver les actions de création et d’ajustement de mouvements pour les vendeurs.
 - [x] Tester les autorisations de mouvements sur desktop et mobile.
+- [x] Vérifier et rendre accessibles les réglages vendeur de prix inférieur, prix hors tarif et remise au-delà du seuil.
+- [x] Appliquer ou compléter les protections vendeur pour annulation, remboursement, correction de stock et coût d’achat.
+- [x] Afficher des messages explicites lorsque l’action sensible est bloquée au vendeur.
+- [x] Tester individuellement chaque autorisation et blocage vendeur.

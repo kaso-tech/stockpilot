@@ -9,6 +9,7 @@ import { resultingStock, signedMovementQuantity } from "../stockRules";
 import { assertPaymentMethodsEnabled, settlementResult } from "../transactionRules";
 import { discountCents, type DiscountType } from "../discountRules";
 import { assertExplicitInvoiceAgentChoice } from "../agentSelectionRules";
+import { assertSellerSensitiveAction } from "../sellerActionRules";
 import { assertSellerDiscount, assertSellerUnitPrice } from "../sellerPriceRules";
 
 const paymentMethod = z.enum(["cash", "card", "mobile_money", "bank_transfer", "credit"]);
@@ -59,8 +60,35 @@ export const transactionsRouter = router({
     const sale = (await db.select().from(sales).where(eq(sales.id, input.saleId)).limit(1))[0];
     if (!sale || sale.channel !== "invoice") throw new TRPCError({ code: "NOT_FOUND", message: "Facture introuvable." });
     if (sale.status !== "draft" || sale.amountPaidCents > 0) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Seules les factures non encaissées peuvent être supprimées." });
-    if (ctx.user.role === "seller") { const settings = (await db.select().from(saleSettings).limit(1))[0]; if (!settings?.sellerCanCancelInvoice) throw new TRPCError({ code: "FORBIDDEN", message: "L’annulation de facture n’est pas autorisée pour les vendeurs." }); }
+    if (ctx.user.role === "seller") { const settings = (await db.select().from(saleSettings).limit(1))[0]; try { assertSellerSensitiveAction(settings, "invoice_cancellation"); } catch (error) { throw new TRPCError({ code: "FORBIDDEN", message: error instanceof Error ? error.message : "Annulation non autorisée." }); } }
     await db.transaction(async tx => { await tx.delete(saleItems).where(eq(saleItems.saleId, sale.id)); await tx.delete(sales).where(eq(sales.id, sale.id)); await tx.insert(auditLogs).values({ actorUserId: ctx.user.id, action: "Suppression", entityType: "Facture", entityId: String(sale.id), detail: `Facture ${sale.invoiceNumber} supprimée avant encaissement` }); });
+    return { success: true };
+  }),
+  refund: protectedProcedure.input(z.object({ saleId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+    const db = await dbOrThrow();
+    await db.transaction(async tx => {
+      const sale = (await tx.select().from(sales).where(eq(sales.id, input.saleId)).limit(1))[0];
+      if (!sale) throw new TRPCError({ code: "NOT_FOUND", message: "Facture introuvable." });
+      if ((sale.status !== "paid" && sale.status !== "partial") || sale.amountPaidCents <= 0) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Seule une facture encaissée ou partiellement encaissée peut être remboursée." });
+      if (ctx.user.role === "seller") {
+        const settings = (await tx.select().from(saleSettings).limit(1))[0];
+        try { assertSellerSensitiveAction(settings, "refund"); } catch (error) { throw new TRPCError({ code: "FORBIDDEN", message: error instanceof Error ? error.message : "Remboursement non autorisé." }); }
+      }
+      const items = await tx.select().from(saleItems).where(eq(saleItems.saleId, sale.id));
+      const productRows = items.length ? await tx.select().from(products).where(inArray(products.id, items.map(item => item.productId))) : [];
+      if (productRows.length !== items.length) throw new TRPCError({ code: "NOT_FOUND", message: "Un produit de cette facture est introuvable ; le remboursement ne peut pas être finalisé." });
+      for (const item of items) {
+        const product = productRows.find(row => row.id === item.productId)!;
+        const quantity = resultingStock(product.quantity, "entry", item.quantity);
+        await tx.update(products).set({ quantity }).where(eq(products.id, product.id));
+        await tx.insert(stockMovements).values({ productId: product.id, type: "entry", quantity: signedMovementQuantity("entry", item.quantity), previousQuantity: product.quantity, resultingQuantity: quantity, reason: `Remboursement ${sale.invoiceNumber}`, createdByUserId: ctx.user.id });
+        if (quantity <= product.minimumQuantity) await tx.insert(stockAlerts).values({ productId: product.id, threshold: product.minimumQuantity, observedQuantity: quantity, status: "active" }).onDuplicateKeyUpdate({ set: { observedQuantity: quantity, threshold: product.minimumQuantity, status: "active", resolvedAt: null } });
+        else await tx.update(stockAlerts).set({ observedQuantity: quantity, status: "resolved", resolvedAt: new Date() }).where(eq(stockAlerts.productId, product.id));
+      }
+      await tx.delete(saleCommissions).where(eq(saleCommissions.saleId, sale.id));
+      await tx.update(sales).set({ status: "void", amountPaidCents: 0 }).where(eq(sales.id, sale.id));
+      await tx.insert(auditLogs).values({ actorUserId: ctx.user.id, action: "Remboursement", entityType: "Facture", entityId: String(sale.id), detail: `Facture ${sale.invoiceNumber} remboursée pour ${sale.amountPaidCents} centimes ; stock réintégré et commissions annulées.` });
+    });
     return { success: true };
   }),
   createDraft: protectedProcedure.input(z.object({ channel: z.enum(["pos", "invoice"]), customerId: z.number().int().positive().nullable(), note: z.string().trim().max(1000).nullable(), items: z.array(itemInput).min(1), invoiceDiscount: discountInput.default({ type: "none", value: 0 }) }).merge(agentSelection)).mutation(async ({ ctx, input }) => {

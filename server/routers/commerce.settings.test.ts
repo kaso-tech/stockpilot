@@ -48,6 +48,11 @@ describe("commerce.settings.save", () => {
     await caller.settings.save({ defaultSalesAgentId: null, defaultCashierId: null, requireSalesAgent: false, requireCashier: false, currency: "XOF", paymentCashEnabled: true, paymentMobileMoneyEnabled: false, paymentCardEnabled: true, paymentBankTransferEnabled: false, paymentCreditEnabled: false });
     expect(inserts.find(item => item.table === saleSettings)?.values).toMatchObject({ paymentCashEnabled: true, paymentMobileMoneyEnabled: false, paymentCardEnabled: true, paymentBankTransferEnabled: false, paymentCreditEnabled: false });
   });
+  it("persiste individuellement toutes les permissions sensibles vendeur", async () => {
+    const caller = commerceRouter.createCaller(adminContext());
+    await caller.settings.save({ defaultSalesAgentId: null, defaultCashierId: null, requireSalesAgent: false, requireCashier: false, currency: "XOF", sellerCanOverridePrice: true, sellerCanSellBelowPrice: true, sellerMaxDiscountPercent: 15, sellerCanCancelInvoice: true, sellerCanRefund: true, sellerCanCorrectStock: true, sellerCanEditPurchasePrice: true });
+    expect(inserts.find(item => item.table === saleSettings)?.values).toMatchObject({ sellerCanOverridePrice: true, sellerCanSellBelowPrice: true, sellerMaxDiscountPercent: 15, sellerCanCancelInvoice: true, sellerCanRefund: true, sellerCanCorrectStock: true, sellerCanEditPurchasePrice: true });
+  });
   it("envoie et persiste un logo d’entreprise valide", async () => {
     vi.mocked(storagePut).mockResolvedValue({ key: "company/logo.png", url: "/manus-storage/company/logo.png" });
     const caller = commerceRouter.createCaller(adminContext());
