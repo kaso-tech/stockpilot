@@ -220,3 +220,7 @@
 - [x] Joindre et consulter un reçu sécurisé pour chaque paiement agent.
 - [x] Afficher le détail des paiements groupés par bénéficiaire dans la paie.
 - [x] Tester le stockage des reçus, les listes par bénéficiaire et les rendus desktop/mobile.
+- [x] Ajouter des paliers de prix par quantité lors de la création et de la modification d’un produit.
+- [x] Appliquer le palier au seuil le plus élevé sans dépasser la quantité vendue, quel que soit le type de client.
+- [x] Afficher le palier retenu dans le POS et la création de facture.
+- [x] Tester les règles de prix, la configuration produit, le POS et les factures sur desktop et mobile.

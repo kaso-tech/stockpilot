@@ -4,6 +4,7 @@ import {
   auditLogs,
   InsertUser,
   products,
+  productPriceTiers,
   stockMovements,
   suppliers,
   users,
@@ -58,7 +59,8 @@ export async function getUserByOpenId(openId: string) {
 export async function listProducts() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(products).orderBy(products.name);
+  const [rows, tiers] = await Promise.all([db.select().from(products).orderBy(products.name), db.select().from(productPriceTiers)]);
+  return rows.map(product => ({ ...product, priceTiers: tiers.filter(tier => tier.productId === product.id).sort((left, right) => left.minQuantity - right.minQuantity) }));
 }
 
 export async function listSuppliers() {

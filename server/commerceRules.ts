@@ -6,6 +6,11 @@ export function priceForCustomer(customerType: CustomerType, retailPriceCents: n
   return customerType === "wholesale" ? wholesalePriceCents : retailPriceCents;
 }
 
+export function priceForQuantityTier(basePriceCents: number, quantity: number, tiers: Array<{ minQuantity: number; unitPriceCents: number }>) {
+  const applicable = tiers.filter(tier => tier.minQuantity <= quantity).sort((left, right) => right.minQuantity - left.minQuantity)[0];
+  return applicable?.unitPriceCents ?? basePriceCents;
+}
+
 export function commissionCents({
   remunerationMode,
   commissionBasis,

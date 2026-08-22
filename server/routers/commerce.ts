@@ -3,10 +3,10 @@ import { desc, eq, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import {
-  agents, auditLogs, customers, products, remunerationProfiles, saleCommissions, sellerCredentials,
+  agents, auditLogs, customers, productPriceTiers, products, remunerationProfiles, saleCommissions, sellerCredentials,
   saleItems, salePayments, sales, saleSettings, stockAlerts, stockMovements, users,
 } from "../../drizzle/schema";
-import { commissionCents, priceForCustomer } from "../commerceRules";
+import { commissionCents, priceForCustomer, priceForQuantityTier } from "../commerceRules";
 import { getDb } from "../db";
 import { adminProcedure, protectedProcedure, router } from "../_core/trpc";
 import { resultingStock, signedMovementQuantity } from "../stockRules";
@@ -87,7 +87,8 @@ export const commerceRouter = router({
         const productIds = input.items.map(item => item.productId);
         const productRows = await tx.select().from(products).where(inArray(products.id, productIds));
         if (productRows.length !== productIds.length) throw new TRPCError({ code: "NOT_FOUND", message: "Un produit de la vente est introuvable." });
-        const lines = input.items.map(item => { const product = productRows.find(row => row.id === item.productId)!; const unitPriceCents = priceForCustomer(customer.type, product.retailPriceCents, product.wholesalePriceCents); const lineTotalCents = unitPriceCents * item.quantity; const lineCostCents = product.purchasePriceCents * item.quantity; const resultingQuantity = resultingStock(product.quantity, "exit", item.quantity); return { product, quantity: item.quantity, unitPriceCents, lineTotalCents, lineCostCents, resultingQuantity }; });
+        const tierRows = productIds.length ? await tx.select().from(productPriceTiers).where(inArray(productPriceTiers.productId, productIds)) : [];
+        const lines = input.items.map(item => { const product = productRows.find(row => row.id === item.productId)!; const basePriceCents = priceForCustomer(customer.type, product.retailPriceCents, product.wholesalePriceCents); const unitPriceCents = priceForQuantityTier(basePriceCents, item.quantity, tierRows.filter(tier => tier.productId === product.id)); const lineTotalCents = unitPriceCents * item.quantity; const lineCostCents = product.purchasePriceCents * item.quantity; const resultingQuantity = resultingStock(product.quantity, "exit", item.quantity); return { product, quantity: item.quantity, unitPriceCents, lineTotalCents, lineCostCents, resultingQuantity }; });
         const totalCents = lines.reduce((sum, line) => sum + line.lineTotalCents, 0); const totalCostCents = lines.reduce((sum, line) => sum + line.lineCostCents, 0); const netProfitCents = totalCents - totalCostCents;
         const result = await tx.insert(sales).values({ invoiceNumber, channel: "invoice", customerId: customer.id, sellerUserId: ctx.user.id, salesAgentId, cashierId, paymentMethod: input.paymentMethod, status: "paid", amountPaidCents: totalCents, subtotalCents: totalCents, totalCents, totalCostCents, netProfitCents, note: input.note });
         const saleId = Number(result[0].insertId);

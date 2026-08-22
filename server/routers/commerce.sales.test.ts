@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { customers, products, remunerationProfiles, saleCommissions, saleItems, sales, stockAlerts, stockMovements } from "../../drizzle/schema";
+import { customers, productPriceTiers, products, remunerationProfiles, saleCommissions, saleItems, sales, stockAlerts, stockMovements } from "../../drizzle/schema";
 import type { TrpcContext } from "../_core/context";
 
 vi.mock("../db", () => ({ getDb: vi.fn() }));
@@ -25,10 +25,11 @@ describe("commerce.sales.create", () => {
     inserted.length = 0; updates.length = 0;
     const customer = { id: 11, name: "Client détail", type: "ordinary" as const };
     const product = { id: 21, reference: "SKU-21", name: "Article", unit: "unité", quantity: 10, minimumQuantity: 3, purchasePriceCents: 600, retailPriceCents: 1000, wholesalePriceCents: 800 };
+    const tiers = [{ productId: 21, minQuantity: 5, unitPriceCents: 850 }];
     const profile = { id: 1, beneficiaryType: "user" as const, beneficiaryId: 7, remunerationMode: "commission" as const, fixedMonthlyCents: 0, commissionBasis: "revenue" as const, rateBasisPoints: 500, active: true };
     const tx: any = {
       select: () => ({ from: (table: unknown) => {
-        const rows = table === customers ? [customer] : table === products ? [product] : table === stockAlerts ? [] : table === remunerationProfiles ? [profile] : [];
+        const rows = table === customers ? [customer] : table === products ? [product] : table === productPriceTiers ? tiers : table === stockAlerts ? [] : table === remunerationProfiles ? [profile] : [];
         const chainableRows = Object.assign(rows, { limit: async () => rows });
         return { where: () => chainableRows, limit: async () => rows };
       }}),
@@ -48,5 +49,11 @@ describe("commerce.sales.create", () => {
     expect(updates.find(item => item.table === products)?.values).toEqual({ quantity: 8 });
     expect(inserted.find(item => item.table === stockMovements)?.values).toMatchObject({ quantity: -2, previousQuantity: 10, resultingQuantity: 8 });
     expect(inserted.find(item => item.table === saleCommissions)?.values).toMatchObject({ saleId: 501, beneficiaryType: "user", beneficiaryId: 7, commissionCents: 100 });
+  });
+
+  it("applique le palier de quantité à un client détail", async () => {
+    const caller = commerceRouter.createCaller(sellerContext());
+    await caller.sales.create({ customerId: 11, salesAgentId: null, cashierId: null, paymentMethod: "cash", note: null, items: [{ productId: 21, quantity: 5 }] });
+    expect(inserted.find(item => item.table === saleItems)?.values).toMatchObject({ quantity: 5, unitPriceCents: 850, lineTotalCents: 4250 });
   });
 });

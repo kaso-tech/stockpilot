@@ -1,8 +1,8 @@
 import { desc, eq, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { agents, auditLogs, customers, products, remunerationProfiles, saleCommissions, saleItems, salePayments, saleSettings, sales, stockAlerts, stockMovements } from "../../drizzle/schema";
-import { commissionCents, priceForCustomer } from "../commerceRules";
+import { agents, auditLogs, customers, productPriceTiers, products, remunerationProfiles, saleCommissions, saleItems, salePayments, saleSettings, sales, stockAlerts, stockMovements } from "../../drizzle/schema";
+import { commissionCents, priceForCustomer, priceForQuantityTier } from "../commerceRules";
 import { getDb } from "../db";
 import { protectedProcedure, router } from "../_core/trpc";
 import { resultingStock, signedMovementQuantity } from "../stockRules";
@@ -59,7 +59,8 @@ export const transactionsRouter = router({
       const productIds = input.items.map(item => item.productId);
       const productRows = await tx.select().from(products).where(inArray(products.id, productIds));
       if (productRows.length !== productIds.length) throw new TRPCError({ code: "NOT_FOUND", message: "Un produit est introuvable." });
-      const lines = input.items.map(item => { const product = productRows.find((row: any) => row.id === item.productId)!; const unitPriceCents = priceForCustomer(customer?.type ?? "ordinary", product.retailPriceCents, product.wholesalePriceCents); const lineSubtotalCents = unitPriceCents * item.quantity; const lineDiscountCents = discountCents(lineSubtotalCents, item.discount.type as DiscountType, item.discount.value); return { product, quantity: item.quantity, unitPriceCents, lineSubtotalCents, lineDiscountCents, discount: item.discount, lineTotalCents: lineSubtotalCents - lineDiscountCents, lineCostCents: product.purchasePriceCents * item.quantity }; });
+      const tierRows = productIds.length ? await tx.select().from(productPriceTiers).where(inArray(productPriceTiers.productId, productIds)) : [];
+      const lines = input.items.map(item => { const product = productRows.find((row: any) => row.id === item.productId)!; const basePriceCents = priceForCustomer(customer?.type ?? "ordinary", product.retailPriceCents, product.wholesalePriceCents); const unitPriceCents = priceForQuantityTier(basePriceCents, item.quantity, tierRows.filter((tier: any) => tier.productId === product.id)); const lineSubtotalCents = unitPriceCents * item.quantity; const lineDiscountCents = discountCents(lineSubtotalCents, item.discount.type as DiscountType, item.discount.value); return { product, quantity: item.quantity, unitPriceCents, lineSubtotalCents, lineDiscountCents, discount: item.discount, lineTotalCents: lineSubtotalCents - lineDiscountCents, lineCostCents: product.purchasePriceCents * item.quantity }; });
       const subtotalCents = lines.reduce((sum, line) => sum + line.lineSubtotalCents, 0);
       const lineNetCents = lines.reduce((sum, line) => sum + line.lineTotalCents, 0);
       const invoiceDiscountCents = discountCents(lineNetCents, input.invoiceDiscount.type as DiscountType, input.invoiceDiscount.value);

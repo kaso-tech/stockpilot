@@ -9,6 +9,7 @@ import {
   expenses,
   inventorySessions,
   products,
+  productPriceTiers,
   remunerationProfiles,
   saleCommissions,
   sales,
@@ -52,7 +53,8 @@ const productInput = z.object({
   quantity: z.number().int().min(0),
   minimumQuantity: z.number().int().min(0),
   supplierId: z.number().int().positive().nullable(),
-});
+  priceTiers: z.array(z.object({ minQuantity: z.number().int().min(2), unitPriceCents: z.number().int().min(0) })).max(12).default([]),
+}).superRefine((input, ctx) => { const seen = new Set<number>(); for (const tier of input.priceTiers) { if (seen.has(tier.minQuantity)) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Chaque seuil de quantité doit être unique." }); seen.add(tier.minQuantity); } });
 
 const supplierInput = z.object({
   name: z.string().trim().min(2).max(160),
@@ -220,8 +222,8 @@ export const appRouter = router({
     create: adminProcedure.input(productInput).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
       try {
-        const result = await db.insert(products).values(input);
-        const productId = Number(result[0].insertId);
+        const { priceTiers, ...productData } = input;
+        const productId = await db.transaction(async tx => { const result = await tx.insert(products).values(productData); const id = Number(result[0].insertId); if (priceTiers.length) await tx.insert(productPriceTiers).values(priceTiers.map(tier => ({ ...tier, productId: id }))); return id; });
         await syncStockAlert(productId);
         await createAudit(ctx.user.id, "Création", "Produit", productId, `Produit ${input.reference} créé`);
         return { success: true, id: productId };
@@ -229,10 +231,10 @@ export const appRouter = router({
         throw new TRPCError({ code: "CONFLICT", message: "Cette référence produit existe déjà.", cause: error });
       }
     }),
-    update: adminProcedure.input(productInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+    update: adminProcedure.input(productInput.safeExtend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
-      const { id, ...values } = input;
-      await db.update(products).set(values).where(eq(products.id, id));
+      const { id, priceTiers, ...values } = input;
+      await db.transaction(async tx => { await tx.update(products).set(values).where(eq(products.id, id)); await tx.delete(productPriceTiers).where(eq(productPriceTiers.productId, id)); if (priceTiers.length) await tx.insert(productPriceTiers).values(priceTiers.map(tier => ({ ...tier, productId: id }))); });
       await syncStockAlert(id);
       await createAudit(ctx.user.id, "Modification", "Produit", id, `Produit ${values.reference} modifié`);
       return { success: true };

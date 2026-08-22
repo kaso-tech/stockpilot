@@ -48,6 +48,15 @@ export const products = mysqlTable("products", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+export const productPriceTiers = mysqlTable("productPriceTiers", {
+  id: int("id").autoincrement().primaryKey(),
+  productId: int("productId").notNull(),
+  minQuantity: int("minQuantity").notNull(),
+  unitPriceCents: int("unitPriceCents").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 export const customers = mysqlTable("customers", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 180 }).notNull(),
