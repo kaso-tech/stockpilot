@@ -291,3 +291,6 @@
 - [x] Autoriser le vendeur à créer, modifier et gérer les clients.
 - [x] Tester les autorisations vendeur et l’encaissement sur desktop et mobile.
 - [x] Restaurer la largeur d’encaissement validée avant la dernière tentative de réduction.
+- [x] Exposer les sauvegardes manuelles avec l’auteur, la date, le statut et les métadonnées d’archive.
+- [x] Ajouter une vue administrateur dédiée au suivi des sauvegardes effectuées par les vendeurs.
+- [x] Tester les autorisations, les données et le rendu responsive de l’historique.

@@ -64,7 +64,23 @@ export async function getBackupDownloadUrl(archiveId: number) {
 
 export async function listBackups(limit = 30) {
   const db = await dbOrThrow();
-  return db.select().from(backupArchives).orderBy(desc(backupArchives.createdAt)).limit(limit);
+  return db.select({
+    id: backupArchives.id,
+    filename: backupArchives.filename,
+    trigger: backupArchives.trigger,
+    status: backupArchives.status,
+    storageKey: backupArchives.storageKey,
+    storageUrl: backupArchives.storageUrl,
+    sizeBytes: backupArchives.sizeBytes,
+    recordCount: backupArchives.recordCount,
+    googleDriveFileId: backupArchives.googleDriveFileId,
+    googleDriveUrl: backupArchives.googleDriveUrl,
+    createdByUserId: backupArchives.createdByUserId,
+    error: backupArchives.error,
+    createdAt: backupArchives.createdAt,
+    createdByName: users.name,
+    createdByRole: users.role,
+  }).from(backupArchives).leftJoin(users, eq(backupArchives.createdByUserId, users.id)).orderBy(desc(backupArchives.createdAt)).limit(limit);
 }
 
 export async function applyRetentionPolicy<T extends { id: number }>(archives: T[], retentionCount: number, remove: (id: number) => Promise<void>) {
