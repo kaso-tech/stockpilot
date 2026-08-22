@@ -228,3 +228,6 @@
 - [x] Ajouter une page Catégories et son accès depuis la navigation.
 - [x] Remplacer le champ texte Catégorie des produits par un sélecteur de catégories administrables.
 - [x] Tester les catégories, les produits et les rendus desktop/mobile.
+- [x] Compacter les cartes de la liste des fournisseurs.
+- [x] Rendre les cartes fournisseurs cliquables et afficher leurs détails complets.
+- [x] Vérifier le panneau fournisseur et le rendu desktop/mobile.
