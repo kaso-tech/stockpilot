@@ -206,6 +206,9 @@ export const agentPayments = mysqlTable("agentPayments", {
   paidAt: timestamp("paidAt").defaultNow().notNull(),
   periodLabel: varchar("periodLabel", { length: 40 }),
   note: text("note"),
+  receiptUrl: varchar("receiptUrl", { length: 1024 }),
+  receiptName: varchar("receiptName", { length: 180 }),
+  receiptMimeType: varchar("receiptMimeType", { length: 80 }),
   createdByUserId: int("createdByUserId").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });

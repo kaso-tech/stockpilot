@@ -217,3 +217,6 @@
 - [x] Inclure les paiements agents dans le bénéfice net, le budget et les rapports par catégorie.
 - [x] Identifier clairement les dépenses d’agents dans le tableau de bord et les rapports.
 - [x] Tester les agrégats de paiements agents sur desktop et mobile.
+- [x] Joindre et consulter un reçu sécurisé pour chaque paiement agent.
+- [x] Afficher le détail des paiements groupés par bénéficiaire dans la paie.
+- [x] Tester le stockage des reçus, les listes par bénéficiaire et les rendus desktop/mobile.
