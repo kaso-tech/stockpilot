@@ -376,3 +376,6 @@
 - [x] Créer une fiche client professionnelle avec détails et actions existantes.
 - [x] Rendre les cartes client cliquables vers leur fiche dédiée et retirer le popup de détail.
 - [x] Tester le parcours de fiche client sur desktop et mobile.
+- [x] Ajouter une action Nouvelle facture depuis la fiche client.
+- [x] Préremplir et verrouiller la sélection du client dans le flux de création de facture.
+- [x] Tester l’ouverture d’une facture préremplie depuis une fiche client.
