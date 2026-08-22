@@ -190,3 +190,8 @@
 - [x] Ajouter un bouton de bascule entre aperçu A4 et aperçu ticket de caisse.
 - [x] Adapter le contenu et les proportions de l’aperçu au format ticket.
 - [x] Vérifier les deux aperçus sur desktop et mobile.
+- [x] Créer les dépenses avec les catégories Loyer, Énergie, Connexion, Salaire, Marketing, Fournitures, Impôts et Autre.
+- [x] Ajouter une page Dépenses pour créer, consulter, modifier et supprimer les dépenses.
+- [x] Intégrer les dépenses au calcul du bénéfice net après coût des marchandises et rémunérations.
+- [x] Afficher les dépenses et le bénéfice net dans les indicateurs de pilotage pertinents.
+- [x] Tester les règles de calcul, les autorisations administrateur et les rendus desktop/mobile.

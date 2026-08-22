@@ -5,6 +5,7 @@ import {
   auditLogs,
   agentPayments,
   customers,
+  expenses,
   inventorySessions,
   products,
   remunerationProfiles,
@@ -34,6 +35,8 @@ import { inventoryRouter } from "./routers/inventory";
 import { payrollRouter } from "./routers/payroll";
 import { backupRouter } from "./routers/backups";
 import { transactionsRouter } from "./routers/transactions";
+import { expensesRouter } from "./routers/expenses";
+import { monthlyExpenseTotalCents, operatingNetProfitCents } from "./expenseRules";
 import { sdk } from "./_core/sdk";
 import { verifyPassword } from "./passwords";
 
@@ -120,6 +123,7 @@ export const appRouter = router({
   payroll: payrollRouter,
   backups: backupRouter,
   transactions: transactionsRouter,
+  expenses: expensesRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -140,7 +144,7 @@ export const appRouter = router({
   dashboard: router({
     get: protectedProcedure.query(async () => {
       const db = await requireDb();
-      const [productRows, movements, saleRows, customerRows, inventories, profiles, commissions, payments] = await Promise.all([listProducts(), listMovements(250), db.select().from(sales), db.select().from(customers), db.select().from(inventorySessions), db.select().from(remunerationProfiles), db.select().from(saleCommissions), db.select().from(agentPayments)]);
+      const [productRows, movements, saleRows, customerRows, inventories, profiles, commissions, payments, expenseRows] = await Promise.all([listProducts(), listMovements(250), db.select().from(sales), db.select().from(customers), db.select().from(inventorySessions), db.select().from(remunerationProfiles), db.select().from(saleCommissions), db.select().from(agentPayments), db.select().from(expenses)]);
       const lowStock = productRows.filter(product => product.quantity <= product.minimumQuantity);
       const totalValueCents = productRows.reduce(
         (sum, product) => sum + product.quantity * product.purchasePriceCents,
@@ -153,6 +157,8 @@ export const appRouter = router({
       const todaySales = paidSales.filter(sale => sale.createdAt.toISOString().slice(0, 10) === today);
       const monthlyRevenueCents = monthlySales.reduce((sum, sale) => sum + sale.totalCents, 0);
       const monthlyMarginCents = monthlySales.reduce((sum, sale) => sum + sale.netProfitCents, 0);
+      const monthlyExpenseCents = monthlyExpenseTotalCents(expenseRows, month);
+      const monthlyOperatingProfitCents = operatingNetProfitCents(monthlyMarginCents, monthlyExpenseCents);
       const duePayrollCents = profiles.reduce((sum, profile) => {
         const commissionCents = commissions.filter(item => item.beneficiaryType === profile.beneficiaryType && item.beneficiaryId === profile.beneficiaryId && item.createdAt.toISOString().slice(0, 7) === month).reduce((total, item) => total + item.commissionCents, 0);
         const fixedCents = profile.remunerationMode === "commission" ? 0 : profile.fixedMonthlyCents;
@@ -182,6 +188,8 @@ export const appRouter = router({
           movementCount: movements.length,
           monthlyRevenueCents,
           monthlyMarginCents,
+          monthlyExpenseCents,
+          monthlyOperatingProfitCents,
           monthlyInvoiceCount: monthlySales.length,
           todayRevenueCents: todaySales.reduce((sum, sale) => sum + sale.totalCents, 0),
           averageBasketCents: monthlySales.length ? Math.round(monthlyRevenueCents / monthlySales.length) : 0,

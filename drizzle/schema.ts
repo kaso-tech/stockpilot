@@ -137,6 +137,17 @@ export const sales = mysqlTable("sales", {
   voidedAt: timestamp("voidedAt"),
 });
 
+export const expenses = mysqlTable("expenses", {
+  id: int("id").autoincrement().primaryKey(),
+  category: mysqlEnum("category", ["rent", "energy", "connection", "salary", "marketing", "supplies", "taxes", "other"]).notNull(),
+  description: varchar("description", { length: 300 }).notNull(),
+  amountCents: int("amountCents").notNull(),
+  spentAt: timestamp("spentAt").notNull().defaultNow(),
+  createdByUserId: int("createdByUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 export const salePayments = mysqlTable("salePayments", {
   id: int("id").autoincrement().primaryKey(),
   saleId: int("saleId").notNull(),
