@@ -36,7 +36,7 @@ import { payrollRouter } from "./routers/payroll";
 import { backupRouter } from "./routers/backups";
 import { transactionsRouter } from "./routers/transactions";
 import { expensesRouter } from "./routers/expenses";
-import { monthlyExpenseTotalCents, operatingNetProfitCents } from "./expenseRules";
+import { expenseBreakdownByCategory, monthlyExpenseTotalCents, operatingNetProfitCents } from "./expenseRules";
 import { sdk } from "./_core/sdk";
 import { verifyPassword } from "./passwords";
 
@@ -190,6 +190,7 @@ export const appRouter = router({
           monthlyMarginCents,
           monthlyExpenseCents,
           monthlyOperatingProfitCents,
+          expenseBreakdown: expenseBreakdownByCategory(expenseRows, month),
           monthlyInvoiceCount: monthlySales.length,
           todayRevenueCents: todaySales.reduce((sum, sale) => sum + sale.totalCents, 0),
           averageBasketCents: monthlySales.length ? Math.round(monthlyRevenueCents / monthlySales.length) : 0,

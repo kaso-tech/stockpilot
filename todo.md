@@ -195,3 +195,6 @@
 - [x] Intégrer les dépenses au calcul du bénéfice net après coût des marchandises et rémunérations.
 - [x] Afficher les dépenses et le bénéfice net dans les indicateurs de pilotage pertinents.
 - [x] Tester les règles de calcul, les autorisations administrateur et les rendus desktop/mobile.
+- [x] Agréger les dépenses mensuelles par catégorie pour alimenter le tableau de bord.
+- [x] Ajouter un graphique circulaire des dépenses avec légende, montants et pourcentages.
+- [x] Vérifier le graphique et son état vide sur desktop et mobile.
