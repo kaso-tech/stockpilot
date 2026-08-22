@@ -225,3 +225,6 @@ html:not(.dark) .commercial-hero .bg-black\/10 { background-color: rgba(255, 255
   #invoice-print .border-white\/\[0\.07\] { border-color: #dbe3ea !important; }
   .no-print { display: none !important; }
 }
+/* Header sombre : les contrôles restent cohérents avec le cockpit nuit. */
+.app-header button[class*="bg-white"] { background-color: #111722 !important; border-color: rgba(255,255,255,.1) !important; color: #e2e8f0 !important; }
+.app-header button[class*="bg-white"]:hover { background-color: rgba(255,255,255,.08) !important; }

@@ -325,3 +325,7 @@
 - [x] Remplacer le tableau des produits par des cartes compactes et cliquables.
 - [x] Créer une fiche produit professionnelle regroupant prix, marges, statistiques, mouvements, fournisseurs et actions.
 - [x] Tester les parcours de synchronisation et de fiche produit sur desktop et mobile.
+- [x] Auditer le header et le formatage des prix existants.
+- [x] Harmoniser le header et ses contrôles avec le thème sombre.
+- [x] Ajouter des réglages de séparateur de chiffres et d’arrondi pour les prix.
+- [x] Tester l’application du format de prix et préparer l’archive actuelle du projet.
