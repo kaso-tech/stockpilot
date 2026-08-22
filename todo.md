@@ -335,3 +335,5 @@
 - [x] Adapter automatiquement le header au thème clair ou sombre sélectionné.
 - [x] Vérifier le header dans les deux thèmes sur desktop et mobile.
 - [x] Corriger l’aperçu de format des prix pour qu’il suive exactement les réglages sélectionnés.
+- [x] Placer la recherche du catalogue au-dessus des filtres de tri.
+- [x] Donner aux filtres de tri des largeurs égales et stables sur leur ligne responsive.

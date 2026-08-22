@@ -226,10 +226,13 @@ html:not(.dark) .commercial-hero .bg-black\/10 { background-color: rgba(255, 255
   .no-print { display: none !important; }
 }
 
-/* Catalogue : les contrôles de recherche et filtres restent sur une ligne, avec un défilement horizontal sur petit écran. */
-div:has(> .relative > input[placeholder="Rechercher une référence…"]) { flex-direction: row !important; flex-wrap: nowrap; overflow-x: auto; padding-bottom: .25rem; }
-div:has(> .relative > input[placeholder="Rechercher une référence…"]) > .relative { min-width: 16rem; flex: 1 0 16rem; }
-div:has(> .relative > input[placeholder="Rechercher une référence…"]) > button { flex: 0 0 auto; }
+/* Catalogue : la recherche garde sa propre ligne ; les filtres ont des largeurs égales et stables. */
+div:has(> .relative > input[placeholder="Rechercher une référence…"]) { flex-direction: row !important; flex-wrap: wrap !important; overflow: visible; }
+div:has(> .relative > input[placeholder="Rechercher une référence…"]) > .relative { min-width: 100%; flex: 0 0 100%; }
+div:has(> .relative > input[placeholder="Rechercher une référence…"]) > button[role="combobox"] { min-width: 0; flex: 1 1 100%; width: 100% !important; }
+@media (min-width: 640px) {
+  div:has(> .relative > input[placeholder="Rechercher une référence…"]) > button[role="combobox"] { flex: 1 1 0; width: auto !important; }
+}
 
 /* Les boutons secondaires du header suivent le thème actif. */
 .dark .app-header button[class*="bg-white"] { background-color: #111722 !important; border-color: rgba(255,255,255,.1) !important; color: #e2e8f0 !important; }
