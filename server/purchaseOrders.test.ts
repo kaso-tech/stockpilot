@@ -27,7 +27,7 @@ describe("purchaseOrders.listBySupplier", () => {
 });
 
 describe("purchaseOrders transitions", () => {
-  const order = { id: 9, orderNumber: "BC-2026-001", supplierId: 4, status: "draft", totalCents: 54000, notes: null, createdAt: new Date("2026-08-22") };
+  const order = { id: 9, orderNumber: "BC-2026-001", supplierId: 4, status: "draft", totalCents: 54000, notes: null, expectedDeliveryDate: null, createdAt: new Date("2026-08-22") };
   const item = { id: 1, purchaseOrderId: 9, productId: 12, productName: "Produit A", productReference: "SKU-A", unit: "pièce", quantity: 6, receivedQuantity: 0, purchasePriceCents: 9000, lineTotalCents: 54000 };
   let productUpdates: unknown[];
   let stockRows: unknown[];
@@ -45,6 +45,10 @@ describe("purchaseOrders transitions", () => {
   it("marque un bon comme envoyé", async () => {
     const result = await appRouter.createCaller(context()).purchaseOrders.markSent({ id: 9 });
     expect(result).toEqual({ success: true, status: "sent" });
+  });
+  it("enregistre une date de livraison attendue sur un bon modifiable", async () => {
+    const result = await appRouter.createCaller(context()).purchaseOrders.updateDetails({ id: 9, notes: "Livraison express", expectedDeliveryDate: new Date("2026-08-30T12:00:00Z") });
+    expect(result).toEqual({ success: true });
   });
   it("réceptionne partiellement le bon et crée l’entrée de stock correspondante", async () => {
     const result = await appRouter.createCaller(context()).purchaseOrders.receive({ id: 9, lines: [{ id: 1, quantity: 2 }] });

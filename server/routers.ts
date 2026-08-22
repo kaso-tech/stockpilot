@@ -365,9 +365,20 @@ export const appRouter = router({
       const rows = await db.select().from(purchaseOrderItems);
       return orders.map(order => ({ ...order, items: rows.filter(item => item.purchaseOrderId === order.id) }));
     }),
+    get: protectedProcedure.input(z.object({ id: z.number().int().positive() })).query(async ({ input }) => {
+      const db = await requireDb();
+      const order = (await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, input.id)).limit(1))[0];
+      if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Bon de commande introuvable." });
+      const [supplier, items] = await Promise.all([
+        db.select().from(suppliers).where(eq(suppliers.id, order.supplierId)).limit(1),
+        db.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, input.id)),
+      ]);
+      return { ...order, supplier: supplier[0] ?? null, items };
+    }),
     create: adminProcedure.input(z.object({
       supplierId: z.number().int().positive(),
       notes: z.string().trim().max(2000).nullable().optional(),
+      expectedDeliveryDate: z.coerce.date().nullable().optional(),
       items: z.array(z.object({ productId: z.number().int().positive(), quantity: z.number().int().positive() })).min(1).max(100),
     })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
@@ -382,13 +393,34 @@ export const appRouter = router({
       const totalCents = selected.reduce((sum, item) => sum + item.lineTotalCents, 0);
       const orderNumber = `BC-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
       const orderId = await db.transaction(async tx => {
-        const result = await tx.insert(purchaseOrders).values({ orderNumber, supplierId: input.supplierId, totalCents, notes: input.notes ?? null, createdByUserId: ctx.user.id });
+        const result = await tx.insert(purchaseOrders).values({ orderNumber, supplierId: input.supplierId, totalCents, notes: input.notes ?? null, expectedDeliveryDate: input.expectedDeliveryDate ?? null, createdByUserId: ctx.user.id });
         const id = Number(result[0].insertId);
         await tx.insert(purchaseOrderItems).values(selected.map(item => ({ purchaseOrderId: id, productId: item.product.id, productName: item.product.name, productReference: item.product.reference, unit: item.product.unit, quantity: item.quantity, purchasePriceCents: item.product.purchasePriceCents, lineTotalCents: item.lineTotalCents })));
         return id;
       });
       await createAudit(ctx.user.id, "Création", "Bon de commande", orderId, `Bon ${orderNumber} créé pour ${supplier.name}`);
       return { id: orderId, orderNumber, totalCents };
+    }),
+    updateDetails: adminProcedure.input(z.object({ id: z.number().int().positive(), notes: z.string().trim().max(2000).nullable(), expectedDeliveryDate: z.coerce.date().nullable() })).mutation(async ({ ctx, input }) => {
+      const db = await requireDb();
+      const order = (await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, input.id)).limit(1))[0];
+      if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Bon de commande introuvable." });
+      if (order.status === "received" || order.status === "cancelled") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Ce bon ne peut plus être modifié." });
+      await db.update(purchaseOrders).set({ notes: input.notes, expectedDeliveryDate: input.expectedDeliveryDate }).where(eq(purchaseOrders.id, input.id));
+      await createAudit(ctx.user.id, "Modification", "Bon de commande", input.id, `Bon ${order.orderNumber} mis à jour`);
+      return { success: true };
+    }),
+    remove: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      const db = await requireDb();
+      const order = (await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, input.id)).limit(1))[0];
+      if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Bon de commande introuvable." });
+      if (order.status !== "draft" && order.status !== "cancelled") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Seuls les bons en attente ou annulés peuvent être supprimés." });
+      await db.transaction(async tx => {
+        await tx.delete(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, input.id));
+        await tx.delete(purchaseOrders).where(eq(purchaseOrders.id, input.id));
+      });
+      await createAudit(ctx.user.id, "Suppression", "Bon de commande", input.id, `Bon ${order.orderNumber} supprimé`);
+      return { success: true };
     }),
     markSent: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();

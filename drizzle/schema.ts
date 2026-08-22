@@ -50,6 +50,7 @@ export const purchaseOrders = mysqlTable("purchaseOrders", {
   status: mysqlEnum("status", ["draft", "sent", "received", "cancelled"]).notNull().default("draft"),
   totalCents: int("totalCents").notNull().default(0),
   notes: text("notes"),
+  expectedDeliveryDate: timestamp("expectedDeliveryDate"),
   cancellationReason: text("cancellationReason"),
   cancelledAt: timestamp("cancelledAt"),
   receivedAt: timestamp("receivedAt"),

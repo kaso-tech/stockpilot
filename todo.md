@@ -352,3 +352,9 @@
 - [x] Ajouter l’annulation motivée d’un bon de commande avec traçabilité.
 - [x] Générer un PDF du bon de commande et le préparer pour le partage e-mail.
 - [x] Tester les réceptions partielles, l’annulation et le PDF de bon sur desktop et mobile.
+- [x] Auditer les cartes, actions et données de bon de commande actuelles.
+- [x] Ajouter et persister une date de livraison attendue sur les bons de commande.
+- [x] Afficher une alerte visuelle lorsque la livraison attendue est dépassée.
+- [x] Transformer l’historique fournisseur en cartes de bons cliquables.
+- [x] Créer une fiche détaillée de bon avec dates, lignes, statuts et actions complètes.
+- [x] Tester les parcours bon de commande sur desktop et mobile.
