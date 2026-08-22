@@ -34,8 +34,11 @@ export const suppliers = mysqlTable("suppliers", {
   name: varchar("name", { length: 160 }).notNull().unique(),
   otherReference: varchar("otherReference", { length: 80 }),
   contactName: varchar("contactName", { length: 160 }),
+  address: text("address"),
   email: varchar("email", { length: 320 }),
   phone: varchar("phone", { length: 50 }),
+  taxNumber: varchar("taxNumber", { length: 100 }),
+  notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -89,6 +92,8 @@ export const customers = mysqlTable("customers", {
   email: varchar("email", { length: 320 }),
   phone: varchar("phone", { length: 50 }),
   address: text("address"),
+  taxNumber: varchar("taxNumber", { length: 100 }),
+  notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

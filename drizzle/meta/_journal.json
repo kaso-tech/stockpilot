@@ -176,6 +176,13 @@
       "when": 1787406324872,
       "tag": "0024_lumpy_revanche",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "5",
+      "when": 1787407711406,
+      "tag": "0025_many_sentinel",
+      "breakpoints": true
     }
   ]
 }

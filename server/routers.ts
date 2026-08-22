@@ -65,9 +65,11 @@ const productInput = z.object({
 const supplierInput = z.object({
   name: z.string().trim().min(2).max(160),
   otherReference: z.string().trim().max(80).regex(/^[A-Za-z0-9]*$/, "La référence doit être alphanumérique.").nullable(),
-  contactName: z.string().trim().max(160).nullable(),
+  address: z.string().trim().max(1000).nullable(),
   email: z.string().trim().email().max(320).nullable(),
   phone: z.string().trim().max(50).nullable(),
+  taxNumber: z.string().trim().max(100).nullable(),
+  notes: z.string().trim().max(2000).nullable(),
 });
 const categoryInput = z.object({ name: z.string().trim().min(2).max(100) });
 const unitInput = z.object({ name: z.string().trim().min(1).max(30).regex(/^[A-Za-zÀ-ÖØ-öø-ÿ0-9\s'-]+$/, "Caractères non autorisés") });

@@ -269,3 +269,7 @@
 - [x] Tester les paliers séparés pour les clients détail et grossistes sur desktop et mobile.
 - [x] Ajouter un bouton pour dupliquer les paliers détail vers la section grossiste.
 - [x] Vérifier la duplication des paliers sur desktop et mobile.
+- [x] Retirer le champ Contact des clients et fournisseurs sans altérer l’historique existant.
+- [x] Ajouter les champs Numéro fiscal et Notes aux clients et fournisseurs.
+- [x] Réorganiser les formulaires selon l’ordre demandé et clarifier Autre référence.
+- [x] Tester les formulaires et fiches clients-fournisseurs sur desktop et mobile.
