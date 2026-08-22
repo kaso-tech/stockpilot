@@ -165,3 +165,5 @@
 - [x] Ajouter un mode de rattachement distinct pour le caissier et l’agent commercial : compte par défaut ou choix au comptoir.
 - [x] Masquer les sélecteurs d’agents de la création de facture lorsqu’un compte par défaut est configuré.
 - [x] Tester les deux modes de rattachement sur la création de facture, desktop et mobile.
+- [x] Afficher en lecture seule les agents par défaut appliqués lors de la création de facture.
+- [x] Vérifier le rendu desktop et mobile des rattachements affichés en lecture seule.
