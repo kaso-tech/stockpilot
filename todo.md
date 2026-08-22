@@ -383,3 +383,6 @@
 - [x] Préremplir l’adresse de livraison du client dans la création de facture.
 - [x] Suggérer les produits réellement achetés par le client et permettre leur ajout rapide.
 - [x] Tester la livraison préremplie et les suggestions produits sur desktop et mobile.
+- [x] Auditer les actions et le rendu existants sur la fiche facture.
+- [x] Ajouter la génération PDF, l’impression et l’envoi e-mail des factures créées.
+- [x] Tester les actions rapides facture sur desktop et mobile.

@@ -6,8 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { invoiceEmailMessage, invoiceEmailSubject } from "@/lib/invoiceShare";
 import { trpc } from "@/lib/trpc";
-import { Eye, Plus, Printer, ReceiptText, Trash2, Undo2, WalletCards } from "lucide-react";
+import { Download, Eye, Mail, Plus, Printer, ReceiptText, Trash2, Undo2, WalletCards } from "lucide-react";
+import { jsPDF } from "jspdf";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -92,6 +94,27 @@ export default function Invoices() {
       popup.close();
     }, 250);
   };
+  const downloadPdf = () => {
+    if (!detail) return;
+    const file = createInvoicePdf(detail, identity);
+    downloadFile(file);
+    toast.success("PDF de la facture généré.");
+  };
+  const emailPdf = async () => {
+    if (!detail) return;
+    const email = detail.customer?.email;
+    if (!email) return toast.error("L’adresse e-mail de ce client n’est pas renseignée.");
+    const file = createInvoicePdf(detail, identity);
+    const subject = invoiceEmailSubject(detail.sale.invoiceNumber);
+    const message = invoiceEmailMessage({ customerName: detail.customer?.name, invoiceNumber: detail.sale.invoiceNumber, total: formatCurrency(detail.sale.totalCents) });
+    if (navigator.canShare?.({ files: [file] })) {
+      try { await navigator.share({ title: subject, text: message, files: [file] }); toast.success("La facture est prête à être envoyée par e-mail."); } catch { return; }
+    } else {
+      downloadFile(file);
+      window.location.href = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(`${message}\n\nLe PDF de la facture a été téléchargé : joignez-le à ce message.`)}`;
+      toast.info("Le PDF est téléchargé. Joignez-le au message e-mail qui s’ouvre.");
+    }
+  };
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -125,7 +148,7 @@ export default function Invoices() {
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-h-[92vh] max-w-2xl overflow-y-auto">
           <DialogHeader><DialogTitle>Aperçu de facture</DialogTitle></DialogHeader>
-          {detail ? <><div id="invoice-print"><InvoiceDocument detail={detail} identity={identity} /></div><div className="grid grid-cols-2 gap-2"><Button variant="outline" onClick={() => print("a4")}><Printer className="mr-2 h-4 w-4" />Imprimer A4</Button><Button variant="outline" onClick={() => print("ticket")}><ReceiptText className="mr-2 h-4 w-4" />Ticket caisse</Button>{(detail.sale.status === "draft" || detail.sale.status === "partial") && <Button className="col-span-2 bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => { setCheckoutSale(detail.sale); setPreviewOpen(false); }}><WalletCards className="mr-2 h-4 w-4" />Encaisser le solde</Button>}{detail.sale.status === "draft" && <Button variant="outline" className="col-span-2 border-rose-400/30 text-rose-300" onClick={() => setDeleteTarget(detail.sale)}><Trash2 className="mr-2 h-4 w-4" />Supprimer la facture</Button>}{(detail.sale.status === "paid" || detail.sale.status === "partial") && <Button variant="outline" className="col-span-2 border-amber-400/30 text-amber-600" onClick={() => askRefund(detail.sale)}><Undo2 className="mr-2 h-4 w-4" />Rembourser la facture</Button>}</div></> : <p className="py-12 text-center text-muted-foreground">Chargement…</p>}
+          {detail ? <><div id="invoice-print"><InvoiceDocument detail={detail} identity={identity} /></div><div className="grid gap-2 sm:grid-cols-3"><Button variant="outline" onClick={downloadPdf}><Download className="mr-2 h-4 w-4" />Générer PDF</Button><Button variant="outline" onClick={() => print("a4")}><Printer className="mr-2 h-4 w-4" />Imprimer</Button><Button variant="outline" onClick={emailPdf}><Mail className="mr-2 h-4 w-4" />E-mail + PDF</Button><Button variant="outline" className="sm:col-span-3" onClick={() => print("ticket")}><ReceiptText className="mr-2 h-4 w-4" />Imprimer au format ticket</Button>{(detail.sale.status === "draft" || detail.sale.status === "partial") && <Button className="sm:col-span-3 bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => { setCheckoutSale(detail.sale); setPreviewOpen(false); }}><WalletCards className="mr-2 h-4 w-4" />Encaisser le solde</Button>}{detail.sale.status === "draft" && <Button variant="outline" className="sm:col-span-3 border-rose-400/30 text-rose-300" onClick={() => setDeleteTarget(detail.sale)}><Trash2 className="mr-2 h-4 w-4" />Supprimer la facture</Button>}{(detail.sale.status === "paid" || detail.sale.status === "partial") && <Button variant="outline" className="sm:col-span-3 border-amber-400/30 text-amber-600" onClick={() => askRefund(detail.sale)}><Undo2 className="mr-2 h-4 w-4" />Rembourser la facture</Button>}</div></> : <p className="py-12 text-center text-muted-foreground">Chargement…</p>}
         </DialogContent>
       </Dialog>
 
@@ -150,5 +173,20 @@ function StatusBadge({ status }: { status: Invoice["status"] }) {
 function InvoiceDocument({ detail, identity }: { detail: any; identity: any }) {
   const customer = detail.customer;
   const lineDiscounts = detail.items.reduce((sum: number, item: any) => sum + (item.discountCents || 0), 0);
-  return <article><header className="row"><div><p className="muted">{identity?.companyName || "StockPilot"}</p><h2>Facture {detail.sale.invoiceNumber}</h2><p className="muted">{formatDate(detail.sale.createdAt, true)}</p></div><StatusBadge status={detail.sale.status} /></header><section className="line row"><div><p className="muted">Facturé à</p><p><b>{customer?.name || "Client comptoir"}</b></p></div><div className="text-right"><p className="muted">Total encaissé</p><p><b>{formatCurrency(detail.sale.amountPaidCents || 0)} / {formatCurrency(detail.sale.totalCents)}</b></p></div></section><section className="line space-y-3">{detail.items.map((item: any) => <div className="row" key={item.id}><div><b>{item.productName}</b><p className="muted">{item.quantity} × {formatCurrency(item.unitPriceCents)}</p></div><b>{formatCurrency(item.lineTotalCents)}</b></div>)}</section><section className="line space-y-1">{lineDiscounts > 0 && <div className="row muted"><span>Remises lignes</span><span>-{formatCurrency(lineDiscounts)}</span></div>}<div className="row"><span>Total</span><b>{formatCurrency(detail.sale.totalCents)}</b></div></section><section className={`a4-only signature ${identity?.companySignatureAlignment || "right"}`}><p className="muted">{identity?.companyAgreementLabel || "Bon pour accord"}</p>{identity?.companySignatureUrl && <img src={identity.companySignatureUrl} alt="Signature ou cachet" />}</section></article>;
+  return <article><header className="row"><div><p className="muted">{identity?.companyName || "StockPilot"}</p><h2>Facture {detail.sale.invoiceNumber}</h2><p className="muted">{formatDate(detail.sale.createdAt, true)}</p></div><StatusBadge status={detail.sale.status} /></header><section className="line row"><div><p className="muted">Facturé à</p><p><b>{customer?.name || "Client comptoir"}</b></p>{detail.sale.deliveryAddress && <p className="muted">Livraison : {detail.sale.deliveryAddress}</p>}</div><div className="text-right"><p className="muted">Total encaissé</p><p><b>{formatCurrency(detail.sale.amountPaidCents || 0)} / {formatCurrency(detail.sale.totalCents)}</b></p></div></section><section className="line space-y-3">{detail.items.map((item: any) => <div className="row" key={item.id}><div><b>{item.productName}</b><p className="muted">{item.quantity} × {formatCurrency(item.unitPriceCents)}</p></div><b>{formatCurrency(item.lineTotalCents)}</b></div>)}</section><section className="line space-y-1">{lineDiscounts > 0 && <div className="row muted"><span>Remises lignes</span><span>-{formatCurrency(lineDiscounts)}</span></div>}<div className="row"><span>Total</span><b>{formatCurrency(detail.sale.totalCents)}</b></div></section><section className={`a4-only signature ${identity?.companySignatureAlignment || "right"}`}><p className="muted">{identity?.companyAgreementLabel || "Bon pour accord"}</p>{identity?.companySignatureUrl && <img src={identity.companySignatureUrl} alt="Signature ou cachet" />}</section></article>;
 }
+
+function createInvoicePdf(detail: any, identity: any) {
+  const doc = new jsPDF({ unit: "pt", format: "a4" }); let y = 56;
+  doc.setFontSize(20); doc.setTextColor(0, 123, 139); doc.text(identity?.companyName || "StockPilot", 44, y); y += 26;
+  doc.setFontSize(13); doc.setTextColor(15, 23, 42); doc.text(`Facture ${detail.sale.invoiceNumber}`, 44, y); y += 18;
+  doc.setFontSize(9); doc.setTextColor(90, 101, 115); doc.text(formatDate(detail.sale.createdAt, true), 44, y); y += 28;
+  doc.setDrawColor(0, 123, 139); doc.line(44, y, 552, y); y += 22;
+  doc.setTextColor(30, 41, 59); doc.setFontSize(10); doc.text(`Client : ${detail.customer?.name || "Client comptoir"}`, 44, y); y += 16;
+  if (detail.sale.deliveryAddress) { doc.setFontSize(9); doc.setTextColor(90, 101, 115); doc.text(`Livraison : ${detail.sale.deliveryAddress}`, 44, y, { maxWidth: 500 }); y += 28; }
+  doc.setFontSize(9); doc.setTextColor(30, 41, 59); doc.text("Produit", 44, y); doc.text("Qté", 380, y); doc.text("Total", 552, y, { align: "right" }); y += 14;
+  detail.items.forEach((item: any) => { if (y > 760) { doc.addPage(); y = 56; } doc.setDrawColor(220, 229, 237); doc.line(44, y, 552, y); y += 16; doc.setTextColor(30, 41, 59); doc.text(item.productName, 44, y, { maxWidth: 300 }); doc.text(String(item.quantity), 380, y); doc.text(formatCurrency(item.lineTotalCents), 552, y, { align: "right" }); y += 13; });
+  y += 18; doc.setFontSize(12); doc.setTextColor(15, 23, 42); doc.text(`Total : ${formatCurrency(detail.sale.totalCents)}`, 552, y, { align: "right" });
+  return new File([doc.output("blob")], `${detail.sale.invoiceNumber}.pdf`, { type: "application/pdf" });
+}
+function downloadFile(file: File) { const url = URL.createObjectURL(file); const link = document.createElement("a"); link.href = url; link.download = file.name; link.click(); URL.revokeObjectURL(url); }
