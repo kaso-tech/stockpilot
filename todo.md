@@ -303,3 +303,6 @@
 - [x] Compacter les cartes de la liste Clients.
 - [x] Ajouter une fiche client complète accessible au clic sur une carte.
 - [x] Tester les formulaires et le détail client sur desktop et mobile.
+- [x] Autoriser les vendeurs à consulter le registre des mouvements de stock.
+- [x] Masquer ou désactiver les actions de création et d’ajustement de mouvements pour les vendeurs.
+- [x] Tester les autorisations de mouvements sur desktop et mobile.

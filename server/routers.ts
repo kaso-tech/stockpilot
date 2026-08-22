@@ -313,7 +313,7 @@ export const appRouter = router({
 
   movements: router({
     list: protectedProcedure.query(() => listMovements()),
-    create: protectedProcedure.input(z.object({
+    create: adminProcedure.input(z.object({
       productId: z.number().int().positive(),
       supplierId: z.number().int().positive().nullable(),
       type: z.enum(["entry", "exit", "adjustment"]),
