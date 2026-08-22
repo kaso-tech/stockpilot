@@ -361,3 +361,6 @@
 - [x] Aligner les actions Modifier et Supprimer en haut à droite de la carte fournisseur.
 - [x] Placer les informations complémentaires juste sous les coordonnées fournisseur.
 - [x] Vérifier la mise en page de la fiche fournisseur sur desktop et mobile.
+- [x] Déplacer les actions de la fiche bon de commande en bas de page.
+- [x] Afficher le retour vers le fournisseur uniquement après réception complète du bon.
+- [x] Vérifier la fiche bon de commande sur desktop et mobile.
