@@ -285,3 +285,9 @@
 - [x] Afficher les agents définis par défaut en lecture seule lors de l’encaissement.
 - [x] Exiger un choix explicite d’agent ou de l’option « Aucun » pour les sélecteurs non définis par défaut.
 - [x] Tester les sélections d’agents et l’encaissement sur desktop et mobile.
+- [x] Conserver l’encaissement déjà validé, sans réduction supplémentaire demandée.
+- [x] Autoriser le vendeur à déclencher une sauvegarde manuelle.
+- [x] Donner au vendeur accès aux paramètres Apparence et Tableau de bord, sans accès aux réglages sensibles.
+- [x] Autoriser le vendeur à créer, modifier et gérer les clients.
+- [x] Tester les autorisations vendeur et l’encaissement sur desktop et mobile.
+- [x] Restaurer la largeur d’encaissement validée avant la dernière tentative de réduction.
