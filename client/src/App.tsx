@@ -17,6 +17,7 @@ import Inventories from "./pages/Inventories";
 import Movements from "./pages/Movements";
 import PointOfSale from "./pages/PointOfSale";
 import Products from "./pages/Products";
+import ProductDetail from "./pages/ProductDetail";
 import Suppliers from "./pages/Suppliers";
 import AuditLog from "./pages/AuditLog";
 import SettingsIndex from "./pages/SettingsIndex";
@@ -31,6 +32,7 @@ import SettingsPos from "./pages/SettingsPos";
 import SettingsHistory from "./pages/SettingsHistory";
 import SettingsDashboard from "./pages/SettingsDashboard";
 import DataExchange from "./pages/DataExchange";
+import SyncJournal from "./pages/SyncJournal";
 
 function Router() {
   return (
@@ -52,6 +54,7 @@ function Router() {
         <Route path={"/parametres/historique"} component={SettingsHistory} />
         <Route path={"/sauvegardes"} component={Backups} />
         <Route path={"/depenses"} component={Expenses} />
+        <Route path={"/produits/:id"} component={ProductDetail} />
         <Route path={"/produits"} component={Products} />
         <Route path={"/categories"} component={Categories} />
         <Route path={"/unites"} component={Units} />
@@ -59,6 +62,7 @@ function Router() {
         <Route path={"/fournisseurs"} component={Suppliers} />
         <Route path={"/alertes"} component={Alerts} />
         <Route path={"/journal"} component={AuditLog} />
+        <Route path={"/synchronisation"} component={SyncJournal} />
         <Route path={"/donnees"} component={DataExchange} />
         <Route path={"/404"} component={NotFound} />
         <Route component={NotFound} />

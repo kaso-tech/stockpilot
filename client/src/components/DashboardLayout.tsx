@@ -79,6 +79,7 @@ const menuItems = [
   { icon: DatabaseBackup, label: "Sauvegardes", path: "/sauvegardes" },
   { icon: TriangleAlert, label: "Alertes", path: "/alertes" },
   { icon: ClipboardList, label: "Journal", path: "/journal" },
+  { icon: CloudUpload, label: "Synchronisation", path: "/synchronisation" },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -128,12 +129,12 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const isMobile = useIsMobile();
   const { data: sellerPermissions } = trpc.commerce.settings.get.useQuery(undefined, { enabled: user?.role === "seller" });
   const sellerMenuItems = [
-    ...menuItems.filter(item => item.path === "/" || item.path === "/pos" || item.path === "/factures" || item.path === "/clients" || item.path === "/mouvements" || (item.path === "/produits" && sellerPermissions?.sellerCanEditPurchasePrice)),
+    ...menuItems.filter(item => item.path === "/" || item.path === "/pos" || item.path === "/factures" || item.path === "/clients" || item.path === "/mouvements" || item.path === "/synchronisation" || (item.path === "/produits" && sellerPermissions?.sellerCanEditPurchasePrice)),
     { icon: Settings2, label: "Apparence", path: "/parametres/apparence" },
     { icon: LayoutDashboard, label: "Mon tableau de bord", path: "/parametres/tableau-de-bord" },
   ];
   const visibleMenuItems = user?.role === "admin" ? menuItems : sellerMenuItems;
-  const activeMenuItem = visibleMenuItems.find(item => item.path === location) ?? visibleMenuItems[0];
+  const activeMenuItem = visibleMenuItems.find(item => item.path === location || (item.path === "/produits" && location.startsWith("/produits/"))) ?? visibleMenuItems[0];
   const initials = (user?.name || user?.email || "U").slice(0, 2).toUpperCase();
   const isAdmin = user?.role === "admin";
   const canRunBackup = Boolean(user);

@@ -319,3 +319,9 @@
 - [x] Permettre l’encaissement partiel des factures dans la file d’attente hors connexion.
 - [x] Imprimer un reçu provisoire clairement identifié pour les ventes POS hors connexion.
 - [x] Tester la synchronisation, le statut partiel et l’impression provisoire sur desktop et mobile.
+- [x] Auditer la file de synchronisation et le catalogue produit existant.
+- [x] Ajouter un journal détaillé des synchronisations avec états, horodatages et causes d’échec.
+- [x] Ajouter une interface de reprise manuelle des synchronisations en erreur.
+- [x] Remplacer le tableau des produits par des cartes compactes et cliquables.
+- [x] Créer une fiche produit professionnelle regroupant prix, marges, statistiques, mouvements, fournisseurs et actions.
+- [x] Tester les parcours de synchronisation et de fiche produit sur desktop et mobile.

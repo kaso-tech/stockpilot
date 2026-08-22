@@ -14,6 +14,7 @@ import {
   productPriceTiers,
   remunerationProfiles,
   saleCommissions,
+  saleItems,
   saleSettings,
   sales,
   sellerCredentials,
@@ -249,6 +250,23 @@ export const appRouter = router({
 
   products: router({
     list: protectedProcedure.query(() => listProducts()),
+    detail: protectedProcedure.input(z.object({ id: z.number().int().positive() })).query(async ({ input }) => {
+      const db = await requireDb();
+      const product = (await db.select().from(products).where(eq(products.id, input.id)).limit(1))[0];
+      if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Produit introuvable." });
+      const [tiers, movements, lines, supplier] = await Promise.all([
+        db.select().from(productPriceTiers).where(eq(productPriceTiers.productId, product.id)),
+        db.select().from(stockMovements).where(eq(stockMovements.productId, product.id)).orderBy(desc(stockMovements.occurredAt)),
+        db.select().from(saleItems).where(eq(saleItems.productId, product.id)),
+        product.supplierId ? (await db.select().from(suppliers).where(eq(suppliers.id, product.supplierId)).limit(1))[0] ?? null : null,
+      ]);
+      const uniqueSaleIds = Array.from(new Set(lines.map(line => line.saleId)));
+      const saleRows = (await Promise.all(uniqueSaleIds.map(async saleId => (await db.select().from(sales).where(eq(sales.id, saleId)).limit(1))[0] ?? null))).filter((sale): sale is NonNullable<typeof sale> => Boolean(sale)).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      const revenueCents = lines.reduce((sum, line) => sum + line.lineTotalCents, 0);
+      const costCents = lines.reduce((sum, line) => sum + line.lineCostCents, 0);
+      const unitsSold = lines.reduce((sum, line) => sum + line.quantity, 0);
+      return { product, supplier, tiers: { retail: tiers.filter(tier => tier.customerType === "retail"), wholesale: tiers.filter(tier => tier.customerType === "wholesale") }, movements: movements.slice(0, 12), sales: saleRows.slice(0, 8), statistics: { revenueCents, costCents, grossMarginCents: revenueCents - costCents, marginRate: revenueCents > 0 ? Math.round(((revenueCents - costCents) / revenueCents) * 1000) / 10 : 0, unitsSold, saleCount: uniqueSaleIds.length, lastSaleAt: saleRows[0]?.createdAt ?? null } };
+    }),
     create: adminProcedure.input(productInput).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
       try {
