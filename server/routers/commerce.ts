@@ -41,6 +41,15 @@ async function listSales(limit = 100) {
 export const commerceRouter = router({
   customers: router({
     list: protectedProcedure.query(async () => (await dbOrThrow()).select().from(customers).orderBy(customers.name)),
+    get: protectedProcedure.input(z.object({ id: z.number().int().positive() })).query(async ({ input }) => {
+      const db = await dbOrThrow();
+      const customer = (await db.select().from(customers).where(eq(customers.id, input.id)).limit(1))[0];
+      if (!customer) throw new TRPCError({ code: "NOT_FOUND", message: "Client introuvable." });
+      const invoices = await db.select({ id: sales.id, invoiceNumber: sales.invoiceNumber, status: sales.status, totalCents: sales.totalCents, amountPaidCents: sales.amountPaidCents, createdAt: sales.createdAt }).from(sales).where(eq(sales.customerId, input.id)).orderBy(desc(sales.createdAt)).limit(30);
+      const totalSalesCents = invoices.reduce((sum, invoice) => sum + invoice.totalCents, 0);
+      const outstandingCents = invoices.reduce((sum, invoice) => sum + Math.max(0, invoice.totalCents - invoice.amountPaidCents), 0);
+      return { customer, invoices, summary: { invoiceCount: invoices.length, totalSalesCents, outstandingCents, lastInvoiceAt: invoices[0]?.createdAt ?? null } };
+    }),
     create: protectedProcedure.input(customerInput).mutation(async ({ ctx, input }) => { const db = await dbOrThrow(); const result = await db.insert(customers).values(input); const id = Number(result[0].insertId); await audit(ctx.user.id, "Création", "Client", id, `Client ${input.name} créé`); return { id }; }),
     update: protectedProcedure.input(customerInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await dbOrThrow(); const { id, ...data } = input; await db.update(customers).set(data).where(eq(customers.id, id)); await audit(ctx.user.id, "Modification", "Client", id, `Client ${data.name} modifié`); return { success: true }; }),
     remove: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await dbOrThrow(); const current = (await db.select().from(customers).where(eq(customers.id, input.id)).limit(1))[0]; if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Client introuvable." }); const invoices = await db.select({ id: sales.id }).from(sales).where(eq(sales.customerId, input.id)).limit(1); if (!customerCanBeRemoved(invoices.length)) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Ce client est lié à des factures et ne peut pas être supprimé." }); await db.delete(customers).where(eq(customers.id, input.id)); await audit(ctx.user.id, "Suppression", "Client", input.id, `Client ${current.name} supprimé`); return { success: true }; }),

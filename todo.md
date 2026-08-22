@@ -372,3 +372,7 @@
 - [x] Ajouter une barre de recherche et des filtres par fournisseur et statut dans la liste des bons de commande.
 - [x] Préserver l’origine d’ouverture d’un bon pour adapter son bouton Retour.
 - [x] Vérifier les retours depuis la liste Bons de commande et depuis la fiche fournisseur.
+- [x] Auditer les cartes client, la fenêtre existante et les données associées.
+- [x] Créer une fiche client professionnelle avec détails et actions existantes.
+- [x] Rendre les cartes client cliquables vers leur fiche dédiée et retirer le popup de détail.
+- [x] Tester le parcours de fiche client sur desktop et mobile.

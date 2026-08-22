@@ -10,6 +10,7 @@ import { OfflineProvider } from "./contexts/OfflineContext";
 import Alerts from "./pages/Alerts";
 import Agents from "./pages/Agents";
 import Customers from "./pages/Customers";
+import CustomerDetail from "./pages/CustomerDetail";
 import Home from "./pages/Home";
 import Invoices from "./pages/Invoices";
 import InvoiceCreate from "./pages/InvoiceCreate";
@@ -43,6 +44,7 @@ function Router() {
       <Switch>
         <Route path={"/"} component={Home} />
         <Route path={"/pos"} component={PointOfSale} />
+        <Route path={"/clients/:id"} component={CustomerDetail} />
         <Route path={"/clients"} component={Customers} />
         <Route path={"/factures"} component={Invoices} />
         <Route path={"/factures/nouvelle"} component={InvoiceCreate} />

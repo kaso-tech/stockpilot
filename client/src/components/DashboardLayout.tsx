@@ -136,7 +136,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     { icon: LayoutDashboard, label: "Mon tableau de bord", path: "/parametres/tableau-de-bord" },
   ];
   const visibleMenuItems = user?.role === "admin" ? menuItems : sellerMenuItems;
-  const activeMenuItem = visibleMenuItems.find(item => item.path === location || (item.path === "/produits" && location.startsWith("/produits/")) || (item.path === "/fournisseurs" && location.startsWith("/fournisseurs/")) || (item.path === "/bons-commande" && location.startsWith("/bons-commande/"))) ?? visibleMenuItems[0];
+  const activeMenuItem = visibleMenuItems.find(item => item.path === location || (item.path === "/produits" && location.startsWith("/produits/")) || (item.path === "/clients" && location.startsWith("/clients/")) || (item.path === "/fournisseurs" && location.startsWith("/fournisseurs/")) || (item.path === "/bons-commande" && location.startsWith("/bons-commande/"))) ?? visibleMenuItems[0];
   const initials = (user?.name || user?.email || "U").slice(0, 2).toUpperCase();
   const isAdmin = user?.role === "admin";
   const canRunBackup = Boolean(user);
@@ -175,7 +175,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           {!isCollapsed && <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Pilotage</p>}
           <SidebarMenu className="gap-1">
             {visibleMenuItems.map(item => {
-              const isActive = location === item.path || (item.path === "/fournisseurs" && location.startsWith("/fournisseurs/")) || (item.path === "/bons-commande" && location.startsWith("/bons-commande/"));
+              const isActive = location === item.path || (item.path === "/clients" && location.startsWith("/clients/")) || (item.path === "/fournisseurs" && location.startsWith("/fournisseurs/")) || (item.path === "/bons-commande" && location.startsWith("/bons-commande/"));
               return (
                 <SidebarMenuItem key={item.path}>
                   <SidebarMenuButton
