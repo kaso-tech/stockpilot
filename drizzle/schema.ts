@@ -149,6 +149,13 @@ export const saleSettings = mysqlTable("saleSettings", {
   paymentMobileMoneyEnabled: boolean("paymentMobileMoneyEnabled").notNull().default(true),
   paymentBankTransferEnabled: boolean("paymentBankTransferEnabled").notNull().default(true),
   paymentCreditEnabled: boolean("paymentCreditEnabled").notNull().default(true),
+  sellerCanOverridePrice: boolean("sellerCanOverridePrice").notNull().default(false),
+  sellerCanSellBelowPrice: boolean("sellerCanSellBelowPrice").notNull().default(false),
+  sellerMaxDiscountPercent: int("sellerMaxDiscountPercent").notNull().default(0),
+  sellerCanCancelInvoice: boolean("sellerCanCancelInvoice").notNull().default(false),
+  sellerCanRefund: boolean("sellerCanRefund").notNull().default(false),
+  sellerCanCorrectStock: boolean("sellerCanCorrectStock").notNull().default(false),
+  sellerCanEditPurchasePrice: boolean("sellerCanEditPurchasePrice").notNull().default(false),
   updatedByUserId: int("updatedByUserId"),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

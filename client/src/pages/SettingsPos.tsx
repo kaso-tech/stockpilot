@@ -6,26 +6,100 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { trpc } from "@/lib/trpc";
-import { ChevronLeft, ReceiptText, Settings2, UsersRound } from "lucide-react";
+import { ChevronLeft, ReceiptText, Settings2, ShieldCheck, UsersRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Link } from "wouter";
 import { Restricted } from "./AuditLog";
 
 type AssignmentMode = "default" | "prompt";
+
 export default function SettingsPos() {
-  const { user } = useAuth(); const isAdmin = user?.role === "admin"; const utils = trpc.useUtils();
-  const { data: settings } = trpc.commerce.settings.get.useQuery(undefined, { enabled: isAdmin }); const { data: agents = [] } = trpc.commerce.agents.list.useQuery(undefined, { enabled: isAdmin });
-  const [salesAgentId, setSalesAgentId] = useState("none"); const [cashierId, setCashierId] = useState("none"); const [salesAgentMode, setSalesAgentMode] = useState<AssignmentMode>("prompt"); const [cashierMode, setCashierMode] = useState<AssignmentMode>("prompt"); const [ticketHeader, setTicketHeader] = useState("Merci de votre achat"); const [ticketFooter, setTicketFooter] = useState("À bientôt"); const [ticketWidthMm, setTicketWidthMm] = useState<"58" | "80">("80");
-  const [paymentCashEnabled, setPaymentCashEnabled] = useState(true); const [paymentMobileMoneyEnabled, setPaymentMobileMoneyEnabled] = useState(true); const [paymentCardEnabled, setPaymentCardEnabled] = useState(true); const [paymentBankTransferEnabled, setPaymentBankTransferEnabled] = useState(true); const [paymentCreditEnabled, setPaymentCreditEnabled] = useState(true);
-  useEffect(() => { if (settings) { setSalesAgentId(settings.defaultSalesAgentId ? String(settings.defaultSalesAgentId) : "none"); setCashierId(settings.defaultCashierId ? String(settings.defaultCashierId) : "none"); setSalesAgentMode(settings.defaultSalesAgentId ? "default" : "prompt"); setCashierMode(settings.defaultCashierId ? "default" : "prompt"); setTicketHeader(settings.ticketHeader || "Merci de votre achat"); setTicketFooter(settings.ticketFooter || "À bientôt"); setTicketWidthMm(settings.ticketWidthMm || "80"); setPaymentCashEnabled(settings.paymentCashEnabled ?? true); setPaymentMobileMoneyEnabled(settings.paymentMobileMoneyEnabled ?? true); setPaymentCardEnabled(settings.paymentCardEnabled ?? true); setPaymentBankTransferEnabled(settings.paymentBankTransferEnabled ?? true); setPaymentCreditEnabled(settings.paymentCreditEnabled ?? true); } }, [settings]);
-  const save = trpc.commerce.settings.save.useMutation({ onSuccess: () => { utils.commerce.settings.get.invalidate(); toast.success("Réglages POS et rattachements enregistrés."); }, onError: error => toast.error(error.message) });
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+  const utils = trpc.useUtils();
+  const { data: settings } = trpc.commerce.settings.get.useQuery(undefined, { enabled: isAdmin });
+  const { data: agents = [] } = trpc.commerce.agents.list.useQuery(undefined, { enabled: isAdmin });
+  const [salesAgentId, setSalesAgentId] = useState("none");
+  const [cashierId, setCashierId] = useState("none");
+  const [salesAgentMode, setSalesAgentMode] = useState<AssignmentMode>("prompt");
+  const [cashierMode, setCashierMode] = useState<AssignmentMode>("prompt");
+  const [ticketHeader, setTicketHeader] = useState("Merci de votre achat");
+  const [ticketFooter, setTicketFooter] = useState("À bientôt");
+  const [ticketWidthMm, setTicketWidthMm] = useState<"58" | "80">("80");
+  const [paymentCashEnabled, setPaymentCashEnabled] = useState(true);
+  const [paymentMobileMoneyEnabled, setPaymentMobileMoneyEnabled] = useState(true);
+  const [paymentCardEnabled, setPaymentCardEnabled] = useState(true);
+  const [paymentBankTransferEnabled, setPaymentBankTransferEnabled] = useState(true);
+  const [paymentCreditEnabled, setPaymentCreditEnabled] = useState(true);
+  const [sellerCanOverridePrice, setSellerCanOverridePrice] = useState(false);
+  const [sellerCanSellBelowPrice, setSellerCanSellBelowPrice] = useState(false);
+  const [sellerMaxDiscountPercent, setSellerMaxDiscountPercent] = useState(0);
+  const [sellerCanCancelInvoice, setSellerCanCancelInvoice] = useState(false);
+
+  useEffect(() => {
+    if (!settings) return;
+    setSalesAgentId(settings.defaultSalesAgentId ? String(settings.defaultSalesAgentId) : "none");
+    setCashierId(settings.defaultCashierId ? String(settings.defaultCashierId) : "none");
+    setSalesAgentMode(settings.defaultSalesAgentId ? "default" : "prompt");
+    setCashierMode(settings.defaultCashierId ? "default" : "prompt");
+    setTicketHeader(settings.ticketHeader || "Merci de votre achat");
+    setTicketFooter(settings.ticketFooter || "À bientôt");
+    setTicketWidthMm(settings.ticketWidthMm || "80");
+    setPaymentCashEnabled(settings.paymentCashEnabled ?? true);
+    setPaymentMobileMoneyEnabled(settings.paymentMobileMoneyEnabled ?? true);
+    setPaymentCardEnabled(settings.paymentCardEnabled ?? true);
+    setPaymentBankTransferEnabled(settings.paymentBankTransferEnabled ?? true);
+    setPaymentCreditEnabled(settings.paymentCreditEnabled ?? true);
+    setSellerCanOverridePrice(settings.sellerCanOverridePrice ?? false);
+    setSellerCanSellBelowPrice(settings.sellerCanSellBelowPrice ?? false);
+    setSellerMaxDiscountPercent(settings.sellerMaxDiscountPercent ?? 0);
+    setSellerCanCancelInvoice(settings.sellerCanCancelInvoice ?? false);
+  }, [settings]);
+
+  const save = trpc.commerce.settings.save.useMutation({
+    onSuccess: () => { utils.commerce.settings.get.invalidate(); toast.success("Réglages POS et protections vendeur enregistrés."); },
+    onError: error => toast.error(error.message),
+  });
   if (!isAdmin) return <Restricted title="POS & ticket" description="Les réglages du point de vente sont réservés aux administrateurs." />;
-  const salesAgents = agents.filter(agent => agent.type === "sales_agent" && agent.active); const cashiers = agents.filter(agent => agent.type === "cashier" && agent.active);
-  const saveSettings = () => save.mutate({ defaultSalesAgentId: salesAgentMode === "default" && salesAgentId !== "none" ? Number(salesAgentId) : null, defaultCashierId: cashierMode === "default" && cashierId !== "none" ? Number(cashierId) : null, requireSalesAgent: false, requireCashier: false, currency: settings?.currency ?? "XOF", ticketHeader, ticketFooter, ticketWidthMm, paymentCashEnabled, paymentMobileMoneyEnabled, paymentCardEnabled, paymentBankTransferEnabled, paymentCreditEnabled });
-  return <div className="mx-auto max-w-4xl space-y-6"><Link href="/parametres" className="inline-flex items-center gap-1 text-sm text-[#007B8B] hover:underline"><ChevronLeft className="h-4 w-4" />Retour aux paramètres</Link><header><p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#007B8B]">Point de vente</p><h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">POS & impression ticket</h1></header><Card className="border-white/[0.07] bg-[#111722]"><CardContent className="space-y-6 p-6"><div className="flex items-center gap-3"><UsersRound className="h-5 w-5 text-[#00bcd4]" /><div><h2 className="font-semibold text-slate-100">Rattachement des ventes</h2><p className="mt-1 text-sm text-slate-400">Le vendeur connecté est toujours rattaché automatiquement à sa vente et à sa rémunération.</p></div></div><div className="grid gap-6 lg:grid-cols-2"><AssignmentCard title="Caissier" description="Rémunéré sur les ventes qu’il encaisse." mode={cashierMode} onModeChange={setCashierMode} selectLabel="Compte appliqué à toutes les ventes" value={cashierId} onValueChange={setCashierId} agents={cashiers} agentNoun="caissier" /><AssignmentCard title="Agent commercial" description="Commissionné sur les ventes qu’il apporte." mode={salesAgentMode} onModeChange={setSalesAgentMode} selectLabel="Compte appliqué à toutes les ventes" value={salesAgentId} onValueChange={setSalesAgentId} agents={salesAgents} agentNoun="agent commercial" /></div></CardContent></Card><div className="grid gap-6 lg:grid-cols-2"><Card className="border-white/[0.07] bg-[#111722]"><CardContent className="space-y-5 p-6"><div className="flex items-center gap-3"><Settings2 className="h-5 w-5 text-[#00bcd4]" /><h2 className="font-semibold text-slate-100">Paramètres POS</h2></div><p className="text-sm text-slate-400">Les rattachements ci-dessus s’appliquent au POS et aux factures. Un compte par défaut n’est pas proposé au comptoir.</p></CardContent></Card><Card className="border-white/[0.07] bg-[#111722]"><CardContent className="space-y-5 p-6"><div className="flex items-center gap-3"><ReceiptText className="h-5 w-5 text-[#00bcd4]" /><h2 className="font-semibold text-slate-100">Ticket de caisse</h2></div><Row label="Largeur"><Select value={ticketWidthMm} onValueChange={value => setTicketWidthMm(value as "58" | "80")}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="58">58 mm</SelectItem><SelectItem value="80">80 mm</SelectItem></SelectContent></Select></Row><Field label="En-tête du ticket"><Input value={ticketHeader} onChange={event => setTicketHeader(event.target.value)} maxLength={160} /></Field><Field label="Pied du ticket"><Input value={ticketFooter} onChange={event => setTicketFooter(event.target.value)} maxLength={240} /></Field></CardContent></Card><Card className="border-white/[0.07] bg-[#111722] lg:col-span-2"><CardContent className="space-y-4 p-6"><div><h2 className="font-semibold text-slate-100">Moyens de paiement</h2><p className="mt-1 text-sm text-slate-400">Seuls les moyens activés sont proposés pendant l’encaissement.</p></div><div className="grid gap-1 sm:grid-cols-2"><Toggle label="Espèces" checked={paymentCashEnabled} onChange={setPaymentCashEnabled} /><Toggle label="Mobile money" checked={paymentMobileMoneyEnabled} onChange={setPaymentMobileMoneyEnabled} /><Toggle label="Carte" checked={paymentCardEnabled} onChange={setPaymentCardEnabled} /><Toggle label="Virement" checked={paymentBankTransferEnabled} onChange={setPaymentBankTransferEnabled} /><Toggle label="Crédit" checked={paymentCreditEnabled} onChange={setPaymentCreditEnabled} /></div></CardContent></Card></div><Button onClick={saveSettings} disabled={save.isPending} className="bg-[#007B8B] text-white hover:bg-[#006a78]">{save.isPending ? "Enregistrement…" : "Enregistrer les réglages POS"}</Button></div>;
+  const salesAgents = agents.filter(agent => agent.type === "sales_agent" && agent.active);
+  const cashiers = agents.filter(agent => agent.type === "cashier" && agent.active);
+  const saveSettings = () => save.mutate({
+    defaultSalesAgentId: salesAgentMode === "default" && salesAgentId !== "none" ? Number(salesAgentId) : null,
+    defaultCashierId: cashierMode === "default" && cashierId !== "none" ? Number(cashierId) : null,
+    requireSalesAgent: false,
+    requireCashier: false,
+    currency: settings?.currency ?? "XOF",
+    ticketHeader,
+    ticketFooter,
+    ticketWidthMm,
+    paymentCashEnabled,
+    paymentMobileMoneyEnabled,
+    paymentCardEnabled,
+    paymentBankTransferEnabled,
+    paymentCreditEnabled,
+    sellerCanOverridePrice,
+    sellerCanSellBelowPrice,
+    sellerMaxDiscountPercent,
+    sellerCanCancelInvoice,
+    sellerCanRefund: false,
+    sellerCanCorrectStock: false,
+    sellerCanEditPurchasePrice: false,
+  });
+
+  return <div className="mx-auto max-w-4xl space-y-6">
+    <Link href="/parametres" className="inline-flex items-center gap-1 text-sm text-primary hover:underline"><ChevronLeft className="h-4 w-4" />Retour aux paramètres</Link>
+    <header><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Point de vente</p><h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">POS & impression ticket</h1></header>
+    <Card className="border-white/[0.07] bg-[#111722]"><CardContent className="space-y-6 p-6"><div className="flex items-center gap-3"><UsersRound className="h-5 w-5 text-primary" /><div><h2 className="font-semibold text-slate-100">Rattachement des ventes</h2><p className="mt-1 text-sm text-slate-400">Le vendeur connecté est toujours rattaché automatiquement à sa vente et à sa rémunération.</p></div></div><div className="grid gap-6 lg:grid-cols-2"><AssignmentCard title="Caissier" description="Rémunéré sur les ventes qu’il encaisse." mode={cashierMode} onModeChange={setCashierMode} value={cashierId} onValueChange={setCashierId} agents={cashiers} agentNoun="caissier" /><AssignmentCard title="Agent commercial" description="Commissionné sur les ventes qu’il apporte." mode={salesAgentMode} onModeChange={setSalesAgentMode} value={salesAgentId} onValueChange={setSalesAgentId} agents={salesAgents} agentNoun="agent commercial" /></div></CardContent></Card>
+    <div className="grid gap-6 lg:grid-cols-2">
+      <Card className="border-white/[0.07] bg-[#111722]"><CardContent className="space-y-5 p-6"><div className="flex items-center gap-3"><ReceiptText className="h-5 w-5 text-primary" /><h2 className="font-semibold text-slate-100">Ticket de caisse</h2></div><Field label="Largeur"><Select value={ticketWidthMm} onValueChange={value => setTicketWidthMm(value as "58" | "80")}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="58">58 mm</SelectItem><SelectItem value="80">80 mm</SelectItem></SelectContent></Select></Field><Field label="En-tête du ticket"><Input value={ticketHeader} onChange={event => setTicketHeader(event.target.value)} maxLength={160} /></Field><Field label="Pied du ticket"><Input value={ticketFooter} onChange={event => setTicketFooter(event.target.value)} maxLength={240} /></Field></CardContent></Card>
+      <Card className="border-white/[0.07] bg-[#111722]"><CardContent className="space-y-5 p-6"><div className="flex items-center gap-3"><Settings2 className="h-5 w-5 text-primary" /><h2 className="font-semibold text-slate-100">Moyens de paiement</h2></div><Toggle label="Espèces" checked={paymentCashEnabled} onChange={setPaymentCashEnabled} /><Toggle label="Mobile money" checked={paymentMobileMoneyEnabled} onChange={setPaymentMobileMoneyEnabled} /><Toggle label="Carte" checked={paymentCardEnabled} onChange={setPaymentCardEnabled} /><Toggle label="Virement" checked={paymentBankTransferEnabled} onChange={setPaymentBankTransferEnabled} /><Toggle label="Crédit" checked={paymentCreditEnabled} onChange={setPaymentCreditEnabled} /></CardContent></Card>
+    </div>
+    <Card className="border-primary/20 bg-primary/[0.04]"><CardContent className="space-y-5 p-6"><div className="flex items-center gap-3"><ShieldCheck className="h-5 w-5 text-primary" /><div><h2 className="font-semibold text-slate-100">Actions sensibles des vendeurs</h2><p className="mt-1 text-sm text-slate-400">Les règles sont vérifiées côté serveur avant l’enregistrement d’une facture.</p></div></div><div className="grid gap-1 sm:grid-cols-2"><Toggle label="Autoriser un prix différent du tarif" checked={sellerCanOverridePrice} onChange={setSellerCanOverridePrice} /><Toggle label="Autoriser un prix inférieur au tarif" checked={sellerCanSellBelowPrice} onChange={setSellerCanSellBelowPrice} /><Toggle label="Autoriser l’annulation d’une facture non encaissée" checked={sellerCanCancelInvoice} onChange={setSellerCanCancelInvoice} /></div><Field label="Remise maximale autorisée au vendeur (%)"><Input type="number" min={0} max={100} value={sellerMaxDiscountPercent} onChange={event => setSellerMaxDiscountPercent(Math.max(0, Math.min(100, Number(event.target.value) || 0)))} /></Field><div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-4 text-sm text-slate-400">Le remboursement, la correction de stock et la modification du coût d’achat restent réservés aux administrateurs.</div></CardContent></Card>
+    <Button onClick={saveSettings} disabled={save.isPending} className="bg-primary text-primary-foreground hover:bg-primary/90">{save.isPending ? "Enregistrement…" : "Enregistrer les réglages POS"}</Button>
+  </div>;
 }
-function AssignmentCard({ title, description, mode, onModeChange, selectLabel, value, onValueChange, agents, agentNoun }: { title: string; description: string; mode: AssignmentMode; onModeChange: (mode: AssignmentMode) => void; selectLabel: string; value: string; onValueChange: (value: string) => void; agents: Array<{ id: number; name: string }>; agentNoun: string }) { return <section className="space-y-4 rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5"><div><h3 className="font-semibold text-slate-100">{title}</h3><p className="mt-1 text-sm text-slate-400">{description}</p></div><div className="grid grid-cols-1 gap-2 sm:grid-cols-2"><Button type="button" variant="outline" onClick={() => onModeChange("default")} className={mode === "default" ? "border-[#007B8B] bg-[#007B8B] text-white hover:bg-[#006a78]" : "border-white/20 text-slate-200"}>Compte par défaut</Button><Button type="button" variant="outline" onClick={() => onModeChange("prompt")} className={mode === "prompt" ? "border-[#007B8B] bg-[#007B8B] text-white hover:bg-[#006a78]" : "border-white/20 text-slate-200"}>Demander au comptoir</Button></div>{mode === "default" ? <div className="space-y-2"><Label className="text-sm text-slate-300">{selectLabel}</Label><Select value={value} onValueChange={onValueChange}><SelectTrigger><SelectValue placeholder={`Choisir un ${agentNoun}`} /></SelectTrigger><SelectContent><SelectItem value="none">Aucun</SelectItem>{agents.map(agent => <SelectItem key={agent.id} value={String(agent.id)}>{agent.name}</SelectItem>)}</SelectContent></Select><p className="text-xs text-slate-400">Le vendeur ne verra pas ce champ lors de la création de la facture.</p></div> : <p className="text-sm text-slate-400">Le vendeur choisira cet intervenant à chaque facture, avec le choix « Aucun » disponible.</p>}</section>; }
-function Row({ label, children }: { label: string; children: React.ReactNode }) { return <div className="space-y-2"><Label className="text-sm text-slate-200">{label}</Label>{children}</div>; }
+
+function AssignmentCard({ title, description, mode, onModeChange, value, onValueChange, agents, agentNoun }: { title: string; description: string; mode: AssignmentMode; onModeChange: (mode: AssignmentMode) => void; value: string; onValueChange: (value: string) => void; agents: Array<{ id: number; name: string }>; agentNoun: string }) { return <section className="space-y-4 rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5"><div><h3 className="font-semibold text-slate-100">{title}</h3><p className="mt-1 text-sm text-slate-400">{description}</p></div><div className="grid grid-cols-1 gap-2 sm:grid-cols-2"><Button type="button" variant="outline" onClick={() => onModeChange("default")} className={mode === "default" ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90" : "border-white/20 text-slate-200"}>Compte par défaut</Button><Button type="button" variant="outline" onClick={() => onModeChange("prompt")} className={mode === "prompt" ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90" : "border-white/20 text-slate-200"}>Demander au comptoir</Button></div>{mode === "default" ? <div className="space-y-2"><Label className="text-sm text-slate-300">Compte appliqué à toutes les ventes</Label><Select value={value} onValueChange={onValueChange}><SelectTrigger><SelectValue placeholder={`Choisir un ${agentNoun}`} /></SelectTrigger><SelectContent><SelectItem value="none">Aucun</SelectItem>{agents.map(agent => <SelectItem key={agent.id} value={String(agent.id)}>{agent.name}</SelectItem>)}</SelectContent></Select><p className="text-xs text-slate-400">Le vendeur ne verra pas ce champ lors de la création de la facture.</p></div> : <p className="text-sm text-slate-400">Le vendeur choisira cet intervenant à chaque facture, avec le choix « Aucun » disponible.</p>}</section>; }
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <div className="space-y-2"><Label className="text-sm text-slate-200">{label}</Label>{children}</div>; }
-function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) { return <div className="flex items-center justify-between gap-4 border-t border-white/[0.07] pt-4"><Label className="text-sm text-slate-200">{label}</Label><Switch checked={checked} onCheckedChange={onChange} /></div>; }
+function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) { return <div className="flex items-center justify-between gap-4 border-t border-white/[0.07] py-3"><Label className="text-sm text-slate-200">{label}</Label><Switch checked={checked} onCheckedChange={onChange} /></div>; }

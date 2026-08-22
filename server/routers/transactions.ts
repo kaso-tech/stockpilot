@@ -9,10 +9,11 @@ import { resultingStock, signedMovementQuantity } from "../stockRules";
 import { assertPaymentMethodsEnabled, settlementResult } from "../transactionRules";
 import { discountCents, type DiscountType } from "../discountRules";
 import { assertExplicitInvoiceAgentChoice } from "../agentSelectionRules";
+import { assertSellerDiscount, assertSellerUnitPrice } from "../sellerPriceRules";
 
 const paymentMethod = z.enum(["cash", "card", "mobile_money", "bank_transfer", "credit"]);
 const discountInput = z.object({ type: z.enum(["none", "percent", "fixed"]), value: z.number().int().min(0) });
-const itemInput = z.object({ productId: z.number().int().positive(), quantity: z.number().int().positive(), discount: discountInput.default({ type: "none", value: 0 }) });
+const itemInput = z.object({ productId: z.number().int().positive(), quantity: z.number().int().positive(), manualUnitPriceCents: z.number().int().positive().nullable().optional(), discount: discountInput.default({ type: "none", value: 0 }) });
 const paymentInput = z.object({ method: paymentMethod, amountCents: z.number().int().positive() });
 const agentSelection = z.object({ salesAgentId: z.number().int().positive().nullable(), cashierId: z.number().int().positive().nullable(), salesAgentSelectionMade: z.boolean().optional().default(false), cashierSelectionMade: z.boolean().optional().default(false) });
 
@@ -58,6 +59,7 @@ export const transactionsRouter = router({
     const sale = (await db.select().from(sales).where(eq(sales.id, input.saleId)).limit(1))[0];
     if (!sale || sale.channel !== "invoice") throw new TRPCError({ code: "NOT_FOUND", message: "Facture introuvable." });
     if (sale.status !== "draft" || sale.amountPaidCents > 0) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Seules les factures non encaissées peuvent être supprimées." });
+    if (ctx.user.role === "seller") { const settings = (await db.select().from(saleSettings).limit(1))[0]; if (!settings?.sellerCanCancelInvoice) throw new TRPCError({ code: "FORBIDDEN", message: "L’annulation de facture n’est pas autorisée pour les vendeurs." }); }
     await db.transaction(async tx => { await tx.delete(saleItems).where(eq(saleItems.saleId, sale.id)); await tx.delete(sales).where(eq(sales.id, sale.id)); await tx.insert(auditLogs).values({ actorUserId: ctx.user.id, action: "Suppression", entityType: "Facture", entityId: String(sale.id), detail: `Facture ${sale.invoiceNumber} supprimée avant encaissement` }); });
     return { success: true };
   }),
@@ -72,10 +74,12 @@ export const transactionsRouter = router({
       const productRows = await tx.select().from(products).where(inArray(products.id, productIds));
       if (productRows.length !== productIds.length) throw new TRPCError({ code: "NOT_FOUND", message: "Un produit est introuvable." });
       const tierRows = productIds.length ? await tx.select().from(productPriceTiers).where(inArray(productPriceTiers.productId, productIds)) : [];
-      const lines = input.items.map(item => { const product = productRows.find((row: any) => row.id === item.productId)!; const isWholesale = customer?.type === "wholesale"; const basePriceCents = priceForCustomer(customer?.type ?? "ordinary", product.retailPriceCents, product.wholesalePriceCents); const applicableTiers = tierRows.filter((tier: any) => tier.productId === product.id && tier.customerType === (isWholesale ? "wholesale" : "retail")); const unitPriceCents = priceForQuantityTier(basePriceCents, item.quantity, applicableTiers); const lineSubtotalCents = unitPriceCents * item.quantity; const lineDiscountCents = discountCents(lineSubtotalCents, item.discount.type as DiscountType, item.discount.value); return { product, quantity: item.quantity, unitPriceCents, lineSubtotalCents, lineDiscountCents, discount: item.discount, lineTotalCents: lineSubtotalCents - lineDiscountCents, lineCostCents: product.purchasePriceCents * item.quantity }; });
+      const permissions = (await tx.select().from(saleSettings).limit(1))[0];
+      const lines = input.items.map(item => { const product = productRows.find((row: any) => row.id === item.productId)!; const isWholesale = customer?.type === "wholesale"; const basePriceCents = priceForCustomer(customer?.type ?? "ordinary", product.retailPriceCents, product.wholesalePriceCents); const applicableTiers = tierRows.filter((tier: any) => tier.productId === product.id && tier.customerType === (isWholesale ? "wholesale" : "retail")); const tariffCents = priceForQuantityTier(basePriceCents, item.quantity, applicableTiers); const unitPriceCents = item.manualUnitPriceCents ?? tariffCents; if (ctx.user.role === "seller") { try { assertSellerUnitPrice(permissions ?? { sellerCanOverridePrice: false, sellerCanSellBelowPrice: false, sellerMaxDiscountPercent: 0 }, tariffCents, unitPriceCents); } catch (error) { throw new TRPCError({ code: "FORBIDDEN", message: error instanceof Error ? error.message : "Prix non autorisé." }); } } const lineSubtotalCents = unitPriceCents * item.quantity; const lineDiscountCents = discountCents(lineSubtotalCents, item.discount.type as DiscountType, item.discount.value); if (ctx.user.role === "seller") { try { assertSellerDiscount(permissions ?? { sellerCanOverridePrice: false, sellerCanSellBelowPrice: false, sellerMaxDiscountPercent: 0 }, lineSubtotalCents, lineDiscountCents); } catch (error) { throw new TRPCError({ code: "FORBIDDEN", message: error instanceof Error ? error.message : "Remise non autorisée." }); } } return { product, quantity: item.quantity, unitPriceCents, lineSubtotalCents, lineDiscountCents, discount: item.discount, lineTotalCents: lineSubtotalCents - lineDiscountCents, lineCostCents: product.purchasePriceCents * item.quantity }; });
       const subtotalCents = lines.reduce((sum, line) => sum + line.lineSubtotalCents, 0);
       const lineNetCents = lines.reduce((sum, line) => sum + line.lineTotalCents, 0);
       const invoiceDiscountCents = discountCents(lineNetCents, input.invoiceDiscount.type as DiscountType, input.invoiceDiscount.value);
+      if (ctx.user.role === "seller") { try { assertSellerDiscount(permissions ?? { sellerCanOverridePrice: false, sellerCanSellBelowPrice: false, sellerMaxDiscountPercent: 0 }, lineNetCents, invoiceDiscountCents); } catch (error) { throw new TRPCError({ code: "FORBIDDEN", message: error instanceof Error ? error.message : "Remise non autorisée." }); } }
       const totalCents = lineNetCents - invoiceDiscountCents;
       const totalCostCents = lines.reduce((sum, line) => sum + line.lineCostCents, 0);
       const assigned = await validateAgents(tx, input, input.channel);

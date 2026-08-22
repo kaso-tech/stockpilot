@@ -294,3 +294,8 @@
 - [x] Exposer les sauvegardes manuelles avec l’auteur, la date, le statut et les métadonnées d’archive.
 - [x] Ajouter une vue administrateur dédiée au suivi des sauvegardes effectuées par les vendeurs.
 - [x] Tester les autorisations, les données et le rendu responsive de l’historique.
+- [x] Autoriser la modification manuelle du prix unitaire lors de la création de facture.
+- [x] Ajouter des réglages administrateur pour prix hors tarif et remise maximale vendeur.
+- [x] Protéger côté serveur les annulations, remboursements, corrections de stock et modifications de coût d’achat par vendeur.
+- [x] Afficher les contrôles et refus explicites dans les écrans de vente et paramètres.
+- [x] Tester les seuils, les autorisations et les parcours desktop/mobile.
