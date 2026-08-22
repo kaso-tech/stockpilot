@@ -184,3 +184,6 @@
 - [x] Harmoniser les boutons des pages Paramètres avec les actions principales de l’application.
 - [x] Ajouter un réglage de couleur principale appliqué globalement aux boutons, badges et icônes.
 - [x] Vérifier le changement de couleur sur les thèmes clair et sombre, desktop et mobile.
+- [x] Ajouter un aperçu de facture en temps réel dans les paramètres d’apparence.
+- [x] Appliquer la couleur principale sélectionnée aux éléments d’accent de l’aperçu.
+- [x] Vérifier l’aperçu de facture sur desktop et mobile.
