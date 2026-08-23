@@ -102,18 +102,18 @@ export async function runBackupWithStatus(actorUserId: number | null, trigger: T
   try {
     const archive = await createBackupSnapshot(actorUserId, trigger, companyId);
     const { backupSettings } = await import("../drizzle/schema");
-    const settings = (await db.select().from(backupSettings).limit(1))[0];
+    const settings = (await db.select().from(backupSettings).where(companyScope(backupSettings.companyId, companyId)).limit(1))[0];
     if (settings) await db.update(backupSettings).set({ lastBackupAt: new Date(), lastBackupStatus: "success", lastBackupError: null }).where(eq(backupSettings.id, settings.id));
     if (settings?.googleDriveRefreshTokenEncrypted) await (await import("./googleDrive")).syncArchiveToGoogleDrive(archive.id);
-    const archives = await listBackups(Math.max(retentionCount + 20, 50));
-    await applyRetentionPolicy(archives, retentionCount, async id => { await db.delete(backupArchives).where(eq(backupArchives.id, id)); });
+    const archives = await listBackups(Math.max(retentionCount + 20, 50), companyId);
+    await applyRetentionPolicy(archives, retentionCount, async id => { await db.delete(backupArchives).where(and(eq(backupArchives.id, id), companyScope(backupArchives.companyId, companyId))); });
     return archive;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Échec inconnu de la sauvegarde.";
     const { backupSettings } = await import("../drizzle/schema");
-    const settings = (await db.select().from(backupSettings).limit(1))[0];
+    const settings = (await db.select().from(backupSettings).where(companyScope(backupSettings.companyId, companyId)).limit(1))[0];
     if (settings) await db.update(backupSettings).set({ lastBackupStatus: "failed", lastBackupError: message }).where(eq(backupSettings.id, settings.id));
-    await db.insert(backupArchives).values({ filename: backupFilename(), trigger, status: "failed", createdByUserId: actorUserId, error: message });
+    await db.insert(backupArchives).values({ companyId, filename: backupFilename(), trigger, status: "failed", createdByUserId: actorUserId, error: message });
     throw error;
   }
 }
