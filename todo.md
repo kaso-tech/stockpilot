@@ -508,3 +508,6 @@
 - [x] Auditer les combinaisons de couleurs peu lisibles dans le thème clair.
 - [x] Corriger les tokens et composants concernés tout en préservant le thème sombre.
 - [x] Vérifier visuellement les thèmes clair et sombre sur les écrans principaux.
+- [x] Corriger la lisibilité de la bannière de démarrage guidé en thème clair.
+- [x] Corriger la lisibilité des boutons d’action rapide en thème clair.
+- [x] Vérifier visuellement les composants signalés sur la page d’accueil claire à partir de la capture fournie et des variantes claires appliquées.
