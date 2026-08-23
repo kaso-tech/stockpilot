@@ -6,6 +6,7 @@
 - Les contextes client, suggestions de produits, consultations et suppressions de clients sont filtrés par entreprise.
 - Les fiches agents et vendeurs contrôlent désormais l’appartenance de la personne consultée avant de retourner ses informations.
 - Les logos, signatures et cachets sont maintenant stockés sous un préfixe d’entreprise plutôt que sous l’identifiant de l’utilisateur qui les téléverse.
+- La génération des commissions de facture ne sélectionne plus que les profils de rémunération actifs de l’entreprise courante.
 
 ## Tables déjà directement rattachées à une entreprise
 

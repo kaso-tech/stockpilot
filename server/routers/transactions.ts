@@ -11,6 +11,7 @@ import { discountCents, type DiscountType } from "../discountRules";
 import { assertExplicitInvoiceAgentChoice } from "../agentSelectionRules";
 import { assertSellerSensitiveAction } from "../sellerActionRules";
 import { assertSellerDiscount, assertSellerUnitPrice } from "../sellerPriceRules";
+import { companyScope } from "../companyScope";
 
 const paymentMethod = z.enum(["cash", "card", "mobile_money", "bank_transfer", "credit"]);
 const discountInput = z.object({ type: z.enum(["none", "percent", "fixed"]), value: z.number().int().min(0) });
@@ -46,11 +47,11 @@ async function validateAgents(tx: any, selected: { salesAgentId: number | null; 
 }
 
 export const transactionsRouter = router({
-  list: protectedProcedure.query(async () => {
+  list: protectedProcedure.query(async ({ ctx }) => {
     const db = await dbOrThrow();
     const [rows, customerRows] = await Promise.all([
-      db.select().from(sales).orderBy(desc(sales.createdAt)).limit(100),
-      db.select().from(customers),
+      db.select().from(sales).where(companyScope(sales.companyId, ctx.user.companyId)).orderBy(desc(sales.createdAt)).limit(100),
+      db.select().from(customers).where(companyScope(customers.companyId, ctx.user.companyId)),
     ]);
     const customerNames = new Map(customerRows.map(customer => [customer.id, customer.name]));
     return rows.map(row => ({ ...row, customerName: row.customerId ? customerNames.get(row.customerId) ?? null : null }));
@@ -67,7 +68,7 @@ export const transactionsRouter = router({
   refund: protectedProcedure.input(z.object({ saleId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
     const db = await dbOrThrow();
     await db.transaction(async tx => {
-      const sale = (await tx.select().from(sales).where(eq(sales.id, input.saleId)).limit(1))[0];
+      const sale = (await tx.select().from(sales).where(and(eq(sales.id, input.saleId), companyScope(sales.companyId, ctx.user.companyId))).limit(1))[0];
       if (!sale) throw new TRPCError({ code: "NOT_FOUND", message: "Facture introuvable." });
       if ((sale.status !== "paid" && sale.status !== "partial") || sale.amountPaidCents <= 0) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Seule une facture encaissée ou partiellement encaissée peut être remboursée." });
       if (ctx.user.role === "seller") {
@@ -131,7 +132,7 @@ export const transactionsRouter = router({
     const db = await dbOrThrow();
     let result: { status: "partial" | "paid"; amountPaidCents: number; balanceCents: number } | null = null;
     await db.transaction(async tx => {
-      const sale = (await tx.select().from(sales).where(eq(sales.id, input.saleId)).limit(1))[0];
+      const sale = (await tx.select().from(sales).where(and(eq(sales.id, input.saleId), companyScope(sales.companyId, ctx.user.companyId))).limit(1))[0];
       if (!sale || sale.status === "void") throw new TRPCError({ code: "NOT_FOUND", message: "Vente introuvable." });
       if (input.offlineOperationId) {
         const existingPayment = (await tx.select().from(salePayments).where(and(eq(salePayments.saleId, sale.id), eq(salePayments.offlineOperationId, input.offlineOperationId))).limit(1))[0];
