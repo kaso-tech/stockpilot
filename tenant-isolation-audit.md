@@ -33,6 +33,8 @@ Les conversions vendeur-vers-agent et agent-vers-vendeur créent désormais les 
 
 Le flux POS applique désormais le périmètre de l’entreprise à la sélection de clients, produits, réglages, agents et profils de rémunération, ainsi qu’à la création des brouillons et aux encaissements.
 
+Les encaissements POS rattachent désormais les mises à jour de stock, mouvements et alertes créés à l’entreprise active.
+
 Les suppressions de brouillons et remboursements appliquent également le périmètre de l’entreprise aux ventes, réglages, produits, mouvements et alertes de stock générés.
 
 Le comptage et la validation d’inventaire vérifient désormais l’entreprise de la session, y compris pour les produits ajustés, mouvements de stock et journaux d’audit créés.
