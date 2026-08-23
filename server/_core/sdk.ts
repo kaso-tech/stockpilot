@@ -171,7 +171,7 @@ class SDKServer {
       {
         openId,
         appId: ENV.appId,
-        name: options.name || "",
+        name: options.name?.trim() || "Utilisateur",
       },
       options
     );

@@ -40,21 +40,23 @@ export function registerOAuthRoutes(app: Express) {
         return;
       }
 
+      const displayName = userInfo.name?.trim() || userInfo.email?.trim() || "Utilisateur";
       await db.upsertUser({
         openId: userInfo.openId,
-        name: userInfo.name || null,
+        name: displayName,
         email: userInfo.email ?? null,
         loginMethod: userInfo.loginMethod ?? userInfo.platform ?? null,
         lastSignedIn: new Date(),
       });
 
       const sessionToken = await sdk.createSessionToken(userInfo.openId, {
-        name: userInfo.name || "",
+        name: displayName,
         expiresInMs: ONE_YEAR_MS,
       });
 
       const cookieOptions = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+      console.info("[OAuth] Session issued after callback", { hasDisplayName: Boolean(displayName), secure: cookieOptions.secure, sameSite: cookieOptions.sameSite });
 
       res.redirect(302, "/");
     } catch (error) {

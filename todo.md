@@ -464,3 +464,6 @@
 - [x] Auditer la table de mot de passe et le compte administrateur cible.
 - [x] Initialiser une entrée hachée de mot de passe de secours en base.
 - [x] Vérifier la connexion de secours indépendamment des secrets runtime.
+- [x] Tracer le callback Google, le cookie de session émis et la première requête authentifiée.
+- [x] Corriger la persistance de session ou la redirection finale après Google.
+- [ ] Vérifier le retour Google complet vers le tableau de bord.
