@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { products, stockAlerts } from "../drizzle/schema";
+import { agentPayments, remunerationProfiles, sales, products, stockAlerts } from "../drizzle/schema";
 import { companyScope } from "./companyScope";
 
 describe("companyScope", () => {
@@ -15,5 +15,11 @@ describe("companyScope", () => {
 
   it("fournit un périmètre dédié aux alertes de stock d’un nouvel espace", () => {
     expect(companyScope(stockAlerts.companyId, 42)).toBeDefined();
+  });
+
+  it("fournit un périmètre distinct aux ventes, rémunérations et paiements agents", () => {
+    expect(companyScope(sales.companyId, 42)).toBeDefined();
+    expect(companyScope(remunerationProfiles.companyId, 42)).toBeDefined();
+    expect(companyScope(agentPayments.companyId, 42)).toBeDefined();
   });
 });

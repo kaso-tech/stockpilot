@@ -12,7 +12,7 @@ const context = (): TrpcContext => ({ user: { id: 1, openId: "checkout-tester", 
 describe("transactions.checkout", () => {
   beforeEach(() => {
     const sale = { id: 7, status: "draft", channel: "invoice", totalCents: 10000, amountPaidCents: 0 };
-    const tx: any = { select: () => ({ from: (table: unknown) => ({ where: () => ({ limit: async () => [sale] }), limit: async () => table === saleSettings ? [{ paymentCashEnabled: false }] : [] }) }) };
+    const tx: any = { select: () => ({ from: (table: unknown) => { const rows: any = table === sales ? [sale] : table === saleSettings ? [{ paymentCashEnabled: false }] : []; rows.limit = async () => rows; rows.where = () => rows; return rows; } }) };
     mockedGetDb.mockResolvedValue({ transaction: async (callback: (db: typeof tx) => Promise<void>) => callback(tx) } as any);
   });
   it("renvoie BAD_REQUEST avant tout encaissement si le moyen est désactivé", async () => {

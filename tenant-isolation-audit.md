@@ -29,6 +29,8 @@ Le contenu des archives d’entreprise est désormais filtré sur les tables dir
 
 Les mises à jour, désactivations et conversions d’agents et vendeurs, ainsi que les profils de rémunération et les paiements associés, appliquent désormais le périmètre de l’entreprise de la session.
 
+Le flux POS applique désormais le périmètre de l’entreprise à la sélection de clients, produits, réglages, agents et profils de rémunération, ainsi qu’à la création des brouillons et aux encaissements.
+
 La restauration sélective traite désormais les tables enfants avant leurs parents : identifiants vendeur avant utilisateurs, lignes et commissions de vente avant ventes, lignes d’inventaire avant sessions, puis les entités directement rattachées à l’entreprise. Les suppressions non héritées restent filtrées par `companyId`.
 
 Les alertes de stock doivent aussi être créées et recherchées avec l’entreprise du produit afin de compléter l’unicité des alertes par entreprise.
