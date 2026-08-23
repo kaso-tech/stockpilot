@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { createTRPCProxyClient, httpBatchLink } from "@trpc/client";
 import type { AppRouter } from "../../../server/routers";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { getOfflineSnapshot, listOfflineOperations, replaceOfflineOperations, replaceOfflineSnapshot, type OfflineScope } from "@/lib/offlineStore";
 
 type Discount = { type: "none" | "percent" | "fixed"; value: number };
 export type OfflinePayment = { method: "cash" | "card" | "mobile_money" | "bank_transfer" | "credit"; amountCents: number };
@@ -42,6 +43,9 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
     const updated = index >= 0 ? logs.map((entry, position) => position === index ? next : entry) : [...logs, next]; commitLog(updated);
   }, [commitLog]);
   const appendQueue = useCallback((item: OfflineSale) => { commit([...readQueue(), item]); upsertLog(item, "queued"); }, [commit, upsertLog]);
+  const offlineScope = useMemo<OfflineScope | null>(() => user ? { companyId: user.companyId, userId: user.id } : null, [user]);
+  useEffect(() => { if (!offlineScope) return; let active = true; void Promise.all([listOfflineOperations(offlineScope), getOfflineSnapshot(offlineScope)]).then(([operations, snapshot]) => { if (!active) return; const queued = operations.map(operation => operation.payload as OfflineSale); if (queued.length) { writeQueue(queued); setSales(queued); } const storedLog = snapshot?.payload as { syncLog?: SyncLogEntry[] } | undefined; if (storedLog?.syncLog) { writeLog(storedLog.syncLog); setSyncLog(storedLog.syncLog); } }).catch(() => undefined); return () => { active = false; }; }, [offlineScope]);
+  useEffect(() => { if (!offlineScope) return; const scopedSales = sales.filter(sale => sale.ownerUserId === offlineScope.userId); void replaceOfflineOperations(offlineScope, scopedSales.map(sale => ({ id: sale.id, type: sale.kind, payload: sale, createdAt: sale.createdAt, attempts: sale.status === "failed" ? 1 : 0, lastError: sale.error }))); const scopedLog = syncLog.filter(entry => entry.ownerUserId === offlineScope.userId); void replaceOfflineSnapshot(offlineScope, { syncLog: scopedLog }); }, [offlineScope, sales, syncLog]);
   const queuePosSale = useCallback((draft: OfflinePosDraft, checkout: OfflineCheckout) => { if (!user) throw new Error("Connectez-vous avant d’enregistrer une vente hors connexion."); const id = globalThis.crypto?.randomUUID?.() ?? `offline-${Date.now()}-${Math.random().toString(36).slice(2)}`; appendQueue({ id, ownerUserId: user.id, kind: "pos_sale", createdAt: Date.now(), status: "pending", draft, checkout }); }, [appendQueue, user]);
   const queueInvoiceDraft = useCallback((draft: OfflineInvoiceDraft) => { if (!user) throw new Error("Connectez-vous avant d’enregistrer une facture hors connexion."); const id = globalThis.crypto?.randomUUID?.() ?? `offline-${Date.now()}-${Math.random().toString(36).slice(2)}`; appendQueue({ id, ownerUserId: user.id, kind: "invoice_draft", createdAt: Date.now(), status: "pending", draft }); }, [appendQueue, user]);
   const queueInvoiceSale = useCallback((draft: OfflineInvoiceDraft, checkout: OfflineCheckout) => { if (!user) throw new Error("Connectez-vous avant d’enregistrer une facture hors connexion."); const id = globalThis.crypto?.randomUUID?.() ?? `offline-${Date.now()}-${Math.random().toString(36).slice(2)}`; appendQueue({ id, ownerUserId: user.id, kind: "invoice_draft", createdAt: Date.now(), status: "pending", draft, checkout }); }, [appendQueue, user]);

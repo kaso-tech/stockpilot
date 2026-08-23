@@ -529,3 +529,8 @@
 - [x] Ajouter des tests automatisés de non-divulgation entre entreprises pour les factures et encaissements POS.
 - [x] Valider l’isolation multi-entreprise sur les parcours critiques avec 153 tests et le build PWA.
 - [x] Isoler la création, le téléchargement, la rétention et la restauration des sauvegardes par entreprise.
+- [x] Auditer les mutations POS et définir les opérations hors connexion idempotentes.
+- [x] Mettre en file dans IndexedDB les ventes et encaissements POS exécutés sans réseau.
+- [x] Synchroniser les opérations POS en attente lors du retour réseau.
+- [x] Ajouter un journal visuel de synchronisation et une résolution manuelle des conflits de stock.
+- [x] Tester les ventes hors connexion, reprises, doublons et conflits de stock.

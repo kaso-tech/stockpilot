@@ -8,7 +8,7 @@ export type OfflineScope = {
 export type OfflineOperation = {
   id: string;
   scopeKey: string;
-  type: "pos_sale" | "invoice_payment";
+  type: string;
   payload: unknown;
   createdAt: number;
   attempts: number;
@@ -63,6 +63,14 @@ export async function queueOfflineOperation(scope: OfflineScope, operation: Omit
 
 export async function listOfflineOperations(scope: OfflineScope) {
   return offlineDatabase.operations.where("scopeKey").equals(offlineScopeKey(scope)).sortBy("createdAt");
+}
+
+export async function replaceOfflineOperations(scope: OfflineScope, operations: Array<Omit<OfflineOperation, "scopeKey">>) {
+  const scopeKey = offlineScopeKey(scope);
+  await offlineDatabase.transaction("rw", offlineDatabase.operations, async () => {
+    await offlineDatabase.operations.where("scopeKey").equals(scopeKey).delete();
+    if (operations.length) await offlineDatabase.operations.bulkPut(operations.map(operation => ({ ...operation, scopeKey })));
+  });
 }
 
 export async function clearOfflineScope(scope: OfflineScope) {
