@@ -494,3 +494,5 @@
 - [x] Diagnostiquer le manque de visibilité : le lien texte était peu perceptible et il n’existait pas de route dédiée à l’inscription.
 - [x] Rendre l’inscription explicitement visible et accessible depuis l’écran de connexion via un bouton et la route /inscription.
 - [x] Vérifier le parcours de connexion et d’inscription par le typage, les tests et le build PWA ; la nouvelle route cible directement le mode inscription sans session.
+- [x] Vérifier et rendre explicite le lien d’inscription sur l’écran de connexion publié.
+- [x] Reporter l’envoi d’e-mail, les jetons, les écrans et les tests de réinitialisation jusqu’à la configuration d’un service d’e-mail.
