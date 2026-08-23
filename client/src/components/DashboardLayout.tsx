@@ -94,8 +94,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [showAdminFallback, setShowAdminFallback] = useState(false);
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
-  const sellerLogin = trpc.auth.localLogin.useMutation({ onSuccess: () => window.location.reload() });
-  const adminFallbackLogin = trpc.auth.adminFallbackLogin.useMutation({ onSuccess: () => window.location.reload() });
+  const returnToDashboard = () => window.location.replace("/");
+  const sellerLogin = trpc.auth.localLogin.useMutation({ onSuccess: returnToDashboard });
+  const adminFallbackLogin = trpc.auth.adminFallbackLogin.useMutation({ onSuccess: returnToDashboard });
 
   if (loading) return <DashboardLayoutSkeleton />;
 

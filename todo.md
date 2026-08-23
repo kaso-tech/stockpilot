@@ -440,3 +440,6 @@
 - [x] Tracer le cycle OAuth Google pour identifier la perte de session après le callback.
 - [x] Corriger la persistance de session afin d’éliminer la boucle de connexion Google.
 - [x] Vérifier un aller-retour Google complet vers le tableau de bord.
+- [x] Tracer la redirection post-connexion vendeur qui mène à la page 404.
+- [x] Corriger la destination après connexion vendeur et vérifier son tableau de bord.
+- [x] Finaliser le diagnostic et le correctif du parcours administrateur Google.
