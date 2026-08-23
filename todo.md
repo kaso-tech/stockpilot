@@ -534,4 +534,8 @@
 - [x] Synchroniser les opérations POS en attente lors du retour réseau.
 - [x] Ajouter un journal visuel de synchronisation et une résolution manuelle des conflits de stock.
 - [x] Tester les ventes hors connexion, reprises, doublons et conflits de stock.
-- [x] Produire un résumé de continuité professionnel pour reprendre le projet dans une nouvelle conversation.
+
+- [x] Finaliser la migration runtime d’OfflineContext vers IndexedDB comme source de vérité unique par entreprise et utilisateur.
+- [x] Migrer une seule fois les anciennes files localStorage compatibles vers le périmètre IndexedDB actif, puis supprimer ces clés legacy sans divulguer de données inter-entreprises.
+- [x] Corriger l’hydratation et les écritures transactionnelles de la file et du journal lors d’un changement de compte ou d’un périmètre vide.
+- [x] Ajouter les tests offline de migration legacy, d’état vide, d’isolation entreprise/utilisateur et de persistance transactionnelle.
