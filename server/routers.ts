@@ -391,6 +391,35 @@ export const appRouter = router({
     }),
   }),
 
+  onboarding: router({
+    status: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.companyId === null) return { completed: true, steps: { product: true, customer: true, paymentMethod: true } };
+      const db = await requireDb();
+      const company = (await db.select().from(companies).where(eq(companies.id, ctx.user.companyId)).limit(1))[0];
+      if (!company) throw new TRPCError({ code: "NOT_FOUND", message: "Entreprise introuvable." });
+      const [productRows, customerRows, settings] = await Promise.all([
+        db.select({ id: products.id }).from(products).where(companyScope(products.companyId, ctx.user.companyId)).limit(1),
+        db.select({ id: customers.id }).from(customers).where(companyScope(customers.companyId, ctx.user.companyId)).limit(1),
+        db.select().from(saleSettings).where(companyScope(saleSettings.companyId, ctx.user.companyId)).limit(1),
+      ]);
+      const activePaymentMethod = Boolean(settings[0] && (settings[0].paymentCashEnabled || settings[0].paymentCardEnabled || settings[0].paymentMobileMoneyEnabled || settings[0].paymentBankTransferEnabled || settings[0].paymentCreditEnabled));
+      return { completed: Boolean(company.onboardingCompletedAt), steps: { product: productRows.length > 0, customer: customerRows.length > 0, paymentMethod: activePaymentMethod } };
+    }),
+    complete: adminProcedure.mutation(async ({ ctx }) => {
+      if (ctx.user.companyId === null) return { success: true };
+      const db = await requireDb();
+      const [productRows, customerRows, settings] = await Promise.all([
+        db.select({ id: products.id }).from(products).where(companyScope(products.companyId, ctx.user.companyId)).limit(1),
+        db.select({ id: customers.id }).from(customers).where(companyScope(customers.companyId, ctx.user.companyId)).limit(1),
+        db.select().from(saleSettings).where(companyScope(saleSettings.companyId, ctx.user.companyId)).limit(1),
+      ]);
+      const activePaymentMethod = Boolean(settings[0] && (settings[0].paymentCashEnabled || settings[0].paymentCardEnabled || settings[0].paymentMobileMoneyEnabled || settings[0].paymentBankTransferEnabled || settings[0].paymentCreditEnabled));
+      if (!productRows.length || !customerRows.length || !activePaymentMethod) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Terminez les trois étapes de démarrage avant de clôturer l’assistant." });
+      await db.update(companies).set({ onboardingCompletedAt: new Date() }).where(eq(companies.id, ctx.user.companyId));
+      return { success: true };
+    }),
+  }),
+
   products: router({
     list: protectedProcedure.query(({ ctx }) => listProducts(ctx.user.companyId)),
     detail: protectedProcedure.input(z.object({ id: z.number().int().positive() })).query(async ({ ctx, input }) => {

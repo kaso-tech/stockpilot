@@ -40,8 +40,10 @@ import SettingsDashboard from "./pages/SettingsDashboard";
 import SettingsSecurity from "./pages/SettingsSecurity";
 import DataExchange from "./pages/DataExchange";
 import SyncJournal from "./pages/SyncJournal";
+import TermsOfUse from "./pages/TermsOfUse";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 
-function Router() {
+function DashboardRouter() {
   return (
     <DashboardLayout>
       <Switch>
@@ -83,6 +85,10 @@ function Router() {
       </Switch>
     </DashboardLayout>
   );
+}
+
+function Router() {
+  return <Switch><Route path="/conditions-utilisation" component={TermsOfUse} /><Route path="/politique-confidentialite" component={PrivacyPolicy} /><Route component={DashboardRouter} /></Switch>;
 }
 
 // NOTE: About Theme

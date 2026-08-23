@@ -482,3 +482,10 @@
 - [x] Isoler les catalogues, clients, agents, vendeurs, ventes, dépenses, réglages et indicateurs principaux par entreprise.
 - [x] Ajouter l’interface d’inscription et le premier paramétrage de l’entreprise.
 - [x] Tester l’inscription, les sessions et l’étanchéité des données principales entre entreprises.
+- [x] Reporter l’audit et la configuration d’envoi d’e-mail de vérification jusqu’à la disponibilité d’un fournisseur d’e-mail.
+- [x] Reporter le code à six chiffres, l’activation différée, le renvoi contrôlé et leurs tests jusqu’à la disponibilité d’un fournisseur d’e-mail.
+- [x] Définir les étapes du premier produit, premier client et premier moyen de paiement.
+- [x] Ajouter les pages Conditions d’utilisation et Politique de confidentialité.
+- [x] Relier les pages légales au formulaire de création d’entreprise.
+- [x] Construire l’assistant de démarrage et mémoriser sa progression par entreprise.
+- [x] Tester le parcours de démarrage et les pages légales.
