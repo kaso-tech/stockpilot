@@ -8,9 +8,10 @@ vi.mock("./storage", () => ({ storagePut: storagePutMock, storageGetSignedUrl: v
 import { createBackupSnapshot, restoreBackupPayload } from "./backups";
 
 function archiveDb() {
-  const from = vi.fn().mockResolvedValue([]);
+  const where = vi.fn().mockResolvedValue([]);
+  const from = vi.fn(() => ({ where }));
   const values = vi.fn().mockResolvedValue([{ insertId: 42 }]);
-  return { select: vi.fn(() => ({ from })), insert: vi.fn(() => ({ values })), from, values };
+  return { select: vi.fn(() => ({ from })), insert: vi.fn(() => ({ values })), from, where, values };
 }
 
 describe("sauvegarde locale intégrée", () => {

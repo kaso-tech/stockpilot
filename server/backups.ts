@@ -3,7 +3,7 @@ import {
   inventorySessions, products, remunerationProfiles, saleCommissions, saleItems,
   saleSettings, sales, sellerCredentials, stockAlerts, stockMovements, suppliers, users,
 } from "../drizzle/schema";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { companyScope } from "./companyScope";
 import { getDb } from "./db";
 import { storageGetSignedUrl, storagePut } from "./storage";
@@ -45,8 +45,44 @@ function backupFilename(now = new Date()) {
 
 export async function createBackupSnapshot(actorUserId: number | null, trigger: Trigger, companyId: number | null = null) {
   const db = await dbOrThrow();
-  const tableEntries = await Promise.all(snapshotSources.map(async source => [source.name, await db.select().from(source.table)] as const));
-  const tables = Object.fromEntries(tableEntries) as Record<string, unknown[]>;
+  const selectCompanyRows = async (table: any) => companyId === null
+    ? db.select().from(table)
+    : db.select().from(table).where(companyScope(table.companyId, companyId));
+  const selectChildren = async (table: any, foreignKey: any, parentIds: number[]) => parentIds.length
+    ? db.select().from(table).where(inArray(foreignKey, parentIds))
+    : [];
+
+  if (companyId === null) {
+    const tableEntries = await Promise.all(snapshotSources.map(async source => [source.name, await db.select().from(source.table)] as const));
+    const tables = Object.fromEntries(tableEntries) as Record<string, unknown[]>;
+    return persistSnapshot(db, actorUserId, trigger, companyId, tables);
+  }
+
+  const [userRows, supplierRows, productRows, customerRows, agentRows, remunerationRows, saleSettingRows, saleRows, agentPaymentRows, inventoryRows, movementRows, alertRows, auditRows] = await Promise.all([
+    selectCompanyRows(users), selectCompanyRows(suppliers), selectCompanyRows(products), selectCompanyRows(customers),
+    selectCompanyRows(agents), selectCompanyRows(remunerationProfiles), selectCompanyRows(saleSettings), selectCompanyRows(sales),
+    selectCompanyRows(agentPayments), selectCompanyRows(inventorySessions), selectCompanyRows(stockMovements), selectCompanyRows(stockAlerts), selectCompanyRows(auditLogs),
+  ]);
+  const userIds = userRows.map((row: any) => row.id);
+  const saleIds = saleRows.map((row: any) => row.id);
+  const inventoryIds = inventoryRows.map((row: any) => row.id);
+  const [credentialRows, saleItemRows, commissionRows, inventoryItemRows] = await Promise.all([
+    selectChildren(sellerCredentials, sellerCredentials.userId, userIds),
+    selectChildren(saleItems, saleItems.saleId, saleIds),
+    selectChildren(saleCommissions, saleCommissions.saleId, saleIds),
+    selectChildren(inventoryItems, inventoryItems.inventorySessionId, inventoryIds),
+  ]);
+  const tables: Record<string, unknown[]> = {
+    users: userRows, sellerCredentials: credentialRows, suppliers: supplierRows, products: productRows,
+    customers: customerRows, agents: agentRows, remunerationProfiles: remunerationRows, saleSettings: saleSettingRows,
+    sales: saleRows, saleItems: saleItemRows, saleCommissions: commissionRows, agentPayments: agentPaymentRows,
+    inventorySessions: inventoryRows, inventoryItems: inventoryItemRows, stockMovements: movementRows,
+    stockAlerts: alertRows, auditLogs: auditRows,
+  };
+  return persistSnapshot(db, actorUserId, trigger, companyId, tables);
+}
+
+async function persistSnapshot(db: any, actorUserId: number | null, trigger: Trigger, companyId: number | null, tables: Record<string, unknown[]>) {
   const payload: BackupPayload = { schemaVersion: 1, exportedAt: new Date().toISOString(), source: "StockPilot", companyId, tables };
   const content = JSON.stringify(payload, null, 2);
   const buffer = Buffer.from(content, "utf8");
