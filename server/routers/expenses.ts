@@ -41,14 +41,14 @@ export const expensesRouter = router({
       return { success: true };
     }),
   }),
-  report: adminProcedure.input(z.object({ yearMonth: z.string().regex(/^\d{4}-\d{2}$/) })).query(async ({ input }) => {
-    const db = await dbOrThrow(); const [rows, payments] = await Promise.all([db.select().from(expenses).orderBy(desc(expenses.spentAt)), db.select().from(agentPayments).orderBy(desc(agentPayments.paidAt))]); const agentRows = agentPaymentExpenseRows(payments); const breakdown = expenseBreakdownByCategory([...rows, ...agentRows], input.yearMonth); const agentPaymentCents = expenseTotalCents(agentRows.filter(row => row.spentAt.toISOString().slice(0, 7) === input.yearMonth));
+  report: adminProcedure.input(z.object({ yearMonth: z.string().regex(/^\d{4}-\d{2}$/) })).query(async ({ ctx, input }) => {
+    const db = await dbOrThrow(); const [rows, payments] = await Promise.all([db.select().from(expenses).where(companyScope(expenses.companyId, ctx.user.companyId)).orderBy(desc(expenses.spentAt)), db.select().from(agentPayments).where(companyScope(agentPayments.companyId, ctx.user.companyId)).orderBy(desc(agentPayments.paidAt))]); const agentRows = agentPaymentExpenseRows(payments); const breakdown = expenseBreakdownByCategory([...rows, ...agentRows], input.yearMonth); const agentPaymentCents = expenseTotalCents(agentRows.filter(row => row.spentAt.toISOString().slice(0, 7) === input.yearMonth));
     return { yearMonth: input.yearMonth, totalCents: expenseTotalCents(breakdown), breakdown, count: rows.filter(row => row.spentAt.toISOString().slice(0, 7) === input.yearMonth).length + agentRows.filter(row => row.spentAt.toISOString().slice(0, 7) === input.yearMonth).length, agentPaymentCents, agentPaymentCount: agentRows.filter(row => row.spentAt.toISOString().slice(0, 7) === input.yearMonth).length };
   }),
   uploadReceipt: adminProcedure.input(z.object({ dataUrl: z.string().min(30).max(7_000_000), filename: z.string().trim().min(1).max(180) })).mutation(async ({ ctx, input }) => {
     const match = input.dataUrl.match(/^data:(application\/pdf|image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/); if (!match) throw new TRPCError({ code: "BAD_REQUEST", message: "Le justificatif doit être un PDF, PNG, JPEG ou WEBP." });
     const mimeType = match[1]; const buffer = Buffer.from(match[2], "base64"); if (buffer.byteLength > 5 * 1024 * 1024) throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "Le justificatif ne doit pas dépasser 5 Mo." });
-    const extension = mimeType === "application/pdf" ? "pdf" : mimeType === "image/jpeg" ? "jpg" : mimeType.split("/")[1]; const { url } = await storagePut(`expenses/${ctx.user.id}/${randomUUID()}.${extension}`, buffer, mimeType);
+    const extension = mimeType === "application/pdf" ? "pdf" : mimeType === "image/jpeg" ? "jpg" : mimeType.split("/")[1]; const { url } = await storagePut(`company/${ctx.user.companyId ?? "legacy"}/expenses/${randomUUID()}.${extension}`, buffer, mimeType);
     return { url, filename: input.filename, mimeType };
   }),
   list: adminProcedure.query(async ({ ctx }) => {

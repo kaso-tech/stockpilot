@@ -323,6 +323,7 @@ export const saleCommissions = mysqlTable("saleCommissions", {
 
 export const agentPayments = mysqlTable("agentPayments", {
   id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId"),
   beneficiaryType: mysqlEnum("beneficiaryType", ["user", "agent"]).notNull(),
   beneficiaryId: int("beneficiaryId").notNull(),
   amountCents: int("amountCents").notNull(),

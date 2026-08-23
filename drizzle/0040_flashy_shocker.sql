@@ -1,0 +1,1 @@
+ALTER TABLE `agentPayments` ADD `companyId` int;
