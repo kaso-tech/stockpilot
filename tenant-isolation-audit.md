@@ -31,6 +31,8 @@ Les mises à jour, désactivations et conversions d’agents et vendeurs, ainsi 
 
 Le flux POS applique désormais le périmètre de l’entreprise à la sélection de clients, produits, réglages, agents et profils de rémunération, ainsi qu’à la création des brouillons et aux encaissements.
 
+Les suppressions de brouillons et remboursements appliquent également le périmètre de l’entreprise aux ventes, réglages, produits, mouvements et alertes de stock générés.
+
 Les tests automatisés vérifient qu’un encaissement POS ou la consultation d’une facture dont la vente n’est pas visible dans l’entreprise active échouent avec une réponse d’absence de ressource.
 
 La restauration sélective traite désormais les tables enfants avant leurs parents : identifiants vendeur avant utilisateurs, lignes et commissions de vente avant ventes, lignes d’inventaire avant sessions, puis les entités directement rattachées à l’entreprise. Les suppressions non héritées restent filtrées par `companyId`.

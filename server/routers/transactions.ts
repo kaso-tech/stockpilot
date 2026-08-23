@@ -61,7 +61,7 @@ export const transactionsRouter = router({
       const sale = (await db.select().from(sales).where(and(eq(sales.id, input.saleId), companyScope(sales.companyId, ctx.user.companyId))).limit(1))[0];
     if (!sale || sale.channel !== "invoice") throw new TRPCError({ code: "NOT_FOUND", message: "Facture introuvable." });
     if (sale.status !== "draft" || sale.amountPaidCents > 0) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Seules les factures non encaissées peuvent être supprimées." });
-    if (ctx.user.role === "seller") { const settings = (await db.select().from(saleSettings).limit(1))[0]; try { assertSellerSensitiveAction(settings, "invoice_cancellation"); } catch (error) { throw new TRPCError({ code: "FORBIDDEN", message: error instanceof Error ? error.message : "Annulation non autorisée." }); } }
+    if (ctx.user.role === "seller") { const settings = (await db.select().from(saleSettings).where(companyScope(saleSettings.companyId, ctx.user.companyId)).limit(1))[0]; try { assertSellerSensitiveAction(settings, "invoice_cancellation"); } catch (error) { throw new TRPCError({ code: "FORBIDDEN", message: error instanceof Error ? error.message : "Annulation non autorisée." }); } }
     await db.transaction(async tx => { await tx.delete(saleItems).where(eq(saleItems.saleId, sale.id)); await tx.delete(sales).where(eq(sales.id, sale.id)); await tx.insert(auditLogs).values({ actorUserId: ctx.user.id, action: "Suppression", entityType: "Facture", entityId: String(sale.id), detail: `Facture ${sale.invoiceNumber} supprimée avant encaissement` }); });
     return { success: true };
   }),
@@ -72,19 +72,19 @@ export const transactionsRouter = router({
       if (!sale) throw new TRPCError({ code: "NOT_FOUND", message: "Facture introuvable." });
       if ((sale.status !== "paid" && sale.status !== "partial") || sale.amountPaidCents <= 0) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Seule une facture encaissée ou partiellement encaissée peut être remboursée." });
       if (ctx.user.role === "seller") {
-        const settings = (await tx.select().from(saleSettings).limit(1))[0];
+        const settings = (await tx.select().from(saleSettings).where(companyScope(saleSettings.companyId, ctx.user.companyId)).limit(1))[0];
         try { assertSellerSensitiveAction(settings, "refund"); } catch (error) { throw new TRPCError({ code: "FORBIDDEN", message: error instanceof Error ? error.message : "Remboursement non autorisé." }); }
       }
       const items = await tx.select().from(saleItems).where(eq(saleItems.saleId, sale.id));
-      const productRows = items.length ? await tx.select().from(products).where(inArray(products.id, items.map(item => item.productId))) : [];
+      const productRows = items.length ? await tx.select().from(products).where(and(inArray(products.id, items.map(item => item.productId)), companyScope(products.companyId, ctx.user.companyId))) : [];
       if (productRows.length !== items.length) throw new TRPCError({ code: "NOT_FOUND", message: "Un produit de cette facture est introuvable ; le remboursement ne peut pas être finalisé." });
       for (const item of items) {
         const product = productRows.find(row => row.id === item.productId)!;
         const quantity = resultingStock(product.quantity, "entry", item.quantity);
-        await tx.update(products).set({ quantity }).where(eq(products.id, product.id));
-        await tx.insert(stockMovements).values({ productId: product.id, type: "entry", quantity: signedMovementQuantity("entry", item.quantity), previousQuantity: product.quantity, resultingQuantity: quantity, reason: `Remboursement ${sale.invoiceNumber}`, createdByUserId: ctx.user.id });
-        if (quantity <= product.minimumQuantity) await tx.insert(stockAlerts).values({ productId: product.id, threshold: product.minimumQuantity, observedQuantity: quantity, status: "active" }).onDuplicateKeyUpdate({ set: { observedQuantity: quantity, threshold: product.minimumQuantity, status: "active", resolvedAt: null } });
-        else await tx.update(stockAlerts).set({ observedQuantity: quantity, status: "resolved", resolvedAt: new Date() }).where(eq(stockAlerts.productId, product.id));
+        await tx.update(products).set({ quantity }).where(and(eq(products.id, product.id), companyScope(products.companyId, ctx.user.companyId)));
+        await tx.insert(stockMovements).values({ companyId: ctx.user.companyId, productId: product.id, type: "entry", quantity: signedMovementQuantity("entry", item.quantity), previousQuantity: product.quantity, resultingQuantity: quantity, reason: `Remboursement ${sale.invoiceNumber}`, createdByUserId: ctx.user.id });
+        if (quantity <= product.minimumQuantity) await tx.insert(stockAlerts).values({ companyId: ctx.user.companyId, productId: product.id, threshold: product.minimumQuantity, observedQuantity: quantity, status: "active" }).onDuplicateKeyUpdate({ set: { observedQuantity: quantity, threshold: product.minimumQuantity, status: "active", resolvedAt: null } });
+        else await tx.update(stockAlerts).set({ observedQuantity: quantity, status: "resolved", resolvedAt: new Date() }).where(and(eq(stockAlerts.productId, product.id), companyScope(stockAlerts.companyId, ctx.user.companyId)));
       }
       await tx.delete(saleCommissions).where(eq(saleCommissions.saleId, sale.id));
       await tx.update(sales).set({ status: "void", amountPaidCents: 0 }).where(eq(sales.id, sale.id));
