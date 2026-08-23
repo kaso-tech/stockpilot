@@ -517,3 +517,14 @@
 - [x] Remplacer la couleur principale par le bleu #2563EB dans les tokens globaux.
 - [x] Adapter l’onglet actif, le bouton Vente Rapide et la carte Démarrage guidé à la nouvelle couleur.
 - [x] Vérifier les contrastes de la nouvelle identité bleue dans les thèmes clair et sombre.
+- [ ] Auditer les limites du mode hors connexion actuel pour les usages prolongés.
+- [ ] Concevoir une base locale durable, une file d’opérations et une synchronisation résiliente.
+- [ ] Définir la stratégie de conflit, de sauvegarde et de reprise après plusieurs jours sans réseau.
+- [x] Auditer la préparation actuelle de StockPilot Pro pour une commercialisation multi-entreprise.
+- [x] Étudier les pratiques professionnelles de solutions de gestion de stock et de vente comparables.
+- [x] Définir l’architecture cible, les offres SaaS et les exigences d’exploitation.
+- [x] Rédiger le plan de configuration et de commercialisation de StockPilot Pro.
+- [x] Cartographier les tables, routes et opérations critiques à isoler par entreprise, avec un audit des priorités restantes.
+- [ ] Compléter les filtres d’entreprise et les contrôles de propriété manquants.
+- [ ] Ajouter des tests automatisés de non-divulgation entre entreprises.
+- [ ] Valider l’isolation multi-entreprise sur les parcours critiques.
