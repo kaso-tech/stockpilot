@@ -428,3 +428,5 @@
 - [x] Ajouter un indicateur visuel de notification non lue.
 - [x] Ajouter l’action Marquer toutes comme lues.
 - [x] Tester les états de lecture de notification sur desktop et mobile.
+- [x] Afficher les badges des factures à encaisser et partiellement réglées en orange.
+- [x] Vérifier les statuts de facture sur les listes et fiches.

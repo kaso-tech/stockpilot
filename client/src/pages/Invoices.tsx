@@ -172,9 +172,10 @@ export default function Invoices() {
   );
 }
 
+export const invoiceStatusMeta = { paid: ["Payée", "bg-emerald-500/10 text-emerald-600"], partial: ["Partielle", "bg-orange-500/10 text-orange-600"], draft: ["À encaisser", "bg-orange-500/10 text-orange-600"], void: ["Remboursée / annulée", "bg-rose-500/10 text-rose-600"] } as const;
+
 export function StatusBadge({ status }: { status: Invoice["status"] }) {
-  const map = { paid: ["Payée", "bg-emerald-500/10 text-emerald-600"], partial: ["Partielle", "bg-amber-500/10 text-amber-600"], draft: ["À encaisser", "bg-slate-500/10 text-slate-500"], void: ["Remboursée / annulée", "bg-rose-500/10 text-rose-600"] } as const;
-  return <Badge className={`border-0 ${map[status][1]}`}>{map[status][0]}</Badge>;
+  return <Badge className={`border-0 ${invoiceStatusMeta[status][1]}`}>{invoiceStatusMeta[status][0]}</Badge>;
 }
 
 export function InvoiceDocument({ detail, identity }: { detail: any; identity: any }) {
