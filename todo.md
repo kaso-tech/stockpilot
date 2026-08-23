@@ -528,3 +528,4 @@
 - [ ] Compléter les filtres d’entreprise et les contrôles de propriété manquants.
 - [ ] Ajouter des tests automatisés de non-divulgation entre entreprises.
 - [ ] Valider l’isolation multi-entreprise sur les parcours critiques.
+- [ ] Isoler la création, le téléchargement, la rétention et la restauration des sauvegardes par entreprise.

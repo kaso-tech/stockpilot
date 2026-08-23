@@ -18,3 +18,7 @@
 2. Remplacer les contraintes globales de référence, nom ou numéro de document par des contraintes composées avec l’entreprise lorsque nécessaire.
 3. Parcourir les routeurs achats, inventaire, transactions, dépenses, sauvegardes et export pour vérifier chaque lecture, écriture et téléchargement.
 4. Ajouter des tests qui tentent explicitement d’accéder à l’identifiant d’une seconde entreprise et attendent un refus ou une absence de résultat.
+
+## Sauvegardes : chantier d’isolation restant
+
+Les archives existantes doivent être rattachées au fichier, à la rétention, au téléchargement et à la restauration d’une seule entreprise. Une restauration ne devra jamais supprimer ni remplacer les données d’une autre entreprise.

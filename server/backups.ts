@@ -28,6 +28,7 @@ export type BackupPayload = {
   schemaVersion: 1;
   exportedAt: string;
   source: "StockPilot";
+  companyId?: number | null;
   tables: Record<string, unknown[]>;
 };
 
