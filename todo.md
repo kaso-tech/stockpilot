@@ -424,3 +424,7 @@
 - [x] Filtrer les notifications administrateur hors de la vue vendeur.
 - [x] Déclencher automatiquement la boîte de dialogue d’impression après ouverture de la facture.
 - [x] Tester les notifications vendeur et l’impression de facture.
+- [x] Auditer le panneau actuel et le stockage des notifications lues.
+- [x] Ajouter un indicateur visuel de notification non lue.
+- [x] Ajouter l’action Marquer toutes comme lues.
+- [x] Tester les états de lecture de notification sur desktop et mobile.
