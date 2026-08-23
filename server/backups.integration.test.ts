@@ -28,6 +28,7 @@ describe("sauvegarde locale intégrée", () => {
     expect(archive.filename).toMatch(/^stockpilot-backup-/);
     expect(archive.payload.source).toBe("StockPilot");
     expect(archive.payload.companyId).toBe(12);
+    expect(db.where).toHaveBeenCalled();
     expect(storagePutMock).toHaveBeenCalledWith(expect.stringContaining("backups/"), expect.any(Buffer), "application/json");
     expect(db.values).toHaveBeenCalledWith(expect.objectContaining({ trigger: "manual", createdByUserId: 7 }));
   });

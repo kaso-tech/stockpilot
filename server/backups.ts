@@ -165,13 +165,37 @@ export function parseBackupPayload(dataUrl: string): BackupPayload {
   return payload;
 }
 
-export async function restoreBackupPayload(payload: BackupPayload, actorUserId: number) {
+export async function restoreBackupPayload(payload: BackupPayload, actorUserId: number, companyId: number | null = null) {
   const db = await dbOrThrow();
   await db.transaction(async tx => {
-    for (const source of restoreDeleteOrder) await tx.delete(source.table);
+    assertBackupCompany(payload, companyId);
+    if (companyId !== null) {
+      const [userRows, saleRows, inventoryRows] = await Promise.all([
+        tx.select({ id: users.id }).from(users).where(companyScope(users.companyId, companyId)),
+        tx.select({ id: sales.id }).from(sales).where(companyScope(sales.companyId, companyId)),
+        tx.select({ id: inventorySessions.id }).from(inventorySessions).where(companyScope(inventorySessions.companyId, companyId)),
+      ]);
+      const userIds = userRows.map((row: { id: number }) => row.id);
+      const saleIds = saleRows.map((row: { id: number }) => row.id);
+      const inventoryIds = inventoryRows.map((row: { id: number }) => row.id);
+      if (userIds.length) await tx.delete(sellerCredentials).where(inArray(sellerCredentials.userId, userIds));
+      if (saleIds.length) {
+        await tx.delete(saleCommissions).where(inArray(saleCommissions.saleId, saleIds));
+        await tx.delete(saleItems).where(inArray(saleItems.saleId, saleIds));
+      }
+      if (inventoryIds.length) await tx.delete(inventoryItems).where(inArray(inventoryItems.inventorySessionId, inventoryIds));
+      for (const source of restoreDeleteOrder) {
+        if (source.table.companyId) await tx.delete(source.table).where(companyScope(source.table.companyId, companyId));
+      }
+    } else {
+      for (const source of restoreDeleteOrder) await tx.delete(source.table);
+    }
     for (const source of snapshotSources) {
-      const rows = payload.tables[source.name];
-      if (Array.isArray(rows) && rows.length > 0) await tx.insert(source.table).values(rows as any);
+      const rows = Array.isArray(payload.tables[source.name]) ? payload.tables[source.name] as any[] : [];
+      const scopedRows = companyId === null || !source.table.companyId
+        ? rows
+        : rows.filter(row => row.companyId === companyId);
+      if (scopedRows.length > 0) await tx.insert(source.table).values(scopedRows as any);
     }
   });
   const restoredCount = Object.values(payload.tables).reduce((sum, rows) => sum + (Array.isArray(rows) ? rows.length : 0), 0);

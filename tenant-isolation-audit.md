@@ -27,6 +27,6 @@ Le format d’archive porte désormais l’identifiant de l’entreprise lors de
 
 Le contenu des archives d’entreprise est désormais filtré sur les tables directement rattachées par `companyId`, puis sur les identifiants des utilisateurs, ventes et sessions d’inventaire retenus pour les relations enfants incluses.
 
-La restauration sélective doit traiter les tables enfants avant leurs parents : lignes et commissions de vente avant ventes, lignes d’inventaire avant sessions, puis les entités directement rattachées à l’entreprise. Les tables sans `companyId` devront être filtrées à partir de leurs parents avant toute suppression.
+La restauration sélective traite désormais les tables enfants avant leurs parents : identifiants vendeur avant utilisateurs, lignes et commissions de vente avant ventes, lignes d’inventaire avant sessions, puis les entités directement rattachées à l’entreprise. Les suppressions non héritées restent filtrées par `companyId`.
 
 Les alertes de stock doivent aussi être créées et recherchées avec l’entreprise du produit afin de compléter l’unicité des alertes par entreprise.
