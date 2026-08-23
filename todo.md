@@ -433,3 +433,7 @@
 - [x] Auditer les journaux et le flux de connexion administrateur via Google.
 - [x] Corriger l’échec d’authentification identifié.
 - [x] Vérifier le retour de connexion administrateur avant publication.
+- [x] Auditer le flux OAuth et définir la connexion de secours administrateur.
+- [x] Ajouter un stockage sécurisé du mot de passe et une procédure de connexion administrateur.
+- [x] Ajouter un formulaire e-mail et mot de passe de secours.
+- [x] Tester les succès, échecs et restrictions de la connexion de secours.

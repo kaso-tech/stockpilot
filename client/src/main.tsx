@@ -5,7 +5,6 @@ import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
-import { startLogin } from "./const";
 import { persistOfflineQueryCache, restoreOfflineQueryCache } from "./lib/offlineCache";
 import "./index.css";
 
@@ -19,9 +18,12 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
 
   const isUnauthorized = error.message === UNAUTHED_ERR_MSG;
 
-  if (!isUnauthorized) return;
-
-  startLogin();
+  if (isUnauthorized) {
+    // DashboardLayout exposes the local sign-in screen, which now includes the
+    // administrator fallback form. Redirecting here would make that option
+    // unreachable whenever a session expires.
+    console.info("[Auth] Session absente ou expirée ; affichage de l’écran de connexion.");
+  }
 };
 
 queryClient.getQueryCache().subscribe(event => {
