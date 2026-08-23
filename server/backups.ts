@@ -42,11 +42,11 @@ function backupFilename(now = new Date()) {
   return `stockpilot-backup-${now.toISOString().replace(/[:.]/g, "-")}.json`;
 }
 
-export async function createBackupSnapshot(actorUserId: number | null, trigger: Trigger) {
+export async function createBackupSnapshot(actorUserId: number | null, trigger: Trigger, companyId: number | null = null) {
   const db = await dbOrThrow();
   const tableEntries = await Promise.all(snapshotSources.map(async source => [source.name, await db.select().from(source.table)] as const));
   const tables = Object.fromEntries(tableEntries) as Record<string, unknown[]>;
-  const payload: BackupPayload = { schemaVersion: 1, exportedAt: new Date().toISOString(), source: "StockPilot", tables };
+  const payload: BackupPayload = { schemaVersion: 1, exportedAt: new Date().toISOString(), source: "StockPilot", companyId, tables };
   const content = JSON.stringify(payload, null, 2);
   const buffer = Buffer.from(content, "utf8");
   const filename = backupFilename();
@@ -92,10 +92,10 @@ export function assertRestoreConfirmation(confirmation: string) {
   if (confirmation !== "RESTAURER") throw new Error("La confirmation RESTAURER est requise pour restaurer une archive.");
 }
 
-export async function runBackupWithStatus(actorUserId: number | null, trigger: Trigger, retentionCount = 14) {
+export async function runBackupWithStatus(actorUserId: number | null, trigger: Trigger, retentionCount = 14, companyId: number | null = null) {
   const db = await dbOrThrow();
   try {
-    const archive = await createBackupSnapshot(actorUserId, trigger);
+    const archive = await createBackupSnapshot(actorUserId, trigger, companyId);
     const { backupSettings } = await import("../drizzle/schema");
     const settings = (await db.select().from(backupSettings).limit(1))[0];
     if (settings) await db.update(backupSettings).set({ lastBackupAt: new Date(), lastBackupStatus: "success", lastBackupError: null }).where(eq(backupSettings.id, settings.id));
