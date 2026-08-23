@@ -13,7 +13,7 @@ export async function runScheduledBackup(req: Request, res: Response) {
     if (!db) return res.status(500).json({ error: "database-unavailable" });
     const settings = (await db.select().from(backupSettings).where(eq(backupSettings.scheduleCronTaskUid, user.taskUid)).limit(1))[0];
     if (!settings || !settings.automaticEnabled) return res.json({ ok: true, skipped: "inactive-or-orphan" });
-    const archive = await runBackupWithStatus(settings.updatedByUserId ?? null, "scheduled", settings.retentionCount);
+    const archive = await runBackupWithStatus(settings.updatedByUserId ?? null, "scheduled", settings.retentionCount, settings.companyId);
     res.json({ ok: true, archiveId: archive.id, filename: archive.filename });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
