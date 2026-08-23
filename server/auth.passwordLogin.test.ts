@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { adminFallbackPasswords, sellerCredentials, users } from "../drizzle/schema";
+import { adminFallbackPasswords, sellerCredentials, userSessions, users } from "../drizzle/schema";
 import { COOKIE_NAME } from "../shared/const";
 
 vi.mock("./db", () => ({ getDb: vi.fn() }));
@@ -20,8 +20,10 @@ function publicContext(cookies: Array<{ name: string; value: string; options: Re
 describe("auth.passwordLogin", () => {
   const admin = { id: 1, openId: "admin-password-test", name: "Administrateur", email: "admin@example.test", role: "admin" as const, active: true };
   const seller = { id: 2, openId: "seller-password-test", name: "Vendeur", email: "vendeur@example.test", role: "seller" as const, active: true };
+  const insertedSessions: Array<Record<string, unknown>> = [];
 
   beforeEach(async () => {
+    insertedSessions.length = 0;
     const adminPasswordHash = await hashPassword("Admin!2026");
     const sellerPasswordHash = await hashPassword("Vendeur!2026");
     const db: any = {
@@ -36,6 +38,7 @@ describe("auth.passwordLogin", () => {
           return { where: () => ({ limit: async () => rows }) };
         },
       }),
+      insert: (table: unknown) => ({ values: async (values: Record<string, unknown>) => { if (table === userSessions) insertedSessions.push(values); return []; } }),
     };
     mockedGetDb.mockResolvedValue(db);
   });
@@ -44,6 +47,8 @@ describe("auth.passwordLogin", () => {
     const cookies: Array<{ name: string; value: string; options: Record<string, unknown> }> = [];
     await expect(appRouter.createCaller(publicContext(cookies)).auth.passwordLogin({ email: "ADMIN@example.test", password: "Admin!2026", rememberMe: false })).resolves.toEqual({ success: true, role: "admin" });
     expect(cookies[0]).toMatchObject({ name: COOKIE_NAME, options: { secure: true, sameSite: "none", httpOnly: true, maxAge: 86_400_000 } });
+    expect(insertedSessions[0]).toMatchObject({ userId: admin.id, deviceLabel: "Appareil inconnu" });
+    expect(insertedSessions[0]?.id).toEqual(expect.any(String));
   });
 
   it("ouvre une session vendeur avec son e-mail et son mot de passe", async () => {
@@ -51,6 +56,7 @@ describe("auth.passwordLogin", () => {
     await expect(appRouter.createCaller(publicContext(cookies)).auth.passwordLogin({ email: "vendeur@example.test", password: "Vendeur!2026", rememberMe: true })).resolves.toEqual({ success: true, role: "seller" });
     expect(cookies).toHaveLength(1);
     expect(cookies[0]?.options).toMatchObject({ maxAge: 2_592_000_000 });
+    expect(insertedSessions[0]).toMatchObject({ userId: seller.id });
   });
 
   it("refuse les identifiants invalides sans émettre de cookie", async () => {

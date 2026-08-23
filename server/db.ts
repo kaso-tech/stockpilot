@@ -7,6 +7,7 @@ import {
   productPriceTiers,
   stockMovements,
   suppliers,
+  userSessions,
   users,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
@@ -54,6 +55,18 @@ export async function getUserByOpenId(openId: string) {
   if (!db) return undefined;
   const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
   return result[0];
+}
+
+export async function getUserSessionById(sessionId: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  return (await db.select().from(userSessions).where(eq(userSessions.id, sessionId)).limit(1))[0];
+}
+
+export async function touchUserSession(sessionId: string) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(userSessions).set({ lastSeenAt: new Date() }).where(eq(userSessions.id, sessionId));
 }
 
 export async function listProducts() {

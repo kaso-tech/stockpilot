@@ -1,5 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { and, desc, eq, ne } from "drizzle-orm";
+import { randomUUID } from "crypto";
 import { z } from "zod";
 import {
   auditLogs,
@@ -25,6 +26,7 @@ import {
   stockMovements,
   suppliers,
   userDashboardPreferences,
+  userSessions,
   users,
 } from "../drizzle/schema";
 import {
@@ -46,6 +48,16 @@ import { payrollRouter } from "./routers/payroll";
 
 const STANDARD_AUTH_SESSION_MS = 24 * 60 * 60 * 1000;
 const REMEMBERED_AUTH_SESSION_MS = 30 * 24 * 60 * 60 * 1000;
+
+function sessionDeviceLabel(userAgent: string | undefined) {
+  const agent = userAgent ?? "";
+  if (/android/i.test(agent)) return "Appareil Android";
+  if (/iPhone|iPad|iPod/i.test(agent)) return "Appareil Apple";
+  if (/Windows/i.test(agent)) return "Ordinateur Windows";
+  if (/Macintosh|Mac OS X/i.test(agent)) return "Ordinateur Mac";
+  if (/Linux/i.test(agent)) return "Ordinateur Linux";
+  return "Appareil inconnu";
+}
 import { backupRouter } from "./routers/backups";
 import { transactionsRouter } from "./routers/transactions";
 import { expensesRouter } from "./routers/expenses";
@@ -152,7 +164,11 @@ export const appRouter = router({
   expenses: expensesRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
-    logout: publicProcedure.mutation(({ ctx }) => {
+    logout: publicProcedure.mutation(async ({ ctx }) => {
+      if (ctx.user?.sessionId) {
+        const db = await getDb();
+        if (db) await db.update(userSessions).set({ revokedAt: new Date() }).where(eq(userSessions.id, ctx.user.sessionId));
+      }
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true } as const;
@@ -185,10 +201,40 @@ export const appRouter = router({
 
       if (!passwordValid) throw new TRPCError({ code: "UNAUTHORIZED", message: "E-mail ou mot de passe incorrect." });
       const sessionDurationMs = input.rememberMe ? REMEMBERED_AUTH_SESSION_MS : STANDARD_AUTH_SESSION_MS;
-      const token = await sdk.createSessionToken(account.openId, { name: account.name || account.email || "Utilisateur", expiresInMs: sessionDurationMs });
+      const sessionId = randomUUID();
+      const userAgent = typeof ctx.req.headers["user-agent"] === "string" ? ctx.req.headers["user-agent"].slice(0, 512) : undefined;
+      await db.insert(userSessions).values({ id: sessionId, userId: account.id, deviceLabel: sessionDeviceLabel(userAgent), userAgent: userAgent ?? null, expiresAt: new Date(Date.now() + sessionDurationMs) });
+      const token = await sdk.createSessionToken(account.openId, { name: account.name || account.email || "Utilisateur", expiresInMs: sessionDurationMs, sessionId });
       ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: sessionDurationMs });
       console.info("[Auth password] Session issued", { role: account.role, remembered: input.rememberMe });
       return { success: true, role: account.role } as const;
+    }),
+    sessions: router({
+      list: protectedProcedure.query(async ({ ctx }) => {
+        const db = await requireDb();
+        const now = new Date();
+        const sessions = await db.select().from(userSessions).where(eq(userSessions.userId, ctx.user.id)).orderBy(desc(userSessions.lastSeenAt));
+        const activeSessions = sessions.filter(session => !session.revokedAt && session.expiresAt > now).map(session => ({ id: session.id, deviceLabel: session.deviceLabel, createdAt: session.createdAt, lastSeenAt: session.lastSeenAt, expiresAt: session.expiresAt, isCurrent: session.id === ctx.user.sessionId }));
+        if (ctx.user.sessionId) return activeSessions;
+        const userAgent = typeof ctx.req.headers["user-agent"] === "string" ? ctx.req.headers["user-agent"] : undefined;
+        return [{ id: "legacy-current", deviceLabel: sessionDeviceLabel(userAgent), createdAt: ctx.user.lastSignedIn, lastSeenAt: ctx.user.lastSignedIn, expiresAt: new Date(ctx.user.lastSignedIn.getTime() + ONE_YEAR_MS), isCurrent: true }, ...activeSessions];
+      }),
+      revoke: protectedProcedure.input(z.object({ sessionId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
+        if (input.sessionId === ctx.user.sessionId) throw new TRPCError({ code: "BAD_REQUEST", message: "Utilisez la déconnexion pour fermer la session de cet appareil." });
+        const db = await requireDb();
+        const session = (await db.select().from(userSessions).where(eq(userSessions.id, input.sessionId)).limit(1))[0];
+        if (!session || session.userId !== ctx.user.id || session.revokedAt) throw new TRPCError({ code: "NOT_FOUND", message: "Session introuvable." });
+        await db.update(userSessions).set({ revokedAt: new Date() }).where(eq(userSessions.id, session.id));
+        return { success: true } as const;
+      }),
+      revokeOthers: protectedProcedure.mutation(async ({ ctx }) => {
+        if (!ctx.user.sessionId) throw new TRPCError({ code: "BAD_REQUEST", message: "Reconnectez-vous pour révoquer les autres sessions." });
+        const db = await requireDb();
+        const sessions = await db.select().from(userSessions).where(eq(userSessions.userId, ctx.user.id));
+        const otherIds = sessions.filter(session => !session.revokedAt && session.id !== ctx.user.sessionId).map(session => session.id);
+        await Promise.all(otherIds.map(sessionId => db.update(userSessions).set({ revokedAt: new Date() }).where(eq(userSessions.id, sessionId))));
+        return { success: true, revokedCount: otherIds.length } as const;
+      }),
     }),
     adminFallbackLogin: publicProcedure.input(z.object({ email: z.string().trim().email(), password: z.string().min(1) })).mutation(async ({ ctx, input }) => {
       const emailMatches = Boolean(ENV.adminFallbackEmail) && input.email.trim().toLowerCase() === ENV.adminFallbackEmail.trim().toLowerCase();

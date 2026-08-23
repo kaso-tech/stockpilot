@@ -55,6 +55,7 @@ import {
   ShoppingCart,
   UsersRound,
   Settings2,
+  ShieldCheck,
   SlidersHorizontal,
   Truck,
   TriangleAlert,
@@ -138,6 +139,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     ...menuItems.filter(item => item.path === "/" || item.path === "/pos" || item.path === "/factures" || item.path === "/clients" || item.path === "/mouvements" || item.path === "/synchronisation" || (item.path === "/produits" && sellerPermissions?.sellerCanEditPurchasePrice)),
     { icon: Settings2, label: "Apparence", path: "/parametres/apparence" },
     { icon: LayoutDashboard, label: "Mon tableau de bord", path: "/parametres/tableau-de-bord" },
+    { icon: ShieldCheck, label: "Sécurité", path: "/parametres/securite" },
   ];
   const visibleMenuItems = user?.role === "admin" ? menuItems : sellerMenuItems;
   const activeMenuItem = visibleMenuItems.find(item => item.path === location || (item.path === "/produits" && location.startsWith("/produits/")) || (item.path === "/clients" && location.startsWith("/clients/")) || (item.path === "/fournisseurs" && location.startsWith("/fournisseurs/")) || (item.path === "/bons-commande" && location.startsWith("/bons-commande/"))) ?? visibleMenuItems[0];

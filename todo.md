@@ -474,3 +474,6 @@
 - [x] Tester les connexions administrateur et vendeur de bout en bout avec les tests de route, de session, de mot de passe, de comptes vendeur et le build de production.
 - [x] Ajouter l’option Se souvenir de moi avec une durée de session prolongée explicite.
 - [x] Tester la durée standard et la durée prolongée de la session de connexion.
+- [x] Créer le suivi persistant des sessions actives par utilisateur.
+- [x] Ajouter la consultation et la révocation sécurisée des sessions sur d’autres appareils.
+- [x] Tester les sessions actives, la révocation distante et la conservation de la session courante.
