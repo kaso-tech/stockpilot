@@ -418,3 +418,5 @@
 - [x] Tester les libellés et actions rapides sur desktop et mobile.
 - [x] Retirer les réglages Répartition des dépenses et Suivi du budget du tableau de bord vendeur.
 - [x] Vérifier les préférences vendeur simplifiées sur desktop et mobile.
+- [x] Ajouter des icônes et couleurs distinctives aux actions rapides du tableau de bord.
+- [x] Vérifier la visibilité des actions rapides sur desktop et mobile.
