@@ -20,14 +20,14 @@ describe("auth.adminFallbackLogin", () => {
     expect(cookies).toHaveLength(0);
   });
 
-  it("refuse la connexion si OWNER_OPEN_ID manque et qu’aucun compte administrateur correspondant n’est disponible", async () => {
+  it("résout le compte administrateur unique lorsque OWNER_OPEN_ID manque", async () => {
     const ownerOpenId = ENV.ownerOpenId;
     const cookies: unknown[] = [];
     const ctx = { user: null, req: { protocol: "https", hostname: "stockpilot-gpaoheuz.manus.space", headers: {} }, res: { cookie: (...args: unknown[]) => cookies.push(args) } } as never;
     try {
       ENV.ownerOpenId = "";
-      await expect(appRouter.createCaller(ctx).auth.adminFallbackLogin({ email: ENV.adminFallbackEmail, password: ENV.adminFallbackPassword })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
-      expect(cookies).toHaveLength(0);
+      await expect(appRouter.createCaller(ctx).auth.adminFallbackLogin({ email: ENV.adminFallbackEmail, password: ENV.adminFallbackPassword })).resolves.toEqual({ success: true });
+      expect(cookies).toHaveLength(1);
     } finally {
       ENV.ownerOpenId = ownerOpenId;
     }

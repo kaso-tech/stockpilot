@@ -169,7 +169,8 @@ export const appRouter = router({
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Identifiants administrateur incorrects." });
       }
       const db = await requireDb();
-      const configuredAdmin = (await db.select().from(users).where(and(eq(users.role, "admin"), eq(users.email, input.email))).limit(1))[0];
+      const adminAccounts = await db.select().from(users).where(eq(users.role, "admin"));
+      const configuredAdmin = adminAccounts.find(account => account.email?.trim().toLowerCase() === input.email.trim().toLowerCase()) ?? (adminAccounts.length === 1 ? adminAccounts[0] : undefined);
       const adminOpenId = ENV.ownerOpenId || configuredAdmin?.openId;
       if (!adminOpenId) {
         console.info("[Auth fallback] Rejected credentials", { emailMatches, passwordLength: input.password.length, configuredPasswordLength: ENV.adminFallbackPassword.length, reason: "admin-account" });

@@ -455,9 +455,12 @@
 - [ ] Reproduire les erreurs avec les identifiants et sessions effectifs sans exposer les secrets.
 - [ ] Corriger la cause racine commune des échecs d’authentification.
 - [ ] Vérifier les connexions administrateur Google et e-mail de bout en bout sans boucle ni erreur.
-- [ ] Tracer sans secret la normalisation du formulaire et les valeurs de configuration actives.
-- [ ] Corriger tout écart de format entre les identifiants saisis et la validation serveur.
+- [x] Tracer sans secret la normalisation du formulaire et les valeurs de configuration actives.
+- [x] Corriger tout écart de format entre les identifiants saisis et la validation serveur.
 - [ ] Valider la connexion de secours sur le parcours publié après correction.
 - [ ] Auditer la publication, le domaine et la réponse HTTPS du site déployé.
 - [ ] Appliquer les correctifs de déploiement ou de domaine disponibles.
 - [ ] Vérifier HTTPS et les deux parcours de connexion après rétablissement.
+- [x] Auditer la table de mot de passe et le compte administrateur cible.
+- [x] Initialiser une entrée hachée de mot de passe de secours en base.
+- [x] Vérifier la connexion de secours indépendamment des secrets runtime.

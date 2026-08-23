@@ -10,6 +10,7 @@ import { createContext } from "./context";
 import { runScheduledBackup } from "../scheduledBackups";
 import { registerGoogleDriveRoutes } from "../googleDriveRoutes";
 import { serveStatic, setupVite } from "./vite";
+import { ensureAdminFallbackPasswordSeed } from "../adminFallbackSeed";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -54,6 +55,7 @@ async function startServer() {
   } else {
     serveStatic(app);
   }
+  await ensureAdminFallbackPasswordSeed();
 
   const preferredPort = parseInt(process.env.PORT || "3000");
   const port = await findAvailablePort(preferredPort);
