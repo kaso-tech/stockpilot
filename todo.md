@@ -514,3 +514,6 @@
 - [x] Auditer les badges d’état, tableaux, modales et menus déroulants en thème clair.
 - [x] Corriger leurs surfaces, textes, bordures et états interactifs pour un contraste lisible.
 - [x] Vérifier les superpositions, menus et modales en thème clair et sombre au niveau des composants partagés, des tokens et du build de production.
+- [x] Remplacer la couleur principale par le bleu #2563EB dans les tokens globaux.
+- [x] Adapter l’onglet actif, le bouton Vente Rapide et la carte Démarrage guidé à la nouvelle couleur.
+- [x] Vérifier les contrastes de la nouvelle identité bleue dans les thèmes clair et sombre.
