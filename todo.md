@@ -472,3 +472,5 @@
 - [x] Remplacer l’écran et le parcours Google par la connexion locale.
 - [x] Désactiver les redirections OAuth et préserver les sessions internes existantes.
 - [x] Tester les connexions administrateur et vendeur de bout en bout avec les tests de route, de session, de mot de passe, de comptes vendeur et le build de production.
+- [x] Ajouter l’option Se souvenir de moi avec une durée de session prolongée explicite.
+- [x] Tester la durée standard et la durée prolongée de la session de connexion.

@@ -43,6 +43,9 @@ import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { commerceRouter } from "./routers/commerce";
 import { inventoryRouter } from "./routers/inventory";
 import { payrollRouter } from "./routers/payroll";
+
+const STANDARD_AUTH_SESSION_MS = 24 * 60 * 60 * 1000;
+const REMEMBERED_AUTH_SESSION_MS = 30 * 24 * 60 * 60 * 1000;
 import { backupRouter } from "./routers/backups";
 import { transactionsRouter } from "./routers/transactions";
 import { expensesRouter } from "./routers/expenses";
@@ -162,7 +165,7 @@ export const appRouter = router({
       ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: ONE_YEAR_MS });
       return { success: true } as const;
     }),
-    passwordLogin: publicProcedure.input(z.object({ email: z.string().trim().email(), password: z.string().min(1) })).mutation(async ({ ctx, input }) => {
+    passwordLogin: publicProcedure.input(z.object({ email: z.string().trim().email(), password: z.string().min(1), rememberMe: z.boolean().optional().default(false) })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
       const email = input.email.trim().toLowerCase();
       const accounts = await db.select().from(users);
@@ -181,9 +184,10 @@ export const appRouter = router({
       }
 
       if (!passwordValid) throw new TRPCError({ code: "UNAUTHORIZED", message: "E-mail ou mot de passe incorrect." });
-      const token = await sdk.createSessionToken(account.openId, { name: account.name || account.email || "Utilisateur", expiresInMs: ONE_YEAR_MS });
-      ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: ONE_YEAR_MS });
-      console.info("[Auth password] Session issued", { role: account.role });
+      const sessionDurationMs = input.rememberMe ? REMEMBERED_AUTH_SESSION_MS : STANDARD_AUTH_SESSION_MS;
+      const token = await sdk.createSessionToken(account.openId, { name: account.name || account.email || "Utilisateur", expiresInMs: sessionDurationMs });
+      ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: sessionDurationMs });
+      console.info("[Auth password] Session issued", { role: account.role, remembered: input.rememberMe });
       return { success: true, role: account.role } as const;
     }),
     adminFallbackLogin: publicProcedure.input(z.object({ email: z.string().trim().email(), password: z.string().min(1) })).mutation(async ({ ctx, input }) => {

@@ -2,6 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { readNotificationIds, unreadNotificationCount, writeNotificationIds } from "@/lib/notificationReadState";
 import { visibleNotificationsForRole, type RoleNotification } from "@/lib/roleNotifications";
@@ -90,6 +91,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { loading, user } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const returnToDashboard = () => window.location.replace("/");
   const passwordLogin = trpc.auth.passwordLogin.useMutation({ onSuccess: returnToDashboard });
 
@@ -110,7 +112,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
           <h1 className="text-2xl font-semibold tracking-tight">Accédez à votre espace commercial</h1>
           <p className="mt-2 text-sm text-slate-400">Connectez-vous avec l’adresse e-mail et le mot de passe de votre compte.</p>
-          <form onSubmit={event => { event.preventDefault(); passwordLogin.mutate({ email, password }); }} className="mt-6 space-y-3"><Input value={email} onChange={event => setEmail(event.target.value)} placeholder="Adresse e-mail" type="email" autoComplete="email" className="border-white/10 bg-white/[0.04]" /><Input value={password} onChange={event => setPassword(event.target.value)} placeholder="Mot de passe" type="password" autoComplete="current-password" className="border-white/10 bg-white/[0.04]" /><Button type="submit" disabled={passwordLogin.isPending || !email || !password} className="h-11 w-full bg-cyan-400 text-slate-950 hover:bg-cyan-300">{passwordLogin.isPending ? "Connexion…" : "Se connecter"}</Button>{passwordLogin.error && <p className="text-center text-xs text-rose-300">{passwordLogin.error.message}</p>}</form>
+          <form onSubmit={event => { event.preventDefault(); passwordLogin.mutate({ email, password, rememberMe }); }} className="mt-6 space-y-3"><Input value={email} onChange={event => setEmail(event.target.value)} placeholder="Adresse e-mail" type="email" autoComplete="email" className="border-white/10 bg-white/[0.04]" /><Input value={password} onChange={event => setPassword(event.target.value)} placeholder="Mot de passe" type="password" autoComplete="current-password" className="border-white/10 bg-white/[0.04]" /><label htmlFor="remember-me" className="flex cursor-pointer items-start gap-3 rounded-xl border border-white/[0.08] bg-white/[0.02] px-3 py-2.5 text-left transition hover:border-cyan-400/35"><Checkbox id="remember-me" checked={rememberMe} onCheckedChange={value => setRememberMe(value === true)} disabled={passwordLogin.isPending} className="mt-0.5 border-slate-500" /><span><span className="block text-sm font-medium text-slate-200">Se souvenir de moi</span><span className="mt-0.5 block text-xs text-slate-400">Prolonge la session sur cet appareil.</span></span></label><Button type="submit" disabled={passwordLogin.isPending || !email || !password} className="h-11 w-full bg-cyan-400 text-slate-950 hover:bg-cyan-300">{passwordLogin.isPending ? "Connexion…" : "Se connecter"}</Button>{passwordLogin.error && <p className="text-center text-xs text-rose-300">{passwordLogin.error.message}</p>}</form>
         </div>
       </div>
     );
