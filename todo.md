@@ -534,3 +534,4 @@
 - [x] Synchroniser les opérations POS en attente lors du retour réseau.
 - [x] Ajouter un journal visuel de synchronisation et une résolution manuelle des conflits de stock.
 - [x] Tester les ventes hors connexion, reprises, doublons et conflits de stock.
+- [x] Produire un résumé de continuité professionnel pour reprendre le projet dans une nouvelle conversation.
