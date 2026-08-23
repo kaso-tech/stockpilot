@@ -33,6 +33,8 @@ Le flux POS applique désormais le périmètre de l’entreprise à la sélectio
 
 Les suppressions de brouillons et remboursements appliquent également le périmètre de l’entreprise aux ventes, réglages, produits, mouvements et alertes de stock générés.
 
+Le comptage et la validation d’inventaire vérifient désormais l’entreprise de la session, y compris pour les produits ajustés, mouvements de stock et journaux d’audit créés.
+
 Les tests automatisés vérifient qu’un encaissement POS ou la consultation d’une facture dont la vente n’est pas visible dans l’entreprise active échouent avec une réponse d’absence de ressource.
 
 La restauration sélective traite désormais les tables enfants avant leurs parents : identifiants vendeur avant utilisateurs, lignes et commissions de vente avant ventes, lignes d’inventaire avant sessions, puis les entités directement rattachées à l’entreprise. Les suppressions non héritées restent filtrées par `companyId`.
