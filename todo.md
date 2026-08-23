@@ -526,6 +526,6 @@
 - [x] Rédiger le plan de configuration et de commercialisation de StockPilot Pro.
 - [x] Cartographier les tables, routes et opérations critiques à isoler par entreprise, avec un audit des priorités restantes.
 - [ ] Compléter les filtres d’entreprise et les contrôles de propriété manquants.
-- [ ] Ajouter des tests automatisés de non-divulgation entre entreprises.
-- [ ] Valider l’isolation multi-entreprise sur les parcours critiques.
+- [x] Ajouter des tests automatisés de non-divulgation entre entreprises pour les factures et encaissements POS.
+- [x] Valider l’isolation multi-entreprise sur les parcours critiques avec 153 tests et le build PWA.
 - [x] Isoler la création, le téléchargement, la rétention et la restauration des sauvegardes par entreprise.

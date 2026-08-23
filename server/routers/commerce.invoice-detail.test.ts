@@ -24,4 +24,10 @@ describe("commerce.sales.detail", () => {
     expect(detail.payments[0]).toMatchObject({ id: 4, method: "cash", amountCents: 24000 });
     expect(detail.participants).toEqual({ seller: { id: 3, name: "Kadré Vendeur", role: "Vendeur" }, salesAgent: { id: 7, name: "Aminata Commerciale", role: "Agent commercial" }, cashier: { id: 8, name: "Moussa Caissier", role: "Caissier" } });
   });
+
+  it("refuse une facture absente du périmètre de l’entreprise active", async () => {
+    const db: any = { select: () => ({ from: () => { const rows: any[] = []; (rows as any).limit = async () => rows; (rows as any).where = () => rows; return rows; } }) };
+    mockedGetDb.mockResolvedValue(db);
+    await expect(commerceRouter.createCaller(sellerContext()).sales.detail({ id: 999 })).rejects.toMatchObject({ code: "NOT_FOUND", message: expect.stringContaining("introuvable") });
+  });
 });
