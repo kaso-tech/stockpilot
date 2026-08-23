@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { ArrowUpRight, Building2, Edit3, Mail, MapPin, Phone, Plus, Search, Trash2, UsersRound } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 
@@ -35,6 +35,7 @@ export default function Customers() {
   const remove = trpc.commerce.customers.remove.useMutation({ onSuccess: () => { refresh(); setDeleteTarget(null); toast.success("Client supprimé."); }, onError: error => toast.error(error.message) });
   const reset = () => { setEditingId(null); setForm(emptyCustomer); };
   const close = () => { setOpen(false); reset(); };
+  useEffect(() => { if (new URLSearchParams(window.location.search).get("nouveau") === "1") { reset(); setOpen(true); window.history.replaceState({}, "", "/clients"); } }, []);
   const edit = (customer: typeof customers[number]) => { setEditingId(customer.id); setForm({ name: customer.name, type: customer.type, email: customer.email || "", phone: customer.phone || "", address: customer.address || "", taxNumber: customer.taxNumber || "", notes: customer.notes || "" }); setOpen(true); };
   const save = () => { if (!form.name.trim()) return toast.error("Le nom du client est requis."); const data = { name: form.name.trim(), otherReference: null, type: form.type, email: form.email.trim() || null, phone: form.phone.trim() || null, address: form.address.trim() || null, taxNumber: form.taxNumber.trim() || null, notes: form.notes.trim() || null }; if (editingId) update.mutate({ id: editingId, ...data }); else create.mutate(data); };
   const visible = useMemo(() => customers.filter(customer => { const needle = search.toLowerCase().trim(); const searchable = [customer.name, customer.email, customer.phone, customer.taxNumber, customer.address].filter(Boolean).join(" ").toLowerCase(); return (!needle || searchable.includes(needle)) && (typeFilter === "all" || customer.type === typeFilter); }).sort((a, b) => a.name.localeCompare(b.name)), [customers, search, typeFilter]);

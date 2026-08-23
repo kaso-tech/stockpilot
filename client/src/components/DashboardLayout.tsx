@@ -64,7 +64,7 @@ import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Vue d’ensemble", path: "/" },
-  { icon: ShoppingCart, label: "Point de vente", path: "/pos" },
+  { icon: ShoppingCart, label: "Vente Rapide", path: "/pos" },
   { icon: ReceiptText, label: "Factures", path: "/factures" },
   { icon: UserRound, label: "Clients", path: "/clients" },
   { icon: PackageSearch, label: "Produits", path: "/produits" },

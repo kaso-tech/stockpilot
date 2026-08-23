@@ -411,3 +411,8 @@
 - [x] Vérifier les contacts simplifiés sur desktop et mobile.
 - [x] Retirer « Pilotage commercial en direct » et « Cockpit commercial » du tableau de bord pour tous les rôles.
 - [x] Vérifier le rendu simplifié du tableau de bord sur desktop et mobile.
+- [x] Auditer les libellés de point de vente, les cartes de facture et les actions rapides.
+- [x] Compacter les cartes de la liste des factures.
+- [x] Remplacer le libellé Point de vente par Vente Rapide.
+- [x] Remplacer les actions du tableau de bord par Vente Rapide, Nouvelle Facture et Nouveau Client.
+- [x] Tester les libellés et actions rapides sur desktop et mobile.
