@@ -517,9 +517,9 @@
 - [x] Remplacer la couleur principale par le bleu #2563EB dans les tokens globaux.
 - [x] Adapter l’onglet actif, le bouton Vente Rapide et la carte Démarrage guidé à la nouvelle couleur.
 - [x] Vérifier les contrastes de la nouvelle identité bleue dans les thèmes clair et sombre.
-- [ ] Auditer les limites du mode hors connexion actuel pour les usages prolongés.
+- [x] Auditer les limites du mode hors connexion actuel pour les usages prolongés.
 - [x] Concevoir et initialiser une base IndexedDB durable, une file d’opérations isolée par entreprise et une demande de stockage persistant.
-- [ ] Définir la stratégie de conflit, de sauvegarde et de reprise après plusieurs jours sans réseau.
+- [x] Définir la stratégie de conflit, de sauvegarde et de reprise après plusieurs jours sans réseau.
 - [x] Auditer la préparation actuelle de StockPilot Pro pour une commercialisation multi-entreprise.
 - [x] Étudier les pratiques professionnelles de solutions de gestion de stock et de vente comparables.
 - [x] Définir l’architecture cible, les offres SaaS et les exigences d’exploitation.
