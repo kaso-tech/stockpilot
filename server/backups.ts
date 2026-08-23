@@ -93,6 +93,10 @@ export function assertRestoreConfirmation(confirmation: string) {
   if (confirmation !== "RESTAURER") throw new Error("La confirmation RESTAURER est requise pour restaurer une archive.");
 }
 
+export function assertBackupCompany(payload: BackupPayload, companyId: number | null) {
+  if (payload.companyId !== undefined && payload.companyId !== companyId) throw new Error("Cette archive appartient à une autre entreprise.");
+}
+
 export async function runBackupWithStatus(actorUserId: number | null, trigger: Trigger, retentionCount = 14, companyId: number | null = null) {
   const db = await dbOrThrow();
   try {
