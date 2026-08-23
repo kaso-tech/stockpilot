@@ -8,7 +8,7 @@ vi.mock("../backups", async () => {
 
 import { backupRouter } from "./backups";
 
-const ctx = { user: { id: 1, role: "admin" }, req: { headers: {} }, res: {} } as any;
+const ctx = { user: { id: 1, role: "admin", companyId: 1 }, req: { headers: {} }, res: {} } as any;
 
 describe("routes de sauvegarde protégées", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -16,7 +16,7 @@ describe("routes de sauvegarde protégées", () => {
   it("génère un lien de téléchargement signé pour une archive", async () => {
     downloadUrlMock.mockResolvedValue("https://download.example.test/backup.json");
     await expect(backupRouter.createCaller(ctx).download({ id: 12 })).resolves.toEqual({ url: "https://download.example.test/backup.json" });
-    expect(downloadUrlMock).toHaveBeenCalledWith(12);
+    expect(downloadUrlMock).toHaveBeenCalledWith(12, 1);
   });
 
   it("rejette une restauration sans la confirmation RESTAURER", async () => {
