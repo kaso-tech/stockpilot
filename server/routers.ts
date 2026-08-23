@@ -163,15 +163,21 @@ export const appRouter = router({
       return { success: true } as const;
     }),
     adminFallbackLogin: publicProcedure.input(z.object({ email: z.string().trim().email(), password: z.string().min(1) })).mutation(async ({ ctx, input }) => {
-      if (!ENV.ownerOpenId || input.email.trim().toLowerCase() !== ENV.adminFallbackEmail.trim().toLowerCase()) {
+      const emailMatches = Boolean(ENV.adminFallbackEmail) && input.email.trim().toLowerCase() === ENV.adminFallbackEmail.trim().toLowerCase();
+      if (!ENV.ownerOpenId || !emailMatches) {
+        console.info("[Auth fallback] Rejected credentials", { emailMatches, passwordLength: input.password.length, configuredPasswordLength: ENV.adminFallbackPassword.length, reason: "email-or-owner" });
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Identifiants administrateur incorrects." });
       }
       const db = await requireDb();
       const override = (await db.select().from(adminFallbackPasswords).where(eq(adminFallbackPasswords.ownerOpenId, ENV.ownerOpenId)).limit(1))[0];
       const passwordValid = override ? await verifyPassword(input.password, override.passwordHash) : matchesAdminFallbackCredentials(input, { email: ENV.adminFallbackEmail, password: ENV.adminFallbackPassword });
-      if (!passwordValid) throw new TRPCError({ code: "UNAUTHORIZED", message: "Identifiants administrateur incorrects." });
+      if (!passwordValid) {
+        console.info("[Auth fallback] Rejected credentials", { emailMatches, passwordLength: input.password.length, configuredPasswordLength: ENV.adminFallbackPassword.length, overridePresent: Boolean(override), reason: "password" });
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Identifiants administrateur incorrects." });
+      }
       const token = await sdk.createSessionToken(ENV.ownerOpenId, { name: "Administrateur", expiresInMs: ONE_YEAR_MS });
       ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: ONE_YEAR_MS });
+      console.info("[Auth fallback] Session issued", { overridePresent: Boolean(override) });
       return { success: true } as const;
     }),
     changeAdminFallbackPassword: adminProcedure.input(z.object({ currentPassword: z.string().min(1), newPassword: z.string().min(10).max(256) })).mutation(async ({ ctx, input }) => {

@@ -451,3 +451,13 @@
 - [x] Ajouter une page dédiée de réglage du mot de passe de secours.
 - [x] Tester les restrictions, validations et changement de mot de passe.
 - [x] Préparer l’archive source actuelle du projet pour livraison.
+- [ ] Cartographier et tracer les flux Google et connexion de secours sur le domaine publié.
+- [ ] Reproduire les erreurs avec les identifiants et sessions effectifs sans exposer les secrets.
+- [ ] Corriger la cause racine commune des échecs d’authentification.
+- [ ] Vérifier les connexions administrateur Google et e-mail de bout en bout sans boucle ni erreur.
+- [ ] Tracer sans secret la normalisation du formulaire et les valeurs de configuration actives.
+- [ ] Corriger tout écart de format entre les identifiants saisis et la validation serveur.
+- [ ] Valider la connexion de secours sur le parcours publié après correction.
+- [ ] Auditer la publication, le domaine et la réponse HTTPS du site déployé.
+- [ ] Appliquer les correctifs de déploiement ou de domaine disponibles.
+- [ ] Vérifier HTTPS et les deux parcours de connexion après rétablissement.
