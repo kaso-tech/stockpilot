@@ -7,7 +7,7 @@ import { getDb } from "../db";
 import { commerceRouter } from "./commerce";
 
 const mockedGetDb = vi.mocked(getDb);
-function sellerContext(): TrpcContext { return { user: { id: 1, openId: "seller-detail", name: "Vendeur", email: "v@example.test", loginMethod: "manus", role: "seller", active: true, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }, req: { protocol: "https", headers: {} } as TrpcContext["req"], res: { clearCookie: () => undefined } as TrpcContext["res"] }; }
+function sellerContext(): TrpcContext { return { user: { id: 1, openId: "seller-detail", name: "Vendeur", email: "v@example.test", loginMethod: "manus", role: "seller", active: true, companyId: 1, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }, req: { protocol: "https", headers: {} } as TrpcContext["req"], res: { clearCookie: () => undefined } as TrpcContext["res"] }; }
 
 describe("commerce.sales.detail", () => {
   beforeEach(() => {

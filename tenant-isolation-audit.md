@@ -5,6 +5,7 @@
 - Les listes et détails de factures sont désormais filtrés par l’entreprise de la session.
 - Les contextes client, suggestions de produits, consultations et suppressions de clients sont filtrés par entreprise.
 - Les fiches agents et vendeurs contrôlent désormais l’appartenance de la personne consultée avant de retourner ses informations.
+- Les logos, signatures et cachets sont maintenant stockés sous un préfixe d’entreprise plutôt que sous l’identifiant de l’utilisateur qui les téléverse.
 
 ## Tables déjà directement rattachées à une entreprise
 

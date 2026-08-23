@@ -12,7 +12,7 @@ import { commerceRouter } from "./commerce";
 const mockedGetDb = vi.mocked(getDb);
 
 function adminContext(): TrpcContext {
-  return { user: { id: 1, openId: "settings-admin", name: "Admin", email: "admin@example.test", loginMethod: "manus", role: "admin", createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }, req: { protocol: "https", headers: {} } as TrpcContext["req"], res: { clearCookie: () => undefined } as TrpcContext["res"] };
+  return { user: { id: 1, openId: "settings-admin", name: "Admin", email: "admin@example.test", loginMethod: "manus", role: "admin", companyId: 1, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }, req: { protocol: "https", headers: {} } as TrpcContext["req"], res: { clearCookie: () => undefined } as TrpcContext["res"] };
 }
 
 describe("commerce.settings.save", () => {
