@@ -14,7 +14,7 @@ export default function SettingsSecurity() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
-  const changePassword = trpc.auth.changeAdminFallbackPassword.useMutation({
+  const changePassword = trpc.auth.adminFallbackPasswordChange.useMutation({
     onSuccess: () => { setCurrentPassword(""); setNewPassword(""); setConfirmation(""); toast.success("Mot de passe de secours mis à jour."); },
     onError: error => toast.error(error.message),
   });

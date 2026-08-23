@@ -164,31 +164,36 @@ export const appRouter = router({
     }),
     adminFallbackLogin: publicProcedure.input(z.object({ email: z.string().trim().email(), password: z.string().min(1) })).mutation(async ({ ctx, input }) => {
       const emailMatches = Boolean(ENV.adminFallbackEmail) && input.email.trim().toLowerCase() === ENV.adminFallbackEmail.trim().toLowerCase();
-      if (!ENV.ownerOpenId || !emailMatches) {
-        console.info("[Auth fallback] Rejected credentials", { emailMatches, passwordLength: input.password.length, configuredPasswordLength: ENV.adminFallbackPassword.length, reason: "email-or-owner" });
+      if (!emailMatches) {
+        console.info("[Auth fallback] Rejected credentials", { emailMatches, passwordLength: input.password.length, configuredPasswordLength: ENV.adminFallbackPassword.length, reason: "email" });
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Identifiants administrateur incorrects." });
       }
       const db = await requireDb();
-      const override = (await db.select().from(adminFallbackPasswords).where(eq(adminFallbackPasswords.ownerOpenId, ENV.ownerOpenId)).limit(1))[0];
+      const configuredAdmin = (await db.select().from(users).where(and(eq(users.role, "admin"), eq(users.email, input.email))).limit(1))[0];
+      const adminOpenId = ENV.ownerOpenId || configuredAdmin?.openId;
+      if (!adminOpenId) {
+        console.info("[Auth fallback] Rejected credentials", { emailMatches, passwordLength: input.password.length, configuredPasswordLength: ENV.adminFallbackPassword.length, reason: "admin-account" });
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Identifiants administrateur incorrects." });
+      }
+      const override = (await db.select().from(adminFallbackPasswords).where(eq(adminFallbackPasswords.ownerOpenId, adminOpenId)).limit(1))[0];
       const passwordValid = override ? await verifyPassword(input.password, override.passwordHash) : matchesAdminFallbackCredentials(input, { email: ENV.adminFallbackEmail, password: ENV.adminFallbackPassword });
       if (!passwordValid) {
         console.info("[Auth fallback] Rejected credentials", { emailMatches, passwordLength: input.password.length, configuredPasswordLength: ENV.adminFallbackPassword.length, overridePresent: Boolean(override), reason: "password" });
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Identifiants administrateur incorrects." });
       }
-      const token = await sdk.createSessionToken(ENV.ownerOpenId, { name: "Administrateur", expiresInMs: ONE_YEAR_MS });
+      const token = await sdk.createSessionToken(adminOpenId, { name: configuredAdmin?.name || "Administrateur", expiresInMs: ONE_YEAR_MS });
       ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: ONE_YEAR_MS });
       console.info("[Auth fallback] Session issued", { overridePresent: Boolean(override) });
       return { success: true } as const;
     }),
-    changeAdminFallbackPassword: adminProcedure.input(z.object({ currentPassword: z.string().min(1), newPassword: z.string().min(10).max(256) })).mutation(async ({ ctx, input }) => {
-      if (!ENV.ownerOpenId || ctx.user.openId !== ENV.ownerOpenId) throw new TRPCError({ code: "FORBIDDEN", message: "Cette action est réservée à l’administrateur principal." });
+    adminFallbackPasswordChange: adminProcedure.input(z.object({ currentPassword: z.string().min(1), newPassword: z.string().min(10).max(256) })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
-      const override = (await db.select().from(adminFallbackPasswords).where(eq(adminFallbackPasswords.ownerOpenId, ENV.ownerOpenId)).limit(1))[0];
+      const override = (await db.select().from(adminFallbackPasswords).where(eq(adminFallbackPasswords.ownerOpenId, ctx.user.openId)).limit(1))[0];
       const currentValid = override ? await verifyPassword(input.currentPassword, override.passwordHash) : matchesAdminFallbackCredentials({ email: ENV.adminFallbackEmail, password: input.currentPassword }, { email: ENV.adminFallbackEmail, password: ENV.adminFallbackPassword });
-      if (!currentValid) throw new TRPCError({ code: "UNAUTHORIZED", message: "Mot de passe actuel incorrect." });
+      if (!currentValid) throw new TRPCError({ code: "UNAUTHORIZED", message: "Le mot de passe actuel est incorrect." });
       const passwordHash = await hashPassword(input.newPassword);
       if (override) await db.update(adminFallbackPasswords).set({ passwordHash, updatedByUserId: ctx.user.id }).where(eq(adminFallbackPasswords.id, override.id));
-      else await db.insert(adminFallbackPasswords).values({ ownerOpenId: ENV.ownerOpenId, passwordHash, updatedByUserId: ctx.user.id });
+      else await db.insert(adminFallbackPasswords).values({ ownerOpenId: ctx.user.openId, passwordHash, updatedByUserId: ctx.user.id });
       return { success: true } as const;
     }),
   }),

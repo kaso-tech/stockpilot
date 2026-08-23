@@ -19,4 +19,17 @@ describe("auth.adminFallbackLogin", () => {
     await expect(caller.auth.adminFallbackLogin({ email: ENV.adminFallbackEmail, password: "mot-de-passe-invalide" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     expect(cookies).toHaveLength(0);
   });
+
+  it("refuse la connexion si OWNER_OPEN_ID manque et qu’aucun compte administrateur correspondant n’est disponible", async () => {
+    const ownerOpenId = ENV.ownerOpenId;
+    const cookies: unknown[] = [];
+    const ctx = { user: null, req: { protocol: "https", hostname: "stockpilot-gpaoheuz.manus.space", headers: {} }, res: { cookie: (...args: unknown[]) => cookies.push(args) } } as never;
+    try {
+      ENV.ownerOpenId = "";
+      await expect(appRouter.createCaller(ctx).auth.adminFallbackLogin({ email: ENV.adminFallbackEmail, password: ENV.adminFallbackPassword })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      expect(cookies).toHaveLength(0);
+    } finally {
+      ENV.ownerOpenId = ownerOpenId;
+    }
+  });
 });
