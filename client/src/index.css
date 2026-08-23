@@ -184,12 +184,16 @@ html:not(.dark) .bg-\[\#090c13\], html:not(.dark) .bg-\[\#0e141f\] { background-
 html:not(.dark) .bg-\[\#111722\], html:not(.dark) .bg-\[\#141b27\] { background-color: #ffffff !important; }
 html:not(.dark) .text-white, html:not(.dark) .text-slate-100 { color: #0b2545 !important; }
 html:not(.dark) .text-slate-200 { color: #1e3a5f !important; }
-html:not(.dark) .text-slate-300, html:not(.dark) .text-slate-400 { color: #466581 !important; }
-html:not(.dark) .text-slate-500, html:not(.dark) .text-slate-600 { color: #63809d !important; }
-html:not(.dark) .border-white\/10, html:not(.dark) .border-white\/\[0\.07\], html:not(.dark) .border-white\/\[0\.06\] { border-color: color-mix(in srgb, var(--app-primary), transparent 85%) !important; }
+html:not(.dark) .text-slate-300, html:not(.dark) .text-slate-400 { color: #36516e !important; }
+html:not(.dark) .text-slate-500, html:not(.dark) .text-slate-600 { color: #48637d !important; }
+html:not(.dark) .text-cyan-100, html:not(.dark) .text-cyan-200, html:not(.dark) .text-cyan-300, html:not(.dark) .text-cyan-400 { color: #006575 !important; }
+html:not(.dark) .border-white\/10, html:not(.dark) .border-white\/\[0\.07\], html:not(.dark) .border-white\/\[0\.06\], html:not(.dark) .border-white\/\[0\.08\] { border-color: color-mix(in srgb, var(--app-primary), transparent 62%) !important; }
+html:not(.dark) .bg-white\/\[0\.02\], html:not(.dark) .bg-white\/\[0\.025\], html:not(.dark) .bg-white\/\[0\.035\], html:not(.dark) .bg-white\/\[0\.04\], html:not(.dark) .bg-white\/\[0\.06\] { background-color: #f4f9fc !important; }
+html:not(.dark) input, html:not(.dark) textarea, html:not(.dark) button[role="combobox"] { border-color: #9fc3cb !important; background-color: #ffffff !important; color: #0b2545 !important; }
+html:not(.dark) input::placeholder, html:not(.dark) textarea::placeholder { color: #526d85 !important; opacity: 1; }
 html:not(.dark) main { background-color: #eff6ff !important; background-image: radial-gradient(circle at 80% -5%, color-mix(in srgb, var(--app-primary), transparent 90%), transparent 25%), linear-gradient(color-mix(in srgb, var(--app-primary), transparent 95%) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--app-primary), transparent 95%) 1px, transparent 1px) !important; }
 html:not(.dark) .commercial-hero { background: linear-gradient(110deg, color-mix(in srgb, var(--app-primary), white 86%), #ffffff) !important; border-color: color-mix(in srgb, var(--app-primary), transparent 78%) !important; }
-html:not(.dark) .commercial-hero .text-cyan-200, html:not(.dark) .commercial-hero .text-cyan-100 { color: var(--app-primary) !important; }
+html:not(.dark) .commercial-hero .text-cyan-200, html:not(.dark) .commercial-hero .text-cyan-100 { color: #006575 !important; }
 html:not(.dark) .commercial-hero .bg-black\/10 { background-color: rgba(255, 255, 255, .72) !important; border-color: color-mix(in srgb, var(--app-primary), transparent 86%) !important; }
 
 :is(.bg-cyan-400, .bg-cyan-500, .bg-\[\#007B8B\], .bg-\[\#00cbe6\]) { background-color: var(--app-primary) !important; color: var(--app-primary-foreground) !important; }

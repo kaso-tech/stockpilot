@@ -502,3 +502,9 @@
 - [x] Ajouter un indicateur de force du mot de passe pendant l’inscription.
 - [x] Ajouter des boutons permettant d’afficher ou masquer les mots de passe de connexion et d’inscription.
 - [x] Tester les contrôles de force et de visibilité de mot de passe.
+- [x] Reproduire la redirection du domaine publié vers l’ancienne authentification : elle était imposée avant le chargement de l’application par la visibilité du domaine.
+- [x] Désactiver la protection de domaine héritée dans les paramètres de visibilité de la plateforme.
+- [x] Vérifier le domaine publié en navigation vierge vers l’inscription locale.
+- [x] Auditer les combinaisons de couleurs peu lisibles dans le thème clair.
+- [x] Corriger les tokens et composants concernés tout en préservant le thème sombre.
+- [x] Vérifier visuellement les thèmes clair et sombre sur les écrans principaux.
