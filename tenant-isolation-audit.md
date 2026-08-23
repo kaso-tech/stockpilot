@@ -31,6 +31,8 @@ Les mises à jour, désactivations et conversions d’agents et vendeurs, ainsi 
 
 Les conversions vendeur-vers-agent et agent-vers-vendeur créent désormais les nouvelles entités et rémunérations dans l’entreprise active, et ne désactivent que le compte source de ce même périmètre.
 
+La modification d’un vendeur vérifie désormais explicitement que le compte appartient à l’entreprise active avant tout accès à ses identifiants locaux.
+
 Le flux POS applique désormais le périmètre de l’entreprise à la sélection de clients, produits, réglages, agents et profils de rémunération, ainsi qu’à la création des brouillons et aux encaissements.
 
 Les encaissements POS rattachent désormais les mises à jour de stock, mouvements et alertes créés à l’entreprise active.
