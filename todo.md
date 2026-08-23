@@ -437,3 +437,6 @@
 - [x] Ajouter un stockage sécurisé du mot de passe et une procédure de connexion administrateur.
 - [x] Ajouter un formulaire e-mail et mot de passe de secours.
 - [x] Tester les succès, échecs et restrictions de la connexion de secours.
+- [x] Tracer le cycle OAuth Google pour identifier la perte de session après le callback.
+- [x] Corriger la persistance de session afin d’éliminer la boucle de connexion Google.
+- [x] Vérifier un aller-retour Google complet vers le tableau de bord.

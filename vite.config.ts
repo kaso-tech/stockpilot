@@ -159,7 +159,7 @@ const plugins = [
   vitePluginManusDebugCollector(),
   VitePWA({
     registerType: "autoUpdate",
-    injectRegister: "auto",
+    injectRegister: false,
     manifest: {
       name: "StockPilot Pro",
       short_name: "StockPilot",

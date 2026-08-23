@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
 import superjson from "superjson";
+import { registerSW } from "virtual:pwa-register";
 import App from "./App";
 import { persistOfflineQueryCache, restoreOfflineQueryCache } from "./lib/offlineCache";
 import "./index.css";
@@ -11,6 +12,18 @@ import "./index.css";
 const queryClient = new QueryClient();
 restoreOfflineQueryCache(queryClient);
 persistOfflineQueryCache(queryClient);
+
+// Apply service-worker updates immediately. Without an explicit update, an
+// installed PWA can continue serving an obsolete client bundle that redirects
+// to OAuth before the local fallback screen is reachable.
+if ("serviceWorker" in navigator) {
+  const updateSW = registerSW({
+    immediate: true,
+    onNeedRefresh() {
+      void updateSW(true);
+    },
+  });
+}
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
