@@ -491,3 +491,6 @@
 - [x] Tester le parcours de démarrage et les pages légales.
 - [x] Ajouter une option persistante permettant à un administrateur d’ignorer définitivement l’assistant de démarrage.
 - [x] Tester que l’assistant ne réapparaît pas après son ignorance.
+- [x] Diagnostiquer le manque de visibilité : le lien texte était peu perceptible et il n’existait pas de route dédiée à l’inscription.
+- [x] Rendre l’inscription explicitement visible et accessible depuis l’écran de connexion via un bouton et la route /inscription.
+- [x] Vérifier le parcours de connexion et d’inscription par le typage, les tests et le build PWA ; la nouvelle route cible directement le mode inscription sans session.
