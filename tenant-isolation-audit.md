@@ -29,6 +29,8 @@ Le contenu des archives d’entreprise est désormais filtré sur les tables dir
 
 Les mises à jour, désactivations et conversions d’agents et vendeurs, ainsi que les profils de rémunération et les paiements associés, appliquent désormais le périmètre de l’entreprise de la session.
 
+Les conversions vendeur-vers-agent et agent-vers-vendeur créent désormais les nouvelles entités et rémunérations dans l’entreprise active, et ne désactivent que le compte source de ce même périmètre.
+
 Le flux POS applique désormais le périmètre de l’entreprise à la sélection de clients, produits, réglages, agents et profils de rémunération, ainsi qu’à la création des brouillons et aux encaissements.
 
 Les suppressions de brouillons et remboursements appliquent également le périmètre de l’entreprise aux ventes, réglages, produits, mouvements et alertes de stock générés.
