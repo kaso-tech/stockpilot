@@ -14,6 +14,6 @@ describe("onboarding.status", () => {
 
   it("signale les étapes restantes et un moyen de paiement déjà configuré", async () => {
     const context = { user: { id: 4, openId: "new-admin", name: "Admin", email: "admin@example.test", loginMethod: "password", role: "admin", active: true, companyId: 9, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }, req: { protocol: "https", headers: {} }, res: {} } as never;
-    await expect(appRouter.createCaller(context).onboarding.status()).resolves.toEqual({ completed: false, steps: { product: false, customer: false, paymentMethod: true } });
+    await expect(appRouter.createCaller(context).onboarding.status()).resolves.toEqual({ completed: false, skipped: false, steps: { product: false, customer: false, paymentMethod: true } });
   });
 });

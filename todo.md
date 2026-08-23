@@ -489,3 +489,5 @@
 - [x] Relier les pages légales au formulaire de création d’entreprise.
 - [x] Construire l’assistant de démarrage et mémoriser sa progression par entreprise.
 - [x] Tester le parcours de démarrage et les pages légales.
+- [x] Ajouter une option persistante permettant à un administrateur d’ignorer définitivement l’assistant de démarrage.
+- [x] Tester que l’assistant ne réapparaît pas après son ignorance.

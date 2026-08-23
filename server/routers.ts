@@ -403,7 +403,7 @@ export const appRouter = router({
         db.select().from(saleSettings).where(companyScope(saleSettings.companyId, ctx.user.companyId)).limit(1),
       ]);
       const activePaymentMethod = Boolean(settings[0] && (settings[0].paymentCashEnabled || settings[0].paymentCardEnabled || settings[0].paymentMobileMoneyEnabled || settings[0].paymentBankTransferEnabled || settings[0].paymentCreditEnabled));
-      return { completed: Boolean(company.onboardingCompletedAt), steps: { product: productRows.length > 0, customer: customerRows.length > 0, paymentMethod: activePaymentMethod } };
+      return { completed: Boolean(company.onboardingCompletedAt || company.onboardingSkippedAt), skipped: Boolean(company.onboardingSkippedAt), steps: { product: productRows.length > 0, customer: customerRows.length > 0, paymentMethod: activePaymentMethod } };
     }),
     complete: adminProcedure.mutation(async ({ ctx }) => {
       if (ctx.user.companyId === null) return { success: true };
@@ -416,6 +416,12 @@ export const appRouter = router({
       const activePaymentMethod = Boolean(settings[0] && (settings[0].paymentCashEnabled || settings[0].paymentCardEnabled || settings[0].paymentMobileMoneyEnabled || settings[0].paymentBankTransferEnabled || settings[0].paymentCreditEnabled));
       if (!productRows.length || !customerRows.length || !activePaymentMethod) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Terminez les trois étapes de démarrage avant de clôturer l’assistant." });
       await db.update(companies).set({ onboardingCompletedAt: new Date() }).where(eq(companies.id, ctx.user.companyId));
+      return { success: true };
+    }),
+    skip: adminProcedure.mutation(async ({ ctx }) => {
+      if (ctx.user.companyId === null) return { success: true };
+      const db = await requireDb();
+      await db.update(companies).set({ onboardingSkippedAt: new Date() }).where(eq(companies.id, ctx.user.companyId));
       return { success: true };
     }),
   }),

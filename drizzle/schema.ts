@@ -5,6 +5,7 @@ export const companies = mysqlTable("companies", {
   name: varchar("name", { length: 200 }).notNull(),
   ownerUserId: int("ownerUserId"),
   onboardingCompletedAt: timestamp("onboardingCompletedAt"),
+  onboardingSkippedAt: timestamp("onboardingSkippedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
