@@ -211,6 +211,12 @@ export const appRouter = router({
       console.info("[Auth password] Session issued", { role: account.role, remembered: input.rememberMe });
       return { success: true, role: account.role } as const;
     }),
+    emailAvailability: publicProcedure.input(z.object({ email: z.string().trim().email().max(320) })).query(async ({ input }) => {
+      const db = await requireDb();
+      const normalizedEmail = input.email.trim().toLowerCase();
+      const accounts = await db.select({ email: users.email }).from(users);
+      return { available: !accounts.some(account => account.email?.trim().toLowerCase() === normalizedEmail) } as const;
+    }),
     registerCompany: publicProcedure.input(z.object({ companyName: z.string().trim().min(2).max(200), administratorName: z.string().trim().min(2).max(160), email: z.string().trim().email().max(320), password: z.string().min(10).max(256), rememberMe: z.boolean().optional().default(true) })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
       const email = input.email.trim().toLowerCase();

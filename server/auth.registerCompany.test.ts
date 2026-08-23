@@ -35,4 +35,9 @@ describe("auth.registerCompany", () => {
     expect(inserts.find(entry => entry.table === userSessions)?.values).toMatchObject({ userId: 73 });
     expect(cookies[0]?.options).toMatchObject({ httpOnly: true, secure: true, sameSite: "none", maxAge: 86_400_000 });
   });
+
+  it("retourne uniquement la disponibilité d’une adresse e-mail pour l’inscription", async () => {
+    const context = { user: null, req: { protocol: "https", headers: {} }, res: {} } as never;
+    await expect(appRouter.createCaller(context).auth.emailAvailability({ email: "nouveau@example.test" })).resolves.toEqual({ available: true });
+  });
 });

@@ -496,3 +496,6 @@
 - [x] Vérifier le parcours de connexion et d’inscription par le typage, les tests et le build PWA ; la nouvelle route cible directement le mode inscription sans session.
 - [x] Vérifier et rendre explicite le lien d’inscription sur l’écran de connexion publié.
 - [x] Reporter l’envoi d’e-mail, les jetons, les écrans et les tests de réinitialisation jusqu’à la configuration d’un service d’e-mail.
+- [x] Ajouter une vérification d’adresse e-mail en temps réel et protégée lors de l’inscription.
+- [x] Afficher l’état de disponibilité et bloquer l’inscription si l’adresse est invalide ou déjà utilisée.
+- [x] Tester la vérification d’adresse e-mail et le blocage de soumission.
