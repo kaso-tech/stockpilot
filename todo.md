@@ -511,3 +511,6 @@
 - [x] Corriger la lisibilité de la bannière de démarrage guidé en thème clair.
 - [x] Corriger la lisibilité des boutons d’action rapide en thème clair.
 - [x] Vérifier visuellement les composants signalés sur la page d’accueil claire à partir de la capture fournie et des variantes claires appliquées.
+- [x] Auditer les badges d’état, tableaux, modales et menus déroulants en thème clair.
+- [x] Corriger leurs surfaces, textes, bordures et états interactifs pour un contraste lisible.
+- [x] Vérifier les superpositions, menus et modales en thème clair et sombre au niveau des composants partagés, des tokens et du build de production.
