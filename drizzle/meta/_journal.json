@@ -253,6 +253,20 @@
       "when": 1787487139715,
       "tag": "0035_complex_klaw",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "5",
+      "when": 1787488166604,
+      "tag": "0036_glossy_outlaw_kid",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "5",
+      "when": 1787488304682,
+      "tag": "0037_round_human_fly",
+      "breakpoints": true
     }
   ]
 }

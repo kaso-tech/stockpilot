@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import { agentPayments, auditLogs, expenseBudgets, expenses } from "../../drizzle/schema";
@@ -8,6 +8,7 @@ import { getDb } from "../db";
 import { adminProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { storagePut } from "../storage";
+import { companyScope } from "../companyScope";
 
 const expenseInput = z.object({
   category: z.enum(expenseCategories),
@@ -27,15 +28,15 @@ async function dbOrThrow() {
 
 export const expensesRouter = router({
   budget: router({
-    get: adminProcedure.input(z.object({ yearMonth: z.string().regex(/^\d{4}-\d{2}$/) })).query(async ({ input }) => {
+    get: adminProcedure.input(z.object({ yearMonth: z.string().regex(/^\d{4}-\d{2}$/) })).query(async ({ ctx, input }) => {
       const db = await dbOrThrow();
-      return (await db.select().from(expenseBudgets).where(eq(expenseBudgets.yearMonth, input.yearMonth)).limit(1))[0] ?? null;
+      return (await db.select().from(expenseBudgets).where(and(eq(expenseBudgets.yearMonth, input.yearMonth), companyScope(expenseBudgets.companyId, ctx.user.companyId))).limit(1))[0] ?? null;
     }),
     save: adminProcedure.input(z.object({ yearMonth: z.string().regex(/^\d{4}-\d{2}$/), amountCents: z.number().int().min(0), warningPercent: z.number().int().min(50).max(100) })).mutation(async ({ ctx, input }) => {
       const db = await dbOrThrow();
-      const current = (await db.select().from(expenseBudgets).where(eq(expenseBudgets.yearMonth, input.yearMonth)).limit(1))[0];
+      const current = (await db.select().from(expenseBudgets).where(and(eq(expenseBudgets.yearMonth, input.yearMonth), companyScope(expenseBudgets.companyId, ctx.user.companyId))).limit(1))[0];
       if (current) await db.update(expenseBudgets).set({ amountCents: input.amountCents, warningPercent: input.warningPercent, updatedByUserId: ctx.user.id }).where(eq(expenseBudgets.id, current.id));
-      else await db.insert(expenseBudgets).values({ ...input, updatedByUserId: ctx.user.id });
+      else await db.insert(expenseBudgets).values({ ...input, companyId: ctx.user.companyId, updatedByUserId: ctx.user.id });
       await db.insert(auditLogs).values({ actorUserId: ctx.user.id, action: "Budget dépenses", entityType: "Budget", entityId: input.yearMonth, detail: `Budget mensuel fixé à ${input.amountCents} centimes` });
       return { success: true };
     }),
@@ -50,13 +51,13 @@ export const expensesRouter = router({
     const extension = mimeType === "application/pdf" ? "pdf" : mimeType === "image/jpeg" ? "jpg" : mimeType.split("/")[1]; const { url } = await storagePut(`expenses/${ctx.user.id}/${randomUUID()}.${extension}`, buffer, mimeType);
     return { url, filename: input.filename, mimeType };
   }),
-  list: adminProcedure.query(async () => {
+  list: adminProcedure.query(async ({ ctx }) => {
     const db = await dbOrThrow();
-    return db.select().from(expenses).orderBy(desc(expenses.spentAt), desc(expenses.id));
+    return db.select().from(expenses).where(companyScope(expenses.companyId, ctx.user.companyId)).orderBy(desc(expenses.spentAt), desc(expenses.id));
   }),
   create: adminProcedure.input(expenseInput).mutation(async ({ ctx, input }) => {
     const db = await dbOrThrow();
-    const result = await db.insert(expenses).values({ ...input, createdByUserId: ctx.user.id });
+    const result = await db.insert(expenses).values({ ...input, companyId: ctx.user.companyId, createdByUserId: ctx.user.id });
     const id = Number(result[0].insertId);
     await db.insert(auditLogs).values({ actorUserId: ctx.user.id, action: "Création", entityType: "Dépense", entityId: String(id), detail: `Dépense ${input.category} de ${input.amountCents} centimes créée` });
     return { id };
@@ -64,13 +65,13 @@ export const expensesRouter = router({
   update: adminProcedure.input(expenseInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
     const db = await dbOrThrow();
     const { id, ...data } = input;
-    await db.update(expenses).set(data).where(eq(expenses.id, id));
+    await db.update(expenses).set(data).where(and(eq(expenses.id, id), companyScope(expenses.companyId, ctx.user.companyId)));
     await db.insert(auditLogs).values({ actorUserId: ctx.user.id, action: "Modification", entityType: "Dépense", entityId: String(id), detail: `Dépense ${data.category} de ${data.amountCents} centimes modifiée` });
     return { success: true };
   }),
   remove: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
     const db = await dbOrThrow();
-    await db.delete(expenses).where(eq(expenses.id, input.id));
+    await db.delete(expenses).where(and(eq(expenses.id, input.id), companyScope(expenses.companyId, ctx.user.companyId)));
     await db.insert(auditLogs).values({ actorUserId: ctx.user.id, action: "Suppression", entityType: "Dépense", entityId: String(input.id), detail: "Dépense supprimée" });
     return { success: true };
   }),

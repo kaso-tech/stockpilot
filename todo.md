@@ -477,3 +477,8 @@
 - [x] Créer le suivi persistant des sessions actives par utilisateur.
 - [x] Ajouter la consultation et la révocation sécurisée des sessions sur d’autres appareils.
 - [x] Tester les sessions actives, la révocation distante et la conservation de la session courante.
+- [x] Auditer les données et définir l’architecture multi-entreprise compatible avec l’existant.
+- [x] Créer l’entreprise et le premier administrateur via une inscription sécurisée.
+- [x] Isoler les catalogues, clients, agents, vendeurs, ventes, dépenses, réglages et indicateurs principaux par entreprise.
+- [x] Ajouter l’interface d’inscription et le premier paramétrage de l’entreprise.
+- [x] Tester l’inscription, les sessions et l’étanchéité des données principales entre entreprises.

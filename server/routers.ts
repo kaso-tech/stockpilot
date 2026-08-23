@@ -5,6 +5,7 @@ import { z } from "zod";
 import {
   auditLogs,
   adminFallbackPasswords,
+  companies,
   agentPayments,
   customers,
   expenseBudgets,
@@ -68,6 +69,7 @@ import { matchesAdminFallbackCredentials } from "./adminFallbackAuth";
 import { hashPassword, verifyPassword } from "./passwords";
 import { categoryCanBeRemoved } from "./categoryRules";
 import { assertSellerSensitiveAction } from "./sellerActionRules";
+import { companyScope } from "./companyScope";
 
 const productInput = z.object({
   reference: z.string().trim().min(2).max(80),
@@ -209,6 +211,32 @@ export const appRouter = router({
       console.info("[Auth password] Session issued", { role: account.role, remembered: input.rememberMe });
       return { success: true, role: account.role } as const;
     }),
+    registerCompany: publicProcedure.input(z.object({ companyName: z.string().trim().min(2).max(200), administratorName: z.string().trim().min(2).max(160), email: z.string().trim().email().max(320), password: z.string().min(10).max(256), rememberMe: z.boolean().optional().default(true) })).mutation(async ({ ctx, input }) => {
+      const db = await requireDb();
+      const email = input.email.trim().toLowerCase();
+      const existingAccount = (await db.select().from(users)).find(user => user.email?.trim().toLowerCase() === email);
+      if (existingAccount) throw new TRPCError({ code: "CONFLICT", message: "Cette adresse e-mail est déjà utilisée." });
+      const sessionDurationMs = input.rememberMe ? REMEMBERED_AUTH_SESSION_MS : STANDARD_AUTH_SESSION_MS;
+      const openId = `local_admin_${randomUUID()}`;
+      const passwordHash = await hashPassword(input.password);
+      const { companyId, administratorId } = await db.transaction(async tx => {
+        const companyResult = await tx.insert(companies).values({ name: input.companyName }).$returningId();
+        const companyId = Number(companyResult[0]?.id);
+        const userResult = await tx.insert(users).values({ openId, name: input.administratorName, email, loginMethod: "password", role: "admin", active: true, companyId }).$returningId();
+        const administratorId = Number(userResult[0]?.id);
+        await tx.update(companies).set({ ownerUserId: administratorId }).where(eq(companies.id, companyId));
+        await tx.insert(adminFallbackPasswords).values({ ownerOpenId: openId, passwordHash, updatedByUserId: administratorId });
+        await tx.insert(saleSettings).values({ companyId, companyName: input.companyName, companyEmail: email, updatedByUserId: administratorId });
+        return { companyId, administratorId };
+      });
+      const sessionId = randomUUID();
+      const userAgent = typeof ctx.req.headers["user-agent"] === "string" ? ctx.req.headers["user-agent"].slice(0, 512) : undefined;
+      await db.insert(userSessions).values({ id: sessionId, userId: administratorId, deviceLabel: sessionDeviceLabel(userAgent), userAgent: userAgent ?? null, expiresAt: new Date(Date.now() + sessionDurationMs) });
+      const token = await sdk.createSessionToken(openId, { name: input.administratorName, expiresInMs: sessionDurationMs, sessionId });
+      ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: sessionDurationMs });
+      console.info("[Auth registration] Company administrator session issued", { companyId });
+      return { success: true, companyId } as const;
+    }),
     sessions: router({
       list: protectedProcedure.query(async ({ ctx }) => {
         const db = await requireDb();
@@ -289,9 +317,10 @@ export const appRouter = router({
   }),
 
   dashboard: router({
-    get: protectedProcedure.query(async () => {
+    get: protectedProcedure.query(async ({ ctx }) => {
       const db = await requireDb();
-      const [productRows, movements, saleRows, customerRows, inventories, profiles, commissions, payments, expenseRows, budgetRows] = await Promise.all([listProducts(), listMovements(250), db.select().from(sales), db.select().from(customers), db.select().from(inventorySessions), db.select().from(remunerationProfiles), db.select().from(saleCommissions), db.select().from(agentPayments), db.select().from(expenses), db.select().from(expenseBudgets)]);
+      const companyId = ctx.user.companyId;
+      const [productRows, movements, saleRows, customerRows, inventories, profiles, commissions, payments, expenseRows, budgetRows] = await Promise.all([listProducts(companyId), listMovements(companyId, 250), db.select().from(sales).where(companyScope(sales.companyId, companyId)), db.select().from(customers).where(companyScope(customers.companyId, companyId)), db.select().from(inventorySessions).where(companyScope(inventorySessions.companyId, companyId)), db.select().from(remunerationProfiles).where(companyScope(remunerationProfiles.companyId, companyId)), companyId === null ? db.select().from(saleCommissions) : Promise.resolve([]), companyId === null ? db.select().from(agentPayments) : Promise.resolve([]), db.select().from(expenses).where(companyScope(expenses.companyId, companyId)), db.select().from(expenseBudgets).where(companyScope(expenseBudgets.companyId, companyId))]);
       const lowStock = productRows.filter(product => product.quantity <= product.minimumQuantity);
       const totalValueCents = productRows.reduce(
         (sum, product) => sum + product.quantity * product.purchasePriceCents,
@@ -363,10 +392,10 @@ export const appRouter = router({
   }),
 
   products: router({
-    list: protectedProcedure.query(() => listProducts()),
-    detail: protectedProcedure.input(z.object({ id: z.number().int().positive() })).query(async ({ input }) => {
+    list: protectedProcedure.query(({ ctx }) => listProducts(ctx.user.companyId)),
+    detail: protectedProcedure.input(z.object({ id: z.number().int().positive() })).query(async ({ ctx, input }) => {
       const db = await requireDb();
-      const product = (await db.select().from(products).where(eq(products.id, input.id)).limit(1))[0];
+      const product = (await db.select().from(products).where(and(eq(products.id, input.id), companyScope(products.companyId, ctx.user.companyId))).limit(1))[0];
       if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Produit introuvable." });
       const [tiers, movements, lines, supplier] = await Promise.all([
         db.select().from(productPriceTiers).where(eq(productPriceTiers.productId, product.id)),
@@ -386,7 +415,7 @@ export const appRouter = router({
       try {
         const { priceTiers, retailPriceTiers, wholesalePriceTiers, ...productData } = input;
         const retailTiers = retailPriceTiers.length ? retailPriceTiers : priceTiers;
-        const productId = await db.transaction(async tx => { const result = await tx.insert(products).values(productData); const id = Number(result[0].insertId); const tiers = [...retailTiers.map(tier => ({ ...tier, productId: id, customerType: "retail" as const })), ...wholesalePriceTiers.map(tier => ({ ...tier, productId: id, customerType: "wholesale" as const }))]; if (tiers.length) await tx.insert(productPriceTiers).values(tiers); return id; });
+        const productId = await db.transaction(async tx => { const result = await tx.insert(products).values({ ...productData, companyId: ctx.user.companyId }); const id = Number(result[0].insertId); const tiers = [...retailTiers.map(tier => ({ ...tier, productId: id, customerType: "retail" as const })), ...wholesalePriceTiers.map(tier => ({ ...tier, productId: id, customerType: "wholesale" as const }))]; if (tiers.length) await tx.insert(productPriceTiers).values(tiers); return id; });
         await syncStockAlert(productId);
         await createAudit(ctx.user.id, "Création", "Produit", productId, `Produit ${input.reference} créé`);
         return { success: true, id: productId };
@@ -398,52 +427,52 @@ export const appRouter = router({
       const db = await requireDb();
       const { id, priceTiers, retailPriceTiers, wholesalePriceTiers, ...values } = input;
       const retailTiers = retailPriceTiers.length ? retailPriceTiers : priceTiers;
-      await db.transaction(async tx => { await tx.update(products).set(values).where(eq(products.id, id)); await tx.delete(productPriceTiers).where(eq(productPriceTiers.productId, id)); const tiers = [...retailTiers.map(tier => ({ ...tier, productId: id, customerType: "retail" as const })), ...wholesalePriceTiers.map(tier => ({ ...tier, productId: id, customerType: "wholesale" as const }))]; if (tiers.length) await tx.insert(productPriceTiers).values(tiers); });
+      await db.transaction(async tx => { await tx.update(products).set(values).where(and(eq(products.id, id), companyScope(products.companyId, ctx.user.companyId))); await tx.delete(productPriceTiers).where(eq(productPriceTiers.productId, id)); const tiers = [...retailTiers.map(tier => ({ ...tier, productId: id, customerType: "retail" as const })), ...wholesalePriceTiers.map(tier => ({ ...tier, productId: id, customerType: "wholesale" as const }))]; if (tiers.length) await tx.insert(productPriceTiers).values(tiers); });
       await syncStockAlert(id);
       await createAudit(ctx.user.id, "Modification", "Produit", id, `Produit ${values.reference} modifié`);
       return { success: true };
     }),
     updatePurchasePrice: protectedProcedure.input(z.object({ id: z.number().int().positive(), purchasePriceCents: z.number().int().min(0) })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
-      const product = (await db.select().from(products).where(eq(products.id, input.id)).limit(1))[0];
+      const product = (await db.select().from(products).where(and(eq(products.id, input.id), companyScope(products.companyId, ctx.user.companyId))).limit(1))[0];
       if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Produit introuvable." });
       if (ctx.user.role === "seller") {
         const settings = (await db.select().from(saleSettings).limit(1))[0];
         try { assertSellerSensitiveAction(settings, "purchase_price"); } catch (error) { throw new TRPCError({ code: "FORBIDDEN", message: error instanceof Error ? error.message : "Modification du coût d’achat non autorisée." }); }
       }
-      await db.update(products).set({ purchasePriceCents: input.purchasePriceCents }).where(eq(products.id, product.id));
+      await db.update(products).set({ purchasePriceCents: input.purchasePriceCents }).where(and(eq(products.id, product.id), companyScope(products.companyId, ctx.user.companyId)));
       await createAudit(ctx.user.id, "Coût d’achat modifié", "Produit", product.id, `${product.reference} : ${product.purchasePriceCents} → ${input.purchasePriceCents} centimes`);
       return { success: true };
     }),
     remove: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
-      const movement = await db.select({ id: stockMovements.id }).from(stockMovements).where(eq(stockMovements.productId, input.id)).limit(1);
+      const movement = await db.select({ id: stockMovements.id }).from(stockMovements).where(and(eq(stockMovements.productId, input.id), companyScope(stockMovements.companyId, ctx.user.companyId))).limit(1);
       if (movement.length) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Un produit avec des mouvements ne peut pas être supprimé." });
-      await db.delete(products).where(eq(products.id, input.id));
+      await db.delete(products).where(and(eq(products.id, input.id), companyScope(products.companyId, ctx.user.companyId)));
       await createAudit(ctx.user.id, "Suppression", "Produit", input.id, "Produit supprimé");
       return { success: true };
     }),
   }),
 
   categories: router({
-    list: protectedProcedure.query(async () => (await requireDb()).select().from(productCategories).orderBy(productCategories.name)),
-    create: adminProcedure.input(categoryInput).mutation(async ({ ctx, input }) => { const db = await requireDb(); try { const result = await db.insert(productCategories).values(input); const id = Number(result[0].insertId); await createAudit(ctx.user.id, "Création", "Catégorie", id, `Catégorie ${input.name} créée`); return { id }; } catch (error) { throw new TRPCError({ code: "CONFLICT", message: "Cette catégorie existe déjà.", cause: error }); } }),
+    list: protectedProcedure.query(async ({ ctx }) => (await requireDb()).select().from(productCategories).where(companyScope(productCategories.companyId, ctx.user.companyId)).orderBy(productCategories.name)),
+    create: adminProcedure.input(categoryInput).mutation(async ({ ctx, input }) => { const db = await requireDb(); try { const result = await db.insert(productCategories).values({ ...input, companyId: ctx.user.companyId }); const id = Number(result[0].insertId); await createAudit(ctx.user.id, "Création", "Catégorie", id, `Catégorie ${input.name} créée`); return { id }; } catch (error) { throw new TRPCError({ code: "CONFLICT", message: "Cette catégorie existe déjà.", cause: error }); } }),
     update: adminProcedure.input(categoryInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await requireDb(); const current = (await db.select().from(productCategories).where(eq(productCategories.id, input.id)).limit(1))[0]; if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Catégorie introuvable." }); try { await db.transaction(async tx => { await tx.update(productCategories).set({ name: input.name }).where(eq(productCategories.id, input.id)); await tx.update(products).set({ category: input.name }).where(eq(products.category, current.name)); }); await createAudit(ctx.user.id, "Modification", "Catégorie", input.id, `Catégorie ${current.name} renommée en ${input.name}`); return { success: true }; } catch (error) { throw new TRPCError({ code: "CONFLICT", message: "Cette catégorie existe déjà.", cause: error }); } }),
     remove: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await requireDb(); const current = (await db.select().from(productCategories).where(eq(productCategories.id, input.id)).limit(1))[0]; if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Catégorie introuvable." }); const usedBy = await db.select({ id: products.id }).from(products).where(eq(products.category, current.name)).limit(1); if (!categoryCanBeRemoved(usedBy.length)) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Cette catégorie est utilisée par des produits et ne peut pas être supprimée." }); await db.delete(productCategories).where(eq(productCategories.id, input.id)); await createAudit(ctx.user.id, "Suppression", "Catégorie", input.id, `Catégorie ${current.name} supprimée`); return { success: true }; }),
   }),
 
   units: router({
-    list: protectedProcedure.query(async () => (await requireDb()).select().from(productUnits).orderBy(productUnits.name)),
-    create: adminProcedure.input(unitInput).mutation(async ({ ctx, input }) => { const db = await requireDb(); try { const result = await db.insert(productUnits).values(input); const id = Number(result[0].insertId); await createAudit(ctx.user.id, "Création", "Unité", id, `Unité ${input.name} créée`); return { id }; } catch (error) { throw new TRPCError({ code: "CONFLICT", message: "Cette unité existe déjà.", cause: error }); } }),
+    list: protectedProcedure.query(async ({ ctx }) => (await requireDb()).select().from(productUnits).where(companyScope(productUnits.companyId, ctx.user.companyId)).orderBy(productUnits.name)),
+    create: adminProcedure.input(unitInput).mutation(async ({ ctx, input }) => { const db = await requireDb(); try { const result = await db.insert(productUnits).values({ ...input, companyId: ctx.user.companyId }); const id = Number(result[0].insertId); await createAudit(ctx.user.id, "Création", "Unité", id, `Unité ${input.name} créée`); return { id }; } catch (error) { throw new TRPCError({ code: "CONFLICT", message: "Cette unité existe déjà.", cause: error }); } }),
     update: adminProcedure.input(unitInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await requireDb(); const current = (await db.select().from(productUnits).where(eq(productUnits.id, input.id)).limit(1))[0]; if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Unité introuvable." }); try { await db.transaction(async tx => { await tx.update(productUnits).set({ name: input.name }).where(eq(productUnits.id, input.id)); await tx.update(products).set({ unit: input.name }).where(eq(products.unit, current.name)); }); await createAudit(ctx.user.id, "Modification", "Unité", input.id, `Unité ${current.name} renommée en ${input.name}`); return { success: true }; } catch (error) { throw new TRPCError({ code: "CONFLICT", message: "Cette unité existe déjà.", cause: error }); } }),
     remove: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await requireDb(); const current = (await db.select().from(productUnits).where(eq(productUnits.id, input.id)).limit(1))[0]; if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Unité introuvable." }); const usedBy = await db.select({ id: products.id }).from(products).where(eq(products.unit, current.name)).limit(1); if (usedBy.length) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Cette unité est utilisée par des produits et ne peut pas être supprimée." }); await db.delete(productUnits).where(eq(productUnits.id, input.id)); await createAudit(ctx.user.id, "Suppression", "Unité", input.id, `Unité ${current.name} supprimée`); return { success: true }; }),
   }),
 
   suppliers: router({
-    list: protectedProcedure.query(() => listSuppliers()),
+    list: protectedProcedure.query(({ ctx }) => listSuppliers(ctx.user.companyId)),
     create: adminProcedure.input(supplierInput).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
-      const result = await db.insert(suppliers).values(input);
+      const result = await db.insert(suppliers).values({ ...input, companyId: ctx.user.companyId });
       const supplierId = Number(result[0].insertId);
       await createAudit(ctx.user.id, "Création", "Fournisseur", supplierId, `Fournisseur ${input.name} créé`);
       return { success: true, id: supplierId };
@@ -451,19 +480,19 @@ export const appRouter = router({
     update: adminProcedure.input(supplierInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
       const { id, ...values } = input;
-      await db.update(suppliers).set(values).where(eq(suppliers.id, id));
+      await db.update(suppliers).set(values).where(and(eq(suppliers.id, id), companyScope(suppliers.companyId, ctx.user.companyId)));
       await createAudit(ctx.user.id, "Modification", "Fournisseur", id, `Fournisseur ${values.name} modifié`);
       return { success: true };
     }),
     remove: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
-      const supplier = (await db.select().from(suppliers).where(eq(suppliers.id, input.id)).limit(1))[0];
+      const supplier = (await db.select().from(suppliers).where(and(eq(suppliers.id, input.id), companyScope(suppliers.companyId, ctx.user.companyId))).limit(1))[0];
       if (!supplier) throw new TRPCError({ code: "NOT_FOUND", message: "Fournisseur introuvable." });
       const linkedProduct = await db.select({ id: products.id }).from(products).where(eq(products.supplierId, input.id)).limit(1);
       if (linkedProduct.length) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Ce fournisseur est rattaché à des produits. Détachez-les avant suppression." });
       const linkedOrder = await db.select({ id: purchaseOrders.id }).from(purchaseOrders).where(eq(purchaseOrders.supplierId, input.id)).limit(1);
       if (linkedOrder.length) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Ce fournisseur possède un historique de bons de commande et ne peut pas être supprimé." });
-      await db.delete(suppliers).where(eq(suppliers.id, input.id));
+      await db.delete(suppliers).where(and(eq(suppliers.id, input.id), companyScope(suppliers.companyId, ctx.user.companyId)));
       await createAudit(ctx.user.id, "Suppression", "Fournisseur", input.id, `Fournisseur ${supplier.name} supprimé`);
       return { success: true };
     }),
@@ -605,7 +634,7 @@ export const appRouter = router({
   }),
 
   movements: router({
-    list: protectedProcedure.query(() => listMovements()),
+    list: protectedProcedure.query(({ ctx }) => listMovements(ctx.user.companyId)),
     create: protectedProcedure.input(z.object({
       productId: z.number().int().positive(),
       supplierId: z.number().int().positive().nullable(),
@@ -655,11 +684,11 @@ export const appRouter = router({
   }),
 
   audit: router({
-    list: adminProcedure.query(() => listAuditLogs()),
+    list: adminProcedure.query(({ ctx }) => listAuditLogs(ctx.user.companyId)),
   }),
 
   users: router({
-    list: adminProcedure.query(() => listUsers()),
+    list: adminProcedure.query(({ ctx }) => listUsers(ctx.user.companyId)),
     updateRole: adminProcedure.input(z.object({ id: z.number().int().positive(), role: z.enum(["admin", "seller"]) })).mutation(async ({ ctx, input }) => {
       if (ctx.user.id === input.id && input.role !== "admin") {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Vous ne pouvez pas retirer votre propre rôle administrateur." });

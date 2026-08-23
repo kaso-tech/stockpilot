@@ -19,7 +19,7 @@ describe("commerce.settings.save", () => {
   const inserts: Array<{ table: unknown; values: unknown }> = [];
   beforeEach(() => {
     inserts.length = 0;
-    const db: any = { select: () => ({ from: () => ({ limit: async () => [] }) }), insert: (table: unknown) => ({ values: async (values: unknown) => { inserts.push({ table, values }); return [{ insertId: 1 }]; } }) };
+    const db: any = { select: () => ({ from: () => ({ where: () => ({ limit: async () => [] }), limit: async () => [] }) }), insert: (table: unknown) => ({ values: async (values: unknown) => { inserts.push({ table, values }); return [{ insertId: 1 }]; } }) };
     mockedGetDb.mockResolvedValue(db);
   });
   it.each(["USD", "EUR", "XOF"] as const)("enregistre %s comme devise de référence", async currency => {

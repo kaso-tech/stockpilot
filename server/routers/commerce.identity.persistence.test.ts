@@ -17,7 +17,7 @@ describe("persistance de l’identité entreprise", () => {
     stored = null;
     vi.mocked(storagePut).mockImplementation(async key => key.includes("signature") ? { key: "company/1/signature.png", url: "/manus-storage/company/1/signature.png" } : { key: "company/1/logo.png", url: "/manus-storage/company/1/logo.png" });
     const db: any = {
-      select: () => ({ from: () => ({ limit: async () => stored ? [stored] : [] }) }),
+      select: () => ({ from: () => ({ where: () => ({ limit: async () => stored ? [stored] : [] }), limit: async () => stored ? [stored] : [] }) }),
       insert: (table: unknown) => ({ values: async (values: Record<string, unknown>) => { if (table === saleSettings) stored = { id: 1, ...values }; return [{ insertId: 1 }]; } }),
       update: (table: unknown) => ({ set: (values: Record<string, unknown>) => ({ where: async () => { if (table === saleSettings) stored = { ...(stored ?? {}), ...values }; } }) }),
     };

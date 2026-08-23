@@ -11,6 +11,7 @@ import {
   users,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
+import { companyScope } from "./companyScope";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -69,10 +70,10 @@ export async function touchUserSession(sessionId: string) {
   await db.update(userSessions).set({ lastSeenAt: new Date() }).where(eq(userSessions.id, sessionId));
 }
 
-export async function listProducts() {
+export async function listProducts(companyId: number | null) {
   const db = await getDb();
   if (!db) return [];
-  const [rows, tiers] = await Promise.all([db.select().from(products).orderBy(products.name), db.select().from(productPriceTiers)]);
+  const [rows, tiers] = await Promise.all([db.select().from(products).where(companyScope(products.companyId, companyId)).orderBy(products.name), db.select().from(productPriceTiers)]);
   return rows.map(product => {
     const productTiers = tiers.filter(tier => tier.productId === product.id).sort((left, right) => left.minQuantity - right.minQuantity);
     const retailPriceTiers = productTiers.filter(tier => tier.customerType === "retail");
@@ -81,13 +82,13 @@ export async function listProducts() {
   });
 }
 
-export async function listSuppliers() {
+export async function listSuppliers(companyId: number | null) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(suppliers).orderBy(suppliers.name);
+  return db.select().from(suppliers).where(companyScope(suppliers.companyId, companyId)).orderBy(suppliers.name);
 }
 
-export async function listMovements(limit = 100) {
+export async function listMovements(companyId: number | null, limit = 100) {
   const db = await getDb();
   if (!db) return [];
   return db
@@ -110,11 +111,12 @@ export async function listMovements(limit = 100) {
     .innerJoin(products, eq(stockMovements.productId, products.id))
     .leftJoin(suppliers, eq(stockMovements.supplierId, suppliers.id))
     .leftJoin(users, eq(stockMovements.createdByUserId, users.id))
+    .where(companyScope(stockMovements.companyId, companyId))
     .orderBy(desc(stockMovements.occurredAt))
     .limit(limit);
 }
 
-export async function listAuditLogs(limit = 100) {
+export async function listAuditLogs(companyId: number | null, limit = 100) {
   const db = await getDb();
   if (!db) return [];
   return db
@@ -130,11 +132,12 @@ export async function listAuditLogs(limit = 100) {
     })
     .from(auditLogs)
     .leftJoin(users, eq(auditLogs.actorUserId, users.id))
+    .where(companyScope(auditLogs.companyId, companyId))
     .orderBy(desc(auditLogs.createdAt))
     .limit(limit);
 }
 
-export async function listUsers() {
+export async function listUsers(companyId: number | null) {
   const db = await getDb();
   if (!db) return [];
   return db
@@ -147,5 +150,6 @@ export async function listUsers() {
       createdAt: users.createdAt,
     })
     .from(users)
+    .where(companyScope(users.companyId, companyId))
     .orderBy(users.name);
 }
