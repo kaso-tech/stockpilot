@@ -7,11 +7,13 @@ import superjson from "superjson";
 import { registerSW } from "virtual:pwa-register";
 import App from "./App";
 import { persistOfflineQueryCache, restoreOfflineQueryCache } from "./lib/offlineCache";
+import { requestPersistentOfflineStorage } from "./lib/offlineStore";
 import "./index.css";
 
 const queryClient = new QueryClient();
 restoreOfflineQueryCache(queryClient);
 persistOfflineQueryCache(queryClient);
+void requestPersistentOfflineStorage();
 
 // Apply service-worker updates immediately. Without an explicit update, an
 // installed PWA can continue serving an obsolete client bundle that redirects
