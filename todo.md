@@ -409,3 +409,5 @@
 - [x] Tester les actions et la navigation de facture sur desktop et mobile.
 - [x] Retirer le bouton WhatsApp redondant des fiches Fournisseur et Agent.
 - [x] Vérifier les contacts simplifiés sur desktop et mobile.
+- [x] Retirer « Pilotage commercial en direct » et « Cockpit commercial » du tableau de bord pour tous les rôles.
+- [x] Vérifier le rendu simplifié du tableau de bord sur desktop et mobile.
