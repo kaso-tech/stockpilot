@@ -446,3 +446,8 @@
 - [x] Auditer les secrets et la comparaison des identifiants administrateur de secours.
 - [x] Corriger la configuration ou validation qui retourne des identifiants incorrects.
 - [x] Vérifier la connexion administrateur de secours de bout en bout.
+- [x] Auditer la gestion du mot de passe de secours et les paramètres administrateur existants.
+- [x] Créer une procédure administrateur sécurisée de changement de mot de passe de secours.
+- [x] Ajouter une page dédiée de réglage du mot de passe de secours.
+- [x] Tester les restrictions, validations et changement de mot de passe.
+- [x] Préparer l’archive source actuelle du projet pour livraison.

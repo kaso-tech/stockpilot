@@ -37,6 +37,7 @@ import Units from "./pages/Units";
 import SettingsPos from "./pages/SettingsPos";
 import SettingsHistory from "./pages/SettingsHistory";
 import SettingsDashboard from "./pages/SettingsDashboard";
+import SettingsSecurity from "./pages/SettingsSecurity";
 import DataExchange from "./pages/DataExchange";
 import SyncJournal from "./pages/SyncJournal";
 
@@ -60,6 +61,7 @@ function Router() {
         <Route path={"/parametres/identite"} component={SettingsIdentity} />
         <Route path={"/parametres/pos"} component={SettingsPos} />
         <Route path={"/parametres/tableau-de-bord"} component={SettingsDashboard} />
+        <Route path={"/parametres/securite"} component={SettingsSecurity} />
         <Route path={"/parametres/historique"} component={SettingsHistory} />
         <Route path={"/sauvegardes"} component={Backups} />
         <Route path={"/depenses"} component={Expenses} />

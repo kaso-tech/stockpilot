@@ -3,6 +3,7 @@ import { and, desc, eq, ne } from "drizzle-orm";
 import { z } from "zod";
 import {
   auditLogs,
+  adminFallbackPasswords,
   agentPayments,
   customers,
   expenseBudgets,
@@ -49,7 +50,7 @@ import { agentPaymentExpenseRows, budgetComparison, expenseBreakdownByCategory, 
 import { sdk } from "./_core/sdk";
 import { ENV } from "./_core/env";
 import { matchesAdminFallbackCredentials } from "./adminFallbackAuth";
-import { verifyPassword } from "./passwords";
+import { hashPassword, verifyPassword } from "./passwords";
 import { categoryCanBeRemoved } from "./categoryRules";
 import { assertSellerSensitiveAction } from "./sellerActionRules";
 
@@ -162,11 +163,26 @@ export const appRouter = router({
       return { success: true } as const;
     }),
     adminFallbackLogin: publicProcedure.input(z.object({ email: z.string().trim().email(), password: z.string().min(1) })).mutation(async ({ ctx, input }) => {
-      if (!matchesAdminFallbackCredentials(input, { email: ENV.adminFallbackEmail, password: ENV.adminFallbackPassword }) || !ENV.ownerOpenId) {
+      if (!ENV.ownerOpenId || input.email.trim().toLowerCase() !== ENV.adminFallbackEmail.trim().toLowerCase()) {
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Identifiants administrateur incorrects." });
       }
+      const db = await requireDb();
+      const override = (await db.select().from(adminFallbackPasswords).where(eq(adminFallbackPasswords.ownerOpenId, ENV.ownerOpenId)).limit(1))[0];
+      const passwordValid = override ? await verifyPassword(input.password, override.passwordHash) : matchesAdminFallbackCredentials(input, { email: ENV.adminFallbackEmail, password: ENV.adminFallbackPassword });
+      if (!passwordValid) throw new TRPCError({ code: "UNAUTHORIZED", message: "Identifiants administrateur incorrects." });
       const token = await sdk.createSessionToken(ENV.ownerOpenId, { name: "Administrateur", expiresInMs: ONE_YEAR_MS });
       ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: ONE_YEAR_MS });
+      return { success: true } as const;
+    }),
+    changeAdminFallbackPassword: adminProcedure.input(z.object({ currentPassword: z.string().min(1), newPassword: z.string().min(10).max(256) })).mutation(async ({ ctx, input }) => {
+      if (!ENV.ownerOpenId || ctx.user.openId !== ENV.ownerOpenId) throw new TRPCError({ code: "FORBIDDEN", message: "Cette action est réservée à l’administrateur principal." });
+      const db = await requireDb();
+      const override = (await db.select().from(adminFallbackPasswords).where(eq(adminFallbackPasswords.ownerOpenId, ENV.ownerOpenId)).limit(1))[0];
+      const currentValid = override ? await verifyPassword(input.currentPassword, override.passwordHash) : matchesAdminFallbackCredentials({ email: ENV.adminFallbackEmail, password: input.currentPassword }, { email: ENV.adminFallbackEmail, password: ENV.adminFallbackPassword });
+      if (!currentValid) throw new TRPCError({ code: "UNAUTHORIZED", message: "Mot de passe actuel incorrect." });
+      const passwordHash = await hashPassword(input.newPassword);
+      if (override) await db.update(adminFallbackPasswords).set({ passwordHash, updatedByUserId: ctx.user.id }).where(eq(adminFallbackPasswords.id, override.id));
+      else await db.insert(adminFallbackPasswords).values({ ownerOpenId: ENV.ownerOpenId, passwordHash, updatedByUserId: ctx.user.id });
       return { success: true } as const;
     }),
   }),
