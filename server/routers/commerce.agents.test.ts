@@ -24,7 +24,7 @@ describe("commerce agents et vendeurs", () => {
     const db: any = {
       insert: (table: unknown) => ({ values: async (values: unknown) => { inserts.push({ table, values }); return [{ insertId: table === agents ? 20 : table === users ? 30 : 1 }]; } }),
       update: (table: unknown) => ({ set: (values: unknown) => ({ where: async () => { updates.push({ table, values }); } }) }),
-      select: () => ({ from: (table: unknown) => { const rows: any = rowsFor(table); rows.where = () => ({ limit: async () => rows }); return rows; } }),
+      select: () => ({ from: (table: unknown) => { const rows: any = rowsFor(table); rows.limit = async () => rows; rows.where = () => rows; return rows; } }),
     };
     mockedGetDb.mockResolvedValue(db);
   });
