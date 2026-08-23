@@ -26,3 +26,5 @@ Les archives existantes doivent être rattachées au fichier, à la rétention, 
 Le format d’archive porte désormais l’identifiant de l’entreprise lors de la création d’une sauvegarde manuelle, avec une couverture de test dédiée.
 
 La restauration sélective doit traiter les tables enfants avant leurs parents : lignes et commissions de vente avant ventes, lignes d’inventaire avant sessions, puis les entités directement rattachées à l’entreprise. Les tables sans `companyId` devront être filtrées à partir de leurs parents avant toute suppression.
+
+Les alertes de stock doivent aussi être créées et recherchées avec l’entreprise du produit afin de compléter l’unicité des alertes par entreprise.
