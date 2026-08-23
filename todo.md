@@ -416,3 +416,5 @@
 - [x] Remplacer le libellé Point de vente par Vente Rapide.
 - [x] Remplacer les actions du tableau de bord par Vente Rapide, Nouvelle Facture et Nouveau Client.
 - [x] Tester les libellés et actions rapides sur desktop et mobile.
+- [x] Retirer les réglages Répartition des dépenses et Suivi du budget du tableau de bord vendeur.
+- [x] Vérifier les préférences vendeur simplifiées sur desktop et mobile.
