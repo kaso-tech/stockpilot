@@ -27,7 +27,6 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { startLogin } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import { usePreferences } from "@/contexts/PreferencesContext";
 import { useOffline } from "@/contexts/OfflineContext";
@@ -89,14 +88,10 @@ const menuItems = [
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { loading, user } = useAuth();
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showAdminFallback, setShowAdminFallback] = useState(false);
-  const [adminEmail, setAdminEmail] = useState("");
-  const [adminPassword, setAdminPassword] = useState("");
   const returnToDashboard = () => window.location.replace("/");
-  const sellerLogin = trpc.auth.localLogin.useMutation({ onSuccess: returnToDashboard });
-  const adminFallbackLogin = trpc.auth.adminFallbackLogin.useMutation({ onSuccess: returnToDashboard });
+  const passwordLogin = trpc.auth.passwordLogin.useMutation({ onSuccess: returnToDashboard });
 
   if (loading) return <DashboardLayoutSkeleton />;
 
@@ -114,11 +109,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
           </div>
           <h1 className="text-2xl font-semibold tracking-tight">Accédez à votre espace commercial</h1>
-          <Button onClick={() => startLogin()} className="mt-6 h-11 w-full bg-cyan-400 text-slate-950 hover:bg-cyan-300">Connexion administrateur avec Google</Button>
-          <button type="button" onClick={() => setShowAdminFallback(value => !value)} className="mt-3 w-full text-center text-xs font-medium text-cyan-300 hover:underline">Connexion de secours par e-mail et mot de passe</button>
-          {showAdminFallback && <form onSubmit={event => { event.preventDefault(); adminFallbackLogin.mutate({ email: adminEmail, password: adminPassword }); }} className="mt-4 space-y-3 rounded-2xl border border-cyan-400/20 bg-cyan-400/[0.04] p-4"><p className="text-xs font-semibold text-cyan-100">Accès administrateur de secours</p><Input value={adminEmail} onChange={event => setAdminEmail(event.target.value)} placeholder="Adresse e-mail administrateur" type="email" autoComplete="email" className="border-white/10 bg-white/[0.04]" /><Input value={adminPassword} onChange={event => setAdminPassword(event.target.value)} placeholder="Mot de passe" type="password" autoComplete="current-password" className="border-white/10 bg-white/[0.04]" /><Button type="submit" disabled={adminFallbackLogin.isPending || !adminEmail || !adminPassword} variant="outline" className="h-10 w-full border-cyan-400/30 text-cyan-100 hover:bg-cyan-400/10">{adminFallbackLogin.isPending ? "Connexion…" : "Se connecter comme administrateur"}</Button>{adminFallbackLogin.error && <p className="text-center text-xs text-rose-300">{adminFallbackLogin.error.message}</p>}</form>}
-          <div className="my-6 flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500"><span className="h-px flex-1 bg-white/10" />ou vendeur<span className="h-px flex-1 bg-white/10" /></div>
-          <form onSubmit={event => { event.preventDefault(); sellerLogin.mutate({ username, password }); }} className="space-y-3"><Input value={username} onChange={event => setUsername(event.target.value)} placeholder="Nom d’utilisateur" autoComplete="username" className="border-white/10 bg-white/[0.04]" /><Input value={password} onChange={event => setPassword(event.target.value)} placeholder="Mot de passe" type="password" autoComplete="current-password" className="border-white/10 bg-white/[0.04]" /><Button type="submit" disabled={sellerLogin.isPending || !username || !password} variant="outline" className="h-10 w-full border-white/10 text-slate-200">{sellerLogin.isPending ? "Connexion…" : "Se connecter comme vendeur"}</Button>{sellerLogin.error && <p className="text-center text-xs text-rose-300">{sellerLogin.error.message}</p>}</form>
+          <p className="mt-2 text-sm text-slate-400">Connectez-vous avec l’adresse e-mail et le mot de passe de votre compte.</p>
+          <form onSubmit={event => { event.preventDefault(); passwordLogin.mutate({ email, password }); }} className="mt-6 space-y-3"><Input value={email} onChange={event => setEmail(event.target.value)} placeholder="Adresse e-mail" type="email" autoComplete="email" className="border-white/10 bg-white/[0.04]" /><Input value={password} onChange={event => setPassword(event.target.value)} placeholder="Mot de passe" type="password" autoComplete="current-password" className="border-white/10 bg-white/[0.04]" /><Button type="submit" disabled={passwordLogin.isPending || !email || !password} className="h-11 w-full bg-cyan-400 text-slate-950 hover:bg-cyan-300">{passwordLogin.isPending ? "Connexion…" : "Se connecter"}</Button>{passwordLogin.error && <p className="text-center text-xs text-rose-300">{passwordLogin.error.message}</p>}</form>
         </div>
       </div>
     );

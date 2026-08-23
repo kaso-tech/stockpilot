@@ -46,8 +46,8 @@ describe("commerce agents et vendeurs", () => {
 
   it("crée, modifie et désactive un vendeur avec des identifiants locaux", async () => {
     const caller = commerceRouter.createCaller(adminContext());
-    await caller.sellers.create({ name: "Vendeur Test", email: null, username: "vendeur.test", password: "Vendeur!2026", remuneration });
-    await caller.sellers.update({ id: 30, name: "Vendeur Modifié", email: null, username: "vendeur.modifie", remuneration, password: "Nouveau!2026" });
+    await caller.sellers.create({ name: "Vendeur Test", email: "nouveau.vendeur@example.test", username: "vendeur.test", password: "Vendeur!2026", remuneration });
+    await caller.sellers.update({ id: 30, name: "Vendeur Modifié", email: "vendeur@example.test", username: "vendeur.modifie", remuneration, password: "Nouveau!2026" });
     await caller.sellers.remove({ id: 30 });
     expect(inserts.find(item => item.table === sellerCredentials)?.values).toMatchObject({ userId: 30, username: "vendeur.test" });
     expect(updates.find(item => item.table === sellerCredentials)?.values).toMatchObject({ username: "vendeur.modifie" });
@@ -57,7 +57,7 @@ describe("commerce agents et vendeurs", () => {
 
   it("convertit un agent en vendeur puis un vendeur en agent tout en désactivant l’ancien profil", async () => {
     const caller = commerceRouter.createCaller(adminContext());
-    await caller.agents.convertToSeller({ id: 20, username: "awa.vendeuse", password: "Awa!2026", remuneration });
+    await caller.agents.convertToSeller({ id: 20, email: "awa.vendeuse@example.test", username: "awa.vendeuse", password: "Awa!2026", remuneration });
     await caller.agents.convertSellerToAgent({ id: 30, type: "cashier", phone: "+22670000000", remuneration });
     expect(inserts.find(item => item.table === users)?.values).toMatchObject({ name: "Awa Agent", role: "seller", active: true });
     expect(inserts.find(item => item.table === sellerCredentials)?.values).toMatchObject({ username: "awa.vendeuse" });

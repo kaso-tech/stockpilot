@@ -162,6 +162,30 @@ export const appRouter = router({
       ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: ONE_YEAR_MS });
       return { success: true } as const;
     }),
+    passwordLogin: publicProcedure.input(z.object({ email: z.string().trim().email(), password: z.string().min(1) })).mutation(async ({ ctx, input }) => {
+      const db = await requireDb();
+      const email = input.email.trim().toLowerCase();
+      const accounts = await db.select().from(users);
+      const account = accounts.find(user => user.active && user.email?.trim().toLowerCase() === email && (user.role === "admin" || user.role === "seller"));
+      if (!account) throw new TRPCError({ code: "UNAUTHORIZED", message: "E-mail ou mot de passe incorrect." });
+
+      let passwordValid = false;
+      if (account.role === "admin") {
+        const storedPassword = (await db.select().from(adminFallbackPasswords).where(eq(adminFallbackPasswords.ownerOpenId, account.openId)).limit(1))[0];
+        passwordValid = storedPassword
+          ? await verifyPassword(input.password, storedPassword.passwordHash)
+          : matchesAdminFallbackCredentials({ email: input.email, password: input.password }, { email: ENV.adminFallbackEmail, password: ENV.adminFallbackPassword });
+      } else {
+        const credential = (await db.select().from(sellerCredentials).where(eq(sellerCredentials.userId, account.id)).limit(1))[0];
+        passwordValid = Boolean(credential) && await verifyPassword(input.password, credential.passwordHash);
+      }
+
+      if (!passwordValid) throw new TRPCError({ code: "UNAUTHORIZED", message: "E-mail ou mot de passe incorrect." });
+      const token = await sdk.createSessionToken(account.openId, { name: account.name || account.email || "Utilisateur", expiresInMs: ONE_YEAR_MS });
+      ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: ONE_YEAR_MS });
+      console.info("[Auth password] Session issued", { role: account.role });
+      return { success: true, role: account.role } as const;
+    }),
     adminFallbackLogin: publicProcedure.input(z.object({ email: z.string().trim().email(), password: z.string().min(1) })).mutation(async ({ ctx, input }) => {
       const emailMatches = Boolean(ENV.adminFallbackEmail) && input.email.trim().toLowerCase() === ENV.adminFallbackEmail.trim().toLowerCase();
       if (!emailMatches) {

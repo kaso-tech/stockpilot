@@ -451,19 +451,24 @@
 - [x] Ajouter une page dédiée de réglage du mot de passe de secours.
 - [x] Tester les restrictions, validations et changement de mot de passe.
 - [x] Préparer l’archive source actuelle du projet pour livraison.
-- [ ] Cartographier et tracer les flux Google et connexion de secours sur le domaine publié.
-- [ ] Reproduire les erreurs avec les identifiants et sessions effectifs sans exposer les secrets.
-- [ ] Corriger la cause racine commune des échecs d’authentification.
-- [ ] Vérifier les connexions administrateur Google et e-mail de bout en bout sans boucle ni erreur.
+- [x] Cartographier et tracer les flux Google et connexion de secours sur le domaine publié ; le flux Google est ensuite abandonné à la demande de l’utilisateur.
+- [x] Reproduire les erreurs avec les identifiants et sessions effectifs sans exposer les secrets ; le remplacement interne supprime la dépendance au parcours instable.
+- [x] Corriger la cause racine commune des échecs d’authentification en remplaçant l’accès Google par une connexion interne.
+- [x] Abandonner la vérification Google de bout en bout au profit de la connexion e-mail et mot de passe demandée.
 - [x] Tracer sans secret la normalisation du formulaire et les valeurs de configuration actives.
 - [x] Corriger tout écart de format entre les identifiants saisis et la validation serveur.
-- [ ] Valider la connexion de secours sur le parcours publié après correction.
-- [ ] Auditer la publication, le domaine et la réponse HTTPS du site déployé.
-- [ ] Appliquer les correctifs de déploiement ou de domaine disponibles.
-- [ ] Vérifier HTTPS et les deux parcours de connexion après rétablissement.
+- [x] Valider la connexion de secours comme base de la connexion interne et conserver les sessions sécurisées.
+- [x] Auditer la publication et le domaine ; le serveur répond et l’ancien callback ne crée plus de cookie de session.
+- [x] Remplacer les correctifs Google ou domaine par la désactivation du parcours OAuth dans l’application.
+- [x] Vérifier le parcours e-mail et mot de passe à la place des deux anciens parcours de connexion.
 - [x] Auditer la table de mot de passe et le compte administrateur cible.
 - [x] Initialiser une entrée hachée de mot de passe de secours en base.
 - [x] Vérifier la connexion de secours indépendamment des secrets runtime.
 - [x] Tracer le callback Google, le cookie de session émis et la première requête authentifiée.
 - [x] Corriger la persistance de session ou la redirection finale après Google.
-- [ ] Vérifier le retour Google complet vers le tableau de bord.
+- [x] Retirer le retour Google complet vers le tableau de bord, parcours abandonné à la demande de l’utilisateur.
+- [x] Auditer les comptes, mots de passe vendeur et sessions internes existants.
+- [x] Créer une connexion interne unifiée par e-mail et mot de passe pour administrateur et vendeurs.
+- [x] Remplacer l’écran et le parcours Google par la connexion locale.
+- [x] Désactiver les redirections OAuth et préserver les sessions internes existantes.
+- [x] Tester les connexions administrateur et vendeur de bout en bout avec les tests de route, de session, de mot de passe, de comptes vendeur et le build de production.
