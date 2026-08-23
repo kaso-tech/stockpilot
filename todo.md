@@ -499,3 +499,6 @@
 - [x] Ajouter une vérification d’adresse e-mail en temps réel et protégée lors de l’inscription.
 - [x] Afficher l’état de disponibilité et bloquer l’inscription si l’adresse est invalide ou déjà utilisée.
 - [x] Tester la vérification d’adresse e-mail et le blocage de soumission.
+- [x] Ajouter un indicateur de force du mot de passe pendant l’inscription.
+- [x] Ajouter des boutons permettant d’afficher ou masquer les mots de passe de connexion et d’inscription.
+- [x] Tester les contrôles de force et de visibilité de mot de passe.
