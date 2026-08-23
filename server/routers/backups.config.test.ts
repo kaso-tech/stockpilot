@@ -10,14 +10,14 @@ function dbFor(settings: Record<string, unknown>) {
   const set = vi.fn(() => ({ where }));
   const values = vi.fn().mockResolvedValue([{ insertId: 1 }]);
   return {
-    select: vi.fn(() => ({ from: vi.fn(() => ({ limit: vi.fn().mockResolvedValue([settings]) })) })),
+    select: vi.fn(() => ({ from: vi.fn(() => ({ where: vi.fn(() => ({ limit: vi.fn().mockResolvedValue([settings]) })), limit: vi.fn().mockResolvedValue([settings]) })) })),
     update: vi.fn(() => ({ set })),
     insert: vi.fn(() => ({ values })),
     set,
   };
 }
 
-const ctx = { user: { id: 1, role: "admin" }, req: { headers: { cookie: "app_session_id=session-1" } } } as any;
+const ctx = { user: { id: 1, role: "admin", companyId: 1 }, req: { headers: { cookie: "app_session_id=session-1" } } } as any;
 
 describe("configuration Heartbeat des sauvegardes", () => {
   beforeEach(() => { vi.clearAllMocks(); });

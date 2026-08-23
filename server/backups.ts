@@ -3,7 +3,8 @@ import {
   inventorySessions, products, remunerationProfiles, saleCommissions, saleItems,
   saleSettings, sales, sellerCredentials, stockAlerts, stockMovements, suppliers, users,
 } from "../drizzle/schema";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
+import { companyScope } from "./companyScope";
 import { getDb } from "./db";
 import { storageGetSignedUrl, storagePut } from "./storage";
 
@@ -56,14 +57,14 @@ export async function createBackupSnapshot(actorUserId: number | null, trigger: 
   return { id: Number(result[0].insertId), filename, storageUrl: stored.url, sizeBytes: buffer.byteLength, recordCount, payload };
 }
 
-export async function getBackupDownloadUrl(archiveId: number) {
+export async function getBackupDownloadUrl(archiveId: number, companyId: number | null = null) {
   const db = await dbOrThrow();
-  const archive = (await db.select().from(backupArchives).where(eq(backupArchives.id, archiveId)).limit(1))[0];
+  const archive = (await db.select().from(backupArchives).where(and(eq(backupArchives.id, archiveId), companyScope(backupArchives.companyId, companyId))).limit(1))[0];
   if (!archive?.storageKey) throw new Error("Archive introuvable.");
   return storageGetSignedUrl(archive.storageKey);
 }
 
-export async function listBackups(limit = 30) {
+export async function listBackups(limit = 30, companyId: number | null = null) {
   const db = await dbOrThrow();
   return db.select({
     id: backupArchives.id,
@@ -81,7 +82,7 @@ export async function listBackups(limit = 30) {
     createdAt: backupArchives.createdAt,
     createdByName: users.name,
     createdByRole: users.role,
-  }).from(backupArchives).leftJoin(users, eq(backupArchives.createdByUserId, users.id)).orderBy(desc(backupArchives.createdAt)).limit(limit);
+  }).from(backupArchives).leftJoin(users, eq(backupArchives.createdByUserId, users.id)).where(companyScope(backupArchives.companyId, companyId)).orderBy(desc(backupArchives.createdAt)).limit(limit);
 }
 
 export async function applyRetentionPolicy<T extends { id: number }>(archives: T[], retentionCount: number, remove: (id: number) => Promise<void>) {
