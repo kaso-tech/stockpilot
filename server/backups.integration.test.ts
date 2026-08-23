@@ -21,11 +21,12 @@ describe("sauvegarde locale intégrée", () => {
     getDbMock.mockResolvedValue(db);
     storagePutMock.mockResolvedValue({ key: "backups/archive.json", url: "/manus-storage/backups/archive.json" });
 
-    const archive = await createBackupSnapshot(7, "manual");
+    const archive = await createBackupSnapshot(7, "manual", 12);
 
     expect(archive.id).toBe(42);
     expect(archive.filename).toMatch(/^stockpilot-backup-/);
     expect(archive.payload.source).toBe("StockPilot");
+    expect(archive.payload.companyId).toBe(12);
     expect(storagePutMock).toHaveBeenCalledWith(expect.stringContaining("backups/"), expect.any(Buffer), "application/json");
     expect(db.values).toHaveBeenCalledWith(expect.objectContaining({ trigger: "manual", createdByUserId: 7 }));
   });

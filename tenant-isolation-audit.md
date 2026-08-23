@@ -22,3 +22,5 @@
 ## Sauvegardes : chantier d’isolation restant
 
 Les archives existantes doivent être rattachées au fichier, à la rétention, au téléchargement et à la restauration d’une seule entreprise. Une restauration ne devra jamais supprimer ni remplacer les données d’une autre entreprise.
+
+Le format d’archive porte désormais l’identifiant de l’entreprise lors de la création d’une sauvegarde manuelle, avec une couverture de test dédiée.

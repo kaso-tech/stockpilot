@@ -50,9 +50,9 @@ export async function createBackupSnapshot(actorUserId: number | null, trigger: 
   const content = JSON.stringify(payload, null, 2);
   const buffer = Buffer.from(content, "utf8");
   const filename = backupFilename();
-  const stored = await storagePut(`backups/${filename}`, buffer, "application/json");
+  const stored = await storagePut(`company/${companyId ?? "legacy"}/backups/${filename}`, buffer, "application/json");
   const recordCount = Object.values(tables).reduce((sum, rows) => sum + rows.length, 0);
-  const result = await db.insert(backupArchives).values({ filename, trigger, storageKey: stored.key, storageUrl: stored.url, sizeBytes: buffer.byteLength, recordCount, createdByUserId: actorUserId });
+  const result = await db.insert(backupArchives).values({ companyId, filename, trigger, storageKey: stored.key, storageUrl: stored.url, sizeBytes: buffer.byteLength, recordCount, createdByUserId: actorUserId });
   return { id: Number(result[0].insertId), filename, storageUrl: stored.url, sizeBytes: buffer.byteLength, recordCount, payload };
 }
 
