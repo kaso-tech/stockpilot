@@ -3,6 +3,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { visibleNotificationsForRole, type RoleNotification } from "@/lib/roleNotifications";
 import { trpc } from "@/lib/trpc";
 import {
   DropdownMenu,
@@ -143,12 +144,15 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const { data: dashboard } = trpc.dashboard.get.useQuery(undefined, { enabled: isAdmin, refetchInterval: 60_000 });
   const { data: backups } = trpc.backups.get.useQuery(undefined, { enabled: isAdmin, refetchInterval: 60_000 });
   const runBackup = trpc.backups.runNow.useMutation({ onSuccess: archive => toast.success(`Sauvegarde ${archive.filename} créée.`), onError: error => toast.error(error.message) });
-  const notifications: Array<{ id: string; title: string; detail: string; tone: "amber" | "violet" | "rose"; path: string }> = [];
-  if (dashboard?.lowStock?.length) notifications.push({ id: "stock", title: "Stock critique", detail: `${dashboard.lowStock.length} produit(s) au seuil minimum`, tone: "amber", path: "/alertes" });
-  if ((dashboard?.summary?.duePayrollCents ?? 0) > 0) notifications.push({ id: "payroll", title: "Paie à régler", detail: `${dashboard?.summary?.duePayrollCents ?? 0} centimes restent à payer`, tone: "violet", path: "/agents" });
-  if (dashboard?.summary?.expenseBudget?.exceeded) notifications.push({ id: "budget-over", title: "Budget dépassé", detail: "Les dépenses ont dépassé le plafond mensuel.", tone: "rose", path: "/depenses" });
-  else if (dashboard?.summary?.expenseBudget?.warningReached) notifications.push({ id: "budget-warning", title: "Seuil budget atteint", detail: "Le seuil d’alerte des dépenses est atteint.", tone: "amber", path: "/depenses" });
-  if (backups?.settings.lastBackupStatus === "failed") notifications.push({ id: "backup", title: "Sauvegarde à vérifier", detail: backups.settings.lastBackupError || "La dernière sauvegarde a échoué.", tone: "rose", path: "/sauvegardes" });
+  const candidateNotifications: RoleNotification[] = [];
+  if (isAdmin) {
+    if (dashboard?.lowStock?.length) candidateNotifications.push({ id: "stock", title: "Stock critique", detail: `${dashboard.lowStock.length} produit(s) au seuil minimum`, tone: "amber", path: "/alertes", audience: "admin" });
+    if ((dashboard?.summary?.duePayrollCents ?? 0) > 0) candidateNotifications.push({ id: "payroll", title: "Paie à régler", detail: `${dashboard?.summary?.duePayrollCents ?? 0} centimes restent à payer`, tone: "violet", path: "/agents", audience: "admin" });
+    if (dashboard?.summary?.expenseBudget?.exceeded) candidateNotifications.push({ id: "budget-over", title: "Budget dépassé", detail: "Les dépenses ont dépassé le plafond mensuel.", tone: "rose", path: "/depenses", audience: "admin" });
+    else if (dashboard?.summary?.expenseBudget?.warningReached) candidateNotifications.push({ id: "budget-warning", title: "Seuil budget atteint", detail: "Le seuil d’alerte des dépenses est atteint.", tone: "amber", path: "/depenses", audience: "admin" });
+    if (backups?.settings.lastBackupStatus === "failed") candidateNotifications.push({ id: "backup", title: "Sauvegarde à vérifier", detail: backups.settings.lastBackupError || "La dernière sauvegarde a échoué.", tone: "rose", path: "/sauvegardes", audience: "admin" });
+  }
+  const notifications = visibleNotificationsForRole(user?.role === "admin" ? "admin" : "seller", candidateNotifications);
 
   return (
     <>

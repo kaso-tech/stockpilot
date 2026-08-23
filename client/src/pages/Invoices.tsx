@@ -87,12 +87,12 @@ export default function Invoices() {
     const copy = node.cloneNode(true) as HTMLElement;
     if (format === "ticket") copy.querySelectorAll(".a4-only").forEach(element => element.remove());
     popup.document.write(`<!doctype html><html><head><title>Facture</title><style>@page{size:${format === "ticket" ? "80mm auto" : "A4"};margin:12mm}body{font-family:Arial,sans-serif;color:#172033;max-width:${format === "ticket" ? "80mm" : "100%"};margin:0 auto}.row{display:flex;justify-content:space-between;gap:12px}.muted{color:#64748b;font-size:12px}.line{border-top:1px solid #dbe3ea;padding-top:12px;margin-top:12px}.signature{margin-top:32px;text-align:right}.signature.center{text-align:center}.signature.left{text-align:left}.signature img{max-width:180px;max-height:80px;object-fit:contain}</style></head><body>${copy.innerHTML}</body></html>`);
+    let printTriggered = false;
+    const triggerPrint = () => { if (printTriggered) return; printTriggered = true; popup.focus(); popup.print(); };
+    popup.addEventListener("afterprint", () => popup.close(), { once: true });
+    popup.addEventListener("load", triggerPrint, { once: true });
     popup.document.close();
-    popup.focus();
-    window.setTimeout(() => {
-      popup.print();
-      popup.close();
-    }, 250);
+    window.setTimeout(triggerPrint, 350);
   };
   const downloadPdf = () => {
     if (!detail) return;

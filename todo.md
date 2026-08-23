@@ -420,3 +420,7 @@
 - [x] Vérifier les préférences vendeur simplifiées sur desktop et mobile.
 - [x] Ajouter des icônes et couleurs distinctives aux actions rapides du tableau de bord.
 - [x] Vérifier la visibilité des actions rapides sur desktop et mobile.
+- [x] Auditer les notifications par rôle et le flux d’impression des factures.
+- [x] Filtrer les notifications administrateur hors de la vue vendeur.
+- [x] Déclencher automatiquement la boîte de dialogue d’impression après ouverture de la facture.
+- [x] Tester les notifications vendeur et l’impression de facture.
