@@ -443,3 +443,6 @@
 - [x] Tracer la redirection post-connexion vendeur qui mène à la page 404.
 - [x] Corriger la destination après connexion vendeur et vérifier son tableau de bord.
 - [x] Finaliser le diagnostic et le correctif du parcours administrateur Google.
+- [x] Auditer les secrets et la comparaison des identifiants administrateur de secours.
+- [x] Corriger la configuration ou validation qui retourne des identifiants incorrects.
+- [x] Vérifier la connexion administrateur de secours de bout en bout.
