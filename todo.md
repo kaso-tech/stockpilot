@@ -407,3 +407,5 @@
 - [x] Créer une fiche professionnelle de facture avec détails, paiements, intervenants et actions.
 - [x] Transformer la liste des factures en cartes cliquables vers leur fiche dédiée.
 - [x] Tester les actions et la navigation de facture sur desktop et mobile.
+- [x] Retirer le bouton WhatsApp redondant des fiches Fournisseur et Agent.
+- [x] Vérifier les contacts simplifiés sur desktop et mobile.
