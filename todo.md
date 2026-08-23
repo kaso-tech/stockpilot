@@ -430,3 +430,6 @@
 - [x] Tester les états de lecture de notification sur desktop et mobile.
 - [x] Afficher les badges des factures à encaisser et partiellement réglées en orange.
 - [x] Vérifier les statuts de facture sur les listes et fiches.
+- [x] Auditer les journaux et le flux de connexion administrateur via Google.
+- [x] Corriger l’échec d’authentification identifié.
+- [x] Vérifier le retour de connexion administrateur avant publication.

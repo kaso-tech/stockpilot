@@ -21,6 +21,13 @@ function isSecureRequest(req: Request) {
   return protoList.some(proto => proto.trim().toLowerCase() === "https");
 }
 
+function requestHostname(req: Request) {
+  if (req.hostname) return req.hostname;
+  const host = req.headers.host;
+  const rawHost = Array.isArray(host) ? host[0] : host;
+  return rawHost?.split(":")[0] ?? "";
+}
+
 export function getSessionCookieOptions(
   req: Request
 ): Pick<CookieOptions, "domain" | "httpOnly" | "path" | "sameSite" | "secure"> {
@@ -39,10 +46,18 @@ export function getSessionCookieOptions(
   //       ? hostname
   //       : undefined;
 
+  const hostname = requestHostname(req);
+  const localRequest = LOCAL_HOSTS.has(hostname) || isIpAddress(hostname);
+  // In production, Express can see the gateway hop as HTTP even though the
+  // browser communicates over HTTPS. A SameSite=None cookie without Secure is
+  // discarded by modern browsers, which makes OAuth appear to succeed but
+  // immediately returns the user to an unauthenticated state.
+  const secure = localRequest ? isSecureRequest(req) : true;
+
   return {
     httpOnly: true,
     path: "/",
-    sameSite: "none",
-    secure: isSecureRequest(req),
+    sameSite: secure ? "none" : "lax",
+    secure,
   };
 }
