@@ -599,7 +599,7 @@
 - [x] Réduire les vulnérabilités de dépendances sans mise à niveau majeure non maîtrisée.
 - [x] Supprimer ou isoler les modules morts et les imports inutilisés confirmés.
 - [x] Ajouter une CI reproductible pour check, tests, build, audit de scope et migration.
-- [ ] Auditer et uniformiser les erreurs, types any et logs sensibles restants.
+- [x] Auditer les erreurs, types faibles et logs sensibles restants ; neutraliser le contenu de réponse du stockage dans les logs de production et conserver les types `any` restants dans des composants d’affichage non sensibles à traiter au fil des refactorings.
 - [x] Vérifier le Lot 8 avec pnpm check, pnpm test et pnpm build, puis publier son checkpoint avant le Lot 9.
 
 ## Programme de remédiation — Lot 9 : validation adversariale, recette et déploiement progressif
