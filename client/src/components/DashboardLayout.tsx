@@ -73,6 +73,7 @@ const menuItems = [
   { icon: LayoutDashboard, label: "Vue d’ensemble", path: "/" },
   { icon: ShoppingCart, label: "Vente Rapide", path: "/pos" },
   { icon: ReceiptText, label: "Factures", path: "/factures" },
+  { icon: FileText, label: "Devis", path: "/devis" },
   { icon: UserRound, label: "Clients", path: "/clients" },
   { icon: PackageSearch, label: "Produits", path: "/produits" },
   { icon: Boxes, label: "Catégories", path: "/categories" },
@@ -178,13 +179,13 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const isMobile = useIsMobile();
   const { data: sellerPermissions } = trpc.commerce.settings.get.useQuery(undefined, { enabled: user?.role === "seller" });
   const sellerMenuItems = [
-    ...menuItems.filter(item => item.path === "/" || item.path === "/pos" || item.path === "/factures" || item.path === "/clients" || item.path === "/mouvements" || item.path === "/synchronisation" || (item.path === "/produits" && sellerPermissions?.sellerCanEditPurchasePrice)),
+    ...menuItems.filter(item => item.path === "/" || item.path === "/pos" || item.path === "/factures" || item.path === "/devis" || item.path === "/clients" || item.path === "/mouvements" || item.path === "/synchronisation" || (item.path === "/produits" && sellerPermissions?.sellerCanEditPurchasePrice)),
     { icon: Settings2, label: "Apparence", path: "/parametres/apparence" },
     { icon: LayoutDashboard, label: "Mon tableau de bord", path: "/parametres/tableau-de-bord" },
     { icon: ShieldCheck, label: "Sécurité", path: "/parametres/securite" },
   ];
   const visibleMenuItems = user?.role === "admin" ? menuItems : sellerMenuItems;
-  const activeMenuItem = visibleMenuItems.find(item => item.path === location || (item.path === "/produits" && location.startsWith("/produits/")) || (item.path === "/clients" && location.startsWith("/clients/")) || (item.path === "/fournisseurs" && location.startsWith("/fournisseurs/")) || (item.path === "/bons-commande" && location.startsWith("/bons-commande/"))) ?? visibleMenuItems[0];
+  const activeMenuItem = visibleMenuItems.find(item => item.path === location || (item.path === "/produits" && location.startsWith("/produits/")) || (item.path === "/clients" && location.startsWith("/clients/")) || (item.path === "/fournisseurs" && location.startsWith("/fournisseurs/")) || (item.path === "/bons-commande" && location.startsWith("/bons-commande/")) || (item.path === "/devis" && location.startsWith("/devis/"))) ?? visibleMenuItems[0];
   const initials = (user?.name || user?.email || "U").slice(0, 2).toUpperCase();
   const isAdmin = user?.role === "admin";
   const canRunBackup = Boolean(user);
@@ -231,7 +232,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           {!isCollapsed && <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Pilotage</p>}
           <SidebarMenu className="gap-1">
             {visibleMenuItems.map(item => {
-              const isActive = location === item.path || (item.path === "/clients" && location.startsWith("/clients/")) || (item.path === "/fournisseurs" && location.startsWith("/fournisseurs/")) || (item.path === "/bons-commande" && location.startsWith("/bons-commande/"));
+              const isActive = location === item.path || (item.path === "/clients" && location.startsWith("/clients/")) || (item.path === "/fournisseurs" && location.startsWith("/fournisseurs/")) || (item.path === "/bons-commande" && location.startsWith("/bons-commande/")) || (item.path === "/devis" && location.startsWith("/devis/"));
               return (
                 <SidebarMenuItem key={item.path}>
                   <SidebarMenuButton

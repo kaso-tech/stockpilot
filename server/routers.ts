@@ -39,6 +39,8 @@ import {
   listUsers,
 } from "./db";
 import { resultingStock, signedMovementQuantity } from "./stockRules";
+import { calculateCommercialTotals } from "./commercialTotals";
+import { MAX_CENTS, MAX_QUANTITY } from "./numericLimits";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
@@ -600,34 +602,38 @@ export const appRouter = router({
       supplierId: z.number().int().positive(),
       notes: z.string().trim().max(2000).nullable().optional(),
       expectedDeliveryDate: z.coerce.date().nullable().optional(),
-      items: z.array(z.object({ productId: z.number().int().positive(), quantity: z.number().int().positive() })).min(1).max(100),
+      items: z.array(z.object({ productId: z.number().int().positive(), quantity: z.number().int().positive().max(MAX_QUANTITY) })).min(1).max(100),
+      deliveryFeeCents: z.number().int().min(0).max(MAX_CENTS).default(0),
     })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
       const supplier = (await db.select().from(suppliers).where(and(eq(suppliers.id, input.supplierId), companyScope(suppliers.companyId, ctx.user.companyId))).limit(1))[0];
       if (!supplier) throw new TRPCError({ code: "NOT_FOUND", message: "Fournisseur introuvable." });
+      const settings = (await db.select().from(saleSettings).where(companyScope(saleSettings.companyId, ctx.user.companyId)).limit(1))[0];
       const catalog = await db.select().from(products).where(companyScope(products.companyId, ctx.user.companyId));
       const selected = input.items.map(item => {
         const product = catalog.find(value => value.id === item.productId);
         if (!product || product.supplierId !== input.supplierId) throw new TRPCError({ code: "BAD_REQUEST", message: "Chaque produit doit être rattaché à ce fournisseur." });
         return { product, quantity: item.quantity, lineTotalCents: item.quantity * product.purchasePriceCents };
       });
-      const totalCents = selected.reduce((sum, item) => sum + item.lineTotalCents, 0);
+      const subtotalCents = selected.reduce((sum, item) => sum + item.lineTotalCents, 0);
+      const totals = calculateCommercialTotals({ subtotalCents, vatRateBasisPoints: settings?.vatEnabled ? settings.vatRateBasisPoints : 0, deliveryFeeCents: input.deliveryFeeCents });
       const orderNumber = `BC-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
       const orderId = await db.transaction(async tx => {
-        const result = await tx.insert(purchaseOrders).values({ companyId: ctx.user.companyId, orderNumber, supplierId: input.supplierId, totalCents, notes: input.notes ?? null, expectedDeliveryDate: input.expectedDeliveryDate ?? null, createdByUserId: ctx.user.id });
+        const result = await tx.insert(purchaseOrders).values({ companyId: ctx.user.companyId, orderNumber, supplierId: input.supplierId, subtotalCents: totals.subtotalCents, vatRateBasisPoints: totals.vatRateBasisPoints, vatCents: totals.vatCents, deliveryFeeCents: totals.deliveryFeeCents, totalCents: totals.totalCents, notes: input.notes ?? null, expectedDeliveryDate: input.expectedDeliveryDate ?? null, createdByUserId: ctx.user.id });
         const id = Number(result[0].insertId);
         await tx.insert(purchaseOrderItems).values(selected.map(item => ({ purchaseOrderId: id, productId: item.product.id, productName: item.product.name, productReference: item.product.reference, unit: item.product.unit, quantity: item.quantity, purchasePriceCents: item.product.purchasePriceCents, lineTotalCents: item.lineTotalCents })));
         return id;
       });
       await createAudit(ctx.user.id, "Création", "Bon de commande", orderId, `Bon ${orderNumber} créé pour ${supplier.name}`);
-      return { id: orderId, orderNumber, totalCents };
+      return { id: orderId, orderNumber, totalCents: totals.totalCents, vatCents: totals.vatCents, deliveryFeeCents: totals.deliveryFeeCents };
     }),
-    updateDetails: adminProcedure.input(z.object({ id: z.number().int().positive(), notes: z.string().trim().max(2000).nullable(), expectedDeliveryDate: z.coerce.date().nullable() })).mutation(async ({ ctx, input }) => {
+    updateDetails: adminProcedure.input(z.object({ id: z.number().int().positive(), notes: z.string().trim().max(2000).nullable(), expectedDeliveryDate: z.coerce.date().nullable(), deliveryFeeCents: z.number().int().min(0).max(MAX_CENTS).optional() })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
       const order = (await db.select().from(purchaseOrders).where(and(eq(purchaseOrders.id, input.id), companyScope(purchaseOrders.companyId, ctx.user.companyId))).limit(1))[0];
       if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Bon de commande introuvable." });
       if (order.status === "received" || order.status === "cancelled") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Ce bon ne peut plus être modifié." });
-      await db.update(purchaseOrders).set({ notes: input.notes, expectedDeliveryDate: input.expectedDeliveryDate }).where(and(eq(purchaseOrders.id, input.id), companyScope(purchaseOrders.companyId, ctx.user.companyId)));
+      const update = input.deliveryFeeCents === undefined ? { notes: input.notes, expectedDeliveryDate: input.expectedDeliveryDate } : { notes: input.notes, expectedDeliveryDate: input.expectedDeliveryDate, deliveryFeeCents: input.deliveryFeeCents, totalCents: order.subtotalCents + order.vatCents + input.deliveryFeeCents };
+      await db.update(purchaseOrders).set(update).where(and(eq(purchaseOrders.id, input.id), companyScope(purchaseOrders.companyId, ctx.user.companyId)));
       await createAudit(ctx.user.id, "Modification", "Bon de commande", input.id, `Bon ${order.orderNumber} mis à jour`);
       return { success: true };
     }),

@@ -609,3 +609,11 @@
 - [x] Vérifier les impressions et exports avec des caractères HTML adversariaux.
 - [x] Exécuter une recette POS, factures, agents, sauvegardes et PWA sans données sensibles.
 - [x] Produire le go/no-go, le plan de rollback et le bilan final de déploiement.
+
+## Fonctionnalité commerciale — recherche paramètres, TVA et livraison
+- [x] Ajouter une recherche instantanée et accessible dans l’index des paramètres.
+- [x] Ajouter une configuration TVA scoped par entreprise avec validation de taux.
+- [x] Ajouter les champs TVA et frais de livraison aux factures, bons et devis concernés.
+- [x] Persister les taux et frais dans les documents afin de figer les montants historiques.
+- [x] Mettre à jour totaux, affichages, détails, impressions et exports.
+- [x] Ajouter les tests de calcul, de validation, d’isolation et de régression, puis lancer pnpm check, pnpm test et pnpm build.
