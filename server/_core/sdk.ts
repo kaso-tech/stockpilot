@@ -25,6 +25,19 @@ export type SessionPayload = {
   sessionId?: string;
 };
 
+const MINIMUM_SESSION_SECRET_LENGTH = 22;
+
+export function assertSecureSessionSecret(secret: string, isProduction: boolean): void {
+  const hasRequiredCharacterDiversity =
+    /[a-z]/.test(secret) && /[A-Z]/.test(secret) && /\d/.test(secret);
+  const isProductionSecretSecure =
+    secret.length >= MINIMUM_SESSION_SECRET_LENGTH && hasRequiredCharacterDiversity;
+
+  if (!secret || (isProduction && !isProductionSecretSecure)) {
+    throw new Error("Session secret is not configured securely.");
+  }
+}
+
 const EXCHANGE_TOKEN_PATH = `/webdev.v1.WebDevAuthPublicService/ExchangeToken`;
 const GET_USER_INFO_PATH = `/webdev.v1.WebDevAuthPublicService/GetUserInfo`;
 const GET_USER_INFO_WITH_JWT_PATH = `/webdev.v1.WebDevAuthPublicService/GetUserInfoWithJwt`;
@@ -160,7 +173,7 @@ class SDKServer {
 
   private getSessionSecret() {
     const secret = ENV.cookieSecret;
-    if (!secret || (ENV.isProduction && secret.length < 32)) throw new Error("Session secret is not configured securely.");
+    assertSecureSessionSecret(secret, ENV.isProduction);
     return new TextEncoder().encode(secret);
   }
 

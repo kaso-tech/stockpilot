@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ENV } from "./_core/env";
 import { appRouter } from "./routers";
 
@@ -18,8 +18,17 @@ suite("auth.adminFallbackLogin (requires DATABASE_URL)", () => {
     const cookies: unknown[] = [];
     const ctx = { user: null, req: { protocol: "https", hostname: "stockpilot-gpaoheuz.manus.space", headers: {} }, res: { cookie: (...args: unknown[]) => cookies.push(args) } } as never;
     const caller = appRouter.createCaller(ctx);
-    await expect(caller.auth.adminFallbackLogin({ email: ENV.adminFallbackEmail, password: "mot-de-passe-invalide" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
-    expect(cookies).toHaveLength(0);
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => undefined);
+
+    try {
+      await expect(caller.auth.adminFallbackLogin({ email: ENV.adminFallbackEmail, password: "mot-de-passe-invalide" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      expect(cookies).toHaveLength(0);
+      expect(infoSpy).toHaveBeenCalledWith("[Auth fallback] Rejected credentials", { reason: "password" });
+      expect(JSON.stringify(infoSpy.mock.calls)).not.toContain("passwordLength");
+      expect(JSON.stringify(infoSpy.mock.calls)).not.toContain("configuredPasswordLength");
+    } finally {
+      infoSpy.mockRestore();
+    }
   });
 
   it("refuse le secours lorsque OWNER_OPEN_ID manque afin de ne pas sélectionner un administrateur d’une autre entreprise", async () => {

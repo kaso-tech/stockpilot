@@ -297,7 +297,7 @@ export const appRouter = router({
       assertLoginRateLimit(ctx.req, input.email);
       const emailMatches = Boolean(ENV.adminFallbackEmail) && input.email.trim().toLowerCase() === ENV.adminFallbackEmail.trim().toLowerCase();
       if (!emailMatches) {
-        console.info("[Auth fallback] Rejected credentials", { emailMatches, passwordLength: input.password.length, configuredPasswordLength: ENV.adminFallbackPassword.length, reason: "email" });
+        console.info("[Auth fallback] Rejected credentials", { reason: "email" });
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Identifiants administrateur incorrects." });
       }
       const db = await requireDb();
@@ -305,13 +305,13 @@ export const appRouter = router({
       const configuredAdmin = adminAccounts.find(account => account.email?.trim().toLowerCase() === input.email.trim().toLowerCase()) ?? (adminAccounts.length === 1 ? adminAccounts[0] : undefined);
       const adminOpenId = ENV.ownerOpenId;
       if (!adminOpenId) {
-        console.info("[Auth fallback] Rejected credentials", { emailMatches, passwordLength: input.password.length, configuredPasswordLength: ENV.adminFallbackPassword.length, reason: "admin-account" });
+        console.info("[Auth fallback] Rejected credentials", { reason: "admin-account" });
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Identifiants administrateur incorrects." });
       }
       const override = (await db.select().from(adminFallbackPasswords).where(eq(adminFallbackPasswords.ownerOpenId, adminOpenId)).limit(1))[0];
       const passwordValid = override ? await verifyPassword(input.password, override.passwordHash) : legacyAdminFallbackEnabled() && matchesAdminFallbackCredentials(input, { email: ENV.adminFallbackEmail, password: ENV.adminFallbackPassword });
       if (!passwordValid) {
-        console.info("[Auth fallback] Rejected credentials", { emailMatches, passwordLength: input.password.length, configuredPasswordLength: ENV.adminFallbackPassword.length, overridePresent: Boolean(override), reason: "password" });
+        console.info("[Auth fallback] Rejected credentials", { reason: "password" });
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Identifiants administrateur incorrects." });
       }
       const token = await sdk.createSessionToken(adminOpenId, { name: configuredAdmin?.name || "Administrateur", expiresInMs: ONE_YEAR_MS });

@@ -634,3 +634,7 @@
 
 ## Synchronisation GitHub
 - [x] Importer et valider le checkpoint GitHub 54911b1, appliquer les migrations 0041 et 0042, puis préparer sa publication.
+
+## Correctif — secret de session
+- [x] Diagnostiquer et corriger l’erreur « Session secret is not configured securely » sans exposer ni affaiblir le secret de session ; retirer des journaux de rejet les métadonnées d’identifiants non nécessaires.
+- [x] Ajouter une couverture de test de la validation de configuration, valider connexion et build, puis publier un checkpoint.
