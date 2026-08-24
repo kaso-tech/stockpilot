@@ -219,6 +219,8 @@ export const saleSettings = mysqlTable("saleSettings", {
   ticketHeader: varchar("ticketHeader", { length: 160 }).notNull().default("Merci de votre achat"),
   ticketFooter: varchar("ticketFooter", { length: 240 }).notNull().default("À bientôt"),
   ticketWidthMm: mysqlEnum("ticketWidthMm", ["58", "80"]).notNull().default("80"),
+  printerName: varchar("printerName", { length: 120 }).notNull().default("Imprimante système"),
+  printerType: mysqlEnum("printerType", ["browser", "thermal"]).notNull().default("browser"),
   paymentCashEnabled: boolean("paymentCashEnabled").notNull().default(true),
   paymentCardEnabled: boolean("paymentCardEnabled").notNull().default(true),
   paymentMobileMoneyEnabled: boolean("paymentMobileMoneyEnabled").notNull().default(true),

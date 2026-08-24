@@ -631,3 +631,11 @@
 - [x] Conserver ensemble les réglages fortement liés comme affichage et devise.
 - [x] Préserver les routes historiques et les permissions administrateur.
 - [x] Ajouter les tests de recherche par sous-réglage et par section.
+
+## Paramètres entreprise, impression et imprimante
+- [x] Retirer les descriptions sous les titres de section et réduire légèrement les espacements de l’index Paramètres.
+- [x] Isoler l’historique des modifications par companyId côté écritures et lectures.
+- [x] Séparer l’écran Identité de l’entreprise de l’écran Impression et périphériques.
+- [x] Ajouter un paramètre d’imprimante scoped par entreprise avec validation et valeur par défaut sûre.
+- [x] Ajouter les routes, liens, permissions et tests de l’imprimante et de l’historique.
+- [x] Exécuter pnpm check, pnpm test, pnpm build et pnpm verify:release, créer un checkpoint et publier la version.

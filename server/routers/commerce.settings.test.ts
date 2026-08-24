@@ -38,6 +38,11 @@ describe("commerce.settings.save", () => {
     await caller.settings.save({ defaultSalesAgentId: null, defaultCashierId: null, requireSalesAgent: true, requireCashier: false, currency: "XOF", ticketHeader: "Bienvenue chez Bati Pro", ticketFooter: "Merci et à bientôt", ticketWidthMm: "58" });
     expect(inserts.find(item => item.table === saleSettings)?.values).toMatchObject({ requireSalesAgent: true, ticketHeader: "Bienvenue chez Bati Pro", ticketFooter: "Merci et à bientôt", ticketWidthMm: "58" });
   });
+  it("enregistre les paramètres d’imprimante indépendamment de l’identité", async () => {
+    const caller = commerceRouter.createCaller(adminContext());
+    await caller.settings.save({ defaultSalesAgentId: null, defaultCashierId: null, requireSalesAgent: false, requireCashier: false, currency: "XOF", ticketHeader: "Ticket StockPilot", ticketFooter: "Merci", ticketWidthMm: "80", printerName: "Caisse principale", printerType: "thermal" });
+    expect(inserts.find(item => item.table === saleSettings)?.values).toMatchObject({ ticketHeader: "Ticket StockPilot", ticketFooter: "Merci", ticketWidthMm: "80", printerName: "Caisse principale", printerType: "thermal" });
+  });
   it("enregistre une couleur principale hexadécimale pour l’application", async () => {
     const caller = commerceRouter.createCaller(adminContext());
     await caller.settings.save({ defaultSalesAgentId: null, defaultCashierId: null, requireSalesAgent: false, requireCashier: false, currency: "XOF", primaryColor: "#6D28D9" });
