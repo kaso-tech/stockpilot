@@ -48,6 +48,7 @@ import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { commerceRouter } from "./routers/commerce";
 import { inventoryRouter } from "./routers/inventory";
 import { payrollRouter } from "./routers/payroll";
+import { printingSettingsRouter } from "./routers/printingSettings";
 
 const STANDARD_AUTH_SESSION_MS = 24 * 60 * 60 * 1000;
 const REMEMBERED_AUTH_SESSION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -180,6 +181,7 @@ async function syncStockAlert(productId: number, companyId: number | null) {
 }
 
 export const appRouter = router({
+  printingSettings: printingSettingsRouter,
   system: systemRouter,
   commerce: commerceRouter,
   inventory: inventoryRouter,

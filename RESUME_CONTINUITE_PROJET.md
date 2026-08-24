@@ -1,10 +1,10 @@
 # StockPilot Pro — Dossier de continuité
 
-**Date de synthèse :** 23 août 2026  
+**Date de synthèse :** 24 août 2026  
 **Projet Manus :** StockPilot SaaS  
 **Chemin de travail :** `/home/ubuntu/stockpilot-pro`  
 **Domaine publié :** `https://stockpilot-gpaoheuz.manus.space`  
-**Dernier checkpoint fonctionnel :** `ef3f69fd`  
+**Dernier checkpoint fonctionnel avant la synchronisation GitHub actuelle :** `20eefcc1`  
 **Dernière archive source fournie :** `/home/ubuntu/stockpilot-pro-current.zip`
 
 ## 1. Objectif produit
@@ -98,6 +98,7 @@ Les conventions permanentes sont les suivantes : interface professionnelle et re
 | `server/companyScope.ts` | Filtre de périmètre entreprise |
 | `server/routers.ts` | Routeur principal, inscription, auth, dashboard |
 | `server/routers/commerce.ts` | Clients, agents, vendeurs, réglages, factures, rémunérations |
+| `server/routers/printingSettings.ts` | Réglages multi-entreprises des tickets et de l’imprimante par défaut |
 | `server/routers/transactions.ts` | POS, brouillons, encaissements, remboursements |
 | `server/routers/inventory.ts` | Inventaires et mouvements |
 | `server/backups.ts` | Création et restauration sélective d’archives |
@@ -112,7 +113,7 @@ Les conventions permanentes sont les suivantes : interface professionnelle et re
 
 ## 8. Tests et état de validation
 
-Le dernier état validé avant ce document comprend **155 tests Vitest**, `pnpm check` et `pnpm build` réussis. Les warnings de chunks PWA volumineux et d’options PNPM anciennes sont non bloquants, mais une future optimisation du découpage du bundle est recommandée.
+Le dernier état validé comprend **190 tests Vitest**, `pnpm check` et `pnpm build` réussis. La synchronisation GitHub récente ajoute une page dédiée « Impression et imprimante », des préférences de ticket et d’imprimante isolées par entreprise, une trace d’audit et la migration Drizzle `0043_loving_boom_boom.sql`, déjà appliquée. Les warnings de chunks PWA volumineux sont non bloquants, mais une future optimisation du découpage du bundle est recommandée.
 
 Les commandes à exécuter après chaque lot significatif sont :
 
@@ -137,4 +138,4 @@ La prochaine conversation doit démarrer par le point critique offline suivant :
 
 ## 10. Instruction de reprise prête à copier
 
-> Reprendre StockPilot Pro dans `/home/ubuntu/stockpilot-pro`. Lire d’abord `RESUME_CONTINUITE_PROJET.md`, `tenant-isolation-audit.md`, `offline-architecture.md` et `todo.md`. Le dernier checkpoint publié est `ef3f69fd` ; un document de continuité a ensuite été ajouté. Le projet est un SaaS React/tRPC/Drizzle multi-entreprise avec auth interne e-mail/mot de passe. Priorité immédiate : terminer la migration du mode hors connexion de `localStorage` vers IndexedDB par entreprise/utilisateur dans `client/src/contexts/OfflineContext.tsx`, sans régression sur les ventes POS et encaissements idempotents. Exécuter `pnpm check`, `pnpm test` et `pnpm build` après les modifications ; relire `todo.md` avant tout checkpoint. Ne jamais exposer les secrets, hashes ou identifiants sensibles.
+> Reprendre StockPilot Pro dans `/home/ubuntu/stockpilot-pro`. Lire d’abord `RESUME_CONTINUITE_PROJET.md`, `tenant-isolation-audit.md`, `offline-architecture.md` et `todo.md`. Le projet est un SaaS React/tRPC/Drizzle multi-entreprise avec auth interne e-mail/mot de passe. La mise à jour GitHub `81833c5` a été intégrée fonctionnellement avec les réglages d’impression multi-entreprises et la migration `0043_loving_boom_boom.sql`. Priorité immédiate : terminer la migration du mode hors connexion de `localStorage` vers IndexedDB par entreprise/utilisateur dans `client/src/contexts/OfflineContext.tsx`, sans régression sur les ventes POS et encaissements idempotents. Exécuter `pnpm check`, `pnpm test` et `pnpm build` après les modifications ; relire `todo.md` avant tout checkpoint. Ne jamais exposer les secrets, hashes ou identifiants sensibles.

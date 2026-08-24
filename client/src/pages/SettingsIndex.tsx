@@ -1,7 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Building2, ChevronRight, CircleDollarSign, DatabaseBackup, History, KeyRound, LayoutDashboard, Palette, ReceiptText, Search, Settings2, ShieldCheck, Tags, UsersRound } from "lucide-react";
+import { Building2, ChevronRight, CircleDollarSign, DatabaseBackup, History, KeyRound, LayoutDashboard, Palette, Printer, ReceiptText, Search, Settings2, ShieldCheck, Tags, UsersRound } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "wouter";
@@ -27,6 +27,12 @@ export const settingsSections: SettingsSection[] = [
     label: "Identité et documents",
     detail: "Présentez votre entreprise avec les informations utilisées sur les documents.",
     links: [{ href: "/parametres/identite", icon: Building2, label: "Identité et impression", detail: "Logo, signature et documents A4", keywords: "entreprise société logo signature facture" }],
+  },
+  {
+    id: "printing",
+    label: "Impression et périphériques",
+    detail: "Configurez les tickets et le comportement de l’imprimante par défaut.",
+    links: [{ href: "/parametres/impression", icon: Printer, label: "Impression et imprimante", detail: "Tickets, largeur et préférence d’imprimante", keywords: "impression imprimante thermique ticket caisse reçu" }],
   },
   {
     id: "appearance",

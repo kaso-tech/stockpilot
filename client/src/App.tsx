@@ -38,6 +38,7 @@ import Categories from "./pages/Categories";
 import Units from "./pages/Units";
 import SettingsPos from "./pages/SettingsPos";
 import SettingsPosSection from "./pages/SettingsPosSection";
+import SettingsPrinting from "./pages/SettingsPrinting";
 import SettingsHistory from "./pages/SettingsHistory";
 import SettingsDashboard from "./pages/SettingsDashboard";
 import SettingsSecurity from "./pages/SettingsSecurity";
@@ -67,6 +68,7 @@ function DashboardRouter() {
         <Route path={"/parametres/devise"} component={SettingsCurrency} />
         <Route path={"/parametres/fiscalite"} component={SettingsFiscal} />
         <Route path={"/parametres/identite"} component={SettingsIdentity} />
+        <Route path={"/parametres/impression"} component={SettingsPrinting} />
         <Route path={"/parametres/pos/rattachement"} component={() => <SettingsPosSection section="assignment" />} />
         <Route path={"/parametres/pos/tickets"} component={() => <SettingsPosSection section="ticket" />} />
         <Route path={"/parametres/pos/paiements"} component={() => <SettingsPosSection section="payments" />} />
