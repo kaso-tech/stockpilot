@@ -11,7 +11,7 @@ const mockedGetDb = vi.mocked(getDb);
 
 function adminContext(): TrpcContext {
   return {
-    user: { id: 3, openId: "admin-test", name: "Admin test", email: "admin@test.local", loginMethod: "manus", role: "admin", createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() },
+    user: { id: 3, openId: "admin-test", name: "Admin test", email: "admin@test.local", loginMethod: "manus", role: "admin", companyId: 1, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() },
     req: { protocol: "https", headers: {} } as TrpcContext["req"],
     res: { clearCookie: () => undefined } as TrpcContext["res"],
   };

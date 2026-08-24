@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, ne } from "drizzle-orm";
+import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import {
@@ -39,6 +39,8 @@ import {
   listUsers,
 } from "./db";
 import { resultingStock, signedMovementQuantity } from "./stockRules";
+import { calculateCommercialTotals } from "./commercialTotals";
+import { MAX_CENTS, MAX_QUANTITY } from "./numericLimits";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
@@ -59,6 +61,25 @@ function sessionDeviceLabel(userAgent: string | undefined) {
   if (/Linux/i.test(agent)) return "Ordinateur Linux";
   return "Appareil inconnu";
 }
+
+function requestIdentity(req: { ip?: string; headers: Record<string, unknown> }) {
+  const forwarded = req.headers["x-forwarded-for"];
+  const forwardedIp = Array.isArray(forwarded) ? forwarded[0] : typeof forwarded === "string" ? forwarded.split(",")[0]?.trim() : undefined;
+  return forwardedIp || req.ip || "unknown";
+}
+
+function assertLoginRateLimit(req: { ip?: string; headers: Record<string, unknown> }, email: string) {
+  const identity = requestIdentity(req);
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!consumeRateLimit(`auth:ip:${identity}`, 30, 15 * 60 * 1000) || !consumeRateLimit(`auth:account:${identity}:${normalizedEmail}`, 10, 15 * 60 * 1000)) {
+    throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop de tentatives. Réessayez plus tard." });
+  }
+}
+
+function legacyAdminFallbackEnabled() {
+  return !ENV.isProduction && process.env.ALLOW_LEGACY_ADMIN_FALLBACK === "true";
+}
+
 import { backupRouter } from "./routers/backups";
 import { transactionsRouter } from "./routers/transactions";
 import { expensesRouter } from "./routers/expenses";
@@ -70,6 +91,7 @@ import { hashPassword, verifyPassword } from "./passwords";
 import { categoryCanBeRemoved } from "./categoryRules";
 import { assertSellerSensitiveAction } from "./sellerActionRules";
 import { companyScope } from "./companyScope";
+import { consumeRateLimit } from "./rateLimit";
 
 const productInput = z.object({
   reference: z.string().trim().min(2).max(80),
@@ -123,12 +145,12 @@ async function createAudit(
   });
 }
 
-async function syncStockAlert(productId: number) {
+async function syncStockAlert(productId: number, companyId: number | null) {
   const db = await requireDb();
-  const row = await db.select().from(products).where(eq(products.id, productId)).limit(1);
+  const row = await db.select().from(products).where(and(eq(products.id, productId), companyScope(products.companyId, companyId))).limit(1);
   const product = row[0];
   if (!product) return;
-  const existing = await db.select().from(stockAlerts).where(eq(stockAlerts.productId, productId)).limit(1);
+  const existing = await db.select().from(stockAlerts).where(and(eq(stockAlerts.productId, productId), companyScope(stockAlerts.companyId, companyId))).limit(1);
   const isBelowThreshold = product.quantity <= product.minimumQuantity;
 
   if (isBelowThreshold) {
@@ -138,9 +160,10 @@ async function syncStockAlert(productId: number) {
         observedQuantity: product.quantity,
         status: "active",
         resolvedAt: null,
-      }).where(eq(stockAlerts.id, existing[0].id));
+      }).where(and(eq(stockAlerts.id, existing[0].id), companyScope(stockAlerts.companyId, companyId)));
     } else {
       await db.insert(stockAlerts).values({
+        companyId,
         productId,
         threshold: product.minimumQuantity,
         observedQuantity: product.quantity,
@@ -152,7 +175,7 @@ async function syncStockAlert(productId: number) {
       observedQuantity: product.quantity,
       status: "resolved",
       resolvedAt: new Date(),
-    }).where(eq(stockAlerts.id, existing[0].id));
+    }).where(and(eq(stockAlerts.id, existing[0].id), companyScope(stockAlerts.companyId, companyId)));
   }
 }
 
@@ -167,23 +190,25 @@ export const appRouter = router({
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(async ({ ctx }) => {
-      if (ctx.user?.sessionId) {
+      if (ctx.user?.sessionId && ctx.user.id > 0) {
         const db = await getDb();
-        if (db) await db.update(userSessions).set({ revokedAt: new Date() }).where(eq(userSessions.id, ctx.user.sessionId));
+        if (db) await db.update(userSessions).set({ revokedAt: new Date() }).where(and(eq(userSessions.id, ctx.user.sessionId), eq(userSessions.userId, ctx.user.id)));
       }
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true } as const;
     }),
-    localLogin: publicProcedure.input(z.object({ username: z.string().trim().min(3), password: z.string().min(1) })).mutation(async ({ ctx, input }) => {
+    localLogin: publicProcedure.input(z.object({ username: z.string().trim().min(3).max(320), password: z.string().min(1).max(256) })).mutation(async ({ ctx, input }) => {
+      assertLoginRateLimit(ctx.req, input.username);
       const db = await requireDb();
       const row = (await db.select({ openId: users.openId, name: users.name, active: users.active, passwordHash: sellerCredentials.passwordHash }).from(sellerCredentials).innerJoin(users, eq(sellerCredentials.userId, users.id)).where(eq(sellerCredentials.username, input.username)).limit(1))[0];
-      if (!row || !row.active || !(await verifyPassword(input.password, row.passwordHash))) throw new TRPCError({ code: "UNAUTHORIZED", message: "Identifiants vendeur incorrects." });
+      if (!row || !row.active || !(await verifyPassword(input.password, row.passwordHash))) throw new TRPCError({ code: "UNAUTHORIZED", message: "E-mail ou mot de passe incorrect." });
       const token = await sdk.createSessionToken(row.openId, { name: row.name || input.username, expiresInMs: ONE_YEAR_MS });
       ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: ONE_YEAR_MS });
       return { success: true } as const;
     }),
-    passwordLogin: publicProcedure.input(z.object({ email: z.string().trim().email(), password: z.string().min(1), rememberMe: z.boolean().optional().default(false) })).mutation(async ({ ctx, input }) => {
+    passwordLogin: publicProcedure.input(z.object({ email: z.string().trim().email().max(320), password: z.string().min(1).max(256), rememberMe: z.boolean().optional().default(false) })).mutation(async ({ ctx, input }) => {
+      assertLoginRateLimit(ctx.req, input.email);
       const db = await requireDb();
       const email = input.email.trim().toLowerCase();
       const accounts = await db.select().from(users);
@@ -193,9 +218,7 @@ export const appRouter = router({
       let passwordValid = false;
       if (account.role === "admin") {
         const storedPassword = (await db.select().from(adminFallbackPasswords).where(eq(adminFallbackPasswords.ownerOpenId, account.openId)).limit(1))[0];
-        passwordValid = storedPassword
-          ? await verifyPassword(input.password, storedPassword.passwordHash)
-          : matchesAdminFallbackCredentials({ email: input.email, password: input.password }, { email: ENV.adminFallbackEmail, password: ENV.adminFallbackPassword });
+        passwordValid = Boolean(storedPassword) && await verifyPassword(input.password, storedPassword.passwordHash);
       } else {
         const credential = (await db.select().from(sellerCredentials).where(eq(sellerCredentials.userId, account.id)).limit(1))[0];
         passwordValid = Boolean(credential) && await verifyPassword(input.password, credential.passwordHash);
@@ -256,9 +279,9 @@ export const appRouter = router({
       revoke: protectedProcedure.input(z.object({ sessionId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
         if (input.sessionId === ctx.user.sessionId) throw new TRPCError({ code: "BAD_REQUEST", message: "Utilisez la déconnexion pour fermer la session de cet appareil." });
         const db = await requireDb();
-        const session = (await db.select().from(userSessions).where(eq(userSessions.id, input.sessionId)).limit(1))[0];
+        const session = (await db.select().from(userSessions).where(and(eq(userSessions.id, input.sessionId), eq(userSessions.userId, ctx.user.id))).limit(1))[0];
         if (!session || session.userId !== ctx.user.id || session.revokedAt) throw new TRPCError({ code: "NOT_FOUND", message: "Session introuvable." });
-        await db.update(userSessions).set({ revokedAt: new Date() }).where(eq(userSessions.id, session.id));
+        await db.update(userSessions).set({ revokedAt: new Date() }).where(and(eq(userSessions.id, session.id), eq(userSessions.userId, ctx.user.id)));
         return { success: true } as const;
       }),
       revokeOthers: protectedProcedure.mutation(async ({ ctx }) => {
@@ -266,11 +289,12 @@ export const appRouter = router({
         const db = await requireDb();
         const sessions = await db.select().from(userSessions).where(eq(userSessions.userId, ctx.user.id));
         const otherIds = sessions.filter(session => !session.revokedAt && session.id !== ctx.user.sessionId).map(session => session.id);
-        await Promise.all(otherIds.map(sessionId => db.update(userSessions).set({ revokedAt: new Date() }).where(eq(userSessions.id, sessionId))));
+        await Promise.all(otherIds.map(sessionId => db.update(userSessions).set({ revokedAt: new Date() }).where(and(eq(userSessions.id, sessionId), eq(userSessions.userId, ctx.user.id)))));
         return { success: true, revokedCount: otherIds.length } as const;
       }),
     }),
-    adminFallbackLogin: publicProcedure.input(z.object({ email: z.string().trim().email(), password: z.string().min(1) })).mutation(async ({ ctx, input }) => {
+    adminFallbackLogin: publicProcedure.input(z.object({ email: z.string().trim().email().max(320), password: z.string().min(1).max(256) })).mutation(async ({ ctx, input }) => {
+      assertLoginRateLimit(ctx.req, input.email);
       const emailMatches = Boolean(ENV.adminFallbackEmail) && input.email.trim().toLowerCase() === ENV.adminFallbackEmail.trim().toLowerCase();
       if (!emailMatches) {
         console.info("[Auth fallback] Rejected credentials", { emailMatches, passwordLength: input.password.length, configuredPasswordLength: ENV.adminFallbackPassword.length, reason: "email" });
@@ -279,13 +303,13 @@ export const appRouter = router({
       const db = await requireDb();
       const adminAccounts = await db.select().from(users).where(eq(users.role, "admin"));
       const configuredAdmin = adminAccounts.find(account => account.email?.trim().toLowerCase() === input.email.trim().toLowerCase()) ?? (adminAccounts.length === 1 ? adminAccounts[0] : undefined);
-      const adminOpenId = ENV.ownerOpenId || configuredAdmin?.openId;
+      const adminOpenId = ENV.ownerOpenId;
       if (!adminOpenId) {
         console.info("[Auth fallback] Rejected credentials", { emailMatches, passwordLength: input.password.length, configuredPasswordLength: ENV.adminFallbackPassword.length, reason: "admin-account" });
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Identifiants administrateur incorrects." });
       }
       const override = (await db.select().from(adminFallbackPasswords).where(eq(adminFallbackPasswords.ownerOpenId, adminOpenId)).limit(1))[0];
-      const passwordValid = override ? await verifyPassword(input.password, override.passwordHash) : matchesAdminFallbackCredentials(input, { email: ENV.adminFallbackEmail, password: ENV.adminFallbackPassword });
+      const passwordValid = override ? await verifyPassword(input.password, override.passwordHash) : legacyAdminFallbackEnabled() && matchesAdminFallbackCredentials(input, { email: ENV.adminFallbackEmail, password: ENV.adminFallbackPassword });
       if (!passwordValid) {
         console.info("[Auth fallback] Rejected credentials", { emailMatches, passwordLength: input.password.length, configuredPasswordLength: ENV.adminFallbackPassword.length, overridePresent: Boolean(override), reason: "password" });
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Identifiants administrateur incorrects." });
@@ -298,7 +322,7 @@ export const appRouter = router({
     adminFallbackPasswordChange: adminProcedure.input(z.object({ currentPassword: z.string().min(1), newPassword: z.string().min(10).max(256) })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
       const override = (await db.select().from(adminFallbackPasswords).where(eq(adminFallbackPasswords.ownerOpenId, ctx.user.openId)).limit(1))[0];
-      const currentValid = override ? await verifyPassword(input.currentPassword, override.passwordHash) : matchesAdminFallbackCredentials({ email: ENV.adminFallbackEmail, password: input.currentPassword }, { email: ENV.adminFallbackEmail, password: ENV.adminFallbackPassword });
+      const currentValid = override ? await verifyPassword(input.currentPassword, override.passwordHash) : legacyAdminFallbackEnabled() && matchesAdminFallbackCredentials({ email: ENV.adminFallbackEmail, password: input.currentPassword }, { email: ENV.adminFallbackEmail, password: ENV.adminFallbackPassword });
       if (!currentValid) throw new TRPCError({ code: "UNAUTHORIZED", message: "Le mot de passe actuel est incorrect." });
       const passwordHash = await hashPassword(input.newPassword);
       if (override) await db.update(adminFallbackPasswords).set({ passwordHash, updatedByUserId: ctx.user.id }).where(eq(adminFallbackPasswords.id, override.id));
@@ -457,7 +481,7 @@ export const appRouter = router({
         const { priceTiers, retailPriceTiers, wholesalePriceTiers, ...productData } = input;
         const retailTiers = retailPriceTiers.length ? retailPriceTiers : priceTiers;
         const productId = await db.transaction(async tx => { const result = await tx.insert(products).values({ ...productData, companyId: ctx.user.companyId }); const id = Number(result[0].insertId); const tiers = [...retailTiers.map(tier => ({ ...tier, productId: id, customerType: "retail" as const })), ...wholesalePriceTiers.map(tier => ({ ...tier, productId: id, customerType: "wholesale" as const }))]; if (tiers.length) await tx.insert(productPriceTiers).values(tiers); return id; });
-        await syncStockAlert(productId);
+        await syncStockAlert(productId, ctx.user.companyId);
         await createAudit(ctx.user.id, "Création", "Produit", productId, `Produit ${input.reference} créé`);
         return { success: true, id: productId };
       } catch (error) {
@@ -468,8 +492,10 @@ export const appRouter = router({
       const db = await requireDb();
       const { id, priceTiers, retailPriceTiers, wholesalePriceTiers, ...values } = input;
       const retailTiers = retailPriceTiers.length ? retailPriceTiers : priceTiers;
+      const current = (await db.select({ id: products.id }).from(products).where(and(eq(products.id, id), companyScope(products.companyId, ctx.user.companyId))).limit(1))[0];
+      if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Produit introuvable." });
       await db.transaction(async tx => { await tx.update(products).set(values).where(and(eq(products.id, id), companyScope(products.companyId, ctx.user.companyId))); await tx.delete(productPriceTiers).where(eq(productPriceTiers.productId, id)); const tiers = [...retailTiers.map(tier => ({ ...tier, productId: id, customerType: "retail" as const })), ...wholesalePriceTiers.map(tier => ({ ...tier, productId: id, customerType: "wholesale" as const }))]; if (tiers.length) await tx.insert(productPriceTiers).values(tiers); });
-      await syncStockAlert(id);
+      await syncStockAlert(id, ctx.user.companyId);
       await createAudit(ctx.user.id, "Modification", "Produit", id, `Produit ${values.reference} modifié`);
       return { success: true };
     }),
@@ -487,6 +513,8 @@ export const appRouter = router({
     }),
     remove: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
+      const product = (await db.select({ id: products.id }).from(products).where(and(eq(products.id, input.id), companyScope(products.companyId, ctx.user.companyId))).limit(1))[0];
+      if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Produit introuvable." });
       const movement = await db.select({ id: stockMovements.id }).from(stockMovements).where(and(eq(stockMovements.productId, input.id), companyScope(stockMovements.companyId, ctx.user.companyId))).limit(1);
       if (movement.length) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Un produit avec des mouvements ne peut pas être supprimé." });
       await db.delete(products).where(and(eq(products.id, input.id), companyScope(products.companyId, ctx.user.companyId)));
@@ -498,15 +526,15 @@ export const appRouter = router({
   categories: router({
     list: protectedProcedure.query(async ({ ctx }) => (await requireDb()).select().from(productCategories).where(companyScope(productCategories.companyId, ctx.user.companyId)).orderBy(productCategories.name)),
     create: adminProcedure.input(categoryInput).mutation(async ({ ctx, input }) => { const db = await requireDb(); try { const result = await db.insert(productCategories).values({ ...input, companyId: ctx.user.companyId }); const id = Number(result[0].insertId); await createAudit(ctx.user.id, "Création", "Catégorie", id, `Catégorie ${input.name} créée`); return { id }; } catch (error) { throw new TRPCError({ code: "CONFLICT", message: "Cette catégorie existe déjà.", cause: error }); } }),
-    update: adminProcedure.input(categoryInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await requireDb(); const current = (await db.select().from(productCategories).where(eq(productCategories.id, input.id)).limit(1))[0]; if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Catégorie introuvable." }); try { await db.transaction(async tx => { await tx.update(productCategories).set({ name: input.name }).where(eq(productCategories.id, input.id)); await tx.update(products).set({ category: input.name }).where(eq(products.category, current.name)); }); await createAudit(ctx.user.id, "Modification", "Catégorie", input.id, `Catégorie ${current.name} renommée en ${input.name}`); return { success: true }; } catch (error) { throw new TRPCError({ code: "CONFLICT", message: "Cette catégorie existe déjà.", cause: error }); } }),
-    remove: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await requireDb(); const current = (await db.select().from(productCategories).where(eq(productCategories.id, input.id)).limit(1))[0]; if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Catégorie introuvable." }); const usedBy = await db.select({ id: products.id }).from(products).where(eq(products.category, current.name)).limit(1); if (!categoryCanBeRemoved(usedBy.length)) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Cette catégorie est utilisée par des produits et ne peut pas être supprimée." }); await db.delete(productCategories).where(eq(productCategories.id, input.id)); await createAudit(ctx.user.id, "Suppression", "Catégorie", input.id, `Catégorie ${current.name} supprimée`); return { success: true }; }),
+    update: adminProcedure.input(categoryInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await requireDb(); const current = (await db.select().from(productCategories).where(and(eq(productCategories.id, input.id), companyScope(productCategories.companyId, ctx.user.companyId))).limit(1))[0]; if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Catégorie introuvable." }); try { await db.transaction(async tx => { await tx.update(productCategories).set({ name: input.name }).where(and(eq(productCategories.id, input.id), companyScope(productCategories.companyId, ctx.user.companyId))); await tx.update(products).set({ category: input.name }).where(and(eq(products.category, current.name), companyScope(products.companyId, ctx.user.companyId))); }); await createAudit(ctx.user.id, "Modification", "Catégorie", input.id, `Catégorie ${current.name} renommée en ${input.name}`); return { success: true }; } catch (error) { throw new TRPCError({ code: "CONFLICT", message: "Cette catégorie existe déjà.", cause: error }); } }),
+    remove: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await requireDb(); const current = (await db.select().from(productCategories).where(and(eq(productCategories.id, input.id), companyScope(productCategories.companyId, ctx.user.companyId))).limit(1))[0]; if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Catégorie introuvable." }); const usedBy = await db.select({ id: products.id }).from(products).where(and(eq(products.category, current.name), companyScope(products.companyId, ctx.user.companyId))).limit(1); if (!categoryCanBeRemoved(usedBy.length)) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Cette catégorie est utilisée par des produits et ne peut pas être supprimée." }); await db.delete(productCategories).where(and(eq(productCategories.id, input.id), companyScope(productCategories.companyId, ctx.user.companyId))); await createAudit(ctx.user.id, "Suppression", "Catégorie", input.id, `Catégorie ${current.name} supprimée`); return { success: true }; }),
   }),
 
   units: router({
     list: protectedProcedure.query(async ({ ctx }) => (await requireDb()).select().from(productUnits).where(companyScope(productUnits.companyId, ctx.user.companyId)).orderBy(productUnits.name)),
     create: adminProcedure.input(unitInput).mutation(async ({ ctx, input }) => { const db = await requireDb(); try { const result = await db.insert(productUnits).values({ ...input, companyId: ctx.user.companyId }); const id = Number(result[0].insertId); await createAudit(ctx.user.id, "Création", "Unité", id, `Unité ${input.name} créée`); return { id }; } catch (error) { throw new TRPCError({ code: "CONFLICT", message: "Cette unité existe déjà.", cause: error }); } }),
-    update: adminProcedure.input(unitInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await requireDb(); const current = (await db.select().from(productUnits).where(eq(productUnits.id, input.id)).limit(1))[0]; if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Unité introuvable." }); try { await db.transaction(async tx => { await tx.update(productUnits).set({ name: input.name }).where(eq(productUnits.id, input.id)); await tx.update(products).set({ unit: input.name }).where(eq(products.unit, current.name)); }); await createAudit(ctx.user.id, "Modification", "Unité", input.id, `Unité ${current.name} renommée en ${input.name}`); return { success: true }; } catch (error) { throw new TRPCError({ code: "CONFLICT", message: "Cette unité existe déjà.", cause: error }); } }),
-    remove: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await requireDb(); const current = (await db.select().from(productUnits).where(eq(productUnits.id, input.id)).limit(1))[0]; if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Unité introuvable." }); const usedBy = await db.select({ id: products.id }).from(products).where(eq(products.unit, current.name)).limit(1); if (usedBy.length) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Cette unité est utilisée par des produits et ne peut pas être supprimée." }); await db.delete(productUnits).where(eq(productUnits.id, input.id)); await createAudit(ctx.user.id, "Suppression", "Unité", input.id, `Unité ${current.name} supprimée`); return { success: true }; }),
+    update: adminProcedure.input(unitInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await requireDb(); const current = (await db.select().from(productUnits).where(and(eq(productUnits.id, input.id), companyScope(productUnits.companyId, ctx.user.companyId))).limit(1))[0]; if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Unité introuvable." }); try { await db.transaction(async tx => { await tx.update(productUnits).set({ name: input.name }).where(and(eq(productUnits.id, input.id), companyScope(productUnits.companyId, ctx.user.companyId))); await tx.update(products).set({ unit: input.name }).where(and(eq(products.unit, current.name), companyScope(products.companyId, ctx.user.companyId))); }); await createAudit(ctx.user.id, "Modification", "Unité", input.id, `Unité ${current.name} renommée en ${input.name}`); return { success: true }; } catch (error) { throw new TRPCError({ code: "CONFLICT", message: "Cette unité existe déjà.", cause: error }); } }),
+    remove: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await requireDb(); const current = (await db.select().from(productUnits).where(and(eq(productUnits.id, input.id), companyScope(productUnits.companyId, ctx.user.companyId))).limit(1))[0]; if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Unité introuvable." }); const usedBy = await db.select({ id: products.id }).from(products).where(and(eq(products.unit, current.name), companyScope(products.companyId, ctx.user.companyId))).limit(1); if (usedBy.length) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Cette unité est utilisée par des produits et ne peut pas être supprimée." }); await db.delete(productUnits).where(and(eq(productUnits.id, input.id), companyScope(productUnits.companyId, ctx.user.companyId))); await createAudit(ctx.user.id, "Suppression", "Unité", input.id, `Unité ${current.name} supprimée`); return { success: true }; }),
   }),
 
   suppliers: router({
@@ -529,9 +557,9 @@ export const appRouter = router({
       const db = await requireDb();
       const supplier = (await db.select().from(suppliers).where(and(eq(suppliers.id, input.id), companyScope(suppliers.companyId, ctx.user.companyId))).limit(1))[0];
       if (!supplier) throw new TRPCError({ code: "NOT_FOUND", message: "Fournisseur introuvable." });
-      const linkedProduct = await db.select({ id: products.id }).from(products).where(eq(products.supplierId, input.id)).limit(1);
+      const linkedProduct = await db.select({ id: products.id }).from(products).where(and(eq(products.supplierId, input.id), companyScope(products.companyId, ctx.user.companyId))).limit(1);
       if (linkedProduct.length) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Ce fournisseur est rattaché à des produits. Détachez-les avant suppression." });
-      const linkedOrder = await db.select({ id: purchaseOrders.id }).from(purchaseOrders).where(eq(purchaseOrders.supplierId, input.id)).limit(1);
+      const linkedOrder = await db.select({ id: purchaseOrders.id }).from(purchaseOrders).where(and(eq(purchaseOrders.supplierId, input.id), companyScope(purchaseOrders.companyId, ctx.user.companyId))).limit(1);
       if (linkedOrder.length) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Ce fournisseur possède un historique de bons de commande et ne peut pas être supprimé." });
       await db.delete(suppliers).where(and(eq(suppliers.id, input.id), companyScope(suppliers.companyId, ctx.user.companyId)));
       await createAudit(ctx.user.id, "Suppression", "Fournisseur", input.id, `Fournisseur ${supplier.name} supprimé`);
@@ -540,33 +568,33 @@ export const appRouter = router({
   }),
 
   purchaseOrders: router({
-    list: protectedProcedure.query(async () => {
+    list: protectedProcedure.query(async ({ ctx }) => {
       const db = await requireDb();
-      const [orders, rows, supplierRows] = await Promise.all([
-        db.select().from(purchaseOrders).orderBy(desc(purchaseOrders.createdAt)),
-        db.select().from(purchaseOrderItems),
-        db.select().from(suppliers),
-      ]);
-      return orders.map(order => ({
-        ...order,
-        supplier: supplierRows.find(supplier => supplier.id === order.supplierId) ?? null,
-        items: rows.filter(item => item.purchaseOrderId === order.id),
-      }));
-    }),
-    listBySupplier: protectedProcedure.input(z.object({ supplierId: z.number().int().positive() })).query(async ({ input }) => {
-      const db = await requireDb();
-      const orders = await db.select().from(purchaseOrders).where(eq(purchaseOrders.supplierId, input.supplierId)).orderBy(desc(purchaseOrders.createdAt));
+      const orders = await db.select().from(purchaseOrders).where(companyScope(purchaseOrders.companyId, ctx.user.companyId)).orderBy(desc(purchaseOrders.createdAt));
       if (!orders.length) return [];
-      const rows = await db.select().from(purchaseOrderItems);
+      const orderIds = new Set(orders.map(order => order.id));
+      const [rows, supplierRows] = await Promise.all([
+        db.select().from(purchaseOrderItems).where(inArray(purchaseOrderItems.purchaseOrderId, orders.map(order => order.id))),
+        db.select().from(suppliers).where(companyScope(suppliers.companyId, ctx.user.companyId)),
+      ]);
+      return orders.map(order => ({ ...order, supplier: supplierRows.find(supplier => supplier.id === order.supplierId) ?? null, items: rows.filter(item => orderIds.has(item.purchaseOrderId) && item.purchaseOrderId === order.id) }));
+    }),
+    listBySupplier: protectedProcedure.input(z.object({ supplierId: z.number().int().positive() })).query(async ({ ctx, input }) => {
+      const db = await requireDb();
+      const supplier = (await db.select().from(suppliers).where(and(eq(suppliers.id, input.supplierId), companyScope(suppliers.companyId, ctx.user.companyId))).limit(1))[0];
+      if (!supplier) return [];
+      const orders = await db.select().from(purchaseOrders).where(and(eq(purchaseOrders.supplierId, input.supplierId), companyScope(purchaseOrders.companyId, ctx.user.companyId))).orderBy(desc(purchaseOrders.createdAt));
+      if (!orders.length) return [];
+      const rows = await db.select().from(purchaseOrderItems).where(inArray(purchaseOrderItems.purchaseOrderId, orders.map(order => order.id)));
       return orders.map(order => ({ ...order, items: rows.filter(item => item.purchaseOrderId === order.id) }));
     }),
-    get: protectedProcedure.input(z.object({ id: z.number().int().positive() })).query(async ({ input }) => {
+    get: protectedProcedure.input(z.object({ id: z.number().int().positive() })).query(async ({ ctx, input }) => {
       const db = await requireDb();
-      const order = (await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, input.id)).limit(1))[0];
+      const order = (await db.select().from(purchaseOrders).where(and(eq(purchaseOrders.id, input.id), companyScope(purchaseOrders.companyId, ctx.user.companyId))).limit(1))[0];
       if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Bon de commande introuvable." });
       const [supplier, items] = await Promise.all([
-        db.select().from(suppliers).where(eq(suppliers.id, order.supplierId)).limit(1),
-        db.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, input.id)),
+        db.select().from(suppliers).where(and(eq(suppliers.id, order.supplierId), companyScope(suppliers.companyId, ctx.user.companyId))).limit(1),
+        db.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, order.id)),
       ]);
       return { ...order, supplier: supplier[0] ?? null, items };
     }),
@@ -574,72 +602,76 @@ export const appRouter = router({
       supplierId: z.number().int().positive(),
       notes: z.string().trim().max(2000).nullable().optional(),
       expectedDeliveryDate: z.coerce.date().nullable().optional(),
-      items: z.array(z.object({ productId: z.number().int().positive(), quantity: z.number().int().positive() })).min(1).max(100),
+      items: z.array(z.object({ productId: z.number().int().positive(), quantity: z.number().int().positive().max(MAX_QUANTITY) })).min(1).max(100),
+      deliveryFeeCents: z.number().int().min(0).max(MAX_CENTS).default(0),
     })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
-      const supplier = (await db.select().from(suppliers).where(eq(suppliers.id, input.supplierId)).limit(1))[0];
+      const supplier = (await db.select().from(suppliers).where(and(eq(suppliers.id, input.supplierId), companyScope(suppliers.companyId, ctx.user.companyId))).limit(1))[0];
       if (!supplier) throw new TRPCError({ code: "NOT_FOUND", message: "Fournisseur introuvable." });
-      const catalog = await db.select().from(products);
+      const settings = (await db.select().from(saleSettings).where(companyScope(saleSettings.companyId, ctx.user.companyId)).limit(1))[0];
+      const catalog = await db.select().from(products).where(companyScope(products.companyId, ctx.user.companyId));
       const selected = input.items.map(item => {
         const product = catalog.find(value => value.id === item.productId);
         if (!product || product.supplierId !== input.supplierId) throw new TRPCError({ code: "BAD_REQUEST", message: "Chaque produit doit être rattaché à ce fournisseur." });
         return { product, quantity: item.quantity, lineTotalCents: item.quantity * product.purchasePriceCents };
       });
-      const totalCents = selected.reduce((sum, item) => sum + item.lineTotalCents, 0);
+      const subtotalCents = selected.reduce((sum, item) => sum + item.lineTotalCents, 0);
+      const totals = calculateCommercialTotals({ subtotalCents, vatRateBasisPoints: settings?.vatEnabled ? settings.vatRateBasisPoints : 0, deliveryFeeCents: input.deliveryFeeCents });
       const orderNumber = `BC-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
       const orderId = await db.transaction(async tx => {
-        const result = await tx.insert(purchaseOrders).values({ orderNumber, supplierId: input.supplierId, totalCents, notes: input.notes ?? null, expectedDeliveryDate: input.expectedDeliveryDate ?? null, createdByUserId: ctx.user.id });
+        const result = await tx.insert(purchaseOrders).values({ companyId: ctx.user.companyId, orderNumber, supplierId: input.supplierId, subtotalCents: totals.subtotalCents, vatRateBasisPoints: totals.vatRateBasisPoints, vatCents: totals.vatCents, deliveryFeeCents: totals.deliveryFeeCents, totalCents: totals.totalCents, notes: input.notes ?? null, expectedDeliveryDate: input.expectedDeliveryDate ?? null, createdByUserId: ctx.user.id });
         const id = Number(result[0].insertId);
         await tx.insert(purchaseOrderItems).values(selected.map(item => ({ purchaseOrderId: id, productId: item.product.id, productName: item.product.name, productReference: item.product.reference, unit: item.product.unit, quantity: item.quantity, purchasePriceCents: item.product.purchasePriceCents, lineTotalCents: item.lineTotalCents })));
         return id;
       });
       await createAudit(ctx.user.id, "Création", "Bon de commande", orderId, `Bon ${orderNumber} créé pour ${supplier.name}`);
-      return { id: orderId, orderNumber, totalCents };
+      return { id: orderId, orderNumber, totalCents: totals.totalCents, vatCents: totals.vatCents, deliveryFeeCents: totals.deliveryFeeCents };
     }),
-    updateDetails: adminProcedure.input(z.object({ id: z.number().int().positive(), notes: z.string().trim().max(2000).nullable(), expectedDeliveryDate: z.coerce.date().nullable() })).mutation(async ({ ctx, input }) => {
+    updateDetails: adminProcedure.input(z.object({ id: z.number().int().positive(), notes: z.string().trim().max(2000).nullable(), expectedDeliveryDate: z.coerce.date().nullable(), deliveryFeeCents: z.number().int().min(0).max(MAX_CENTS).optional() })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
-      const order = (await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, input.id)).limit(1))[0];
+      const order = (await db.select().from(purchaseOrders).where(and(eq(purchaseOrders.id, input.id), companyScope(purchaseOrders.companyId, ctx.user.companyId))).limit(1))[0];
       if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Bon de commande introuvable." });
       if (order.status === "received" || order.status === "cancelled") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Ce bon ne peut plus être modifié." });
-      await db.update(purchaseOrders).set({ notes: input.notes, expectedDeliveryDate: input.expectedDeliveryDate }).where(eq(purchaseOrders.id, input.id));
+      const update = input.deliveryFeeCents === undefined ? { notes: input.notes, expectedDeliveryDate: input.expectedDeliveryDate } : { notes: input.notes, expectedDeliveryDate: input.expectedDeliveryDate, deliveryFeeCents: input.deliveryFeeCents, totalCents: order.subtotalCents + order.vatCents + input.deliveryFeeCents };
+      await db.update(purchaseOrders).set(update).where(and(eq(purchaseOrders.id, input.id), companyScope(purchaseOrders.companyId, ctx.user.companyId)));
       await createAudit(ctx.user.id, "Modification", "Bon de commande", input.id, `Bon ${order.orderNumber} mis à jour`);
       return { success: true };
     }),
     remove: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
-      const order = (await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, input.id)).limit(1))[0];
+      const order = (await db.select().from(purchaseOrders).where(and(eq(purchaseOrders.id, input.id), companyScope(purchaseOrders.companyId, ctx.user.companyId))).limit(1))[0];
       if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Bon de commande introuvable." });
       if (order.status !== "draft" && order.status !== "cancelled") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Seuls les bons en attente ou annulés peuvent être supprimés." });
       await db.transaction(async tx => {
         await tx.delete(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, input.id));
-        await tx.delete(purchaseOrders).where(eq(purchaseOrders.id, input.id));
+        await tx.delete(purchaseOrders).where(and(eq(purchaseOrders.id, input.id), companyScope(purchaseOrders.companyId, ctx.user.companyId)));
       });
       await createAudit(ctx.user.id, "Suppression", "Bon de commande", input.id, `Bon ${order.orderNumber} supprimé`);
       return { success: true };
     }),
     markSent: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
-      const order = (await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, input.id)).limit(1))[0];
+      const order = (await db.select().from(purchaseOrders).where(and(eq(purchaseOrders.id, input.id), companyScope(purchaseOrders.companyId, ctx.user.companyId))).limit(1))[0];
       if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Bon de commande introuvable." });
       if (order.status === "received" || order.status === "cancelled") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Ce bon ne peut plus être marqué comme envoyé." });
       if (order.status !== "sent") {
-        await db.update(purchaseOrders).set({ status: "sent" }).where(eq(purchaseOrders.id, input.id));
+        await db.update(purchaseOrders).set({ status: "sent" }).where(and(eq(purchaseOrders.id, input.id), companyScope(purchaseOrders.companyId, ctx.user.companyId)));
         await createAudit(ctx.user.id, "Envoi", "Bon de commande", input.id, `Bon ${order.orderNumber} marqué comme envoyé`);
       }
       return { success: true, status: "sent" as const };
     }),
     cancel: adminProcedure.input(z.object({ id: z.number().int().positive(), reason: z.string().trim().min(3).max(2000) })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
-      const order = (await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, input.id)).limit(1))[0];
+      const order = (await db.select().from(purchaseOrders).where(and(eq(purchaseOrders.id, input.id), companyScope(purchaseOrders.companyId, ctx.user.companyId))).limit(1))[0];
       if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Bon de commande introuvable." });
       if (order.status === "received") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Un bon entièrement reçu ne peut pas être annulé." });
-      await db.update(purchaseOrders).set({ status: "cancelled", cancellationReason: input.reason, cancelledAt: new Date() }).where(eq(purchaseOrders.id, input.id));
+      await db.update(purchaseOrders).set({ status: "cancelled", cancellationReason: input.reason, cancelledAt: new Date() }).where(and(eq(purchaseOrders.id, input.id), companyScope(purchaseOrders.companyId, ctx.user.companyId)));
       await createAudit(ctx.user.id, "Annulation", "Bon de commande", input.id, `Bon ${order.orderNumber} annulé : ${input.reason}`);
       return { success: true, status: "cancelled" as const };
     }),
     receive: adminProcedure.input(z.object({ id: z.number().int().positive(), lines: z.array(z.object({ id: z.number().int().positive(), quantity: z.number().int().positive() })).min(1).max(100) })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
-      const order = (await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, input.id)).limit(1))[0];
+      const order = (await db.select().from(purchaseOrders).where(and(eq(purchaseOrders.id, input.id), companyScope(purchaseOrders.companyId, ctx.user.companyId))).limit(1))[0];
       if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Bon de commande introuvable." });
       if (order.status === "cancelled") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Un bon annulé ne peut pas être réceptionné." });
       if (order.status === "received") return { success: true, alreadyReceived: true, status: "received" as const };
@@ -655,18 +687,18 @@ export const appRouter = router({
       const result = await db.transaction(async tx => {
         for (const item of items.filter(value => requestedByItemId.has(value.id))) {
           const receivedNow = requestedByItemId.get(item.id) ?? 0;
-          const product = (await tx.select().from(products).where(eq(products.id, item.productId)).limit(1))[0];
+          const product = (await tx.select().from(products).where(and(eq(products.id, item.productId), companyScope(products.companyId, ctx.user.companyId))).limit(1))[0];
           if (!product) throw new TRPCError({ code: "NOT_FOUND", message: `Produit ${item.productName} introuvable.` });
           const resultingQuantity = product.quantity + receivedNow;
-          await tx.update(products).set({ quantity: resultingQuantity }).where(eq(products.id, product.id));
-          const quantityUpdate = await tx.update(purchaseOrderItems).set({ receivedQuantity: item.receivedQuantity + receivedNow }).where(and(eq(purchaseOrderItems.id, item.id), eq(purchaseOrderItems.receivedQuantity, item.receivedQuantity)));
+          await tx.update(products).set({ quantity: resultingQuantity }).where(and(eq(products.id, product.id), companyScope(products.companyId, ctx.user.companyId)));
+          const quantityUpdate = await tx.update(purchaseOrderItems).set({ receivedQuantity: item.receivedQuantity + receivedNow }).where(and(eq(purchaseOrderItems.id, item.id), eq(purchaseOrderItems.purchaseOrderId, input.id), eq(purchaseOrderItems.receivedQuantity, item.receivedQuantity)));
           const affected = Number((quantityUpdate as unknown as Array<{ affectedRows?: number }>)[0]?.affectedRows ?? 0);
           if (!affected) throw new TRPCError({ code: "CONFLICT", message: "Ce bon a été modifié. Actualisez la page avant de poursuivre." });
-          await tx.insert(stockMovements).values({ productId: product.id, supplierId: order.supplierId, type: "entry", quantity: receivedNow, previousQuantity: product.quantity, resultingQuantity, reason: `Réception partielle du bon ${order.orderNumber}`, createdByUserId: ctx.user.id });
+          await tx.insert(stockMovements).values({ companyId: ctx.user.companyId, productId: product.id, supplierId: order.supplierId, type: "entry", quantity: receivedNow, previousQuantity: product.quantity, resultingQuantity, reason: `Réception partielle du bon ${order.orderNumber}`, createdByUserId: ctx.user.id });
         }
         const complete = items.every(item => item.receivedQuantity + (requestedByItemId.get(item.id) ?? 0) >= item.quantity);
         const status = complete ? "received" : "sent";
-        await tx.update(purchaseOrders).set({ status, receivedAt: complete ? new Date() : null }).where(eq(purchaseOrders.id, input.id));
+        await tx.update(purchaseOrders).set({ status, receivedAt: complete ? new Date() : null }).where(and(eq(purchaseOrders.id, input.id), companyScope(purchaseOrders.companyId, ctx.user.companyId)));
         return { status, complete };
       });
       await createAudit(ctx.user.id, "Réception", "Bon de commande", input.id, `${result.complete ? "Réception complète" : "Réception partielle"} du bon ${order.orderNumber}`);
@@ -684,13 +716,17 @@ export const appRouter = router({
       reason: z.string().trim().min(3).max(255),
     })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
+      if (input.supplierId !== null) {
+        const supplier = (await db.select({ id: suppliers.id }).from(suppliers).where(and(eq(suppliers.id, input.supplierId), companyScope(suppliers.companyId, ctx.user.companyId))).limit(1))[0];
+        if (!supplier) throw new TRPCError({ code: "NOT_FOUND", message: "Fournisseur introuvable." });
+      }
       if (ctx.user.role === "seller") {
         if (input.type !== "adjustment" || input.supplierId !== null) throw new TRPCError({ code: "FORBIDDEN", message: "Un vendeur ne peut enregistrer qu’une correction de stock sans fournisseur." });
-        const settings = (await db.select().from(saleSettings).limit(1))[0];
+        const settings = (await db.select().from(saleSettings).where(companyScope(saleSettings.companyId, ctx.user.companyId)).limit(1))[0];
         try { assertSellerSensitiveAction(settings, "stock_correction"); } catch (error) { throw new TRPCError({ code: "FORBIDDEN", message: error instanceof Error ? error.message : "Correction de stock non autorisée." }); }
       }
       await db.transaction(async tx => {
-        const row = await tx.select().from(products).where(eq(products.id, input.productId)).limit(1);
+        const row = await tx.select().from(products).where(and(eq(products.id, input.productId), companyScope(products.companyId, ctx.user.companyId))).limit(1);
         const product = row[0];
         if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Produit introuvable." });
         const signedQuantity = signedMovementQuantity(input.type, input.quantity);
@@ -700,8 +736,9 @@ export const appRouter = router({
         } catch (error) {
           throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "Mouvement invalide." });
         }
-        await tx.update(products).set({ quantity: resultingQuantity }).where(eq(products.id, product.id));
+        await tx.update(products).set({ quantity: resultingQuantity }).where(and(eq(products.id, product.id), companyScope(products.companyId, ctx.user.companyId)));
         await tx.insert(stockMovements).values({
+          companyId: ctx.user.companyId,
           productId: product.id,
           supplierId: input.supplierId,
           type: input.type,
@@ -712,6 +749,7 @@ export const appRouter = router({
           createdByUserId: ctx.user.id,
         });
         await tx.insert(auditLogs).values({
+          companyId: ctx.user.companyId,
           actorUserId: ctx.user.id,
           action: "Mouvement enregistré",
           entityType: "Mouvement de stock",
@@ -719,7 +757,7 @@ export const appRouter = router({
           detail: `${input.type} de ${Math.abs(signedQuantity)} ${product.unit} pour ${product.reference} : ${input.reason}`,
         });
       });
-      await syncStockAlert(input.productId);
+      await syncStockAlert(input.productId, ctx.user.companyId);
       return { success: true };
     }),
   }),
@@ -735,7 +773,9 @@ export const appRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Vous ne pouvez pas retirer votre propre rôle administrateur." });
       }
       const db = await requireDb();
-      await db.update(users).set({ role: input.role }).where(and(eq(users.id, input.id)));
+      const target = (await db.select({ id: users.id }).from(users).where(and(eq(users.id, input.id), companyScope(users.companyId, ctx.user.companyId))).limit(1))[0];
+      if (!target) throw new TRPCError({ code: "NOT_FOUND", message: "Utilisateur introuvable dans cette entreprise." });
+      await db.update(users).set({ role: input.role }).where(and(eq(users.id, input.id), companyScope(users.companyId, ctx.user.companyId)));
       await createAudit(ctx.user.id, "Rôle modifié", "Utilisateur", input.id, `Rôle défini sur ${input.role === "admin" ? "administrateur" : "vendeur"}`);
       return { success: true };
     }),

@@ -1,4 +1,4 @@
-let activeCurrency = (typeof window !== "undefined" ? localStorage.getItem("stockpilot_currency") : null) || "XOF";
+let activeCurrency: "USD" | "EUR" | "XOF" = "XOF";
 export type PriceGrouping = "space" | "comma" | "none";
 export type PriceRounding = "none" | "unit" | "ten" | "hundred" | "thousand";
 let activePriceGrouping: PriceGrouping = "space";

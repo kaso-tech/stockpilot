@@ -1,25 +1,76 @@
 import { trpc } from "@/lib/trpc";
 import { setActiveCurrency, setActivePriceFormat, type PriceGrouping, type PriceRounding } from "@/lib/format";
-import { readPreference, writePreference } from "@/lib/preferenceStorage";
 import { applyPrimaryColor, DEFAULT_PRIMARY_COLOR, normalizePrimaryColor } from "@/lib/primaryColor";
-import React, { createContext, useContext, useEffect, useState } from "react";
+import { getOfflinePreferences, replaceOfflinePreferences, type OfflineScope } from "@/lib/offlineStore";
+import { useAuth } from "@/_core/hooks/useAuth";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 export type Currency = "USD" | "EUR" | "XOF";
 type PreferencesContextType = { currency: Currency; setCurrency: (currency: Currency) => void; primaryColor: string; setPrimaryColor: (color: string) => void; priceGrouping: PriceGrouping; setPriceGrouping: (value: PriceGrouping) => void; priceRounding: PriceRounding; setPriceRounding: (value: PriceRounding) => void };
+type StoredPreferences = { currency: Currency; primaryColor: string; priceGrouping: PriceGrouping; priceRounding: PriceRounding };
+const DEFAULT_PREFERENCES: StoredPreferences = { currency: "XOF", primaryColor: DEFAULT_PRIMARY_COLOR, priceGrouping: "space", priceRounding: "none" };
 const PreferencesContext = createContext<PreferencesContextType | undefined>(undefined);
+
+function validScope(user: { id: number; companyId: number | null } | null | undefined): OfflineScope | null {
+  return user && Number.isInteger(user.id) && user.id > 0 && Number.isInteger(user.companyId) && Number(user.companyId) > 0 ? { userId: user.id, companyId: Number(user.companyId) } : null;
+}
+
+function normalizeStoredPreferences(value: unknown): StoredPreferences | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Partial<StoredPreferences>;
+  if (!record.currency || !["USD", "EUR", "XOF"].includes(record.currency)) return null;
+  if (!record.priceGrouping || !["space", "comma", "none"].includes(record.priceGrouping)) return null;
+  if (!record.priceRounding || !["none", "unit", "ten", "hundred", "thousand"].includes(record.priceRounding)) return null;
+  return { currency: record.currency, primaryColor: normalizePrimaryColor(record.primaryColor), priceGrouping: record.priceGrouping, priceRounding: record.priceRounding };
+}
+
 export function PreferencesProvider({ children }: { children: React.ReactNode }) {
-  const [currency, setCurrencyState] = useState<Currency>(() => readPreference(typeof window === "undefined" ? undefined : localStorage, "stockpilot_currency", ["USD", "EUR", "XOF"], "XOF"));
-  const [primaryColor, setPrimaryColorState] = useState(() => normalizePrimaryColor(typeof window === "undefined" ? undefined : localStorage.getItem("stockpilot_primary_color")));
-  const [priceGrouping, setPriceGroupingState] = useState<PriceGrouping>(() => readPreference(typeof window === "undefined" ? undefined : localStorage, "stockpilot_price_grouping", ["space", "comma", "none"], "space"));
-  const [priceRounding, setPriceRoundingState] = useState<PriceRounding>(() => readPreference(typeof window === "undefined" ? undefined : localStorage, "stockpilot_price_rounding", ["none", "unit", "ten", "hundred", "thousand"], "none"));
-  const { data } = trpc.commerce.settings.get.useQuery(undefined, { retry: false });
-  useEffect(() => { applyPrimaryColor(primaryColor); }, [primaryColor]);
-  useEffect(() => { setActivePriceFormat(priceGrouping, priceRounding); }, [priceGrouping, priceRounding]);
-  useEffect(() => { if (data?.currency) { setCurrencyState(data.currency); setActiveCurrency(data.currency); writePreference(typeof window === "undefined" ? undefined : localStorage, "stockpilot_currency", data.currency); } if (data?.primaryColor) { const next = normalizePrimaryColor(data.primaryColor); setPrimaryColorState(next); writePreference(typeof window === "undefined" ? undefined : localStorage, "stockpilot_primary_color", next); } }, [data?.currency, data?.primaryColor]);
-  const setCurrency = (nextCurrency: Currency) => { setCurrencyState(nextCurrency); setActiveCurrency(nextCurrency); writePreference(typeof window === "undefined" ? undefined : localStorage, "stockpilot_currency", nextCurrency); };
-  const setPrimaryColor = (nextColor: string) => { const normalized = normalizePrimaryColor(nextColor || DEFAULT_PRIMARY_COLOR); setPrimaryColorState(normalized); writePreference(typeof window === "undefined" ? undefined : localStorage, "stockpilot_primary_color", normalized); };
-  const setPriceGrouping = (value: PriceGrouping) => { setActivePriceFormat(value, priceRounding); setPriceGroupingState(value); writePreference(typeof window === "undefined" ? undefined : localStorage, "stockpilot_price_grouping", value); };
-  const setPriceRounding = (value: PriceRounding) => { setActivePriceFormat(priceGrouping, value); setPriceRoundingState(value); writePreference(typeof window === "undefined" ? undefined : localStorage, "stockpilot_price_rounding", value); };
-  return <PreferencesContext.Provider value={{ currency, setCurrency, primaryColor, setPrimaryColor, priceGrouping, setPriceGrouping, priceRounding, setPriceRounding }}>{children}</PreferencesContext.Provider>;
+  const { user } = useAuth();
+  const scope = useMemo(() => validScope(user), [user]);
+  const [preferences, setPreferences] = useState<StoredPreferences>(DEFAULT_PREFERENCES);
+  const { data } = trpc.commerce.settings.get.useQuery(undefined, { retry: false, enabled: Boolean(scope) });
+
+  useEffect(() => {
+    applyPrimaryColor(preferences.primaryColor);
+    setActiveCurrency(preferences.currency);
+    setActivePriceFormat(preferences.priceGrouping, preferences.priceRounding);
+  }, [preferences]);
+
+  useEffect(() => {
+    let active = true;
+    if (!scope) {
+      setPreferences(DEFAULT_PREFERENCES);
+      return () => { active = false; };
+    }
+    void getOfflinePreferences(scope).then(snapshot => {
+      if (!active) return;
+      const stored = normalizeStoredPreferences(snapshot?.payload);
+      if (stored && typeof navigator !== "undefined" && !navigator.onLine) setPreferences(stored);
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [scope]);
+
+  useEffect(() => {
+    if (!scope || !data) return;
+    const next: StoredPreferences = {
+      currency: data.currency ?? DEFAULT_PREFERENCES.currency,
+      primaryColor: normalizePrimaryColor(data.primaryColor),
+      priceGrouping: preferences.priceGrouping,
+      priceRounding: preferences.priceRounding,
+    };
+    setPreferences(current => ({ ...next, priceGrouping: current.priceGrouping, priceRounding: current.priceRounding }));
+    void replaceOfflinePreferences(scope, next).catch(() => undefined);
+  }, [data?.currency, data?.primaryColor, scope]);
+
+  const persist = (scopeAtWrite: OfflineScope | null, next: StoredPreferences) => {
+    setPreferences(next);
+    if (scopeAtWrite) void replaceOfflinePreferences(scopeAtWrite, next).catch(() => undefined);
+  };
+  const setCurrency = (currency: Currency) => persist(scope, { ...preferences, currency });
+  const setPrimaryColor = (color: string) => persist(scope, { ...preferences, primaryColor: normalizePrimaryColor(color || DEFAULT_PRIMARY_COLOR) });
+  const setPriceGrouping = (priceGrouping: PriceGrouping) => persist(scope, { ...preferences, priceGrouping });
+  const setPriceRounding = (priceRounding: PriceRounding) => persist(scope, { ...preferences, priceRounding });
+
+  return <PreferencesContext.Provider value={{ currency: preferences.currency, setCurrency, primaryColor: preferences.primaryColor, setPrimaryColor, priceGrouping: preferences.priceGrouping, setPriceGrouping, priceRounding: preferences.priceRounding, setPriceRounding }}>{children}</PreferencesContext.Provider>;
 }
 export function usePreferences() { const context = useContext(PreferencesContext); if (!context) throw new Error("usePreferences must be used within PreferencesProvider"); return context; }

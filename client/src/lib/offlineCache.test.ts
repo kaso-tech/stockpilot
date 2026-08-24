@@ -1,32 +1,38 @@
+import "fake-indexeddb/auto";
 import { QueryClient } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { clearOfflineQueryCache, offlineQueryCacheKey, persistOfflineQueryCache, restoreOfflineQueryCache } from "./offlineCache";
+import { clearOfflineQueryCache, persistOfflineQueryCache, restoreOfflineQueryCache } from "./offlineCache";
+import { offlineDatabase, type OfflineScope } from "./offlineStore";
 
-function memoryStorage() {
-  const values = new Map<string, string>();
-  return { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => values.set(key, value), removeItem: (key: string) => values.delete(key), read: (key: string) => values.get(key) ?? null };
-}
+const scope: OfflineScope = { companyId: 3, userId: 9 };
+const waitForPersistence = () => new Promise(resolve => setTimeout(resolve, 450));
 
 describe("cache hors connexion", () => {
-  const storage = memoryStorage();
-  beforeEach(() => { vi.useFakeTimers(); vi.stubGlobal("window", { localStorage: storage, setTimeout }); });
-  afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); clearOfflineQueryCache(); });
+  beforeEach(async () => {
+    await offlineDatabase.delete();
+    await offlineDatabase.open();
+    vi.stubGlobal("window", { setTimeout: globalThis.setTimeout });
+  });
+  afterEach(() => { vi.unstubAllGlobals(); });
 
-  it("enregistre et restaure les données déjà synchronisées", () => {
+  it("enregistre et restaure les données déjà synchronisées dans le scope actif", async () => {
     const source = new QueryClient();
-    persistOfflineQueryCache(source);
+    persistOfflineQueryCache(source, scope);
     source.setQueryData(["products"], [{ id: 1, name: "Article disponible" }]);
-    vi.runAllTimers();
-    expect(storage.read(offlineQueryCacheKey)).toContain("Article disponible");
+    await waitForPersistence();
     const target = new QueryClient();
-    restoreOfflineQueryCache(target);
+    await restoreOfflineQueryCache(target, scope);
     expect(target.getQueryData(["products"])).toEqual([{ id: 1, name: "Article disponible" }]);
+    const other = new QueryClient();
+    await restoreOfflineQueryCache(other, { companyId: 4, userId: 9 });
+    expect(other.getQueryData(["products"])).toBeUndefined();
   });
 
-  it("écarte un cache local corrompu sans bloquer l’application", () => {
-    storage.setItem(offlineQueryCacheKey, "{");
+  it("écarte un cache IndexedDB local corrompu sans bloquer l’application", async () => {
+    await offlineDatabase.queryCaches.put({ scopeKey: "company:3:user:9", savedAt: Date.now(), dehydratedState: "{" });
     const client = new QueryClient();
-    expect(() => restoreOfflineQueryCache(client)).not.toThrow();
-    expect(storage.read(offlineQueryCacheKey)).toBeNull();
+    await expect(restoreOfflineQueryCache(client, scope)).resolves.toBeUndefined();
+    expect(await offlineDatabase.queryCaches.get("company:3:user:9")).toBeUndefined();
+    await clearOfflineQueryCache(scope);
   });
 });

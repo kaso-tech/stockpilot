@@ -1,0 +1,32 @@
+id;priorite;constat;lot_principal;dependances;preuve_de_fermeture;gate
+C-01;Critique;Bons de commande non isolés;L2;L1,L6,L8;Tests liste détail mutations réception A-vers-B et B-vers-A;Bloquant
+C-02;Critique;IDOR mouvements de stock;L2;L1,L6,L8;Aucun changement produit stock alerte adverse;Bloquant
+C-03;Critique;Catégories et unités globales;L2;L1,L6,L8;Propagation limitée au tenant et suppression sûre;Bloquant
+C-04;Critique;Changement de rôle non scoppé;L2;L1,L4,L8;Rôle adverse inchangé et refus propre;Bloquant
+C-05;Critique;Sauvegardes legacy globales;L3;L1,L6,L8;Backup restore téléchargement tenant-isolated;Bloquant
+E-01;Élevée;Audit logs sans companyId;L3;L1,L8;Journal complet du tenant et migration legacy documentée;Bloquant
+E-02;Élevée;Cache React Query global;L5;L1,L8;Test compte A-B logout et offline;Bloquant
+E-03;Élevée;Identité offline globale;L5;L4,L8;Purge logout changement compte et expiration;Bloquant
+E-04;Élevée;OAuth résiduel;L4;L8;Recherche code tests redirection et routes publiques;Bloquant
+E-05;Élevée;Fallback admin hors session DB;L4;L8;Session révocable ou suppression confirmée;Bloquant
+E-06;Élevée;Idempotence multi-moyens;L6;L1,L8;Rejeu identique sans double paiement;Bloquant
+E-07;Élevée;Idempotence sans companyScope;L6;L1,L8;Clé unique companyId-operationId et test adverse;Bloquant
+E-08;Élevée;XSS impression alertes;L5;L8;Payload HTML inerte dans popup et print;Bloquant
+E-09;Élevée;Google Drive global;L3;L1,L8;State tokens archive dossier par tenant;Bloquant
+E-10;Élevée;Absence de rate limiting;L4;L8;Tests seuil login inscription uploads;Bloquant
+E-11;Élevée;Erreurs cron divulguées;L3;L4,L8;Réponse générique code HTTP correct corrélation serveur;Bloquant
+E-12;Élevée;Restauration peu validée;L3;L6,L8;Dry-run schémas par table rejet parent-enfant;Bloquant
+M-01;Moyenne;Inventaire validé modifiable;L6;L8;Mutation refusée après validation;Important
+M-02;Moyenne;Inventaire non atomique;L6;L8;Rollback sans session orpheline;Important
+M-03;Moyenne;Dépenses silencieuses;L6;L2,L8;Aucune ligne affectée retourne une erreur;Important
+M-04;Moyenne;Rapports en mémoire;L6;L8;Pagination agrégation DB budget latence;Important
+M-05;Moyenne;Bons chargés globalement;L2;L6,L8;Requête scoppée et pagination;Important
+M-06;Moyenne;Enfants sans scope explicite;L1;L2,L3,L6,L8;Tests parents-enfants inter-tenant;Important
+M-07;Moyenne;Schéma sans FK et companyId nullable;L6;L0,L1,L3,L8;Migration FK backfill contraintes;Important
+M-08;Moyenne;Secrets vides;L4;L7,L8;Échec démarrage explicite et tests configurés;Important
+M-09;Moyenne;Configuration pnpm ignorée;L7;L8;Warning supprimé et lockfile reproductible;Important
+M-10;Moyenne;Callback OAuth non monté;L4;L7,L8;Route supprimée ou décision auth validée;Important
+M-11;Moyenne;Préférences locales globales;L5;L8;Changement compte sans réutilisation indue;Important
+F-01;Faible;Analytics absents;L7;L8;Build sans placeholders involontaires;Qualité
+F-02;Faible;Routeur monolithique;L7;L1,L2,L3;Domaines séparés et revue scope facilitée;Qualité
+F-03;Faible;Code mort candidat;L7;L8;Graphe imports et décision documentée;Qualité

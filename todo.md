@@ -539,3 +539,98 @@
 - [x] Migrer une seule fois les anciennes files localStorage compatibles vers le périmètre IndexedDB actif, puis supprimer ces clés legacy sans divulguer de données inter-entreprises.
 - [x] Corriger l’hydratation et les écritures transactionnelles de la file et du journal lors d’un changement de compte ou d’un périmètre vide.
 - [x] Ajouter les tests offline de migration legacy, d’état vide, d’isolation entreprise/utilisateur et de persistance transactionnelle.
+
+## Programme de remédiation — Lot 1 : baseline et harnais de sécurité
+- [x] Créer le registre de remédiation exhaustif C-01 à F-03 avec propriétaire, lot, dépendances, preuve et statut.
+- [x] Documenter la baseline reproductible, les commandes de validation, les critères de go/no-go et le rollback.
+- [x] Ajouter des fixtures déterministes de deux entreprises pour les futurs tests d’isolation et d’intégrité.
+- [x] Ajouter un harnais de tests d’isolation réutilisable sans données réelles ni secrets.
+- [x] Vérifier le Lot 1 avec pnpm check, pnpm test et pnpm build, puis publier son checkpoint avant le Lot 2.
+
+## Programme de remédiation — Lot 2 : noyau d’isolation multi-entreprise
+- [x] Créer des helpers typés de chargement et d’assertion de ressources par companyId.
+- [x] Renforcer companyScope pour refuser les ressources legacy hors des parcours explicitement migrés.
+- [x] Ajouter un audit statique des requêtes par identifiant sans scope.
+- [x] Ajouter des tests de propriété parent/enfant et de refus inter-entreprise réutilisables.
+- [x] Vérifier le Lot 2 avec pnpm check, pnpm test et pnpm build, puis publier son checkpoint avant le Lot 3.
+
+## Programme de remédiation — Lot 3 : routes métier critiques et opérations stock/achats
+- [x] Isoler complètement les bons de commande, fournisseurs, lignes, produits et réceptions par companyId.
+- [x] Isoler les mouvements de stock, réglages vendeur et alertes dans toutes les lectures et écritures.
+- [x] Isoler les catégories, unités et propagations vers les produits.
+- [x] Isoler la modification des rôles utilisateurs et les enfants métier associés.
+- [x] Ajouter les tests A/B de lecture, création, modification, suppression et réception inter-entreprises.
+- [x] Vérifier le Lot 3 avec pnpm check, pnpm test et pnpm build, puis publier son checkpoint avant le Lot 4.
+
+## Programme de remédiation — Lot 4 : sauvegardes, restauration, audit et Google Drive
+- [x] Supprimer le mode global implicite des sauvegardes et scoper chaque archive par companyId.
+- [x] Valider les payloads de restauration par schéma et relations parent-enfant avant toute suppression.
+- [x] Rendre les lignes d’audit nouvelles obligatoirement attribuées à une entreprise.
+- [x] Scoper Google Drive, son state OAuth, ses tokens et la synchronisation des archives.
+- [x] Rendre le callback planifié générique, idempotent et correctement codé en HTTP.
+- [x] Vérifier le Lot 4 avec pnpm check, pnpm test et pnpm build, puis publier son checkpoint avant le Lot 5.
+
+## Programme de remédiation — Lot 5 : authentification, sessions et exposition réseau
+- [x] Supprimer les chemins OAuth/Google résiduels du flux d’authentification applicatif sans toucher à Google Drive.
+- [x] Durcir le fallback administrateur et supprimer toute valeur de secours dangereuse en production.
+- [x] Renforcer cookies, expiration, révocation et validation de session.
+- [x] Ajouter une limitation de débit et une politique uniforme pour les endpoints publics sensibles.
+- [x] Uniformiser les erreurs d’authentification sans divulgation d’information.
+- [x] Vérifier le Lot 5 avec pnpm check, pnpm test et pnpm build, puis publier son checkpoint avant le Lot 6.
+
+## Programme de remédiation — Lot 6 : client offline-first, PWA et impressions
+- [x] Garantir qu’IndexedDB reste la source unique sans localStorage métier ou identité.
+- [x] Scoper caches, préférences, notifications et journaux par companyId/userId.
+- [x] Purger les caches lors du changement de compte, de société ou de déconnexion.
+- [x] Corriger les sinks XSS et les HTML d’impression avec échappement systématique.
+- [x] Durcir les limites PWA, les uploads locaux et les reprises réseau.
+- [x] Vérifier le Lot 6 avec pnpm check, pnpm test et pnpm build, puis publier son checkpoint avant le Lot 7.
+
+## Programme de remédiation — Lot 7 : intégrité métier, schéma et performance
+- [x] Ajouter des bornes et validations serveur sur quantités, montants, remises et dates.
+- [x] Garantir l’idempotence des opérations offline et des mutations financières critiques.
+- [x] Renforcer les transactions stock/vente pour éviter les dépassements et écritures incohérentes.
+- [x] Ajouter les index et contraintes de schéma nécessaires sans migration destructive.
+- [x] Remplacer les lectures globales coûteuses par des requêtes filtrées et paginées.
+- [x] Vérifier le Lot 7 avec pnpm check, pnpm test et pnpm build, puis publier son checkpoint avant le Lot 8.
+
+## Programme de remédiation — Lot 8 : dépendances, CI, code mort et qualité
+- [x] Déplacer la configuration pnpm ignorée vers un fichier supporté et vérifier les patches réellement appliqués.
+- [x] Réduire les vulnérabilités de dépendances sans mise à niveau majeure non maîtrisée.
+- [x] Supprimer ou isoler les modules morts et les imports inutilisés confirmés.
+- [x] Ajouter une CI reproductible pour check, tests, build, audit de scope et migration.
+- [ ] Uniformiser les erreurs, types any et logs sensibles restants.
+- [x] Vérifier le Lot 8 avec pnpm check, pnpm test et pnpm build, puis publier son checkpoint avant le Lot 9.
+
+## Programme de remédiation — Lot 9 : validation adversariale, recette et déploiement progressif
+- [x] Exécuter les scénarios A/B de refus inter-entreprises sur lectures, écritures, fichiers, backups et offline.
+- [x] Vérifier les endpoints publics, les redirections, les cookies et l’absence de réactivation OAuth.
+- [x] Vérifier la migration IndexedDB, le changement de compte et la reprise après perte réseau dans un navigateur.
+- [x] Vérifier les impressions et exports avec des caractères HTML adversariaux.
+- [x] Exécuter une recette POS, factures, agents, sauvegardes et PWA sans données sensibles.
+- [x] Produire le go/no-go, le plan de rollback et le bilan final de déploiement.
+
+## Fonctionnalité commerciale — recherche paramètres, TVA et livraison
+- [x] Ajouter une recherche instantanée et accessible dans l’index des paramètres.
+- [x] Ajouter une configuration TVA scoped par entreprise avec validation de taux.
+- [x] Ajouter les champs TVA et frais de livraison aux factures, bons et devis concernés.
+- [x] Persister les taux et frais dans les documents afin de figer les montants historiques.
+- [x] Mettre à jour totaux, affichages, détails, impressions et exports.
+- [x] Ajouter les tests de calcul, de validation, d’isolation et de régression, puis lancer pnpm check, pnpm test et pnpm build.
+
+## Fiabilité synchronisation offline — verrou et persistance
+- [x] Sérialiser les appels concurrents à syncNow et éviter les synchronisations doubles par opération.
+- [x] Exposer un état d’erreur de persistance IndexedDB au contexte offline.
+- [x] Ne plus ignorer silencieusement les échecs d’écriture et conserver une action de reprise.
+- [x] Ajouter les tests de concurrence, d’échec IndexedDB et de reprise.
+- [x] Vérifier avec pnpm check, pnpm test et pnpm build, puis créer un checkpoint.
+
+## Réorganisation des paramètres
+- [x] Regrouper les paramètres par sections thématiques avec une hiérarchie lisible.
+- [x] Créer des liens indépendants pour rattachement, tickets, paiements et actions vendeurs.
+- [x] Conserver ensemble les réglages fortement liés comme affichage et devise.
+- [x] Préserver les routes historiques et les permissions administrateur.
+- [x] Ajouter les tests de recherche par sous-réglage et par section.
+
+## Synchronisation GitHub
+- [x] Importer et valider le checkpoint GitHub 54911b1, appliquer les migrations 0041 et 0042, puis préparer sa publication.

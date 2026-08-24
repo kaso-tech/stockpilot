@@ -12,12 +12,3 @@ export function normalizeDashboardPreferences(value: unknown, role?: "admin" | "
   const candidate = value as Partial<DashboardPreferences>;
   return dashboardPreferenceKeys.reduce((result, key) => ({ ...result, [key]: role === "seller" && sellerHiddenDashboardPreferenceKeys.includes(key) ? false : typeof candidate[key] === "boolean" ? candidate[key] : fallback[key] }), {} as DashboardPreferences);
 }
-const storageKey = "stockpilot_dashboard_preferences";
-
-export function readDashboardPreferences(storage: Storage | undefined = typeof window === "undefined" ? undefined : localStorage): DashboardPreferences {
-  if (!storage) return defaultDashboardPreferences;
-  try {
-    return normalizeDashboardPreferences(JSON.parse(storage.getItem(storageKey) || "{}"));
-  } catch { return defaultDashboardPreferences; }
-}
-export function writeDashboardPreferences(preferences: DashboardPreferences, storage: Storage | undefined = typeof window === "undefined" ? undefined : localStorage) { storage?.setItem(storageKey, JSON.stringify(preferences)); }

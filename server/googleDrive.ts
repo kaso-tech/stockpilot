@@ -1,8 +1,9 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { backupArchives, backupSettings } from "../drizzle/schema";
 import { getDb } from "./db";
 import { storageGetSignedUrl } from "./storage";
+import { companyScope } from "./companyScope";
 
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -24,20 +25,23 @@ export async function exchangeGoogleDriveCode(code: string, redirectUri: string)
 
 async function refreshGoogleDriveAccessToken(refreshToken: string) { requireConfig(); const body = new URLSearchParams({ refresh_token: refreshToken, client_id: clientId(), client_secret: clientSecret(), grant_type: "refresh_token" }); const response = await fetch(GOOGLE_TOKEN_URL, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body }); if (!response.ok) throw new Error("La connexion Google Drive a expiré. Reconnectez le compte Google."); return await response.json() as { access_token: string; expires_in: number; } ; }
 
-async function currentAccessToken(settings: typeof backupSettings.$inferSelect) { const now = Date.now(); if (settings.googleDriveAccessTokenEncrypted && settings.googleDriveTokenExpiresAt && settings.googleDriveTokenExpiresAt.getTime() > now + 60_000) return decryptSecret(settings.googleDriveAccessTokenEncrypted); if (!settings.googleDriveRefreshTokenEncrypted) throw new Error("Google Drive n’est pas connecté."); const refreshToken = decryptSecret(settings.googleDriveRefreshTokenEncrypted); const refreshed = await refreshGoogleDriveAccessToken(refreshToken); const db = await getDb(); if (!db) throw new Error("Base de données indisponible."); await db.update(backupSettings).set({ googleDriveAccessTokenEncrypted: encryptSecret(refreshed.access_token), googleDriveTokenExpiresAt: new Date(Date.now() + refreshed.expires_in * 1000) }).where(eq(backupSettings.id, settings.id)); return refreshed.access_token; }
+async function currentAccessToken(settings: typeof backupSettings.$inferSelect, companyId: number) { const now = Date.now(); if (settings.googleDriveAccessTokenEncrypted && settings.googleDriveTokenExpiresAt && settings.googleDriveTokenExpiresAt.getTime() > now + 60_000) return decryptSecret(settings.googleDriveAccessTokenEncrypted); if (!settings.googleDriveRefreshTokenEncrypted) throw new Error("Google Drive n’est pas connecté."); const refreshToken = decryptSecret(settings.googleDriveRefreshTokenEncrypted); const refreshed = await refreshGoogleDriveAccessToken(refreshToken); const db = await getDb(); if (!db) throw new Error("Base de données indisponible."); await db.update(backupSettings).set({ googleDriveAccessTokenEncrypted: encryptSecret(refreshed.access_token), googleDriveTokenExpiresAt: new Date(Date.now() + refreshed.expires_in * 1000) }).where(and(eq(backupSettings.id, settings.id), companyScope(backupSettings.companyId, companyId))); return refreshed.access_token; }
 
 async function multipartUpload(accessToken: string, metadata: Record<string, unknown>, content: Buffer, mimeType: string) { const boundary = `stockpilot-${randomBytes(8).toString("hex")}`; const body = Buffer.concat([Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`), content, Buffer.from(`\r\n--${boundary}--`)]); const response = await fetch(DRIVE_FILES_URL, { method: "POST", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": `multipart/related; boundary=${boundary}` }, body }); if (!response.ok) throw new Error(`Échec de la copie Google Drive (${response.status}).`); return await response.json() as { id: string; webViewLink?: string; } ; }
 
 async function createDriveFolder(accessToken: string) { const response = await fetch("https://www.googleapis.com/drive/v3/files", { method: "POST", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }, body: JSON.stringify({ name: "StockPilot Backups", mimeType: "application/vnd.google-apps.folder" }) }); if (!response.ok) throw new Error(`Impossible de créer le dossier Google Drive (${response.status}).`); return await response.json() as { id: string; } ; }
 
-export async function syncArchiveToGoogleDrive(archiveId: number) {
+export async function syncArchiveToGoogleDrive(archiveId: number, companyId: number | null = null) {
+  const scopedCompanyId = typeof companyId === "number" ? companyId : Number.NaN;
+  if (!Number.isInteger(scopedCompanyId) || scopedCompanyId <= 0) throw new Error("La synchronisation Drive exige une entreprise explicite.");
   const db = await getDb(); if (!db) throw new Error("Base de données indisponible.");
-  const settings = (await db.select().from(backupSettings).limit(1))[0]; const archive = (await db.select().from(backupArchives).where(eq(backupArchives.id, archiveId)).limit(1))[0];
+  const settings = (await db.select().from(backupSettings).where(companyScope(backupSettings.companyId, scopedCompanyId)).limit(1))[0];
+  const archive = (await db.select().from(backupArchives).where(and(eq(backupArchives.id, archiveId), companyScope(backupArchives.companyId, scopedCompanyId))).limit(1))[0];
   if (!settings || !archive?.storageKey || !settings.googleDriveRefreshTokenEncrypted) return null;
-  const accessToken = await currentAccessToken(settings); let folderId = settings.googleDriveFolderId;
-  if (!folderId) { folderId = (await createDriveFolder(accessToken)).id; await db.update(backupSettings).set({ googleDriveFolderId: folderId }).where(eq(backupSettings.id, settings.id)); }
+  const accessToken = await currentAccessToken(settings, scopedCompanyId); let folderId = settings.googleDriveFolderId;
+  if (!folderId) { folderId = (await createDriveFolder(accessToken)).id; await db.update(backupSettings).set({ googleDriveFolderId: folderId }).where(and(eq(backupSettings.id, settings.id), companyScope(backupSettings.companyId, scopedCompanyId))); }
   const signedUrl = await storageGetSignedUrl(archive.storageKey); const source = await fetch(signedUrl); if (!source.ok) throw new Error("Impossible de lire l’archive locale avant la copie Drive."); const content = Buffer.from(await source.arrayBuffer());
   const uploaded = await multipartUpload(accessToken, { name: archive.filename, parents: [folderId], mimeType: "application/json" }, content, "application/json");
-  await db.update(backupArchives).set({ googleDriveFileId: uploaded.id, googleDriveUrl: uploaded.webViewLink ?? `https://drive.google.com/open?id=${uploaded.id}` }).where(eq(backupArchives.id, archive.id));
+  await db.update(backupArchives).set({ googleDriveFileId: uploaded.id, googleDriveUrl: uploaded.webViewLink ?? `https://drive.google.com/open?id=${uploaded.id}` }).where(and(eq(backupArchives.id, archive.id), companyScope(backupArchives.companyId, scopedCompanyId)));
   return uploaded;
 }

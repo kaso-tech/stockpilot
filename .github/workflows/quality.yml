@@ -1,0 +1,39 @@
+name: StockPilot quality
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.4.1
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Typecheck
+        run: pnpm check
+      - name: Tests
+        run: pnpm test
+      - name: Tenant scope audit
+        run: node scripts/audit-tenant-scope.mjs
+      - name: Migration artifact check
+        run: test -s drizzle/0041_nosy_goblin_queen.sql
+      - name: Production build
+        run: pnpm build

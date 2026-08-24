@@ -6,18 +6,14 @@ import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import { registerSW } from "virtual:pwa-register";
 import App from "./App";
-import { persistOfflineQueryCache, restoreOfflineQueryCache } from "./lib/offlineCache";
 import { requestPersistentOfflineStorage } from "./lib/offlineStore";
 import "./index.css";
 
 const queryClient = new QueryClient();
-restoreOfflineQueryCache(queryClient);
-persistOfflineQueryCache(queryClient);
 void requestPersistentOfflineStorage();
 
-// Apply service-worker updates immediately. Without an explicit update, an
-// installed PWA can continue serving an obsolete client bundle that redirects
-// to OAuth before the local fallback screen is reachable.
+// Apply service-worker updates immediately so an installed PWA receives the
+// internal email/password authentication flow without stale client bundles.
 if ("serviceWorker" in navigator) {
   const updateSW = registerSW({
     immediate: true,
@@ -63,10 +59,8 @@ const trpcClient = trpc.createClient({
       url: "/api/trpc",
       transformer: superjson,
       headers() {
-        // Preview auto-login fallback: when the browser blocks iframe cookies
-        // (Safari ITP / private browsing / WebView), the runtime mirrors the
-        // session into sessionStorage so we can forward it as a Bearer token.
-        // The regular OAuth cookie flow keeps working and takes priority server-side.
+        // Forward the internal session token when the browser blocks cookies
+        // (Safari ITP / private browsing / WebView).
         try {
           const raw = sessionStorage.getItem("manus-cookie");
           if (raw) {

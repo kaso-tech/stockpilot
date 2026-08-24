@@ -16,6 +16,7 @@ import Home from "./pages/Home";
 import Invoices from "./pages/Invoices";
 import InvoiceDetail from "./pages/InvoiceDetail";
 import InvoiceCreate from "./pages/InvoiceCreate";
+import Quotes from "./pages/Quotes";
 import Inventories from "./pages/Inventories";
 import Movements from "./pages/Movements";
 import PointOfSale from "./pages/PointOfSale";
@@ -30,11 +31,13 @@ import SettingsIndex from "./pages/SettingsIndex";
 import SettingsAppearance from "./pages/SettingsAppearance";
 import SettingsCurrency from "./pages/SettingsCurrency";
 import SettingsIdentity from "./pages/SettingsIdentity";
+import SettingsFiscal from "./pages/SettingsFiscal";
 import Backups from "./pages/Backups";
 import Expenses from "./pages/Expenses";
 import Categories from "./pages/Categories";
 import Units from "./pages/Units";
 import SettingsPos from "./pages/SettingsPos";
+import SettingsPosSection from "./pages/SettingsPosSection";
 import SettingsHistory from "./pages/SettingsHistory";
 import SettingsDashboard from "./pages/SettingsDashboard";
 import SettingsSecurity from "./pages/SettingsSecurity";
@@ -51,16 +54,23 @@ function DashboardRouter() {
         <Route path={"/pos"} component={PointOfSale} />
         <Route path={"/clients/:id"} component={CustomerDetail} />
         <Route path={"/clients"} component={Customers} />
-        <Route path={"/factures/nouvelle"} component={InvoiceCreate} />
+        <Route path={"/factures/nouvelle"} component={() => <InvoiceCreate />} />
+        <Route path={"/devis/nouveau"} component={() => <InvoiceCreate documentType="quote" />} />
         <Route path={"/factures/:id"} component={InvoiceDetail} />
         <Route path={"/factures"} component={Invoices} />
+        <Route path={"/devis"} component={Quotes} />
         <Route path={"/inventaires"} component={Inventories} />
         <Route path={"/agents/:beneficiaryType/:id"} component={AgentDetail} />
         <Route path={"/agents"} component={Agents} />
         <Route path={"/parametres"} component={SettingsIndex} />
         <Route path={"/parametres/apparence"} component={SettingsAppearance} />
         <Route path={"/parametres/devise"} component={SettingsCurrency} />
+        <Route path={"/parametres/fiscalite"} component={SettingsFiscal} />
         <Route path={"/parametres/identite"} component={SettingsIdentity} />
+        <Route path={"/parametres/pos/rattachement"} component={() => <SettingsPosSection section="assignment" />} />
+        <Route path={"/parametres/pos/tickets"} component={() => <SettingsPosSection section="ticket" />} />
+        <Route path={"/parametres/pos/paiements"} component={() => <SettingsPosSection section="payments" />} />
+        <Route path={"/parametres/pos/actions-vendeurs"} component={() => <SettingsPosSection section="seller" />} />
         <Route path={"/parametres/pos"} component={SettingsPos} />
         <Route path={"/parametres/tableau-de-bord"} component={SettingsDashboard} />
         <Route path={"/parametres/securite"} component={SettingsSecurity} />
