@@ -577,3 +577,11 @@
 - [x] Ajouter une limitation de débit et une politique uniforme pour les endpoints publics sensibles.
 - [x] Uniformiser les erreurs d’authentification sans divulgation d’information.
 - [x] Vérifier le Lot 5 avec pnpm check, pnpm test et pnpm build, puis publier son checkpoint avant le Lot 6.
+
+## Programme de remédiation — Lot 6 : client offline-first, PWA et impressions
+- [x] Garantir qu’IndexedDB reste la source unique sans localStorage métier ou identité.
+- [x] Scoper caches, préférences, notifications et journaux par companyId/userId.
+- [x] Purger les caches lors du changement de compte, de société ou de déconnexion.
+- [x] Corriger les sinks XSS et les HTML d’impression avec échappement systématique.
+- [x] Durcir les limites PWA, les uploads locaux et les reprises réseau.
+- [x] Vérifier le Lot 6 avec pnpm check, pnpm test et pnpm build, puis publier son checkpoint avant le Lot 7.

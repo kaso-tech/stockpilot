@@ -201,8 +201,8 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   }
   const notifications = visibleNotificationsForRole(user?.role === "admin" ? "admin" : "seller", candidateNotifications);
   const [readNotificationIdsState, setReadNotificationIdsState] = useState<string[]>([]);
-  useEffect(() => { setReadNotificationIdsState(readNotificationIds(user?.id)); }, [user?.id]);
-  const saveReadNotifications = (ids: string[]) => { setReadNotificationIdsState(ids); writeNotificationIds(user?.id, ids); };
+  useEffect(() => { setReadNotificationIdsState(readNotificationIds(user?.companyId ?? undefined, user?.id)); }, [user?.companyId, user?.id]);
+  const saveReadNotifications = (ids: string[]) => { setReadNotificationIdsState(ids); writeNotificationIds(user?.companyId ?? undefined, user?.id, ids); };
   const markNotificationRead = (id: string) => { if (!readNotificationIdsState.includes(id)) saveReadNotifications([...readNotificationIdsState, id]); };
   const markAllNotificationsRead = () => saveReadNotifications(notifications.map(notification => notification.id));
 

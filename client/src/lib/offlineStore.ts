@@ -1,7 +1,7 @@
 import Dexie, { type Table } from "dexie";
 
 export type OfflineScope = {
-  companyId: number | null | undefined;
+  companyId: number;
   userId: number;
 };
 
@@ -21,6 +21,18 @@ export type OfflineSnapshot = {
   payload: unknown;
 };
 
+export type OfflinePreference = {
+  scopeKey: string;
+  savedAt: number;
+  payload: unknown;
+};
+
+export type OfflineQueryCache = {
+  scopeKey: string;
+  savedAt: number;
+  dehydratedState: unknown;
+};
+
 type OfflineMigration = {
   key: string;
   scopeKey: string;
@@ -34,12 +46,15 @@ const legacyMigrationName = "localStorage-to-indexeddb-v1";
 const maxLogEntries = 150;
 
 export function offlineScopeKey(scope: OfflineScope) {
-  return `company:${scope.companyId ?? "legacy"}:user:${scope.userId}`;
+  if (!Number.isInteger(scope.companyId) || Number(scope.companyId) <= 0 || !Number.isInteger(scope.userId) || scope.userId <= 0) throw new Error("Un périmètre offline entreprise/utilisateur valide est requis.");
+  return `company:${scope.companyId}:user:${scope.userId}`;
 }
 
 class StockPilotOfflineDatabase extends Dexie {
   operations!: Table<OfflineOperation, string>;
   snapshots!: Table<OfflineSnapshot, string>;
+  preferences!: Table<OfflinePreference, string>;
+  queryCaches!: Table<OfflineQueryCache, string>;
   migrations!: Table<OfflineMigration, string>;
 
   constructor() {
@@ -51,6 +66,13 @@ class StockPilotOfflineDatabase extends Dexie {
     this.version(2).stores({
       operations: "id, scopeKey, createdAt, type",
       snapshots: "scopeKey, savedAt",
+      migrations: "key, scopeKey, completedAt",
+    });
+    this.version(3).stores({
+      operations: "id, scopeKey, createdAt, type",
+      snapshots: "scopeKey, savedAt",
+      preferences: "scopeKey, savedAt",
+      queryCaches: "scopeKey, savedAt",
       migrations: "key, scopeKey, completedAt",
     });
   }
@@ -187,6 +209,30 @@ export async function getOfflineSnapshot(scope: OfflineScope) {
   return offlineDatabase.snapshots.get(offlineScopeKey(scope));
 }
 
+export async function replaceOfflinePreferences(scope: OfflineScope, payload: unknown) {
+  await offlineDatabase.preferences.put({ scopeKey: offlineScopeKey(scope), savedAt: Date.now(), payload });
+}
+
+export async function getOfflinePreferences(scope: OfflineScope) {
+  return offlineDatabase.preferences.get(offlineScopeKey(scope));
+}
+
+export async function replaceOfflineQueryCache(scope: OfflineScope, dehydratedState: unknown) {
+  await offlineDatabase.queryCaches.put({ scopeKey: offlineScopeKey(scope), savedAt: Date.now(), dehydratedState });
+}
+
+export async function getOfflineQueryCache(scope: OfflineScope) {
+  return offlineDatabase.queryCaches.get(offlineScopeKey(scope));
+}
+
+export async function clearOfflineQueryCache(scope: OfflineScope) {
+  await offlineDatabase.queryCaches.delete(offlineScopeKey(scope));
+}
+
+export async function clearOfflinePreferences(scope: OfflineScope) {
+  await offlineDatabase.preferences.delete(offlineScopeKey(scope));
+}
+
 export async function readOfflineScope(scope: OfflineScope) {
   const scopeKey = offlineScopeKey(scope);
   return offlineDatabase.transaction("r", offlineDatabase.operations, offlineDatabase.snapshots, async () => {
@@ -225,8 +271,10 @@ export async function replaceOfflineScope(scope: OfflineScope, operations: Array
 
 export async function clearOfflineScope(scope: OfflineScope) {
   const scopeKey = offlineScopeKey(scope);
-  await offlineDatabase.transaction("rw", offlineDatabase.operations, offlineDatabase.snapshots, async () => {
+  await offlineDatabase.transaction("rw", offlineDatabase.operations, offlineDatabase.snapshots, offlineDatabase.preferences, offlineDatabase.queryCaches, async () => {
     await offlineDatabase.operations.where("scopeKey").equals(scopeKey).delete();
     await offlineDatabase.snapshots.delete(scopeKey);
+    await offlineDatabase.preferences.delete(scopeKey);
+    await offlineDatabase.queryCaches.delete(scopeKey);
   });
 }

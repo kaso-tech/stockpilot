@@ -4,6 +4,7 @@ import {
   listOfflineOperations,
   migrateLegacyOfflineStorage,
   offlineDatabase,
+  offlineScopeKey,
   readOfflineScope,
   replaceOfflineScope,
   type OfflineScope,
@@ -12,11 +13,7 @@ import {
 type MemoryStorage = Pick<Storage, "getItem" | "removeItem"> & { values: Map<string, string> };
 function createMemoryStorage(initial: Record<string, unknown[]>) : MemoryStorage {
   const values = new Map(Object.entries(initial).map(([key, value]) => [key, JSON.stringify(value)]));
-  return {
-    values,
-    getItem: key => values.get(key) ?? null,
-    removeItem: key => { values.delete(key); },
-  };
+  return { values, getItem: key => values.get(key) ?? null, removeItem: key => { values.delete(key); } };
 }
 
 const scope: OfflineScope = { companyId: 12, userId: 4 };
@@ -27,15 +24,13 @@ beforeEach(async () => {
 });
 
 describe("offlineScopeKey", () => {
-  it("sépare les données hors connexion par entreprise et utilisateur", async () => {
-    const { offlineScopeKey } = await import("./offlineStore");
+  it("sépare les données hors connexion par entreprise et utilisateur", () => {
     expect(offlineScopeKey({ companyId: 12, userId: 4 })).toBe("company:12:user:4");
     expect(offlineScopeKey({ companyId: 13, userId: 4 })).not.toBe(offlineScopeKey({ companyId: 12, userId: 4 }));
   });
 
-  it("isole aussi les comptes hérités sans entreprise", async () => {
-    const { offlineScopeKey } = await import("./offlineStore");
-    expect(offlineScopeKey({ companyId: null, userId: 4 })).toBe("company:legacy:user:4");
+  it("refuse les comptes sans entreprise", () => {
+    expect(() => offlineScopeKey({ companyId: null as never, userId: 4 })).toThrow("périmètre offline");
   });
 });
 
@@ -52,7 +47,6 @@ describe("migrateLegacyOfflineStorage", () => {
         { id: "sync-other", ownerUserId: 5, operationId: "other-user", kind: "pos_sale", summary: "Vente", status: "queued", createdAt: 11, updatedAt: 11, attemptCount: 0 },
       ],
     });
-
     await expect(migrateLegacyOfflineStorage(scope, storage)).resolves.toBe(true);
     const { operations, snapshot } = await readOfflineScope(scope);
     expect(operations).toHaveLength(1);
@@ -63,10 +57,7 @@ describe("migrateLegacyOfflineStorage", () => {
   });
 
   it("ne réimporte pas une migration déjà enregistrée et ne recrée aucune file", async () => {
-    const storage = createMemoryStorage({
-      stockpilot_offline_sales_v1: [{ id: "first", ownerUserId: 4, kind: "pos_sale", createdAt: 10, draft: { items: [] } }],
-      stockpilot_sync_log_v1: [],
-    });
+    const storage = createMemoryStorage({ stockpilot_offline_sales_v1: [{ id: "first", ownerUserId: 4, kind: "pos_sale", createdAt: 10, draft: { items: [] } }], stockpilot_sync_log_v1: [] });
     await migrateLegacyOfflineStorage(scope, storage);
     storage.values.set("stockpilot_offline_sales_v1", JSON.stringify([{ id: "second", ownerUserId: 4, kind: "pos_sale", createdAt: 11, draft: { items: [] } }]));
     await expect(migrateLegacyOfflineStorage(scope, storage)).resolves.toBe(false);

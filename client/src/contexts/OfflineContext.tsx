@@ -17,8 +17,8 @@ export type OfflinePayment = { method: "cash" | "card" | "mobile_money" | "bank_
 export type OfflinePosDraft = { channel: "pos"; customerId: null; salesAgentId: null; cashierId: null; salesAgentSelectionMade: boolean; cashierSelectionMade: boolean; note: null; deliveryAddress: null; invoiceDiscount: Discount; items: Array<{ productId: number; productName: string; productReference: string; unitPriceCents: number; lineTotalCents: number; quantity: number; discount: Discount }> };
 export type OfflineInvoiceDraft = { channel: "invoice"; customerId: number; salesAgentId: number | null; cashierId: number | null; salesAgentSelectionMade: boolean; cashierSelectionMade: boolean; note: null; deliveryAddress: string | null; invoiceDiscount: Discount; items: Array<{ productId: number; quantity: number; manualUnitPriceCents: number | null; discount: Discount }> };
 export type OfflineCheckout = { settlementMode: "full" | "partial"; payments: OfflinePayment[]; salesAgentId: number | null; cashierId: number | null; note: null };
-export type OfflineSale = { id: string; ownerUserId: number; companyId: number | null; kind: "pos_sale" | "invoice_draft"; createdAt: number; status: "pending" | "syncing" | "failed"; error?: string; draft: OfflinePosDraft | OfflineInvoiceDraft; checkout?: OfflineCheckout };
-export type SyncLogEntry = { id: string; ownerUserId: number; companyId: number | null; operationId: string; kind: OfflineSale["kind"]; summary: string; status: "queued" | "syncing" | "succeeded" | "failed"; createdAt: number; updatedAt: number; attemptCount: number; error?: string };
+export type OfflineSale = { id: string; ownerUserId: number; companyId: number; kind: "pos_sale" | "invoice_draft"; createdAt: number; status: "pending" | "syncing" | "failed"; error?: string; draft: OfflinePosDraft | OfflineInvoiceDraft; checkout?: OfflineCheckout };
+export type SyncLogEntry = { id: string; ownerUserId: number; companyId: number; operationId: string; kind: OfflineSale["kind"]; summary: string; status: "queued" | "syncing" | "succeeded" | "failed"; createdAt: number; updatedAt: number; attemptCount: number; error?: string };
 
 const maxLogEntries = 150;
 function summaryFor(item: OfflineSale) { const quantity = item.draft.items.reduce((sum, line) => sum + line.quantity, 0); const title = item.kind === "pos_sale" ? "Vente comptoir" : item.checkout?.settlementMode === "partial" ? "Facture · règlement partiel" : "Brouillon de facture"; return `${title} · ${quantity} article${quantity > 1 ? "s" : ""}`; }
@@ -32,9 +32,8 @@ type ScopedRecord = { ownerUserId?: unknown; companyId?: unknown };
 function normalizeScopedRecord<T extends ScopedRecord>(value: unknown, scope: OfflineScope) {
   if (!value || typeof value !== "object") return null;
   const record = value as T;
-  if (record.ownerUserId !== scope.userId) return null;
-  if (record.companyId !== undefined && record.companyId !== scope.companyId) return null;
-  return { ...record, companyId: scope.companyId } as T & { companyId: number | null | undefined };
+  if (record.ownerUserId !== scope.userId || record.companyId !== scope.companyId) return null;
+  return { ...record, companyId: scope.companyId } as T;
 }
 
 export function OfflineProvider({ children }: { children: ReactNode }) {
@@ -48,7 +47,10 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
   const scopeRef = useRef<OfflineScope | null>(null);
   const hydrationPromiseRef = useRef<Promise<void> | null>(null);
   const persistChainRef = useRef<Promise<void>>(Promise.resolve());
-  const offlineScope = useMemo<OfflineScope | null>(() => user ? { companyId: user.companyId, userId: user.id } : null, [user]);
+  const offlineScope = useMemo<OfflineScope | null>(() => {
+    const companyId = user?.companyId;
+    return user && typeof companyId === "number" && Number.isInteger(companyId) && companyId > 0 ? { companyId, userId: user.id } : null;
+  }, [user]);
   const scopeKey = offlineScope ? offlineScopeKey(offlineScope) : null;
 
   const persistState = useCallback((nextSales: OfflineSale[], nextLog: SyncLogEntry[]) => {
@@ -116,9 +118,9 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
     persistState(nextSales, [...existingLog, nextLog]);
   }, [persistState]);
 
-  const queuePosSale = useCallback((draft: OfflinePosDraft, checkout: OfflineCheckout) => { if (!user) throw new Error("Connectez-vous avant d’enregistrer une vente hors connexion."); const id = globalThis.crypto?.randomUUID?.() ?? `offline-${Date.now()}-${Math.random().toString(36).slice(2)}`; appendQueue({ id, ownerUserId: user.id, companyId: user.companyId ?? null, kind: "pos_sale", createdAt: Date.now(), status: "pending", draft, checkout }); }, [appendQueue, user]);
-  const queueInvoiceDraft = useCallback((draft: OfflineInvoiceDraft) => { if (!user) throw new Error("Connectez-vous avant d’enregistrer une facture hors connexion."); const id = globalThis.crypto?.randomUUID?.() ?? `offline-${Date.now()}-${Math.random().toString(36).slice(2)}`; appendQueue({ id, ownerUserId: user.id, companyId: user.companyId ?? null, kind: "invoice_draft", createdAt: Date.now(), status: "pending", draft }); }, [appendQueue, user]);
-  const queueInvoiceSale = useCallback((draft: OfflineInvoiceDraft, checkout: OfflineCheckout) => { if (!user) throw new Error("Connectez-vous avant d’enregistrer une facture hors connexion."); const id = globalThis.crypto?.randomUUID?.() ?? `offline-${Date.now()}-${Math.random().toString(36).slice(2)}`; appendQueue({ id, ownerUserId: user.id, companyId: user.companyId ?? null, kind: "invoice_draft", createdAt: Date.now(), status: "pending", draft, checkout }); }, [appendQueue, user]);
+  const queuePosSale = useCallback((draft: OfflinePosDraft, checkout: OfflineCheckout) => { if (!user || !offlineScope) throw new Error("Connectez-vous à une entreprise avant d’enregistrer une vente hors connexion."); const id = globalThis.crypto?.randomUUID?.() ?? `offline-${Date.now()}-${Math.random().toString(36).slice(2)}`; appendQueue({ id, ownerUserId: user.id, companyId: offlineScope.companyId, kind: "pos_sale", createdAt: Date.now(), status: "pending", draft, checkout }); }, [appendQueue, offlineScope, user]);
+  const queueInvoiceDraft = useCallback((draft: OfflineInvoiceDraft) => { if (!user || !offlineScope) throw new Error("Connectez-vous à une entreprise avant d’enregistrer une facture hors connexion."); const id = globalThis.crypto?.randomUUID?.() ?? `offline-${Date.now()}-${Math.random().toString(36).slice(2)}`; appendQueue({ id, ownerUserId: user.id, companyId: offlineScope.companyId, kind: "invoice_draft", createdAt: Date.now(), status: "pending", draft }); }, [appendQueue, offlineScope, user]);
+  const queueInvoiceSale = useCallback((draft: OfflineInvoiceDraft, checkout: OfflineCheckout) => { if (!user || !offlineScope) throw new Error("Connectez-vous à une entreprise avant d’enregistrer une facture hors connexion."); const id = globalThis.crypto?.randomUUID?.() ?? `offline-${Date.now()}-${Math.random().toString(36).slice(2)}`; appendQueue({ id, ownerUserId: user.id, companyId: offlineScope.companyId, kind: "invoice_draft", createdAt: Date.now(), status: "pending", draft, checkout }); }, [appendQueue, offlineScope, user]);
 
   const syncOperation = useCallback(async (item: OfflineSale) => {
     if (!navigator.onLine) return false;
