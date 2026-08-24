@@ -593,3 +593,11 @@
 - [x] Ajouter les index et contraintes de schéma nécessaires sans migration destructive.
 - [x] Remplacer les lectures globales coûteuses par des requêtes filtrées et paginées.
 - [x] Vérifier le Lot 7 avec pnpm check, pnpm test et pnpm build, puis publier son checkpoint avant le Lot 8.
+
+## Programme de remédiation — Lot 8 : dépendances, CI, code mort et qualité
+- [x] Déplacer la configuration pnpm ignorée vers un fichier supporté et vérifier les patches réellement appliqués.
+- [x] Réduire les vulnérabilités de dépendances sans mise à niveau majeure non maîtrisée.
+- [x] Supprimer ou isoler les modules morts et les imports inutilisés confirmés.
+- [x] Ajouter une CI reproductible pour check, tests, build, audit de scope et migration.
+- [ ] Uniformiser les erreurs, types any et logs sensibles restants.
+- [x] Vérifier le Lot 8 avec pnpm check, pnpm test et pnpm build, puis publier son checkpoint avant le Lot 9.

@@ -1,0 +1,11 @@
+packages:
+  - .
+
+patchedDependencies:
+  wouter@3.7.1: patches/wouter@3.7.1.patch
+
+overrides:
+  tailwindcss>nanoid: 3.3.7
+  dompurify: 3.4.14
+  qs: 6.14.1
+  fast-xml-parser: 5.5.7
