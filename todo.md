@@ -561,3 +561,11 @@
 - [x] Isoler la modification des rôles utilisateurs et les enfants métier associés.
 - [x] Ajouter les tests A/B de lecture, création, modification, suppression et réception inter-entreprises.
 - [x] Vérifier le Lot 3 avec pnpm check, pnpm test et pnpm build, puis publier son checkpoint avant le Lot 4.
+
+## Programme de remédiation — Lot 4 : sauvegardes, restauration, audit et Google Drive
+- [x] Supprimer le mode global implicite des sauvegardes et scoper chaque archive par companyId.
+- [x] Valider les payloads de restauration par schéma et relations parent-enfant avant toute suppression.
+- [x] Rendre les lignes d’audit nouvelles obligatoirement attribuées à une entreprise.
+- [x] Scoper Google Drive, son state OAuth, ses tokens et la synchronisation des archives.
+- [x] Rendre le callback planifié générique, idempotent et correctement codé en HTTP.
+- [x] Vérifier le Lot 4 avec pnpm check, pnpm test et pnpm build, puis publier son checkpoint avant le Lot 5.

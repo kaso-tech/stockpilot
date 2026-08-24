@@ -34,18 +34,19 @@ describe("sauvegarde locale intégrée", () => {
   });
 
   it("restaure les tables de l’archive puis crée une trace d’audit", async () => {
-    const deleteMock = vi.fn().mockResolvedValue(undefined);
+    const deleteMock = vi.fn(() => ({ where: vi.fn().mockResolvedValue(undefined) }));
     const insertValues = vi.fn().mockResolvedValue(undefined);
-    const tx = { delete: deleteMock, insert: vi.fn(() => ({ values: insertValues })) };
+    const selectMock = vi.fn(() => ({ from: vi.fn(() => ({ where: vi.fn().mockResolvedValue([]) })) }));
+    const tx = { select: selectMock, delete: deleteMock, insert: vi.fn(() => ({ values: insertValues })) };
     const auditValues = vi.fn().mockResolvedValue(undefined);
     const db = { transaction: vi.fn(async (callback: (transaction: typeof tx) => Promise<void>) => callback(tx)), insert: vi.fn(() => ({ values: auditValues })) };
     getDbMock.mockResolvedValue(db);
 
-    const result = await restoreBackupPayload({ schemaVersion: 1, source: "StockPilot", exportedAt: "2026-08-21T00:00:00.000Z", tables: { products: [{ id: 1, name: "Produit" }], sales: [] } }, 7);
+    const result = await restoreBackupPayload({ schemaVersion: 1, source: "StockPilot", exportedAt: "2026-08-21T00:00:00.000Z", companyId: 12, tables: { products: [{ id: 1, companyId: 12, name: "Produit" }], sales: [] } }, 7, 12);
 
     expect(result.restoredCount).toBe(1);
     expect(deleteMock).toHaveBeenCalled();
-    expect(insertValues).toHaveBeenCalledWith([{ id: 1, name: "Produit" }]);
+    expect(insertValues).toHaveBeenCalledWith([{ id: 1, companyId: 12, name: "Produit" }]);
     expect(auditValues).toHaveBeenCalledWith(expect.objectContaining({ actorUserId: 7, action: "Restauration" }));
   });
 });
