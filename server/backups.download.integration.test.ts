@@ -5,7 +5,9 @@ vi.mock("./db", () => ({ getDb: getDbMock }));
 
 import { getBackupDownloadUrl } from "./backups";
 
-describe("lien signé réel de sauvegarde", () => {
+const suite = process.env.BUILT_IN_FORGE_API_URL && process.env.BUILT_IN_FORGE_API_KEY ? describe : describe.skip;
+
+suite("lien signé réel de sauvegarde (requires Forge storage)", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("demande au stockage un lien signé pour une archive persistée", async () => {

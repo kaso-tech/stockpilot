@@ -539,3 +539,10 @@
 - [x] Migrer une seule fois les anciennes files localStorage compatibles vers le périmètre IndexedDB actif, puis supprimer ces clés legacy sans divulguer de données inter-entreprises.
 - [x] Corriger l’hydratation et les écritures transactionnelles de la file et du journal lors d’un changement de compte ou d’un périmètre vide.
 - [x] Ajouter les tests offline de migration legacy, d’état vide, d’isolation entreprise/utilisateur et de persistance transactionnelle.
+
+## Programme de remédiation — Lot 1 : baseline et harnais de sécurité
+- [x] Créer le registre de remédiation exhaustif C-01 à F-03 avec propriétaire, lot, dépendances, preuve et statut.
+- [x] Documenter la baseline reproductible, les commandes de validation, les critères de go/no-go et le rollback.
+- [x] Ajouter des fixtures déterministes de deux entreprises pour les futurs tests d’isolation et d’intégrité.
+- [x] Ajouter un harnais de tests d’isolation réutilisable sans données réelles ni secrets.
+- [x] Vérifier le Lot 1 avec pnpm check, pnpm test et pnpm build, puis publier son checkpoint avant le Lot 2.
