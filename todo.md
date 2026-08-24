@@ -553,3 +553,11 @@
 - [x] Ajouter un audit statique des requêtes par identifiant sans scope.
 - [x] Ajouter des tests de propriété parent/enfant et de refus inter-entreprise réutilisables.
 - [x] Vérifier le Lot 2 avec pnpm check, pnpm test et pnpm build, puis publier son checkpoint avant le Lot 3.
+
+## Programme de remédiation — Lot 3 : routes métier critiques et opérations stock/achats
+- [x] Isoler complètement les bons de commande, fournisseurs, lignes, produits et réceptions par companyId.
+- [x] Isoler les mouvements de stock, réglages vendeur et alertes dans toutes les lectures et écritures.
+- [x] Isoler les catégories, unités et propagations vers les produits.
+- [x] Isoler la modification des rôles utilisateurs et les enfants métier associés.
+- [x] Ajouter les tests A/B de lecture, création, modification, suppression et réception inter-entreprises.
+- [x] Vérifier le Lot 3 avec pnpm check, pnpm test et pnpm build, puis publier son checkpoint avant le Lot 4.
