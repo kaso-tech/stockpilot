@@ -601,3 +601,11 @@
 - [x] Ajouter une CI reproductible pour check, tests, build, audit de scope et migration.
 - [ ] Uniformiser les erreurs, types any et logs sensibles restants.
 - [x] Vérifier le Lot 8 avec pnpm check, pnpm test et pnpm build, puis publier son checkpoint avant le Lot 9.
+
+## Programme de remédiation — Lot 9 : validation adversariale, recette et déploiement progressif
+- [x] Exécuter les scénarios A/B de refus inter-entreprises sur lectures, écritures, fichiers, backups et offline.
+- [x] Vérifier les endpoints publics, les redirections, les cookies et l’absence de réactivation OAuth.
+- [x] Vérifier la migration IndexedDB, le changement de compte et la reprise après perte réseau dans un navigateur.
+- [x] Vérifier les impressions et exports avec des caractères HTML adversariaux.
+- [x] Exécuter une recette POS, factures, agents, sauvegardes et PWA sans données sensibles.
+- [x] Produire le go/no-go, le plan de rollback et le bilan final de déploiement.
