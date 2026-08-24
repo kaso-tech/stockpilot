@@ -8,11 +8,15 @@ export function assertPaymentMethodsEnabled(methods: PaymentMethod[], settings: 
   if (methods.some(method => settings?.[paymentSettingKey[method]] === false)) throw new Error("Un moyen de paiement sélectionné est désactivé dans les réglages.");
 }
 
+import { MAX_CENTS } from "./numericLimits";
+
 export function settlementResult(remainingCents: number, mode: SettlementMode, paymentAmounts: number[]) {
-  const paidCents = paymentAmounts.reduce((sum, amount) => sum + Math.max(0, amount), 0);
+  if (!Number.isSafeInteger(remainingCents) || remainingCents <= 0 || remainingCents > MAX_CENTS) throw new Error("Le solde à encaisser est invalide.");
+  if (!paymentAmounts.length || paymentAmounts.some(amount => !Number.isSafeInteger(amount) || amount <= 0 || amount > MAX_CENTS)) throw new Error("Le règlement contient un montant invalide.");
+  const paidCents = paymentAmounts.reduce((sum, amount) => sum + amount, 0);
   if (remainingCents <= 0) throw new Error("Cette vente est déjà intégralement encaissée.");
   if (paidCents <= 0) throw new Error("Le règlement doit comporter un montant positif.");
-  if (paidCents > remainingCents) throw new Error("Le montant saisi dépasse le solde à encaisser.");
+  if (paidCents > MAX_CENTS || paidCents > remainingCents) throw new Error("Le montant saisi dépasse le solde à encaisser.");
   if (mode === "full" && paidCents !== remainingCents) throw new Error("Le règlement intégral doit couvrir la totalité du solde.");
   if (mode === "partial" && paidCents >= remainingCents) throw new Error("Pour un règlement partiel, saisissez un montant inférieur au solde.");
   return { paidCents, balanceCents: remainingCents - paidCents, status: paidCents === remainingCents ? "paid" as const : "partial" as const };

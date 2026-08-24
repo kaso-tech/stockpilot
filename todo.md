@@ -585,3 +585,11 @@
 - [x] Corriger les sinks XSS et les HTML d’impression avec échappement systématique.
 - [x] Durcir les limites PWA, les uploads locaux et les reprises réseau.
 - [x] Vérifier le Lot 6 avec pnpm check, pnpm test et pnpm build, puis publier son checkpoint avant le Lot 7.
+
+## Programme de remédiation — Lot 7 : intégrité métier, schéma et performance
+- [x] Ajouter des bornes et validations serveur sur quantités, montants, remises et dates.
+- [x] Garantir l’idempotence des opérations offline et des mutations financières critiques.
+- [x] Renforcer les transactions stock/vente pour éviter les dépassements et écritures incohérentes.
+- [x] Ajouter les index et contraintes de schéma nécessaires sans migration destructive.
+- [x] Remplacer les lectures globales coûteuses par des requêtes filtrées et paginées.
+- [x] Vérifier le Lot 7 avec pnpm check, pnpm test et pnpm build, puis publier son checkpoint avant le Lot 8.

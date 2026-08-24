@@ -12,11 +12,12 @@ import { assertExplicitInvoiceAgentChoice } from "../agentSelectionRules";
 import { assertSellerSensitiveAction } from "../sellerActionRules";
 import { assertSellerDiscount, assertSellerUnitPrice } from "../sellerPriceRules";
 import { companyScope } from "../companyScope";
+import { assertSafeDatabaseInt, MAX_CENTS, MAX_DISCOUNT_BASIS_POINTS, MAX_LINE_ITEMS, MAX_QUANTITY } from "../numericLimits";
 
 const paymentMethod = z.enum(["cash", "card", "mobile_money", "bank_transfer", "credit"]);
-const discountInput = z.object({ type: z.enum(["none", "percent", "fixed"]), value: z.number().int().min(0) });
-const itemInput = z.object({ productId: z.number().int().positive(), quantity: z.number().int().positive(), manualUnitPriceCents: z.number().int().positive().nullable().optional(), discount: discountInput.default({ type: "none", value: 0 }) });
-const paymentInput = z.object({ method: paymentMethod, amountCents: z.number().int().positive() });
+const discountInput = z.object({ type: z.enum(["none", "percent", "fixed"]), value: z.number().int().min(0).max(MAX_CENTS) }).superRefine((value, ctx) => { if (value.type === "percent" && value.value > MAX_DISCOUNT_BASIS_POINTS) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Le pourcentage de remise est invalide." }); });
+const itemInput = z.object({ productId: z.number().int().positive(), quantity: z.number().int().positive().max(MAX_QUANTITY), manualUnitPriceCents: z.number().int().positive().max(MAX_CENTS).nullable().optional(), discount: discountInput.default({ type: "none", value: 0 }) });
+const paymentInput = z.object({ method: paymentMethod, amountCents: z.number().int().positive().max(MAX_CENTS) });
 const agentSelection = z.object({ salesAgentId: z.number().int().positive().nullable(), cashierId: z.number().int().positive().nullable(), salesAgentSelectionMade: z.boolean().optional().default(false), cashierSelectionMade: z.boolean().optional().default(false) });
 
 async function dbOrThrow() {
@@ -62,7 +63,7 @@ export const transactionsRouter = router({
     if (!sale || sale.channel !== "invoice") throw new TRPCError({ code: "NOT_FOUND", message: "Facture introuvable." });
     if (sale.status !== "draft" || sale.amountPaidCents > 0) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Seules les factures non encaissées peuvent être supprimées." });
     if (ctx.user.role === "seller") { const settings = (await db.select().from(saleSettings).where(companyScope(saleSettings.companyId, ctx.user.companyId)).limit(1))[0]; try { assertSellerSensitiveAction(settings, "invoice_cancellation"); } catch (error) { throw new TRPCError({ code: "FORBIDDEN", message: error instanceof Error ? error.message : "Annulation non autorisée." }); } }
-    await db.transaction(async tx => { await tx.delete(saleItems).where(eq(saleItems.saleId, sale.id)); await tx.delete(sales).where(eq(sales.id, sale.id)); await tx.insert(auditLogs).values({ actorUserId: ctx.user.id, action: "Suppression", entityType: "Facture", entityId: String(sale.id), detail: `Facture ${sale.invoiceNumber} supprimée avant encaissement` }); });
+    await db.transaction(async tx => { await tx.delete(saleItems).where(eq(saleItems.saleId, sale.id)); await tx.delete(sales).where(eq(sales.id, sale.id)); await tx.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Suppression", entityType: "Facture", entityId: String(sale.id), detail: `Facture ${sale.invoiceNumber} supprimée avant encaissement` }); });
     return { success: true };
   }),
   refund: protectedProcedure.input(z.object({ saleId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
@@ -87,18 +88,18 @@ export const transactionsRouter = router({
         else await tx.update(stockAlerts).set({ observedQuantity: quantity, status: "resolved", resolvedAt: new Date() }).where(and(eq(stockAlerts.productId, product.id), companyScope(stockAlerts.companyId, ctx.user.companyId)));
       }
       await tx.delete(saleCommissions).where(eq(saleCommissions.saleId, sale.id));
-      await tx.update(sales).set({ status: "void", amountPaidCents: 0 }).where(eq(sales.id, sale.id));
-      await tx.insert(auditLogs).values({ actorUserId: ctx.user.id, action: "Remboursement", entityType: "Facture", entityId: String(sale.id), detail: `Facture ${sale.invoiceNumber} remboursée pour ${sale.amountPaidCents} centimes ; stock réintégré et commissions annulées.` });
+      await tx.update(sales).set({ status: "void", amountPaidCents: 0 }).where(and(eq(sales.id, sale.id), companyScope(sales.companyId, ctx.user.companyId)));
+      await tx.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Remboursement", entityType: "Facture", entityId: String(sale.id), detail: `Facture ${sale.invoiceNumber} remboursée pour ${sale.amountPaidCents} centimes ; stock réintégré et commissions annulées.` });
     });
     return { success: true };
   }),
-  createDraft: protectedProcedure.input(z.object({ channel: z.enum(["pos", "invoice"]), customerId: z.number().int().positive().nullable(), note: z.string().trim().max(1000).nullable(), deliveryAddress: z.string().trim().max(1500).nullable().optional(), items: z.array(itemInput).min(1), invoiceDiscount: discountInput.default({ type: "none", value: 0 }), offlineOperationId: z.string().trim().min(8).max(80).optional() }).merge(agentSelection)).mutation(async ({ ctx, input }) => {
+  createDraft: protectedProcedure.input(z.object({ channel: z.enum(["pos", "invoice"]), customerId: z.number().int().positive().nullable(), note: z.string().trim().max(1000).nullable(), deliveryAddress: z.string().trim().max(1500).nullable().optional(), items: z.array(itemInput).min(1).max(MAX_LINE_ITEMS), invoiceDiscount: discountInput.default({ type: "none", value: 0 }), offlineOperationId: z.string().trim().min(8).max(80).optional() }).merge(agentSelection)).mutation(async ({ ctx, input }) => {
     if (input.channel === "invoice" && !input.customerId) throw new TRPCError({ code: "BAD_REQUEST", message: "Un client est obligatoire pour créer une facture." });
     const db = await dbOrThrow();
     let created: { id: number; invoiceNumber: string; totalCents: number; salesAgentId: number | null; cashierId: number | null } | null = null;
     await db.transaction(async tx => {
       if (input.offlineOperationId) {
-        const existing = (await tx.select().from(sales).where(and(eq(sales.offlineOperationId, input.offlineOperationId), eq(sales.sellerUserId, ctx.user.id))).limit(1))[0];
+        const existing = (await tx.select().from(sales).where(and(eq(sales.offlineOperationId, input.offlineOperationId), eq(sales.sellerUserId, ctx.user.id), companyScope(sales.companyId, ctx.user.companyId))).limit(1))[0];
         if (existing) {
           created = { id: existing.id, invoiceNumber: existing.invoiceNumber, totalCents: existing.totalCents, salesAgentId: existing.salesAgentId, cashierId: existing.cashierId };
           return;
@@ -111,19 +112,19 @@ export const transactionsRouter = router({
       if (productRows.length !== productIds.length) throw new TRPCError({ code: "NOT_FOUND", message: "Un produit est introuvable." });
       const tierRows = productIds.length ? await tx.select().from(productPriceTiers).where(inArray(productPriceTiers.productId, productIds)) : [];
       const permissions = (await tx.select().from(saleSettings).where(companyScope(saleSettings.companyId, ctx.user.companyId)).limit(1))[0];
-      const lines = input.items.map(item => { const product = productRows.find((row: any) => row.id === item.productId)!; const isWholesale = customer?.type === "wholesale"; const basePriceCents = priceForCustomer(customer?.type ?? "ordinary", product.retailPriceCents, product.wholesalePriceCents); const applicableTiers = tierRows.filter((tier: any) => tier.productId === product.id && tier.customerType === (isWholesale ? "wholesale" : "retail")); const tariffCents = priceForQuantityTier(basePriceCents, item.quantity, applicableTiers); const unitPriceCents = item.manualUnitPriceCents ?? tariffCents; if (ctx.user.role === "seller") { try { assertSellerUnitPrice(permissions ?? { sellerCanOverridePrice: false, sellerCanSellBelowPrice: false, sellerMaxDiscountPercent: 0 }, tariffCents, unitPriceCents); } catch (error) { throw new TRPCError({ code: "FORBIDDEN", message: error instanceof Error ? error.message : "Prix non autorisé." }); } } const lineSubtotalCents = unitPriceCents * item.quantity; const lineDiscountCents = discountCents(lineSubtotalCents, item.discount.type as DiscountType, item.discount.value); if (ctx.user.role === "seller") { try { assertSellerDiscount(permissions ?? { sellerCanOverridePrice: false, sellerCanSellBelowPrice: false, sellerMaxDiscountPercent: 0 }, lineSubtotalCents, lineDiscountCents); } catch (error) { throw new TRPCError({ code: "FORBIDDEN", message: error instanceof Error ? error.message : "Remise non autorisée." }); } } return { product, quantity: item.quantity, unitPriceCents, lineSubtotalCents, lineDiscountCents, discount: item.discount, lineTotalCents: lineSubtotalCents - lineDiscountCents, lineCostCents: product.purchasePriceCents * item.quantity }; });
-      const subtotalCents = lines.reduce((sum, line) => sum + line.lineSubtotalCents, 0);
-      const lineNetCents = lines.reduce((sum, line) => sum + line.lineTotalCents, 0);
+      const lines = input.items.map(item => { const product = productRows.find((row: any) => row.id === item.productId)!; const isWholesale = customer?.type === "wholesale"; const basePriceCents = priceForCustomer(customer?.type ?? "ordinary", product.retailPriceCents, product.wholesalePriceCents); const applicableTiers = tierRows.filter((tier: any) => tier.productId === product.id && tier.customerType === (isWholesale ? "wholesale" : "retail")); const tariffCents = priceForQuantityTier(basePriceCents, item.quantity, applicableTiers); const unitPriceCents = item.manualUnitPriceCents ?? tariffCents; if (ctx.user.role === "seller") { try { assertSellerUnitPrice(permissions ?? { sellerCanOverridePrice: false, sellerCanSellBelowPrice: false, sellerMaxDiscountPercent: 0 }, tariffCents, unitPriceCents); } catch (error) { throw new TRPCError({ code: "FORBIDDEN", message: error instanceof Error ? error.message : "Prix non autorisé." }); } } const lineSubtotalCents = assertSafeDatabaseInt(unitPriceCents * item.quantity, "Sous-total de ligne"); const lineDiscountCents = discountCents(lineSubtotalCents, item.discount.type as DiscountType, item.discount.value); if (ctx.user.role === "seller") { try { assertSellerDiscount(permissions ?? { sellerCanOverridePrice: false, sellerCanSellBelowPrice: false, sellerMaxDiscountPercent: 0 }, lineSubtotalCents, lineDiscountCents); } catch (error) { throw new TRPCError({ code: "FORBIDDEN", message: error instanceof Error ? error.message : "Remise non autorisée." }); } } return { product, quantity: item.quantity, unitPriceCents, lineSubtotalCents, lineDiscountCents, discount: item.discount, lineTotalCents: assertSafeDatabaseInt(lineSubtotalCents - lineDiscountCents, "Total de ligne"), lineCostCents: assertSafeDatabaseInt(product.purchasePriceCents * item.quantity, "Coût de ligne") }; });
+      const subtotalCents = assertSafeDatabaseInt(lines.reduce((sum, line) => sum + line.lineSubtotalCents, 0), "Sous-total");
+      const lineNetCents = assertSafeDatabaseInt(lines.reduce((sum, line) => sum + line.lineTotalCents, 0), "Total net");
       const invoiceDiscountCents = discountCents(lineNetCents, input.invoiceDiscount.type as DiscountType, input.invoiceDiscount.value);
       if (ctx.user.role === "seller") { try { assertSellerDiscount(permissions ?? { sellerCanOverridePrice: false, sellerCanSellBelowPrice: false, sellerMaxDiscountPercent: 0 }, lineNetCents, invoiceDiscountCents); } catch (error) { throw new TRPCError({ code: "FORBIDDEN", message: error instanceof Error ? error.message : "Remise non autorisée." }); } }
-      const totalCents = lineNetCents - invoiceDiscountCents;
-      const totalCostCents = lines.reduce((sum, line) => sum + line.lineCostCents, 0);
+      const totalCents = assertSafeDatabaseInt(lineNetCents - invoiceDiscountCents, "Total");
+      const totalCostCents = assertSafeDatabaseInt(lines.reduce((sum, line) => sum + line.lineCostCents, 0), "Coût total");
       const assigned = await validateAgents(tx, ctx.user.companyId, input, input.channel);
       const number = invoiceNumber(input.channel);
-      const result = await tx.insert(sales).values({ companyId: ctx.user.companyId, invoiceNumber: number, offlineOperationId: input.offlineOperationId, channel: input.channel, customerId: customer?.id ?? null, sellerUserId: ctx.user.id, ...assigned, paymentMethod: "cash", amountPaidCents: 0, subtotalCents, invoiceDiscountType: input.invoiceDiscount.type, invoiceDiscountValue: input.invoiceDiscount.value, invoiceDiscountCents, totalCents, totalCostCents, netProfitCents: totalCents - totalCostCents, note: input.note, deliveryAddress: input.deliveryAddress?.trim() || null, status: "draft" });
+      const result = await tx.insert(sales).values({ companyId: ctx.user.companyId, invoiceNumber: number, offlineOperationId: input.offlineOperationId, channel: input.channel, customerId: customer?.id ?? null, sellerUserId: ctx.user.id, ...assigned, paymentMethod: "cash", amountPaidCents: 0, subtotalCents, invoiceDiscountType: input.invoiceDiscount.type, invoiceDiscountValue: input.invoiceDiscount.value, invoiceDiscountCents, totalCents, totalCostCents, netProfitCents: assertSafeDatabaseInt(totalCents - totalCostCents, "Bénéfice net"), note: input.note, deliveryAddress: input.deliveryAddress?.trim() || null, status: "draft" });
       const saleId = Number(result[0].insertId);
       for (const line of lines) await tx.insert(saleItems).values({ saleId, productId: line.product.id, productName: line.product.name, productReference: line.product.reference, quantity: line.quantity, unitPriceCents: line.unitPriceCents, purchasePriceCents: line.product.purchasePriceCents, discountType: line.discount.type, discountValue: line.discount.value, discountCents: line.lineDiscountCents, lineSubtotalCents: line.lineSubtotalCents, lineTotalCents: line.lineTotalCents, lineCostCents: line.lineCostCents });
-      await tx.insert(auditLogs).values({ actorUserId: ctx.user.id, action: "Document créé", entityType: input.channel === "pos" ? "Ticket POS" : "Facture", entityId: String(saleId), detail: `${number} enregistré en attente d’encaissement` });
+      await tx.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Document créé", entityType: input.channel === "pos" ? "Ticket POS" : "Facture", entityId: String(saleId), detail: `${number} enregistré en attente d’encaissement` });
       created = { id: saleId, invoiceNumber: number, totalCents, salesAgentId: assigned.salesAgentId, cashierId: assigned.cashierId };
     });
     return created!;
@@ -161,8 +162,8 @@ export const transactionsRouter = router({
       for (let index = 0; index < input.payments.length; index += 1) { const payment = input.payments[index]!; await tx.insert(salePayments).values({ saleId: sale.id, offlineOperationId: index === 0 ? input.offlineOperationId : undefined, method: payment.method, amountCents: payment.amountCents, createdByUserId: ctx.user.id }); }
       const amountPaidCents = sale.amountPaidCents + settlement.paidCents;
       const status = settlement.status;
-      await tx.update(sales).set({ ...assigned, status, amountPaidCents, paymentMethod: input.payments[0].method, note: input.note ?? sale.note }).where(eq(sales.id, sale.id));
-      await tx.insert(auditLogs).values({ actorUserId: ctx.user.id, action: "Encaissement", entityType: "Vente", entityId: String(sale.id), detail: `${settlement.paidCents} encaissé sur ${sale.invoiceNumber} (${status === "paid" ? "soldée" : "partielle"})` });
+      await tx.update(sales).set({ ...assigned, status, amountPaidCents, paymentMethod: input.payments[0].method, note: input.note ?? sale.note }).where(and(eq(sales.id, sale.id), companyScope(sales.companyId, ctx.user.companyId)));
+      await tx.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Encaissement", entityType: "Vente", entityId: String(sale.id), detail: `${settlement.paidCents} encaissé sur ${sale.invoiceNumber} (${status === "paid" ? "soldée" : "partielle"})` });
       result = { status, amountPaidCents, balanceCents: sale.totalCents - amountPaidCents };
     });
     return result!;

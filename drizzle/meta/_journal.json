@@ -288,6 +288,13 @@
       "when": 1787500389014,
       "tag": "0040_flashy_shocker",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "5",
+      "when": 1787533016490,
+      "tag": "0041_nosy_goblin_queen",
+      "breakpoints": true
     }
   ]
 }
