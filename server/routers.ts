@@ -59,6 +59,25 @@ function sessionDeviceLabel(userAgent: string | undefined) {
   if (/Linux/i.test(agent)) return "Ordinateur Linux";
   return "Appareil inconnu";
 }
+
+function requestIdentity(req: { ip?: string; headers: Record<string, unknown> }) {
+  const forwarded = req.headers["x-forwarded-for"];
+  const forwardedIp = Array.isArray(forwarded) ? forwarded[0] : typeof forwarded === "string" ? forwarded.split(",")[0]?.trim() : undefined;
+  return forwardedIp || req.ip || "unknown";
+}
+
+function assertLoginRateLimit(req: { ip?: string; headers: Record<string, unknown> }, email: string) {
+  const identity = requestIdentity(req);
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!consumeRateLimit(`auth:ip:${identity}`, 30, 15 * 60 * 1000) || !consumeRateLimit(`auth:account:${identity}:${normalizedEmail}`, 10, 15 * 60 * 1000)) {
+    throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop de tentatives. Réessayez plus tard." });
+  }
+}
+
+function legacyAdminFallbackEnabled() {
+  return !ENV.isProduction && process.env.ALLOW_LEGACY_ADMIN_FALLBACK === "true";
+}
+
 import { backupRouter } from "./routers/backups";
 import { transactionsRouter } from "./routers/transactions";
 import { expensesRouter } from "./routers/expenses";
@@ -70,6 +89,7 @@ import { hashPassword, verifyPassword } from "./passwords";
 import { categoryCanBeRemoved } from "./categoryRules";
 import { assertSellerSensitiveAction } from "./sellerActionRules";
 import { companyScope } from "./companyScope";
+import { consumeRateLimit } from "./rateLimit";
 
 const productInput = z.object({
   reference: z.string().trim().min(2).max(80),
@@ -168,23 +188,25 @@ export const appRouter = router({
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(async ({ ctx }) => {
-      if (ctx.user?.sessionId) {
+      if (ctx.user?.sessionId && ctx.user.id > 0) {
         const db = await getDb();
-        if (db) await db.update(userSessions).set({ revokedAt: new Date() }).where(eq(userSessions.id, ctx.user.sessionId));
+        if (db) await db.update(userSessions).set({ revokedAt: new Date() }).where(and(eq(userSessions.id, ctx.user.sessionId), eq(userSessions.userId, ctx.user.id)));
       }
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true } as const;
     }),
-    localLogin: publicProcedure.input(z.object({ username: z.string().trim().min(3), password: z.string().min(1) })).mutation(async ({ ctx, input }) => {
+    localLogin: publicProcedure.input(z.object({ username: z.string().trim().min(3).max(320), password: z.string().min(1).max(256) })).mutation(async ({ ctx, input }) => {
+      assertLoginRateLimit(ctx.req, input.username);
       const db = await requireDb();
       const row = (await db.select({ openId: users.openId, name: users.name, active: users.active, passwordHash: sellerCredentials.passwordHash }).from(sellerCredentials).innerJoin(users, eq(sellerCredentials.userId, users.id)).where(eq(sellerCredentials.username, input.username)).limit(1))[0];
-      if (!row || !row.active || !(await verifyPassword(input.password, row.passwordHash))) throw new TRPCError({ code: "UNAUTHORIZED", message: "Identifiants vendeur incorrects." });
+      if (!row || !row.active || !(await verifyPassword(input.password, row.passwordHash))) throw new TRPCError({ code: "UNAUTHORIZED", message: "E-mail ou mot de passe incorrect." });
       const token = await sdk.createSessionToken(row.openId, { name: row.name || input.username, expiresInMs: ONE_YEAR_MS });
       ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: ONE_YEAR_MS });
       return { success: true } as const;
     }),
-    passwordLogin: publicProcedure.input(z.object({ email: z.string().trim().email(), password: z.string().min(1), rememberMe: z.boolean().optional().default(false) })).mutation(async ({ ctx, input }) => {
+    passwordLogin: publicProcedure.input(z.object({ email: z.string().trim().email().max(320), password: z.string().min(1).max(256), rememberMe: z.boolean().optional().default(false) })).mutation(async ({ ctx, input }) => {
+      assertLoginRateLimit(ctx.req, input.email);
       const db = await requireDb();
       const email = input.email.trim().toLowerCase();
       const accounts = await db.select().from(users);
@@ -194,9 +216,7 @@ export const appRouter = router({
       let passwordValid = false;
       if (account.role === "admin") {
         const storedPassword = (await db.select().from(adminFallbackPasswords).where(eq(adminFallbackPasswords.ownerOpenId, account.openId)).limit(1))[0];
-        passwordValid = storedPassword
-          ? await verifyPassword(input.password, storedPassword.passwordHash)
-          : matchesAdminFallbackCredentials({ email: input.email, password: input.password }, { email: ENV.adminFallbackEmail, password: ENV.adminFallbackPassword });
+        passwordValid = Boolean(storedPassword) && await verifyPassword(input.password, storedPassword.passwordHash);
       } else {
         const credential = (await db.select().from(sellerCredentials).where(eq(sellerCredentials.userId, account.id)).limit(1))[0];
         passwordValid = Boolean(credential) && await verifyPassword(input.password, credential.passwordHash);
@@ -257,9 +277,9 @@ export const appRouter = router({
       revoke: protectedProcedure.input(z.object({ sessionId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
         if (input.sessionId === ctx.user.sessionId) throw new TRPCError({ code: "BAD_REQUEST", message: "Utilisez la déconnexion pour fermer la session de cet appareil." });
         const db = await requireDb();
-        const session = (await db.select().from(userSessions).where(eq(userSessions.id, input.sessionId)).limit(1))[0];
+        const session = (await db.select().from(userSessions).where(and(eq(userSessions.id, input.sessionId), eq(userSessions.userId, ctx.user.id))).limit(1))[0];
         if (!session || session.userId !== ctx.user.id || session.revokedAt) throw new TRPCError({ code: "NOT_FOUND", message: "Session introuvable." });
-        await db.update(userSessions).set({ revokedAt: new Date() }).where(eq(userSessions.id, session.id));
+        await db.update(userSessions).set({ revokedAt: new Date() }).where(and(eq(userSessions.id, session.id), eq(userSessions.userId, ctx.user.id)));
         return { success: true } as const;
       }),
       revokeOthers: protectedProcedure.mutation(async ({ ctx }) => {
@@ -267,11 +287,12 @@ export const appRouter = router({
         const db = await requireDb();
         const sessions = await db.select().from(userSessions).where(eq(userSessions.userId, ctx.user.id));
         const otherIds = sessions.filter(session => !session.revokedAt && session.id !== ctx.user.sessionId).map(session => session.id);
-        await Promise.all(otherIds.map(sessionId => db.update(userSessions).set({ revokedAt: new Date() }).where(eq(userSessions.id, sessionId))));
+        await Promise.all(otherIds.map(sessionId => db.update(userSessions).set({ revokedAt: new Date() }).where(and(eq(userSessions.id, sessionId), eq(userSessions.userId, ctx.user.id)))));
         return { success: true, revokedCount: otherIds.length } as const;
       }),
     }),
-    adminFallbackLogin: publicProcedure.input(z.object({ email: z.string().trim().email(), password: z.string().min(1) })).mutation(async ({ ctx, input }) => {
+    adminFallbackLogin: publicProcedure.input(z.object({ email: z.string().trim().email().max(320), password: z.string().min(1).max(256) })).mutation(async ({ ctx, input }) => {
+      assertLoginRateLimit(ctx.req, input.email);
       const emailMatches = Boolean(ENV.adminFallbackEmail) && input.email.trim().toLowerCase() === ENV.adminFallbackEmail.trim().toLowerCase();
       if (!emailMatches) {
         console.info("[Auth fallback] Rejected credentials", { emailMatches, passwordLength: input.password.length, configuredPasswordLength: ENV.adminFallbackPassword.length, reason: "email" });
@@ -280,13 +301,13 @@ export const appRouter = router({
       const db = await requireDb();
       const adminAccounts = await db.select().from(users).where(eq(users.role, "admin"));
       const configuredAdmin = adminAccounts.find(account => account.email?.trim().toLowerCase() === input.email.trim().toLowerCase()) ?? (adminAccounts.length === 1 ? adminAccounts[0] : undefined);
-      const adminOpenId = ENV.ownerOpenId || configuredAdmin?.openId;
+      const adminOpenId = ENV.ownerOpenId;
       if (!adminOpenId) {
         console.info("[Auth fallback] Rejected credentials", { emailMatches, passwordLength: input.password.length, configuredPasswordLength: ENV.adminFallbackPassword.length, reason: "admin-account" });
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Identifiants administrateur incorrects." });
       }
       const override = (await db.select().from(adminFallbackPasswords).where(eq(adminFallbackPasswords.ownerOpenId, adminOpenId)).limit(1))[0];
-      const passwordValid = override ? await verifyPassword(input.password, override.passwordHash) : matchesAdminFallbackCredentials(input, { email: ENV.adminFallbackEmail, password: ENV.adminFallbackPassword });
+      const passwordValid = override ? await verifyPassword(input.password, override.passwordHash) : legacyAdminFallbackEnabled() && matchesAdminFallbackCredentials(input, { email: ENV.adminFallbackEmail, password: ENV.adminFallbackPassword });
       if (!passwordValid) {
         console.info("[Auth fallback] Rejected credentials", { emailMatches, passwordLength: input.password.length, configuredPasswordLength: ENV.adminFallbackPassword.length, overridePresent: Boolean(override), reason: "password" });
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Identifiants administrateur incorrects." });
@@ -299,7 +320,7 @@ export const appRouter = router({
     adminFallbackPasswordChange: adminProcedure.input(z.object({ currentPassword: z.string().min(1), newPassword: z.string().min(10).max(256) })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
       const override = (await db.select().from(adminFallbackPasswords).where(eq(adminFallbackPasswords.ownerOpenId, ctx.user.openId)).limit(1))[0];
-      const currentValid = override ? await verifyPassword(input.currentPassword, override.passwordHash) : matchesAdminFallbackCredentials({ email: ENV.adminFallbackEmail, password: input.currentPassword }, { email: ENV.adminFallbackEmail, password: ENV.adminFallbackPassword });
+      const currentValid = override ? await verifyPassword(input.currentPassword, override.passwordHash) : legacyAdminFallbackEnabled() && matchesAdminFallbackCredentials({ email: ENV.adminFallbackEmail, password: input.currentPassword }, { email: ENV.adminFallbackEmail, password: ENV.adminFallbackPassword });
       if (!currentValid) throw new TRPCError({ code: "UNAUTHORIZED", message: "Le mot de passe actuel est incorrect." });
       const passwordHash = await hashPassword(input.newPassword);
       if (override) await db.update(adminFallbackPasswords).set({ passwordHash, updatedByUserId: ctx.user.id }).where(eq(adminFallbackPasswords.id, override.id));

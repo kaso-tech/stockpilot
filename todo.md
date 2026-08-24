@@ -569,3 +569,11 @@
 - [x] Scoper Google Drive, son state OAuth, ses tokens et la synchronisation des archives.
 - [x] Rendre le callback planifié générique, idempotent et correctement codé en HTTP.
 - [x] Vérifier le Lot 4 avec pnpm check, pnpm test et pnpm build, puis publier son checkpoint avant le Lot 5.
+
+## Programme de remédiation — Lot 5 : authentification, sessions et exposition réseau
+- [x] Supprimer les chemins OAuth/Google résiduels du flux d’authentification applicatif sans toucher à Google Drive.
+- [x] Durcir le fallback administrateur et supprimer toute valeur de secours dangereuse en production.
+- [x] Renforcer cookies, expiration, révocation et validation de session.
+- [x] Ajouter une limitation de débit et une politique uniforme pour les endpoints publics sensibles.
+- [x] Uniformiser les erreurs d’authentification sans divulgation d’information.
+- [x] Vérifier le Lot 5 avec pnpm check, pnpm test et pnpm build, puis publier son checkpoint avant le Lot 6.

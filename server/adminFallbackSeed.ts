@@ -12,7 +12,7 @@ export function findConfiguredAdmin(accounts: AdminAccount[], email: string) {
 }
 
 export async function ensureAdminFallbackPasswordSeed() {
-  if (!ENV.adminFallbackEmail || !ENV.adminFallbackPassword) return;
+  if (ENV.isProduction || !ENV.adminFallbackEmail || !ENV.adminFallbackPassword) return;
   const db = await getDb();
   if (!db) return;
 
