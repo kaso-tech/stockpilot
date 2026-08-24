@@ -108,3 +108,10 @@ describe("devis offline avec fiscalité", () => {
     expect((await readOfflineScope(otherScope)).operations).toHaveLength(0);
   });
 });
+
+describe("erreurs de persistance", () => {
+  it("rejette une transaction contenant une donnée non sérialisable", async () => {
+    const invalidPayload = { id: "invalid", type: "pos_sale", payload: { ownerUserId: scope.userId, companyId: scope.companyId, invalid: () => undefined }, createdAt: 1, attempts: 0 };
+    await expect(replaceOfflineScope(scope, [invalidPayload], { syncLog: [] })).rejects.toBeTruthy();
+  });
+});

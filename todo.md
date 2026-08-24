@@ -617,3 +617,10 @@
 - [x] Persister les taux et frais dans les documents afin de figer les montants historiques.
 - [x] Mettre à jour totaux, affichages, détails, impressions et exports.
 - [x] Ajouter les tests de calcul, de validation, d’isolation et de régression, puis lancer pnpm check, pnpm test et pnpm build.
+
+## Fiabilité synchronisation offline — verrou et persistance
+- [x] Sérialiser les appels concurrents à syncNow et éviter les synchronisations doubles par opération.
+- [x] Exposer un état d’erreur de persistance IndexedDB au contexte offline.
+- [x] Ne plus ignorer silencieusement les échecs d’écriture et conserver une action de reprise.
+- [x] Ajouter les tests de concurrence, d’échec IndexedDB et de reprise.
+- [x] Vérifier avec pnpm check, pnpm test et pnpm build, puis créer un checkpoint.
