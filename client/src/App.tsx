@@ -37,6 +37,7 @@ import Expenses from "./pages/Expenses";
 import Categories from "./pages/Categories";
 import Units from "./pages/Units";
 import SettingsPos from "./pages/SettingsPos";
+import SettingsPosSection from "./pages/SettingsPosSection";
 import SettingsHistory from "./pages/SettingsHistory";
 import SettingsDashboard from "./pages/SettingsDashboard";
 import SettingsSecurity from "./pages/SettingsSecurity";
@@ -66,6 +67,10 @@ function DashboardRouter() {
         <Route path={"/parametres/devise"} component={SettingsCurrency} />
         <Route path={"/parametres/fiscalite"} component={SettingsFiscal} />
         <Route path={"/parametres/identite"} component={SettingsIdentity} />
+        <Route path={"/parametres/pos/rattachement"} component={() => <SettingsPosSection section="assignment" />} />
+        <Route path={"/parametres/pos/tickets"} component={() => <SettingsPosSection section="ticket" />} />
+        <Route path={"/parametres/pos/paiements"} component={() => <SettingsPosSection section="payments" />} />
+        <Route path={"/parametres/pos/actions-vendeurs"} component={() => <SettingsPosSection section="seller" />} />
         <Route path={"/parametres/pos"} component={SettingsPos} />
         <Route path={"/parametres/tableau-de-bord"} component={SettingsDashboard} />
         <Route path={"/parametres/securite"} component={SettingsSecurity} />

@@ -624,3 +624,10 @@
 - [x] Ne plus ignorer silencieusement les échecs d’écriture et conserver une action de reprise.
 - [x] Ajouter les tests de concurrence, d’échec IndexedDB et de reprise.
 - [x] Vérifier avec pnpm check, pnpm test et pnpm build, puis créer un checkpoint.
+
+## Réorganisation des paramètres
+- [x] Regrouper les paramètres par sections thématiques avec une hiérarchie lisible.
+- [x] Créer des liens indépendants pour rattachement, tickets, paiements et actions vendeurs.
+- [x] Conserver ensemble les réglages fortement liés comme affichage et devise.
+- [x] Préserver les routes historiques et les permissions administrateur.
+- [x] Ajouter les tests de recherche par sous-réglage et par section.
