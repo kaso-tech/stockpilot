@@ -76,3 +76,35 @@ describe("replaceOfflineScope", () => {
     expect(snapshot?.payload).toEqual({ syncLog: [] });
   });
 });
+
+describe("devis offline avec fiscalité", () => {
+  it("conserve le canal quote, le taux TVA et les frais de livraison dans le périmètre actif", async () => {
+    const quote = {
+      id: "quote-offline-1",
+      ownerUserId: scope.userId,
+      companyId: scope.companyId,
+      kind: "invoice_draft",
+      createdAt: 100,
+      status: "pending",
+      draft: {
+        channel: "quote",
+        customerId: 77,
+        salesAgentId: null,
+        cashierId: null,
+        salesAgentSelectionMade: true,
+        cashierSelectionMade: true,
+        note: null,
+        deliveryAddress: "12 rue du Marché",
+        deliveryFeeCents: 1500,
+        vatRateBasisPoints: 1800,
+        vatCents: 1800,
+        invoiceDiscount: { type: "none", value: 0 },
+        items: [{ productId: 9, quantity: 2, manualUnitPriceCents: 5000, discount: { type: "none", value: 0 } }],
+      },
+    };
+    await replaceOfflineScope(scope, [{ id: quote.id, type: quote.kind, payload: quote, createdAt: quote.createdAt, attempts: 0 }], { syncLog: [] });
+    const otherScope: OfflineScope = { companyId: 13, userId: scope.userId };
+    expect((await readOfflineScope(scope)).operations[0]?.payload).toMatchObject({ draft: { channel: "quote", deliveryFeeCents: 1500, vatRateBasisPoints: 1800, vatCents: 1800 } });
+    expect((await readOfflineScope(otherScope)).operations).toHaveLength(0);
+  });
+});
