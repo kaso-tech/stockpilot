@@ -9,7 +9,7 @@ import { storagePut } from "../storage";
 import { commerceRouter } from "./commerce";
 
 const mockedGetDb = vi.mocked(getDb);
-function adminContext(): TrpcContext { return { user: { id: 1, openId: "identity-admin", name: "Admin", email: "admin@example.test", loginMethod: "manus", role: "admin", active: true, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }, req: { protocol: "https", headers: {} } as TrpcContext["req"], res: { clearCookie: () => undefined } as TrpcContext["res"] }; }
+function adminContext(): TrpcContext { return { user: { id: 1, openId: "identity-admin", name: "Admin", email: "admin@example.test", loginMethod: "manus", role: "admin", active: true, companyId: 1, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }, req: { protocol: "https", headers: {} } as TrpcContext["req"], res: { clearCookie: () => undefined } as TrpcContext["res"] }; }
 
 describe("persistance de l’identité entreprise", () => {
   let stored: Record<string, unknown> | null;

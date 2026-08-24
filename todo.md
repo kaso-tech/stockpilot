@@ -546,3 +546,10 @@
 - [x] Ajouter des fixtures déterministes de deux entreprises pour les futurs tests d’isolation et d’intégrité.
 - [x] Ajouter un harnais de tests d’isolation réutilisable sans données réelles ni secrets.
 - [x] Vérifier le Lot 1 avec pnpm check, pnpm test et pnpm build, puis publier son checkpoint avant le Lot 2.
+
+## Programme de remédiation — Lot 2 : noyau d’isolation multi-entreprise
+- [x] Créer des helpers typés de chargement et d’assertion de ressources par companyId.
+- [x] Renforcer companyScope pour refuser les ressources legacy hors des parcours explicitement migrés.
+- [x] Ajouter un audit statique des requêtes par identifiant sans scope.
+- [x] Ajouter des tests de propriété parent/enfant et de refus inter-entreprise réutilisables.
+- [x] Vérifier le Lot 2 avec pnpm check, pnpm test et pnpm build, puis publier son checkpoint avant le Lot 3.

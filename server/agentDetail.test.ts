@@ -7,7 +7,7 @@ import { getDb } from "./db";
 import { appRouter } from "./routers";
 
 const mockedGetDb = vi.mocked(getDb);
-const context = (): TrpcContext => ({ user: { id: 1, openId: "agent-detail-admin", name: "Admin", email: "admin@example.test", loginMethod: "manus", role: "admin", active: true, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }, req: { protocol: "https", headers: {} } as TrpcContext["req"], res: { clearCookie: () => undefined } as TrpcContext["res"] });
+const context = (): TrpcContext => ({ user: { id: 1, openId: "agent-detail-admin", name: "Admin", email: "admin@example.test", loginMethod: "manus", role: "admin", active: true, companyId: 1, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }, req: { protocol: "https", headers: {} } as TrpcContext["req"], res: { clearCookie: () => undefined } as TrpcContext["res"] });
 
 function queryResult<T>(values: T[]) {
   return Object.assign(values, { limit: async () => values, orderBy: () => queryResult(values) });
