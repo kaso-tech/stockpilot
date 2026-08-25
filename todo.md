@@ -695,3 +695,9 @@
 - [x] Ouvrir les tickets dans une fenêtre de détail rapide au lieu d’une page dédiée.
 - [x] Permettre depuis cette fenêtre l’encaissement, l’impression et la conversion préremplie en facture.
 - [x] Tester les actions et publier le correctif.
+
+## Ajustements — articles, TVA et quantité POS
+- [x] Retirer le libellé « Tarif appliqué » des lignes de facture et devis.
+- [x] Afficher la TVA uniquement si elle est activée globalement et autoriser sa bascule seulement pour les vendeurs habilités.
+- [x] Ajouter la saisie directe de quantité dans le panier Vente rapide entre les boutons − et +.
+- [x] Tester les contrôles et publier le correctif.

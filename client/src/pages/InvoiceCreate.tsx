@@ -736,14 +736,7 @@ export default function InvoiceCreate({
                       </Button>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                    <span>Tarif appliqué : {formatCurrency(line.tariffCents)}</span>
-                    {line.tierMinQuantity && (
-                      <span>
-                        Palier dès {line.tierMinQuantity} {line.product.unit}
-                      </span>
-                    )}
-                  </div>
+                  {line.tierMinQuantity && <div className="text-xs text-muted-foreground">Palier dès {line.tierMinQuantity} {line.product.unit}</div>}
                   {(user?.role !== "seller" || sellerDiscountPermissions?.sellerCanLineDiscount) && <DiscountEditor
                     compact
                     label="Remise ligne"
@@ -785,7 +778,7 @@ export default function InvoiceCreate({
               </div>}
             </div>
             {(user?.role !== "seller" || sellerDiscountPermissions?.sellerCanInvoiceDiscount) && <DiscountEditor label="Remise facture" value={invoiceDiscount} onChange={setInvoiceDiscount} />}
-            {settings?.vatEnabled && sellerCanToggleVat ? <DocumentVatRateSelector rates={vatRatePresets} defaultRateBasisPoints={settings.vatRateBasisPoints} canToggle /> : null}
+            {settings?.vatEnabled ? <DocumentVatRateSelector rates={vatRatePresets} defaultRateBasisPoints={settings.vatRateBasisPoints} canToggle={sellerCanToggleVat} /> : null}
             <div className="space-y-1 text-sm text-muted-foreground">
               <div className="flex justify-between">
                 <span>Sous-total</span>

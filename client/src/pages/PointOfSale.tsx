@@ -9,6 +9,7 @@ import {
 import { useAuth } from "@/_core/hooks/useAuth";
 import { CheckoutSheet } from "@/components/CheckoutSheet";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -97,6 +98,7 @@ export default function PointOfSale() {
   const [cameraOpen, setCameraOpen] = useState(false);
   const [invoiceDiscount, setInvoiceDiscount] =
     useState<DiscountForm>(noDiscount);
+  const [posApplyVat, setPosApplyVat] = useState(true);
   const [checkoutSale, setCheckoutSale] = useState<CheckoutSale | null>(null);
   const pendingTickets = useMemo(() => transactions.filter(ticket => ticket.channel === "pos" && (ticket.status === "draft" || ticket.status === "partial")).slice(0, 4), [transactions]);
 
@@ -210,7 +212,9 @@ export default function PointOfSale() {
   const lineNetCents = lines.reduce((sum, line) => sum + line.totalCents, 0);
   const invoiceDiscountCents = calculateDiscount(lineNetCents, invoiceDiscount);
   const taxableSubtotalCents = lineNetCents - invoiceDiscountCents;
-  const vatRateBasisPoints = settings?.vatEnabled
+  const sellerCanToggleVat = user?.role !== "seller" || Boolean(settings?.sellerCanToggleVat);
+  const applyVat = Boolean(settings?.vatEnabled) && (sellerCanToggleVat ? posApplyVat : true);
+  const vatRateBasisPoints = applyVat
     ? (settings.vatRateBasisPoints ?? 0)
     : 0;
   const vatCents = Math.round(
@@ -301,6 +305,8 @@ export default function PointOfSale() {
       note: null,
       deliveryAddress: null,
       invoiceDiscount: discountPayload(invoiceDiscount),
+      applyVat,
+      vatRateBasisPoints: applyVat ? vatRateBasisPoints : undefined,
       items: lines.map(line => ({
         productId: line.productId,
         productName: line.product.name,
@@ -328,6 +334,8 @@ export default function PointOfSale() {
       cashierId: null,
       note: null,
       invoiceDiscount: discountPayload(invoiceDiscount),
+      applyVat,
+      vatRateBasisPoints: applyVat ? vatRateBasisPoints : undefined,
       items: cart.map(item => ({
         productId: item.productId,
         quantity: item.quantity,
@@ -354,6 +362,8 @@ export default function PointOfSale() {
       cashierId: null,
       note: null,
       invoiceDiscount: discountPayload(invoiceDiscount),
+      applyVat,
+      vatRateBasisPoints: applyVat ? vatRateBasisPoints : undefined,
       items: cart.map(item => ({ productId: item.productId, quantity: item.quantity, discount: discountPayload(item.discount) })),
     });
   };
@@ -703,9 +713,7 @@ export default function PointOfSale() {
                       >
                         <Minus className="h-3.5 w-3.5" />
                       </Button>
-                      <span className="w-6 text-center text-sm font-semibold">
-                        {line.quantity}
-                      </span>
+                      <Input aria-label={`Quantité de ${line.product.name}`} type="number" inputMode="numeric" min="1" max={line.product.quantity} value={line.quantity} onChange={event => { const next = Number(event.target.value); if (Number.isSafeInteger(next) && next > 0) quantity(line.productId, next); }} className="h-8 w-10 rounded-none border-y-0 px-1 text-center text-sm font-semibold" />
                       <Button
                         aria-label={`Ajouter une unité de ${line.product.name}`}
                         size="icon"
@@ -733,6 +741,7 @@ export default function PointOfSale() {
                     onChange={setInvoiceDiscount}
                   />
                 )}
+                {settings?.vatEnabled && <div className="flex items-center justify-between rounded-lg border border-primary/20 bg-primary/[0.05] px-3 py-2 text-sm"><div className="flex items-center gap-2 font-medium">{sellerCanToggleVat ? <Checkbox id="pos-vat" checked={posApplyVat} onCheckedChange={value => setPosApplyVat(value === true)} /> : null}<label htmlFor={sellerCanToggleVat ? "pos-vat" : undefined}>TVA appliquée</label></div>{!sellerCanToggleVat && <span className="text-xs text-muted-foreground">Configuration de l’entreprise</span>}</div>}
                 <div className="space-y-1 text-sm text-muted-foreground">
                   <div className="flex items-center justify-between">
                     <span>Sous-total net</span>
