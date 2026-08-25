@@ -79,6 +79,7 @@ export default function InvoiceCreate({
   const { data: customers = [] } = trpc.commerce.customers.list.useQuery();
   const { data: agents = [] } = trpc.commerce.agents.list.useQuery();
   const { data: settings } = trpc.commerce.settings.get.useQuery();
+  const { data: sellerDiscountPermissions } = trpc.sellerDiscountPermissions.get.useQuery(undefined, { enabled: user?.role === "seller" });
   const { data: vatRatePresets = [] } = trpc.vatRates.list.useQuery();
   const documentPath = documentType === "quote" ? "/devis" : "/factures";
   const prefilledCustomerId = invoiceCustomerPrefill(window.location.search);
@@ -202,9 +203,8 @@ export default function InvoiceCreate({
   const lineNetCents = lines.reduce((sum, line) => sum + line.totalCents, 0);
   const invoiceDiscountCents = calculateDiscount(lineNetCents, invoiceDiscount);
   const taxableSubtotalCents = lineNetCents - invoiceDiscountCents;
-  const applyVat =
-    settings?.vatEnabled &&
-    sessionStorage.getItem("stockpilot-vat-choice") !== "false";
+  const sellerCanToggleVat = user?.role !== "seller" || Boolean(settings?.sellerCanToggleVat);
+  const applyVat = settings?.vatEnabled && (sellerCanToggleVat ? sessionStorage.getItem("stockpilot-vat-choice") !== "false" : true);
   const storedVatRate = Number(sessionStorage.getItem("stockpilot-vat-rate"));
   const selectedPresetRate = vatRatePresets.find(
     rate => rate.rateBasisPoints === storedVatRate
@@ -723,14 +723,14 @@ export default function InvoiceCreate({
                       </span>
                     )}
                   </div>
-                  <DiscountEditor
+                  {(user?.role !== "seller" || sellerDiscountPermissions?.sellerCanLineDiscount) && <DiscountEditor
                     compact
                     label="Remise ligne"
                     value={line.discount}
                     onChange={discount =>
                       setLineDiscount(line.productId, discount)
                     }
-                  />
+                  />}
                 </div>
               ))
             ) : (
@@ -763,8 +763,8 @@ export default function InvoiceCreate({
                 </div>
               </div>}
             </div>
-            {(user?.role !== "seller" || settings?.sellerCanInvoiceDiscount) && <DiscountEditor label="Remise facture" value={invoiceDiscount} onChange={setInvoiceDiscount} />}
-            {settings?.vatEnabled ? <DocumentVatRateSelector rates={vatRatePresets} defaultRateBasisPoints={settings.vatRateBasisPoints} canToggle={user?.role === "admin" || Boolean(settings.sellerCanToggleVat)} /> : null}
+            {(user?.role !== "seller" || sellerDiscountPermissions?.sellerCanInvoiceDiscount) && <DiscountEditor label="Remise facture" value={invoiceDiscount} onChange={setInvoiceDiscount} />}
+            {settings?.vatEnabled && sellerCanToggleVat ? <DocumentVatRateSelector rates={vatRatePresets} defaultRateBasisPoints={settings.vatRateBasisPoints} canToggle /> : null}
             <div className="space-y-1 text-sm text-muted-foreground">
               <div className="flex justify-between">
                 <span>Sous-total</span>

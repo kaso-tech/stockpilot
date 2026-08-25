@@ -669,3 +669,8 @@
 ## Correctif — autorisations de remise vendeur
 - [x] Rétablir les contrôles distincts de remise par produit, facture et panier dans les paramètres vendeur.
 - [x] Rétablir les plafonds associés, vérifier la persistance et publier le correctif.
+
+## Correctif critique — application des autorisations vendeur
+- [x] Masquer et bloquer les remises non autorisées dans la facture, le devis et Vente rapide.
+- [x] Masquer et bloquer la bascule TVA lorsque le vendeur n’est pas autorisé à la modifier.
+- [x] Ajouter des scénarios de refus côté client et serveur, puis valider et publier le correctif.
