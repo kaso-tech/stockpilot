@@ -758,3 +758,10 @@
 - [x] Étendre les contrats serveur avec des filtres d’entrepôt strictement validés.
 - [x] Raccorder le tableau de bord, les listes commerciales, les historiques et les statistiques d’agents au dépôt actif.
 - [x] Tester la cohérence des totaux, l’isolation multi-entreprise et publier le correctif.
+
+## Pilotage consolidé et affectations vendeur-entrepôt
+- [x] Définir les indicateurs comparatifs par entrepôt et leurs règles d’agrégation.
+- [x] Créer les affectations vendeur-entrepôt avec contrôles multi-entreprise et audit.
+- [x] Restreindre les sélections opérationnelles d’un vendeur aux entrepôts qui lui sont attribués.
+- [x] Ajouter le tableau de bord comparatif et l’interface d’affectation administrateur.
+- [x] Tester les calculs, l’isolation et les accès vendeur, puis publier le correctif.

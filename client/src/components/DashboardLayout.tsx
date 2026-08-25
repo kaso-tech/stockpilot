@@ -75,6 +75,7 @@ import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Vue d’ensemble", path: "/" },
+  { icon: LayoutDashboard, label: "Pilotage consolidé", path: "/pilotage-entrepots" },
   { icon: ShoppingCart, label: "Vente Rapide", path: "/pos" },
   { icon: ReceiptText, label: "Tickets", path: "/tickets" },
   { icon: ReceiptText, label: "Factures", path: "/factures" },

@@ -101,6 +101,7 @@ import { assertSellerSensitiveAction } from "./sellerActionRules";
 import { companyScope } from "./companyScope";
 import { consumeRateLimit } from "./rateLimit";
 import { creditWarehouseStock, debitWarehouseStock, getDefaultWarehouse, getScopedWarehouse } from "./warehouseStock";
+import { assertSellerWarehouseAccess } from "./sellerWarehouseAccess";
 
 const productInput = z.object({
   reference: z.string().trim().min(2).max(80),
@@ -428,7 +429,7 @@ export const appRouter = router({
       const monthlyAgentPaymentCents = monthlyExpenseTotalCents(agentExpenseRows, month);
       const monthlyExpenseCents = monthlyManualExpenseCents + monthlyAgentPaymentCents;
       const monthlyOperatingProfitCents = operatingNetProfitCents(monthlyMarginCents, monthlyExpenseCents);
-      const currentBudget = budgetRows.find(budget => budget.yearMonth === month);
+      const currentBudget = budgetRows.find(budget => budget.yearMonth === month && (!input?.warehouseId || budget.warehouseId === input.warehouseId));
       const expenseBudget = budgetComparison(currentBudget?.amountCents ?? null, monthlyExpenseCents, currentBudget?.warningPercent ?? 80);
       const duePayrollCents = profiles.reduce((sum, profile) => {
         const commissionCents = commissions.filter(item => item.beneficiaryType === profile.beneficiaryType && item.beneficiaryId === profile.beneficiaryId && item.createdAt.toISOString().slice(0, 7) === month).reduce((total, item) => total + item.commissionCents, 0);
@@ -479,6 +480,35 @@ export const appRouter = router({
         unpaidInvoices: saleRows.filter(sale => sale.channel === "invoice" && sale.status !== "paid").sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 5).map(sale => { const customer = sale.customerId ? customerMap.get(sale.customerId) : undefined; return { id: sale.id, invoiceNumber: sale.invoiceNumber, totalCents: sale.totalCents, amountPaidCents: sale.amountPaidCents, balanceCents: Math.max(0, sale.totalCents - sale.amountPaidCents), status: sale.status, createdAt: sale.createdAt, customerName: customer?.name ?? "Client" }; }),
       };
     }),
+    compareWarehouses: adminProcedure.input(z.object({ yearMonth: z.string().regex(/^\d{4}-\d{2}$/).optional() }).optional()).query(async ({ ctx, input }) => {
+      const db = await requireDb();
+      const companyId = ctx.user.companyId;
+      const yearMonth = input?.yearMonth ?? new Date().toISOString().slice(0, 7);
+      const [warehouseRows, saleRows, expenseRows, paymentRows, budgetRows, catalog, stockRows] = await Promise.all([
+        db.select().from(warehouses).where(and(companyScope(warehouses.companyId, companyId), eq(warehouses.active, true))).orderBy(warehouses.name),
+        db.select().from(sales).where(companyScope(sales.companyId, companyId)),
+        db.select().from(expenses).where(companyScope(expenses.companyId, companyId)),
+        db.select().from(agentPayments).where(companyScope(agentPayments.companyId, companyId)),
+        db.select().from(expenseBudgets).where(companyScope(expenseBudgets.companyId, companyId)),
+        db.select({ id: products.id, purchasePriceCents: products.purchasePriceCents, minimumQuantity: products.minimumQuantity }).from(products).where(companyScope(products.companyId, companyId)),
+        db.select().from(warehouseStocks).where(companyScope(warehouseStocks.companyId, companyId)),
+      ]);
+      const rows = warehouseRows.map(warehouse => {
+        const monthlyPaidSales = saleRows.filter(sale => sale.warehouseId === warehouse.id && sale.status === "paid" && sale.createdAt.toISOString().slice(0, 7) === yearMonth);
+        const monthlyExpenses = expenseRows.filter(expense => expense.warehouseId === warehouse.id && expense.spentAt.toISOString().slice(0, 7) === yearMonth).reduce((sum, expense) => sum + expense.amountCents, 0);
+        const monthlyPayroll = paymentRows.filter(payment => payment.warehouseId === warehouse.id && payment.paidAt.toISOString().slice(0, 7) === yearMonth).reduce((sum, payment) => sum + payment.amountCents, 0);
+        const localizedStocks = stockRows.filter(stock => stock.warehouseId === warehouse.id);
+        const stockValueCents = localizedStocks.reduce((sum, stock) => sum + stock.quantity * (catalog.find(product => product.id === stock.productId)?.purchasePriceCents ?? 0), 0);
+        const lowStockCount = localizedStocks.filter(stock => stock.quantity <= (catalog.find(product => product.id === stock.productId)?.minimumQuantity ?? 0)).length;
+        const revenueCents = monthlyPaidSales.reduce((sum, sale) => sum + sale.totalCents, 0);
+        const marginCents = monthlyPaidSales.reduce((sum, sale) => sum + sale.netProfitCents, 0);
+        const expenseCents = monthlyExpenses + monthlyPayroll;
+        const budget = budgetRows.find(item => item.warehouseId === warehouse.id && item.yearMonth === yearMonth);
+        return { id: warehouse.id, name: warehouse.name, code: warehouse.code, isDefault: warehouse.isDefault, revenueCents, marginCents, expenseCents, operatingProfitCents: marginCents - expenseCents, invoiceCount: monthlyPaidSales.length, averageBasketCents: monthlyPaidSales.length ? Math.round(revenueCents / monthlyPaidSales.length) : 0, stockValueCents, lowStockCount, budgetCents: budget?.amountCents ?? null, budgetPercent: budget?.amountCents ? Math.round((expenseCents / budget.amountCents) * 100) : null };
+      });
+      const totals = rows.reduce((sum, row) => ({ revenueCents: sum.revenueCents + row.revenueCents, marginCents: sum.marginCents + row.marginCents, expenseCents: sum.expenseCents + row.expenseCents, operatingProfitCents: sum.operatingProfitCents + row.operatingProfitCents, invoiceCount: sum.invoiceCount + row.invoiceCount, stockValueCents: sum.stockValueCents + row.stockValueCents, lowStockCount: sum.lowStockCount + row.lowStockCount }), { revenueCents: 0, marginCents: 0, expenseCents: 0, operatingProfitCents: 0, invoiceCount: 0, stockValueCents: 0, lowStockCount: 0 });
+      return { yearMonth, warehouses: rows.sort((left, right) => right.revenueCents - left.revenueCents || left.name.localeCompare(right.name)), totals };
+    }),
   }),
 
   onboarding: router({
@@ -520,8 +550,7 @@ export const appRouter = router({
     list: protectedProcedure.input(z.object({ warehouseId: z.number().int().positive().optional() }).optional()).query(async ({ ctx, input }) => {
       const db = await requireDb();
       if (input?.warehouseId) {
-        const warehouse = (await db.select({ id: warehouses.id }).from(warehouses).where(and(eq(warehouses.id, input.warehouseId), companyScope(warehouses.companyId, ctx.user.companyId))).limit(1))[0];
-        if (!warehouse) throw new TRPCError({ code: "NOT_FOUND", message: "Entrepôt introuvable." });
+        await assertSellerWarehouseAccess(db, ctx.user, input.warehouseId, { requireActive: true });
       }
       return listProducts(ctx.user.companyId, input?.warehouseId);
     }),

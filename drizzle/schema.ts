@@ -55,6 +55,19 @@ export const userWarehousePreferences = mysqlTable("userWarehousePreferences", {
   index("user_warehouse_preferences_company_warehouse_idx").on(table.companyId, table.warehouseId),
 ]);
 
+/** Dépôts auxquels un vendeur est explicitement autorisé à accéder. */
+export const sellerWarehouseAssignments = mysqlTable("sellerWarehouseAssignments", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  sellerUserId: int("sellerUserId").notNull(),
+  warehouseId: int("warehouseId").notNull(),
+  createdByUserId: int("createdByUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [
+  uniqueIndex("seller_warehouse_assignments_unique").on(table.companyId, table.sellerUserId, table.warehouseId),
+  index("seller_warehouse_assignments_company_warehouse_idx").on(table.companyId, table.warehouseId),
+]);
+
 export const sellerCredentials = mysqlTable("sellerCredentials", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull().unique(),

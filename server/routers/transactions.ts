@@ -16,6 +16,7 @@ import { assertSafeDatabaseInt, MAX_CENTS, MAX_DISCOUNT_BASIS_POINTS, MAX_LINE_I
 import { calculateCommercialTotals } from "../commercialTotals";
 import { assertVatPresetSelection } from "../vatRateRules";
 import { creditWarehouseStock, debitWarehouseStock, getDefaultWarehouse, getScopedWarehouse } from "../warehouseStock";
+import { assignedWarehouseIds, assertSellerWarehouseAccess } from "../sellerWarehouseAccess";
 
 const paymentMethod = z.enum(["cash", "card", "mobile_money", "bank_transfer", "credit"]);
 const discountInput = z.object({ type: z.enum(["none", "percent", "fixed"]), value: z.number().int().min(0).max(MAX_CENTS) }).superRefine((value, ctx) => { if (value.type === "percent" && value.value > MAX_DISCOUNT_BASIS_POINTS) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Le pourcentage de remise est invalide." }); });
@@ -53,13 +54,15 @@ async function validateAgents(tx: any, companyId: number | null, selected: { sal
 export const transactionsRouter = router({
   list: protectedProcedure.input(z.object({ warehouseId: z.number().int().positive().optional() }).optional()).query(async ({ ctx, input }) => {
     const db = await dbOrThrow();
-    if (input?.warehouseId) await getScopedWarehouse(db, ctx.user.companyId, input.warehouseId, { requireActive: true });
+    if (input?.warehouseId) await assertSellerWarehouseAccess(db, ctx.user, input.warehouseId, { requireActive: true });
+    const allowedWarehouseIds = await assignedWarehouseIds(db, ctx.user);
     const [rows, customerRows] = await Promise.all([
       db.select().from(sales).where(input?.warehouseId ? and(companyScope(sales.companyId, ctx.user.companyId), eq(sales.warehouseId, input.warehouseId)) : companyScope(sales.companyId, ctx.user.companyId)).orderBy(desc(sales.createdAt)).limit(100),
       db.select().from(customers).where(companyScope(customers.companyId, ctx.user.companyId)),
     ]);
     const customerNames = new Map(customerRows.map(customer => [customer.id, customer.name]));
-    return rows.map(row => ({ ...row, customerName: row.customerId ? customerNames.get(row.customerId) ?? null : null }));
+    const visibleRows = allowedWarehouseIds === null ? rows : rows.filter(row => row.warehouseId !== null && allowedWarehouseIds.includes(row.warehouseId));
+    return visibleRows.map(row => ({ ...row, customerName: row.customerId ? customerNames.get(row.customerId) ?? null : null }));
   }),
   removeDraft: protectedProcedure.input(z.object({ saleId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
     const db = await dbOrThrow();
@@ -113,7 +116,8 @@ export const transactionsRouter = router({
       }
       const customer = input.customerId ? (await tx.select().from(customers).where(and(eq(customers.id, input.customerId), companyScope(customers.companyId, ctx.user.companyId))).limit(1))[0] : null;
       if (input.customerId && !customer) throw new TRPCError({ code: "NOT_FOUND", message: "Client introuvable." });
-      const warehouse = input.warehouseId ? await getScopedWarehouse(tx, ctx.user.companyId, input.warehouseId, { requireActive: true }) : await getDefaultWarehouse(tx, ctx.user.companyId);
+      const defaultWarehouse = input.warehouseId ? null : await getDefaultWarehouse(tx, ctx.user.companyId);
+      const warehouse = input.warehouseId ? await assertSellerWarehouseAccess(tx, ctx.user, input.warehouseId, { requireActive: true }) : ctx.user.role === "seller" ? await assertSellerWarehouseAccess(tx, ctx.user, defaultWarehouse!.id, { requireActive: true }) : defaultWarehouse!;
       const productIds = input.items.map(item => item.productId);
       const productRows = await tx.select().from(products).where(and(inArray(products.id, productIds), companyScope(products.companyId, ctx.user.companyId)));
       if (productRows.length !== productIds.length) throw new TRPCError({ code: "NOT_FOUND", message: "Un produit est introuvable." });

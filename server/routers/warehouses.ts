@@ -1,4 +1,4 @@
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { auditLogs, products, stockTransfers, userWarehousePreferences, warehouseStocks, warehouses } from "../../drizzle/schema";
@@ -7,6 +7,7 @@ import { adminProcedure, protectedProcedure, router } from "../_core/trpc";
 import { companyScope } from "../companyScope";
 import { getScopedWarehouse } from "../warehouseStock";
 import { resolveActiveWarehouse } from "../activeWarehouseRules";
+import { assignedWarehouseIds, assertSellerWarehouseAccess } from "../sellerWarehouseAccess";
 
 const warehouseInput = z.object({
   name: z.string().trim().min(2).max(160),
@@ -51,6 +52,8 @@ export const warehousesRouter = router({
 
   list: protectedProcedure.query(async ({ ctx }) => {
     const db = await dbOrThrow();
+    const assignedIds = await assignedWarehouseIds(db, ctx.user);
+    const scope = assignedIds === null ? companyScope(warehouses.companyId, ctx.user.companyId) : assignedIds.length ? and(companyScope(warehouses.companyId, ctx.user.companyId), inArray(warehouses.id, assignedIds)) : and(companyScope(warehouses.companyId, ctx.user.companyId), sql`1 = 0`);
     const rows = await db.select({
       id: warehouses.id,
       name: warehouses.name,
@@ -64,7 +67,7 @@ export const warehousesRouter = router({
       totalQuantity: sql<number>`coalesce(sum(${warehouseStocks.quantity}), 0)`,
     }).from(warehouses)
       .leftJoin(warehouseStocks, and(eq(warehouseStocks.warehouseId, warehouses.id), companyScope(warehouseStocks.companyId, ctx.user.companyId)))
-      .where(companyScope(warehouses.companyId, ctx.user.companyId))
+      .where(scope)
       .groupBy(warehouses.id, warehouses.name, warehouses.code, warehouses.address, warehouses.active, warehouses.isDefault, warehouses.createdAt, warehouses.updatedAt)
       .orderBy(asc(warehouses.isDefault), asc(warehouses.name));
     return rows.sort((left, right) => Number(right.isDefault) - Number(left.isDefault) || left.name.localeCompare(right.name));
@@ -72,7 +75,7 @@ export const warehousesRouter = router({
 
   stocks: protectedProcedure.input(z.object({ warehouseId: z.number().int().positive() })).query(async ({ ctx, input }) => {
     const db = await dbOrThrow();
-    const warehouse = await getScopedWarehouse(db, ctx.user.companyId, input.warehouseId);
+    const warehouse = await assertSellerWarehouseAccess(db, ctx.user, input.warehouseId);
     const rows = await db.select({
       productId: products.id,
       reference: products.reference,

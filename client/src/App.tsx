@@ -50,12 +50,14 @@ import TermsOfUse from "./pages/TermsOfUse";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import Warehouses from "./pages/Warehouses";
 import StockTransfers from "./pages/StockTransfers";
+import WarehouseComparison from "./pages/WarehouseComparison";
 
 function DashboardRouter() {
   return (
     <DashboardLayout>
       <Switch>
         <Route path={"/"} component={Home} />
+        <Route path={"/pilotage-entrepots"} component={WarehouseComparison} />
         <Route path={"/pos"} component={PointOfSale} />
         <Route path={"/tickets"} component={Tickets} />
         <Route path={"/clients/:id"} component={CustomerDetail} />

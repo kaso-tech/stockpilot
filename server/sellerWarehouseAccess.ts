@@ -1,0 +1,25 @@
+import { and, eq } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
+import { sellerWarehouseAssignments } from "../drizzle/schema";
+import { companyScope } from "./companyScope";
+import { getScopedWarehouse } from "./warehouseStock";
+
+type ScopedUser = { id: number; role: "admin" | "seller"; companyId: number | null };
+
+export async function assignedWarehouseIds(tx: any, user: ScopedUser) {
+  if (user.role !== "seller") return null;
+  const rows = await tx.select({ warehouseId: sellerWarehouseAssignments.warehouseId })
+    .from(sellerWarehouseAssignments)
+    .where(and(companyScope(sellerWarehouseAssignments.companyId, user.companyId), eq(sellerWarehouseAssignments.sellerUserId, user.id)));
+  return rows.map((row: { warehouseId: number }) => row.warehouseId);
+}
+
+export async function assertSellerWarehouseAccess(tx: any, user: ScopedUser, warehouseId: number, options?: { requireActive?: boolean }) {
+  const warehouse = await getScopedWarehouse(tx, user.companyId, warehouseId, options);
+  if (user.role !== "seller") return warehouse;
+  const assignment = (await tx.select({ id: sellerWarehouseAssignments.id }).from(sellerWarehouseAssignments)
+    .where(and(companyScope(sellerWarehouseAssignments.companyId, user.companyId), eq(sellerWarehouseAssignments.sellerUserId, user.id), eq(sellerWarehouseAssignments.warehouseId, warehouse.id)))
+    .limit(1))[0];
+  if (!assignment) throw new TRPCError({ code: "FORBIDDEN", message: "Cet entrepôt ne vous est pas attribué." });
+  return warehouse;
+}

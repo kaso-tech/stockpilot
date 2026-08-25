@@ -43,6 +43,12 @@ Un sélecteur global d’entrepôt est disponible dans l’en-tête pour les adm
 
 Le changement de dépôt administratif pilote désormais les données opérationnelles : tableau de bord, chiffre d’affaires, marges, stock, alertes, tendances, factures, devis, tickets, mouvements, inventaires, produits, dépenses, paiements agents et commissions. Les pages POS et création de documents commerciaux synchronisent aussi leur entrepôt opérationnel avec ce choix, en vidant le panier local lors d’un basculement afin d’éviter un mélange de stocks. Les budgets mensuels, dépenses et paiements agents disposent maintenant d’un `warehouseId`; les migrations `0050` et `0051` ont rattaché les écritures historiques au dépôt principal. Les entités de référence de l’entreprise — clients, fournisseurs, catalogue maître, coordonnées, paramètres et profils agents — restent volontairement partagées, tandis que leurs historiques et performances suivent l’entrepôt actif.
 
+## Pilotage consolidé et accès vendeur aux dépôts
+
+La migration `0052` crée `sellerWarehouseAssignments`, avec unicité par entreprise, vendeur et entrepôt. Les vendeurs historiques sont rattachés aux dépôts actifs de leur entreprise pour préserver leur capacité opérationnelle; les nouveaux vendeurs et agents convertis en vendeurs reçoivent le dépôt principal par défaut, puis l’administrateur peut ajuster la liste depuis « Agents & paie ». La création et la consultation de documents, de produits et de stocks vérifient désormais cette affectation côté serveur, y compris lorsque le dépôt par défaut aurait été résolu implicitement.
+
+La route « Pilotage consolidé » compare les entrepôts actifs d’une entreprise sur une période mensuelle : chiffre d’affaires encaissé, marge, dépenses incluant la paie, résultat opérationnel, nombre de documents, panier moyen, valeur de stock, alertes de seuil et budget. Elle reste réservée aux administrateurs; chaque ligne permet de basculer vers la vue opérationnelle du dépôt sélectionné.
+
 ## 2. Environnement et exploitation
 
 | Élément | Valeur / règle |
