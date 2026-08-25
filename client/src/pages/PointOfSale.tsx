@@ -29,6 +29,7 @@ import {
   restockEstimateCents,
 } from "@/lib/replenishmentRules";
 import { trpc } from "@/lib/trpc";
+import { useActiveWarehouse } from "@/contexts/ActiveWarehouseContext";
 import { useOffline, type OfflinePosDraft } from "@/contexts/OfflineContext";
 import {
   AlertTriangle,
@@ -74,16 +75,19 @@ export default function PointOfSale() {
   const utils = trpc.useUtils();
   const [, setLocation] = useLocation();
   const { user } = useAuth();
+  const { activeWarehouseId, setActiveWarehouseId } = useActiveWarehouse();
+  const isAdmin = user?.role === "admin";
   const { isOnline, pendingProductQuantitiesByWarehouse } = useOffline();
   const { data: warehouses = [] } = trpc.warehouses.list.useQuery();
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | null>(null);
   useEffect(() => { if (selectedWarehouseId === null && warehouses.length) setSelectedWarehouseId(warehouses.find(warehouse => warehouse.isDefault)?.id ?? warehouses.find(warehouse => warehouse.active)?.id ?? null); }, [selectedWarehouseId, warehouses]);
+  useEffect(() => { if (isAdmin && activeWarehouseId && activeWarehouseId !== selectedWarehouseId) { setCart([]); setSelectedWarehouseId(activeWarehouseId); } }, [activeWarehouseId, isAdmin, selectedWarehouseId]);
   const { data: products = [] } = trpc.products.list.useQuery(selectedWarehouseId ? { warehouseId: selectedWarehouseId } : undefined);
   const pendingProductQuantities = pendingProductQuantitiesByWarehouse[selectedWarehouseId ?? 0] ?? {};
   const { data: suppliers = [] } = trpc.suppliers.list.useQuery();
   const { data: agents = [] } = trpc.commerce.agents.list.useQuery();
   const { data: settings } = trpc.commerce.settings.get.useQuery();
-  const { data: transactions = [] } = trpc.transactions.list.useQuery();
+  const { data: transactions = [] } = trpc.transactions.list.useQuery(selectedWarehouseId ? { warehouseId: selectedWarehouseId } : undefined);
   const { data: sellerDiscountPermissions } =
     trpc.sellerDiscountPermissions.get.useQuery(undefined, {
       enabled: user?.role === "seller",
@@ -413,7 +417,7 @@ export default function PointOfSale() {
           <h1 className="mt-2 text-2xl font-semibold text-slate-950 dark:text-white sm:text-3xl">
             Vente Rapide
           </h1>
-          <label className="mt-3 flex max-w-sm items-center gap-2 text-xs font-medium text-slate-500">Entrepôt opérationnel<select value={selectedWarehouseId ? String(selectedWarehouseId) : ""} onChange={event => { const nextId = Number(event.target.value); if (nextId && nextId !== selectedWarehouseId && cart.length && !window.confirm("Changer d’entrepôt videra le panier en cours. Continuer ?")) return; if (nextId !== selectedWarehouseId) clearCart(); setSelectedWarehouseId(nextId || null); }} className="min-w-0 flex-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary" disabled={!warehouses.length}>{warehouses.filter(warehouse => warehouse.active).map(warehouse => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}{warehouse.isDefault ? " · Principal" : ""}</option>)}</select></label>
+          <label className="mt-3 flex max-w-sm items-center gap-2 text-xs font-medium text-slate-500">Entrepôt opérationnel<select value={selectedWarehouseId ? String(selectedWarehouseId) : ""} onChange={event => { const nextId = Number(event.target.value); if (nextId && nextId !== selectedWarehouseId && cart.length && !window.confirm("Changer d’entrepôt videra le panier en cours. Continuer ?")) return; if (nextId !== selectedWarehouseId) clearCart(); if (isAdmin && nextId) setActiveWarehouseId(nextId); setSelectedWarehouseId(nextId || null); }} className="min-w-0 flex-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary" disabled={!warehouses.length}>{warehouses.filter(warehouse => warehouse.active).map(warehouse => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}{warehouse.isDefault ? " · Principal" : ""}</option>)}</select></label>
         </div>
         {cart.length > 0 && (
           <button

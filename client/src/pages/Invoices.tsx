@@ -24,6 +24,7 @@ import { documentParticipantNames, documentParticipantOptionLabel, matchesDocume
 import { invoiceEmailMessage, invoiceEmailSubject } from "@/lib/invoiceShare";
 import { downloadCommercialDocumentsCsv } from "@/lib/documentCsv";
 import { trpc } from "@/lib/trpc";
+import { useActiveWarehouse } from "@/contexts/ActiveWarehouseContext";
 import {
   Download,
   Eye,
@@ -56,6 +57,7 @@ type Invoice = {
 
 export default function Invoices() {
   const { user } = useAuth();
+  const { activeWarehouseId } = useActiveWarehouse();
   const [, setLocation] = useLocation();
   const initial =
     Number(new URLSearchParams(window.location.search).get("facture")) || null;
@@ -70,7 +72,7 @@ export default function Invoices() {
   const [periodFilter, setPeriodFilter] = useState<"all" | "today" | "week" | "month">("all");
   const utils = trpc.useUtils();
   const { data: transactions = [], isLoading } =
-    trpc.transactions.list.useQuery();
+    trpc.transactions.list.useQuery(user?.role === "admin" && activeWarehouseId ? { warehouseId: activeWarehouseId } : undefined);
   const { data: detail } = trpc.commerce.sales.detail.useQuery(
     { id: selectedId ?? 0 },
     { enabled: Boolean(selectedId) }

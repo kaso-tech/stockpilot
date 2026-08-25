@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatCurrency } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
+import { useActiveWarehouse } from "@/contexts/ActiveWarehouseContext";
 import { Banknote, BriefcaseBusiness, ChevronRight, Plus, UserRoundCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -25,8 +26,9 @@ export default function Agents() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const isAdmin = user?.role === "admin";
+  const { activeWarehouseId, activeWarehouse } = useActiveWarehouse();
   const utils = trpc.useUtils();
-  const { data: payroll } = trpc.payroll.overview.useQuery(undefined, { enabled: isAdmin });
+  const { data: payroll } = trpc.payroll.overview.useQuery(activeWarehouseId ? { warehouseId: activeWarehouseId } : undefined, { enabled: isAdmin });
   const { data: sellers = [] } = trpc.commerce.sellers.list.useQuery(undefined, { enabled: isAdmin });
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Beneficiary | null>(null);

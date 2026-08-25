@@ -386,6 +386,7 @@ export const sales = mysqlTable("sales", {
 export const expenses = mysqlTable("expenses", {
   id: int("id").autoincrement().primaryKey(),
   companyId: int("companyId"),
+  warehouseId: int("warehouseId"),
   category: mysqlEnum("category", ["rent", "energy", "connection", "salary", "marketing", "supplies", "taxes", "other"]).notNull(),
   description: varchar("description", { length: 300 }).notNull(),
   amountCents: int("amountCents").notNull(),
@@ -396,18 +397,19 @@ export const expenses = mysqlTable("expenses", {
   createdByUserId: int("createdByUserId").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, table => [index("expenses_company_warehouse_spent_idx").on(table.companyId, table.warehouseId, table.spentAt)]);
 
 export const expenseBudgets = mysqlTable("expenseBudgets", {
   id: int("id").autoincrement().primaryKey(),
   companyId: int("companyId"),
-  yearMonth: varchar("yearMonth", { length: 7 }).notNull().unique(),
+  warehouseId: int("warehouseId"),
+  yearMonth: varchar("yearMonth", { length: 7 }).notNull(),
   amountCents: int("amountCents").notNull(),
   warningPercent: int("warningPercent").notNull().default(80),
   updatedByUserId: int("updatedByUserId").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, table => [uniqueIndex("expense_budgets_company_warehouse_month_unique").on(table.companyId, table.warehouseId, table.yearMonth)]);
 
 export const salePayments = mysqlTable("salePayments", {
   id: int("id").autoincrement().primaryKey(),
@@ -450,6 +452,7 @@ export const saleCommissions = mysqlTable("saleCommissions", {
 export const agentPayments = mysqlTable("agentPayments", {
   id: int("id").autoincrement().primaryKey(),
   companyId: int("companyId"),
+  warehouseId: int("warehouseId"),
   beneficiaryType: mysqlEnum("beneficiaryType", ["user", "agent"]).notNull(),
   beneficiaryId: int("beneficiaryId").notNull(),
   amountCents: int("amountCents").notNull(),
@@ -461,7 +464,7 @@ export const agentPayments = mysqlTable("agentPayments", {
   receiptMimeType: varchar("receiptMimeType", { length: 80 }),
   createdByUserId: int("createdByUserId").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, table => [index("agent_payments_company_warehouse_paid_idx").on(table.companyId, table.warehouseId, table.paidAt)]);
 
 export const inventorySessions = mysqlTable("inventorySessions", {
   id: int("id").autoincrement().primaryKey(),

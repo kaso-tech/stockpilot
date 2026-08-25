@@ -6,15 +6,17 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import { documentParticipantNames, documentParticipantOptionLabel, matchesDocumentParticipant } from "@/lib/documentParticipants";
 import { downloadCommercialDocumentsCsv } from "@/lib/documentCsv";
 import { trpc } from "@/lib/trpc";
+import { useActiveWarehouse } from "@/contexts/ActiveWarehouseContext";
 import { Download, Eye, FileText, Plus, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 
 export default function Quotes() {
   const { user } = useAuth();
+  const { activeWarehouseId } = useActiveWarehouse();
   const [, setLocation] = useLocation();
   const { data: transactions = [], isLoading } =
-    trpc.transactions.list.useQuery();
+    trpc.transactions.list.useQuery(user?.role === "admin" && activeWarehouseId ? { warehouseId: activeWarehouseId } : undefined);
   const { data: documentParticipants = [] } = trpc.commerce.documentParticipants.useQuery();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"all" | "draft" | "paid" | "void">("all");

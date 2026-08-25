@@ -24,7 +24,7 @@ export function ActiveWarehouseProvider({ children }: { children: React.ReactNod
   const warehouses = useMemo(() => rows.filter(warehouse => warehouse.active).map(warehouse => ({ id: warehouse.id, name: warehouse.name, code: warehouse.code, isDefault: warehouse.isDefault })), [rows]);
   useEffect(() => { setLocalActiveWarehouseId(isAdmin ? active?.warehouseId ?? null : null); }, [active?.warehouseId, isAdmin]);
   const setActive = trpc.warehouses.setActive.useMutation({
-    onSuccess: result => { setLocalActiveWarehouseId(result.warehouseId); void utils.warehouses.active.invalidate(); void utils.products.list.invalidate(); void utils.movements.list.invalidate(); void utils.inventory.list.invalidate(); },
+    onSuccess: result => { setLocalActiveWarehouseId(result.warehouseId); void utils.warehouses.active.invalidate(); void utils.products.list.invalidate(); void utils.movements.list.invalidate(); void utils.inventory.list.invalidate(); void utils.dashboard.get.invalidate(); void utils.transactions.list.invalidate(); void utils.expenses.list.invalidate(); void utils.expenses.report.invalidate(); void utils.payroll.overview.invalidate(); void utils.commerce.agents.detail.invalidate(); },
     onError: error => toast.error(error.message),
   });
   const value = useMemo(() => ({ activeWarehouseId, activeWarehouse: warehouses.find(warehouse => warehouse.id === activeWarehouseId) ?? null, warehouses, isReady: !isAdmin || !isLoading, setActiveWarehouseId: (warehouseId: number) => setActive.mutate({ warehouseId }) }), [activeWarehouseId, isAdmin, isLoading, setActive, warehouses]);

@@ -752,3 +752,9 @@
 - [x] Ajouter un sélecteur d’entrepôt global réservé à l’administrateur.
 - [x] Raccorder les vues de gestion des stocks, produits, mouvements et inventaires au dépôt actif.
 - [x] Tester la persistance, le cloisonnement et publier le correctif.
+
+## Vue d’exploitation complète par entrepôt
+- [x] Auditer les documents, ventes, indicateurs, agents et dépenses pouvant être filtrés par entrepôt.
+- [x] Étendre les contrats serveur avec des filtres d’entrepôt strictement validés.
+- [x] Raccorder le tableau de bord, les listes commerciales, les historiques et les statistiques d’agents au dépôt actif.
+- [x] Tester la cohérence des totaux, l’isolation multi-entreprise et publier le correctif.

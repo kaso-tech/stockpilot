@@ -3,9 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CheckoutSheet, printPosReceipt } from "@/components/CheckoutSheet";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { documentParticipantNames, documentParticipantOptionLabel, matchesDocumentParticipant } from "@/lib/documentParticipants";
 import { trpc } from "@/lib/trpc";
+import { useActiveWarehouse } from "@/contexts/ActiveWarehouseContext";
 import { Download, Eye, FileText, Printer, ReceiptText, Search } from "lucide-react";
 import { downloadCommercialDocumentsCsv } from "@/lib/documentCsv";
 import { useMemo, useState } from "react";
@@ -22,8 +24,10 @@ const statusMeta: Record<TicketStatus, [string, string]> = {
 };
 
 export default function Tickets() {
+  const { user } = useAuth();
+  const { activeWarehouseId } = useActiveWarehouse();
   const [, setLocation] = useLocation();
-  const { data: transactions = [], isLoading } = trpc.transactions.list.useQuery();
+  const { data: transactions = [], isLoading } = trpc.transactions.list.useQuery(user?.role === "admin" && activeWarehouseId ? { warehouseId: activeWarehouseId } : undefined);
   const { data: agents = [] } = trpc.commerce.agents.list.useQuery();
   const { data: documentParticipants = [] } = trpc.commerce.documentParticipants.useQuery();
   const [search, setSearch] = useState("");

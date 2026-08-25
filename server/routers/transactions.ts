@@ -51,10 +51,11 @@ async function validateAgents(tx: any, companyId: number | null, selected: { sal
 }
 
 export const transactionsRouter = router({
-  list: protectedProcedure.query(async ({ ctx }) => {
+  list: protectedProcedure.input(z.object({ warehouseId: z.number().int().positive().optional() }).optional()).query(async ({ ctx, input }) => {
     const db = await dbOrThrow();
+    if (input?.warehouseId) await getScopedWarehouse(db, ctx.user.companyId, input.warehouseId, { requireActive: true });
     const [rows, customerRows] = await Promise.all([
-      db.select().from(sales).where(companyScope(sales.companyId, ctx.user.companyId)).orderBy(desc(sales.createdAt)).limit(100),
+      db.select().from(sales).where(input?.warehouseId ? and(companyScope(sales.companyId, ctx.user.companyId), eq(sales.warehouseId, input.warehouseId)) : companyScope(sales.companyId, ctx.user.companyId)).orderBy(desc(sales.createdAt)).limit(100),
       db.select().from(customers).where(companyScope(customers.companyId, ctx.user.companyId)),
     ]);
     const customerNames = new Map(customerRows.map(customer => [customer.id, customer.name]));

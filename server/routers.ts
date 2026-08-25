@@ -402,10 +402,15 @@ export const appRouter = router({
   }),
 
   dashboard: router({
-    get: protectedProcedure.query(async ({ ctx }) => {
+    get: protectedProcedure.input(z.object({ warehouseId: z.number().int().positive().optional() }).optional()).query(async ({ ctx, input }) => {
       const db = await requireDb();
       const companyId = ctx.user.companyId;
-      const [productRows, movements, saleRows, customerRows, inventories, profiles, commissions, payments, expenseRows, budgetRows] = await Promise.all([listProducts(companyId), listMovements(companyId, 250), db.select().from(sales).where(companyScope(sales.companyId, companyId)), db.select().from(customers).where(companyScope(customers.companyId, companyId)), db.select().from(inventorySessions).where(companyScope(inventorySessions.companyId, companyId)), db.select().from(remunerationProfiles).where(companyScope(remunerationProfiles.companyId, companyId)), companyId === null ? db.select().from(saleCommissions) : Promise.resolve([]), companyId === null ? db.select().from(agentPayments) : Promise.resolve([]), db.select().from(expenses).where(companyScope(expenses.companyId, companyId)), db.select().from(expenseBudgets).where(companyScope(expenseBudgets.companyId, companyId))]);
+      if (input?.warehouseId) await getScopedWarehouse(db, companyId, input.warehouseId, { requireActive: true });
+      const salesScope = input?.warehouseId ? and(companyScope(sales.companyId, companyId), eq(sales.warehouseId, input.warehouseId)) : companyScope(sales.companyId, companyId);
+      const inventoryScope = input?.warehouseId ? and(companyScope(inventorySessions.companyId, companyId), eq(inventorySessions.warehouseId, input.warehouseId)) : companyScope(inventorySessions.companyId, companyId);
+      const expenseScope = input?.warehouseId ? and(companyScope(expenses.companyId, companyId), eq(expenses.warehouseId, input.warehouseId)) : companyScope(expenses.companyId, companyId);
+      const paymentScope = input?.warehouseId ? and(companyScope(agentPayments.companyId, companyId), eq(agentPayments.warehouseId, input.warehouseId)) : companyScope(agentPayments.companyId, companyId);
+      const [productRows, movements, saleRows, customerRows, inventories, profiles, commissions, payments, expenseRows, budgetRows] = await Promise.all([listProducts(companyId, input?.warehouseId), listMovements(companyId, 250, input?.warehouseId), db.select().from(sales).where(salesScope), db.select().from(customers).where(companyScope(customers.companyId, companyId)), db.select().from(inventorySessions).where(inventoryScope), db.select().from(remunerationProfiles).where(companyScope(remunerationProfiles.companyId, companyId)), companyId === null ? db.select().from(saleCommissions) : Promise.resolve([]), db.select().from(agentPayments).where(paymentScope), db.select().from(expenses).where(expenseScope), db.select().from(expenseBudgets).where(companyScope(expenseBudgets.companyId, companyId))]);
       const lowStock = productRows.filter(product => product.quantity <= product.minimumQuantity);
       const totalValueCents = productRows.reduce(
         (sum, product) => sum + product.quantity * product.purchasePriceCents,

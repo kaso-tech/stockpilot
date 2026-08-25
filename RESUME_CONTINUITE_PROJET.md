@@ -39,6 +39,10 @@ La page « Import & export » comporte un espace réservé aux administrateurs p
 
 Un sélecteur global d’entrepôt est disponible dans l’en-tête pour les administrateurs. Le choix est persistant par couple utilisateur/entreprise dans `userWarehousePreferences`, validé contre les entrepôts actifs du périmètre courant et tracé dans l’audit. Les produits, alertes de stock, mouvements et inventaires affichent désormais les quantités et historiques de l’entrepôt actif. La création d’un produit depuis cette gestion affecte son stock initial à ce même entrepôt. Les flux POS et facture conservent leur propre sélection opérationnelle afin de ne pas modifier les ventes en cours.
 
+## Vue d’exploitation complète par entrepôt
+
+Le changement de dépôt administratif pilote désormais les données opérationnelles : tableau de bord, chiffre d’affaires, marges, stock, alertes, tendances, factures, devis, tickets, mouvements, inventaires, produits, dépenses, paiements agents et commissions. Les pages POS et création de documents commerciaux synchronisent aussi leur entrepôt opérationnel avec ce choix, en vidant le panier local lors d’un basculement afin d’éviter un mélange de stocks. Les budgets mensuels, dépenses et paiements agents disposent maintenant d’un `warehouseId`; les migrations `0050` et `0051` ont rattaché les écritures historiques au dépôt principal. Les entités de référence de l’entreprise — clients, fournisseurs, catalogue maître, coordonnées, paramètres et profils agents — restent volontairement partagées, tandis que leurs historiques et performances suivent l’entrepôt actif.
+
 ## 2. Environnement et exploitation
 
 | Élément | Valeur / règle |

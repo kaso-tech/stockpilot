@@ -108,8 +108,9 @@ export const commerceRouter = router({
   }),
   agents: router({
     list: protectedProcedure.query(async ({ ctx }) => (await dbOrThrow()).select().from(agents).where(companyScope(agents.companyId, ctx.user.companyId)).orderBy(agents.name)),
-    detail: adminProcedure.input(z.object({ beneficiaryType: z.enum(["user", "agent"]), id: z.number().int().positive() })).query(async ({ ctx, input }) => {
+    detail: adminProcedure.input(z.object({ beneficiaryType: z.enum(["user", "agent"]), id: z.number().int().positive(), warehouseId: z.number().int().positive().optional() })).query(async ({ ctx, input }) => {
       const db = await dbOrThrow();
+      if (input.warehouseId) await getScopedWarehouse(db, ctx.user.companyId, input.warehouseId, { requireActive: true });
       const isSeller = input.beneficiaryType === "user";
       const [source] = isSeller ? await db.select().from(users).where(and(eq(users.id, input.id), eq(users.role, "seller"), companyScope(users.companyId, ctx.user.companyId))).limit(1) : await db.select().from(agents).where(and(eq(agents.id, input.id), companyScope(agents.companyId, ctx.user.companyId))).limit(1);
       if (!source) throw new TRPCError({ code: "NOT_FOUND", message: "Agent introuvable." });
@@ -118,7 +119,7 @@ export const commerceRouter = router({
       const [commissionRows, paymentRows, saleRows] = await Promise.all([
         db.select().from(saleCommissions).where(and(eq(saleCommissions.beneficiaryType, input.beneficiaryType), eq(saleCommissions.beneficiaryId, input.id))).orderBy(desc(saleCommissions.createdAt)),
         db.select().from(agentPayments).where(and(eq(agentPayments.beneficiaryType, input.beneficiaryType), eq(agentPayments.beneficiaryId, input.id), companyScope(agentPayments.companyId, ctx.user.companyId))).orderBy(desc(agentPayments.paidAt)),
-        isSeller ? db.select().from(sales).where(and(eq(sales.sellerUserId, input.id), companyScope(sales.companyId, ctx.user.companyId))).orderBy(desc(sales.createdAt)).limit(40) : db.select().from(sales).where(and(or(eq(sales.salesAgentId, input.id), eq(sales.cashierId, input.id)), companyScope(sales.companyId, ctx.user.companyId))).orderBy(desc(sales.createdAt)).limit(40),
+        isSeller ? db.select().from(sales).where(and(eq(sales.sellerUserId, input.id), companyScope(sales.companyId, ctx.user.companyId), ...(input.warehouseId ? [eq(sales.warehouseId, input.warehouseId)] : []))).orderBy(desc(sales.createdAt)).limit(40) : db.select().from(sales).where(and(or(eq(sales.salesAgentId, input.id), eq(sales.cashierId, input.id)), companyScope(sales.companyId, ctx.user.companyId), ...(input.warehouseId ? [eq(sales.warehouseId, input.warehouseId)] : []))).orderBy(desc(sales.createdAt)).limit(40),
       ]);
       const customerIds = Array.from(new Set(saleRows.map(sale => sale.customerId).filter((id): id is number => id !== null)));
       const customerRows = customerIds.length ? await db.select().from(customers).where(inArray(customers.id, customerIds)) : [];

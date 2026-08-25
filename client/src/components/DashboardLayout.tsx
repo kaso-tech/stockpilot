@@ -199,7 +199,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const initials = (user?.name || user?.email || "U").slice(0, 2).toUpperCase();
   const isAdmin = user?.role === "admin";
   const canRunBackup = Boolean(user);
-  const { data: dashboard } = trpc.dashboard.get.useQuery(undefined, { enabled: isAdmin, refetchInterval: 60_000 });
+  const { data: dashboard } = trpc.dashboard.get.useQuery(activeWarehouseId ? { warehouseId: activeWarehouseId } : undefined, { enabled: isAdmin, refetchInterval: 60_000 });
   const { data: backups } = trpc.backups.get.useQuery(undefined, { enabled: isAdmin, refetchInterval: 60_000 });
   const runBackup = trpc.backups.runNow.useMutation({ onSuccess: archive => toast.success(`Sauvegarde ${archive.filename} créée.`), onError: error => toast.error(error.message) });
   const candidateNotifications: RoleNotification[] = [];

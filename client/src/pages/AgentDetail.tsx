@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
+import { useActiveWarehouse } from "@/contexts/ActiveWarehouseContext";
 import { ArrowLeft, Banknote, BarChart3, BriefcaseBusiness, Edit3, Mail, MessageSquare, Phone, ReceiptText, Trash2, WalletCards } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -15,9 +16,10 @@ export default function AgentDetail() {
   const [, params] = useRoute("/agents/:beneficiaryType/:id");
   const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
+  const { activeWarehouseId } = useActiveWarehouse();
   const beneficiaryType = params?.beneficiaryType === "user" ? "user" as const : "agent" as const;
   const id = Number(params?.id);
-  const { data, isLoading } = trpc.commerce.agents.detail.useQuery({ beneficiaryType, id }, { enabled: Number.isFinite(id) && id > 0 });
+  const { data, isLoading } = trpc.commerce.agents.detail.useQuery({ beneficiaryType, id, warehouseId: activeWarehouseId ?? undefined }, { enabled: Number.isFinite(id) && id > 0 });
   const [openEdit, setOpenEdit] = useState(false);
   const [openPay, setOpenPay] = useState(false);
   const [amount, setAmount] = useState("");
@@ -47,7 +49,7 @@ export default function AgentDetail() {
       <Card className="border-white/[0.07] bg-[#111722]"><CardContent className="p-5"><h2 className="font-semibold text-white">Historique des paiements</h2><div className="mt-4 space-y-3">{data.payments.length ? data.payments.map(item => <div key={item.id} className="flex items-start justify-between gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3"><div className="min-w-0"><p className="text-sm font-medium text-slate-200">{new Date(item.paidAt).toLocaleDateString("fr-FR")}</p><p className="mt-1 truncate text-xs text-slate-500">{item.periodLabel || "Période libre"}{item.note ? ` · ${item.note}` : ""}</p></div><span className="shrink-0 font-semibold text-emerald-300">{formatCurrency(item.amountCents)}</span></div>) : <p className="text-sm text-slate-500">Aucun paiement enregistré.</p>}</div></CardContent></Card></section>
     <section className="rounded-2xl border border-white/[0.07] bg-[#111722] p-5"><h2 className="font-semibold text-white">Ventes associées</h2><div className="mt-4 grid gap-2 md:grid-cols-2">{data.sales.length ? data.sales.map(sale => <button key={sale.id} type="button" onClick={() => setLocation(`/factures?facture=${sale.id}`)} className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 text-left hover:border-cyan-400/35"><span className="min-w-0"><span className="block truncate text-sm font-medium text-slate-200">{sale.invoiceNumber}</span><span className="block truncate text-xs text-slate-500">{sale.customerName} · {new Date(sale.createdAt).toLocaleDateString("fr-FR")}</span></span><span className="shrink-0 text-sm font-semibold text-cyan-300">{formatCurrency(sale.totalCents)}</span></button>) : <p className="text-sm text-slate-500">Aucune vente associée.</p>}</div></section>
     <AgentDialog open={openEdit} editing={beneficiary} form={form} setForm={setForm} onClose={() => setOpenEdit(false)} onSubmit={submitEdit} pending={updateAgent.isPending || updateSeller.isPending} />
-    <Dialog open={openPay} onOpenChange={setOpenPay}><DialogContent className="border-white/10 bg-[#141b27] text-slate-100"><DialogHeader><DialogTitle>Paiement · {agent.name}</DialogTitle></DialogHeader><div className="space-y-2"><label className="text-sm">Montant</label><Input type="number" min="0" step="1" value={amount} onChange={event => setAmount(event.target.value)} /></div><DialogFooter><Button variant="ghost" onClick={() => setOpenPay(false)}>Annuler</Button><Button className="bg-cyan-400 text-slate-950" onClick={() => { const amountCents = Math.round(Number(amount) * 100); if (!amountCents) return toast.error("Saisissez un montant valide."); pay.mutate({ beneficiaryType, beneficiaryId: id, amountCents, note: null }); }}>Valider le paiement</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={openPay} onOpenChange={setOpenPay}><DialogContent className="border-white/10 bg-[#141b27] text-slate-100"><DialogHeader><DialogTitle>Paiement · {agent.name}</DialogTitle></DialogHeader><div className="space-y-2"><label className="text-sm">Montant</label><Input type="number" min="0" step="1" value={amount} onChange={event => setAmount(event.target.value)} /></div><DialogFooter><Button variant="ghost" onClick={() => setOpenPay(false)}>Annuler</Button><Button className="bg-cyan-400 text-slate-950" onClick={() => { const amountCents = Math.round(Number(amount) * 100); if (!amountCents) return toast.error("Saisissez un montant valide."); if (!activeWarehouseId) return toast.error("Sélectionnez un entrepôt actif."); pay.mutate({ beneficiaryType, beneficiaryId: id, amountCents, note: null, warehouseId: activeWarehouseId }); }}>Valider le paiement</Button></DialogFooter></DialogContent></Dialog>
   </div>;
 }
 
