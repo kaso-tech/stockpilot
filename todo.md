@@ -641,6 +641,11 @@
 - [x] Réorganiser les paramètres en rubriques professionnelles, séparer l’impression de l’entreprise et supprimer les doublons de tickets/impression.
 - [x] Isoler l’historique des modifications par entreprise, compléter les tests et publier le correctif.
 
+## Harmonisation — devis et factures
+- [x] Aligner les listes, fiches et actions des devis sur le modèle professionnel des factures.
+- [x] Remplacer l’action Email+PDF par un menu « Envoyer » proposant WhatsApp, SMS et e-mail avec les informations du client et du document préremplies.
+- [x] Tester les parcours de partage des devis et factures, puis publier le correctif.
+
 ## Correctif — secret de session
 - [x] Diagnostiquer et corriger l’erreur « Session secret is not configured securely » sans exposer ni affaiblir le secret de session ; retirer des journaux de rejet les métadonnées d’identifiants non nécessaires.
 - [x] Ajouter une couverture de test de la validation de configuration, valider connexion et build, puis publier un checkpoint.

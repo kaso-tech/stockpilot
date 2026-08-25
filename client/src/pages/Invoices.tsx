@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { invoiceEmailMessage, invoiceEmailSubject } from "@/lib/invoiceShare";
+import { DocumentSendMenu } from "@/components/DocumentSendMenu";
 import { trpc } from "@/lib/trpc";
-import { Download, Eye, Mail, Plus, Printer, ReceiptText, Trash2, Undo2, WalletCards } from "lucide-react";
+import { Download, Eye, Plus, Printer, ReceiptText, Trash2, Undo2, WalletCards } from "lucide-react";
 import { jsPDF } from "jspdf";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -100,21 +100,6 @@ export default function Invoices() {
     downloadFile(file);
     toast.success("PDF de la facture généré.");
   };
-  const emailPdf = async () => {
-    if (!detail) return;
-    const email = detail.customer?.email;
-    if (!email) return toast.error("L’adresse e-mail de ce client n’est pas renseignée.");
-    const file = createInvoicePdf(detail, identity);
-    const subject = invoiceEmailSubject(detail.sale.invoiceNumber);
-    const message = invoiceEmailMessage({ customerName: detail.customer?.name, invoiceNumber: detail.sale.invoiceNumber, total: formatCurrency(detail.sale.totalCents) });
-    if (navigator.canShare?.({ files: [file] })) {
-      try { await navigator.share({ title: subject, text: message, files: [file] }); toast.success("La facture est prête à être envoyée par e-mail."); } catch { return; }
-    } else {
-      downloadFile(file);
-      window.location.href = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(`${message}\n\nLe PDF de la facture a été téléchargé : joignez-le à ce message.`)}`;
-      toast.info("Le PDF est téléchargé. Joignez-le au message e-mail qui s’ouvre.");
-    }
-  };
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -155,7 +140,7 @@ export default function Invoices() {
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-h-[92vh] max-w-2xl overflow-y-auto">
           <DialogHeader><DialogTitle>Aperçu de facture</DialogTitle></DialogHeader>
-          {detail ? <><div id="invoice-print"><InvoiceDocument detail={detail} identity={identity} /></div><div className="grid gap-2 sm:grid-cols-3"><Button variant="outline" onClick={downloadPdf}><Download className="mr-2 h-4 w-4" />Générer PDF</Button><Button variant="outline" onClick={() => print("a4")}><Printer className="mr-2 h-4 w-4" />Imprimer</Button><Button variant="outline" onClick={emailPdf}><Mail className="mr-2 h-4 w-4" />E-mail + PDF</Button><Button variant="outline" className="sm:col-span-3" onClick={() => print("ticket")}><ReceiptText className="mr-2 h-4 w-4" />Imprimer au format ticket</Button>{(detail.sale.status === "draft" || detail.sale.status === "partial") && <Button className="sm:col-span-3 bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => { setCheckoutSale(detail.sale); setPreviewOpen(false); }}><WalletCards className="mr-2 h-4 w-4" />Encaisser le solde</Button>}{detail.sale.status === "draft" && <Button variant="outline" className="sm:col-span-3 border-rose-400/30 text-rose-300" onClick={() => setDeleteTarget(detail.sale)}><Trash2 className="mr-2 h-4 w-4" />Supprimer la facture</Button>}{(detail.sale.status === "paid" || detail.sale.status === "partial") && <Button variant="outline" className="sm:col-span-3 border-amber-400/30 text-amber-600" onClick={() => askRefund(detail.sale)}><Undo2 className="mr-2 h-4 w-4" />Rembourser la facture</Button>}</div></> : <p className="py-12 text-center text-muted-foreground">Chargement…</p>}
+          {detail ? <><div id="invoice-print"><InvoiceDocument detail={detail} identity={identity} /></div><div className="grid gap-2 sm:grid-cols-3"><Button variant="outline" onClick={downloadPdf}><Download className="mr-2 h-4 w-4" />Générer PDF</Button><Button variant="outline" onClick={() => print("a4")}><Printer className="mr-2 h-4 w-4" />Imprimer</Button><DocumentSendMenu type="invoice" documentNumber={detail.sale.invoiceNumber} total={formatCurrency(detail.sale.totalCents)} customer={detail.customer} downloadPdf={downloadPdf} /><Button variant="outline" className="sm:col-span-3" onClick={() => print("ticket")}><ReceiptText className="mr-2 h-4 w-4" />Imprimer au format ticket</Button>{(detail.sale.status === "draft" || detail.sale.status === "partial") && <Button className="sm:col-span-3 bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => { setCheckoutSale(detail.sale); setPreviewOpen(false); }}><WalletCards className="mr-2 h-4 w-4" />Encaisser le solde</Button>}{detail.sale.status === "draft" && <Button variant="outline" className="sm:col-span-3 border-rose-400/30 text-rose-300" onClick={() => setDeleteTarget(detail.sale)}><Trash2 className="mr-2 h-4 w-4" />Supprimer la facture</Button>}{(detail.sale.status === "paid" || detail.sale.status === "partial") && <Button variant="outline" className="sm:col-span-3 border-amber-400/30 text-amber-600" onClick={() => askRefund(detail.sale)}><Undo2 className="mr-2 h-4 w-4" />Rembourser la facture</Button>}</div></> : <p className="py-12 text-center text-muted-foreground">Chargement…</p>}
         </DialogContent>
       </Dialog>
 

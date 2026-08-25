@@ -57,7 +57,8 @@ function DashboardRouter() {
         <Route path={"/clients"} component={Customers} />
         <Route path={"/factures/nouvelle"} component={() => <InvoiceCreate />} />
         <Route path={"/devis/nouveau"} component={() => <InvoiceCreate documentType="quote" />} />
-        <Route path={"/factures/:id"} component={InvoiceDetail} />
+        <Route path={"/factures/:id"} component={() => <InvoiceDetail />} />
+        <Route path={"/devis/:id"} component={() => <InvoiceDetail documentType="quote" />} />
         <Route path={"/factures"} component={Invoices} />
         <Route path={"/devis"} component={Quotes} />
         <Route path={"/inventaires"} component={Inventories} />
