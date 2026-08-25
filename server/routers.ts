@@ -93,6 +93,7 @@ import { categoryCanBeRemoved } from "./categoryRules";
 import { assertSellerSensitiveAction } from "./sellerActionRules";
 import { companyScope } from "./companyScope";
 import { consumeRateLimit } from "./rateLimit";
+import { filterSettingsAuditLogs } from "./settingsAudit";
 
 const productInput = z.object({
   reference: z.string().trim().min(2).max(80),
@@ -766,6 +767,7 @@ export const appRouter = router({
 
   audit: router({
     list: adminProcedure.query(({ ctx }) => listAuditLogs(ctx.user.companyId)),
+    settings: adminProcedure.query(async ({ ctx }) => filterSettingsAuditLogs(await listAuditLogs(ctx.user.companyId))),
   }),
 
   users: router({

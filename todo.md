@@ -636,6 +636,11 @@
 - [x] Importer et valider le checkpoint GitHub 54911b1, appliquer les migrations 0041 et 0042, puis préparer sa publication.
 - [x] Comparer et intégrer la nouvelle mise à jour déposée sur GitHub, appliquer les migrations éventuelles, valider et publier le checkpoint.
 
+## Réorganisation — paramètres et historique
+- [x] Retirer les descriptions sous les titres des cartes de paramètres et réduire légèrement les espacements.
+- [x] Réorganiser les paramètres en rubriques professionnelles, séparer l’impression de l’entreprise et supprimer les doublons de tickets/impression.
+- [x] Isoler l’historique des modifications par entreprise, compléter les tests et publier le correctif.
+
 ## Correctif — secret de session
 - [x] Diagnostiquer et corriger l’erreur « Session secret is not configured securely » sans exposer ni affaiblir le secret de session ; retirer des journaux de rejet les métadonnées d’identifiants non nécessaires.
 - [x] Ajouter une couverture de test de la validation de configuration, valider connexion et build, puis publier un checkpoint.

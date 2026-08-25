@@ -70,7 +70,7 @@ function DashboardRouter() {
         <Route path={"/parametres/identite"} component={SettingsIdentity} />
         <Route path={"/parametres/impression"} component={SettingsPrinting} />
         <Route path={"/parametres/pos/rattachement"} component={() => <SettingsPosSection section="assignment" />} />
-        <Route path={"/parametres/pos/tickets"} component={() => <SettingsPosSection section="ticket" />} />
+        <Route path={"/parametres/pos/tickets"} component={SettingsPrinting} />
         <Route path={"/parametres/pos/paiements"} component={() => <SettingsPosSection section="payments" />} />
         <Route path={"/parametres/pos/actions-vendeurs"} component={() => <SettingsPosSection section="seller" />} />
         <Route path={"/parametres/pos"} component={SettingsPos} />

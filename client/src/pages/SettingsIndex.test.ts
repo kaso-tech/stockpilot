@@ -5,7 +5,7 @@ describe("filterSettingsSections", () => {
   it("retourne le sous-réglage paiement dans sa section", () => {
     const result = filterSettingsSections("mobile money");
     expect(result).toHaveLength(1);
-    expect(result[0]?.label).toBe("Vente et caisse");
+    expect(result[0]?.label).toBe("Vente rapide");
     expect(result[0]?.links.map(link => link.label)).toEqual(["Moyens de paiement"]);
   });
 
@@ -18,7 +18,7 @@ describe("filterSettingsSections", () => {
   it("retourne le lien Impression et imprimante", () => {
     const result = filterSettingsSections("imprimante");
     expect(result).toHaveLength(1);
-    expect(result[0]?.label).toBe("Impression et périphériques");
+    expect(result[0]?.label).toBe("Impression");
     expect(result[0]?.links.map(link => link.href)).toEqual(["/parametres/impression"]);
   });
 
