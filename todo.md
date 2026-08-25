@@ -674,3 +674,9 @@
 - [x] Masquer et bloquer les remises non autorisées dans la facture, le devis et Vente rapide.
 - [x] Masquer et bloquer la bascule TVA lorsque le vendeur n’est pas autorisé à la modifier.
 - [x] Ajouter des scénarios de refus côté client et serveur, puis valider et publier le correctif.
+
+## Restauration — paramètres, historique et documents commerciaux
+- [x] Restaurer une page de paramètres professionnelle sans descriptions de cartes ni doublons d’impression/tickets, avec l’impression séparée de l’entreprise.
+- [x] Restaurer un historique de modifications isolé par entreprise.
+- [x] Restaurer l’harmonisation complète devis/factures et le menu d’envoi WhatsApp, SMS et e-mail prérempli.
+- [x] Vérifier les parcours restaurés et publier le correctif.

@@ -770,6 +770,10 @@ export const appRouter = router({
 
   audit: router({
     list: adminProcedure.query(({ ctx }) => listAuditLogs(ctx.user.companyId)),
+    settings: adminProcedure.query(async ({ ctx }) => {
+      const { isSettingsAuditEntry } = await import("./settingsAudit");
+      return (await listAuditLogs(ctx.user.companyId)).filter(isSettingsAuditEntry);
+    }),
   }),
 
   users: router({
