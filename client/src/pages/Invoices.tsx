@@ -20,6 +20,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { documentParticipantNames, documentParticipantOptionLabel, matchesDocumentParticipant } from "@/lib/documentParticipants";
 import { invoiceEmailMessage, invoiceEmailSubject } from "@/lib/invoiceShare";
 import { downloadCommercialDocumentsCsv } from "@/lib/documentCsv";
 import { trpc } from "@/lib/trpc";
@@ -50,6 +51,7 @@ type Invoice = {
   customerName?: string | null;
   salesAgentId?: number | null;
   cashierId?: number | null;
+  sellerUserId?: number | null;
 };
 
 export default function Invoices() {
@@ -75,6 +77,7 @@ export default function Invoices() {
   );
   const { data: identity } = trpc.commerce.settings.get.useQuery();
   const { data: agents = [] } = trpc.commerce.agents.list.useQuery();
+  const { data: documentParticipants = [] } = trpc.commerce.documentParticipants.useQuery();
   const removeDraft = trpc.transactions.removeDraft.useMutation({
     onSuccess: () => {
       utils.transactions.list.invalidate();
@@ -105,14 +108,14 @@ export default function Invoices() {
     const term = search.trim().toLowerCase();
     const matchesSearch = !term || invoice.invoiceNumber.toLowerCase().includes(term) || (invoice.customerName || "").toLowerCase().includes(term);
     const matchesStatus = statusFilter === "all" || (statusFilter === "unpaid" ? invoice.status === "draft" || invoice.status === "partial" : invoice.status === statusFilter);
-    const matchesAgent = agentFilter === "all" || invoice.salesAgentId === Number(agentFilter) || invoice.cashierId === Number(agentFilter);
+    const matchesAgent = matchesDocumentParticipant(invoice, agentFilter);
     const created = new Date(invoice.createdAt).getTime(); const now = Date.now();
     const matchesPeriod = periodFilter === "all" || (periodFilter === "today" ? created >= new Date().setHours(0, 0, 0, 0) : periodFilter === "week" ? created >= now - 7 * 86_400_000 : created >= now - 31 * 86_400_000);
     return matchesSearch && matchesStatus && matchesAgent && matchesPeriod;
   }), [agentFilter, invoices, periodFilter, search, statusFilter]);
   const canRefund =
     user?.role === "admin" || Boolean(identity?.sellerCanRefund);
-  const exportFilteredInvoices = () => downloadCommercialDocumentsCsv("factures-filtrees.csv", filteredInvoices.map(invoice => ({ reference: invoice.invoiceNumber, date: invoice.createdAt, client: invoice.customerName || "Client comptoir", statut: invoiceStatusMeta[invoice.status][0], agent: agents.filter(agent => agent.id === invoice.salesAgentId || agent.id === invoice.cashierId).map(agent => agent.name).join(" / ") || "—", totalCents: invoice.totalCents, encaisseCents: invoice.amountPaidCents })));
+  const exportFilteredInvoices = () => downloadCommercialDocumentsCsv("factures-filtrees.csv", filteredInvoices.map(invoice => ({ reference: invoice.invoiceNumber, date: invoice.createdAt, client: invoice.customerName || "Client comptoir", statut: invoiceStatusMeta[invoice.status][0], agent: documentParticipantNames(invoice, documentParticipants), totalCents: invoice.totalCents, encaisseCents: invoice.amountPaidCents })));
 
   useEffect(() => {
     if (initial) setPreviewOpen(true);
@@ -201,7 +204,7 @@ export default function Invoices() {
         <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={exportFilteredInvoices}><Download className="mr-2 h-4 w-4" />Exporter CSV</Button><Button onClick={() => setLocation("/factures/nouvelle")} className="bg-primary text-primary-foreground hover:bg-primary/90"><Plus className="mr-2 h-4 w-4" />Créer une facture</Button></div>
       </header>
 
-      <section className="rounded-2xl border border-white/[0.07] bg-[#111722] p-4"><div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_repeat(3,minmax(150px,.45fr))]"><label className="relative"><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-500" /><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Facture, client…" className="h-10 w-full rounded-xl border border-white/[0.09] bg-black/10 pl-9 pr-3 text-sm text-slate-100 outline-none focus:border-primary/70" /></label><select value={statusFilter} onChange={event => setStatusFilter(event.target.value as typeof statusFilter)} className="h-10 rounded-xl border border-white/[0.09] bg-black/10 px-3 text-sm text-slate-200"><option value="all">Tous les statuts</option><option value="unpaid">Non encaissées</option><option value="paid">Réglées</option><option value="partial">Partielles</option><option value="void">Retournées</option></select><select value={agentFilter} onChange={event => setAgentFilter(event.target.value)} className="h-10 rounded-xl border border-white/[0.09] bg-black/10 px-3 text-sm text-slate-200"><option value="all">Tous les agents</option>{agents.map(agent => <option key={agent.id} value={agent.id}>{agent.name}</option>)}</select><select value={periodFilter} onChange={event => setPeriodFilter(event.target.value as typeof periodFilter)} className="h-10 rounded-xl border border-white/[0.09] bg-black/10 px-3 text-sm text-slate-200"><option value="all">Toutes les dates</option><option value="today">Aujourd’hui</option><option value="week">7 derniers jours</option><option value="month">30 derniers jours</option></select></div><p className="mt-3 text-xs text-slate-500">{filteredInvoices.length} facture{filteredInvoices.length > 1 ? "s" : ""} affichée{filteredInvoices.length > 1 ? "s" : ""}</p></section>
+      <section className="rounded-2xl border border-white/[0.07] bg-[#111722] p-4"><div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_repeat(3,minmax(150px,.45fr))]"><label className="relative"><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-500" /><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Facture, client…" className="h-10 w-full rounded-xl border border-white/[0.09] bg-black/10 pl-9 pr-3 text-sm text-slate-100 outline-none focus:border-primary/70" /></label><select value={statusFilter} onChange={event => setStatusFilter(event.target.value as typeof statusFilter)} className="h-10 rounded-xl border border-white/[0.09] bg-black/10 px-3 text-sm text-slate-200"><option value="all">Tous les statuts</option><option value="unpaid">Non encaissées</option><option value="paid">Réglées</option><option value="partial">Partielles</option><option value="void">Retournées</option></select><select value={agentFilter} onChange={event => setAgentFilter(event.target.value)} className="h-10 rounded-xl border border-white/[0.09] bg-black/10 px-3 text-sm text-slate-200"><option value="all">Tous les intervenants</option>{documentParticipants.map(participant => <option key={participant.key} value={participant.key}>{documentParticipantOptionLabel(participant)}</option>)}</select><select value={periodFilter} onChange={event => setPeriodFilter(event.target.value as typeof periodFilter)} className="h-10 rounded-xl border border-white/[0.09] bg-black/10 px-3 text-sm text-slate-200"><option value="all">Toutes les dates</option><option value="today">Aujourd’hui</option><option value="week">7 derniers jours</option><option value="month">30 derniers jours</option></select></div><p className="mt-3 text-xs text-slate-500">{filteredInvoices.length} facture{filteredInvoices.length > 1 ? "s" : ""} affichée{filteredInvoices.length > 1 ? "s" : ""}</p></section>
 
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {isLoading ? (

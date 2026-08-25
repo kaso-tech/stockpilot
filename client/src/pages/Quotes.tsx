@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { documentParticipantNames, documentParticipantOptionLabel, matchesDocumentParticipant } from "@/lib/documentParticipants";
 import { downloadCommercialDocumentsCsv } from "@/lib/documentCsv";
 import { trpc } from "@/lib/trpc";
 import { Download, Eye, FileText, Plus, Search } from "lucide-react";
@@ -14,7 +15,7 @@ export default function Quotes() {
   const [, setLocation] = useLocation();
   const { data: transactions = [], isLoading } =
     trpc.transactions.list.useQuery();
-  const { data: agents = [] } = trpc.commerce.agents.list.useQuery();
+  const { data: documentParticipants = [] } = trpc.commerce.documentParticipants.useQuery();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"all" | "draft" | "paid" | "void">("all");
   const [agentId, setAgentId] = useState("all");
@@ -24,12 +25,12 @@ export default function Quotes() {
     const term = search.trim().toLowerCase();
     const matchesSearch = !term || quote.invoiceNumber.toLowerCase().includes(term) || (quote.customerName || "").toLowerCase().includes(term);
     const matchesStatus = status === "all" || quote.status === status;
-    const matchesAgent = agentId === "all" || quote.salesAgentId === Number(agentId) || quote.cashierId === Number(agentId);
+    const matchesAgent = matchesDocumentParticipant(quote, agentId);
     const created = new Date(quote.createdAt).getTime(); const now = Date.now();
     const matchesPeriod = period === "all" || (period === "today" ? created >= new Date().setHours(0, 0, 0, 0) : period === "week" ? created >= now - 7 * 86_400_000 : created >= now - 31 * 86_400_000);
     return matchesSearch && matchesStatus && matchesAgent && matchesPeriod;
   }), [agentId, period, quotes, search, status]);
-  const exportFilteredQuotes = () => downloadCommercialDocumentsCsv("devis-filtres.csv", filteredQuotes.map(quote => ({ reference: quote.invoiceNumber, date: quote.createdAt, client: quote.customerName || "Client", statut: quote.status === "paid" ? "Accepté" : quote.status === "void" ? "Retourné / annulé" : "En attente", agent: agents.filter(agent => agent.id === quote.salesAgentId || agent.id === quote.cashierId).map(agent => agent.name).join(" / ") || "—", totalCents: quote.totalCents, encaisseCents: quote.amountPaidCents })));
+  const exportFilteredQuotes = () => downloadCommercialDocumentsCsv("devis-filtres.csv", filteredQuotes.map(quote => ({ reference: quote.invoiceNumber, date: quote.createdAt, client: quote.customerName || "Client", statut: quote.status === "paid" ? "Accepté" : quote.status === "void" ? "Retourné / annulé" : "En attente", agent: documentParticipantNames(quote, documentParticipants), totalCents: quote.totalCents, encaisseCents: quote.amountPaidCents })));
   if (user?.role !== "admin" && user?.role !== "seller")
     return (
       <div className="mx-auto max-w-5xl py-16 text-center text-muted-foreground">
@@ -49,7 +50,7 @@ export default function Quotes() {
         </div>
         <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={exportFilteredQuotes}><Download className="mr-2 h-4 w-4" />Exporter CSV</Button><Button onClick={() => setLocation("/devis/nouveau")} className="bg-primary text-primary-foreground hover:bg-primary/90"><Plus className="mr-2 h-4 w-4" />Créer un devis</Button></div>
       </header>
-      <section className="rounded-2xl border border-white/[0.07] bg-[#111722] p-4"><div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_repeat(3,minmax(150px,.45fr))]"><label className="relative"><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-500" /><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Devis, client…" className="h-10 w-full rounded-xl border border-white/[0.09] bg-black/10 pl-9 pr-3 text-sm text-slate-100 outline-none focus:border-primary/70" /></label><select value={status} onChange={event => setStatus(event.target.value as typeof status)} className="h-10 rounded-xl border border-white/[0.09] bg-black/10 px-3 text-sm text-slate-200"><option value="all">Tous les statuts</option><option value="draft">En attente</option><option value="paid">Acceptés</option><option value="void">Retournés / annulés</option></select><select value={agentId} onChange={event => setAgentId(event.target.value)} className="h-10 rounded-xl border border-white/[0.09] bg-black/10 px-3 text-sm text-slate-200"><option value="all">Tous les agents</option>{agents.map(agent => <option key={agent.id} value={agent.id}>{agent.name}</option>)}</select><select value={period} onChange={event => setPeriod(event.target.value as typeof period)} className="h-10 rounded-xl border border-white/[0.09] bg-black/10 px-3 text-sm text-slate-200"><option value="all">Toutes les dates</option><option value="today">Aujourd’hui</option><option value="week">7 derniers jours</option><option value="month">30 derniers jours</option></select></div><p className="mt-3 text-xs text-slate-500">{filteredQuotes.length} devis affiché{filteredQuotes.length > 1 ? "s" : ""}</p></section>
+      <section className="rounded-2xl border border-white/[0.07] bg-[#111722] p-4"><div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_repeat(3,minmax(150px,.45fr))]"><label className="relative"><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-500" /><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Devis, client…" className="h-10 w-full rounded-xl border border-white/[0.09] bg-black/10 pl-9 pr-3 text-sm text-slate-100 outline-none focus:border-primary/70" /></label><select value={status} onChange={event => setStatus(event.target.value as typeof status)} className="h-10 rounded-xl border border-white/[0.09] bg-black/10 px-3 text-sm text-slate-200"><option value="all">Tous les statuts</option><option value="draft">En attente</option><option value="paid">Acceptés</option><option value="void">Retournés / annulés</option></select><select value={agentId} onChange={event => setAgentId(event.target.value)} className="h-10 rounded-xl border border-white/[0.09] bg-black/10 px-3 text-sm text-slate-200"><option value="all">Tous les intervenants</option>{documentParticipants.map(participant => <option key={participant.key} value={participant.key}>{documentParticipantOptionLabel(participant)}</option>)}</select><select value={period} onChange={event => setPeriod(event.target.value as typeof period)} className="h-10 rounded-xl border border-white/[0.09] bg-black/10 px-3 text-sm text-slate-200"><option value="all">Toutes les dates</option><option value="today">Aujourd’hui</option><option value="week">7 derniers jours</option><option value="month">30 derniers jours</option></select></div><p className="mt-3 text-xs text-slate-500">{filteredQuotes.length} devis affiché{filteredQuotes.length > 1 ? "s" : ""}</p></section>
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {isLoading ? (
           <Card className="md:col-span-2 xl:col-span-3">

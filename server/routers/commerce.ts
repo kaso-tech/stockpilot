@@ -95,6 +95,17 @@ export const commerceRouter = router({
     update: protectedProcedure.input(customerInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await dbOrThrow(); const { id, ...data } = input; await db.update(customers).set(data).where(and(eq(customers.id, id), companyScope(customers.companyId, ctx.user.companyId))); await audit(ctx.user.id, "Modification", "Client", id, `Client ${data.name} modifié`); return { success: true }; }),
     remove: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await dbOrThrow(); const current = (await db.select().from(customers).where(and(eq(customers.id, input.id), companyScope(customers.companyId, ctx.user.companyId))).limit(1))[0]; if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Client introuvable." }); const invoices = await db.select({ id: sales.id }).from(sales).where(and(eq(sales.customerId, input.id), companyScope(sales.companyId, ctx.user.companyId))).limit(1); if (!customerCanBeRemoved(invoices.length)) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Ce client est lié à des factures et ne peut pas être supprimé." }); await db.delete(customers).where(and(eq(customers.id, input.id), companyScope(customers.companyId, ctx.user.companyId))); await audit(ctx.user.id, "Suppression", "Client", input.id, `Client ${current.name} supprimé`); return { success: true }; }),
   }),
+  documentParticipants: protectedProcedure.query(async ({ ctx }) => {
+    const db = await dbOrThrow();
+    const [sellerRows, agentRows] = await Promise.all([
+      db.select({ id: users.id, name: users.name }).from(users).where(and(eq(users.role, "seller"), companyScope(users.companyId, ctx.user.companyId))).orderBy(users.name),
+      db.select({ id: agents.id, name: agents.name, type: agents.type }).from(agents).where(companyScope(agents.companyId, ctx.user.companyId)).orderBy(agents.name),
+    ]);
+    return [
+      ...sellerRows.map(seller => ({ key: `seller:${seller.id}` as const, name: seller.name || "Vendeur", role: "Vendeur" as const })),
+      ...agentRows.map(agent => ({ key: `agent:${agent.id}` as const, name: agent.name, role: agent.type === "cashier" ? ("Caissier" as const) : ("Agent commercial" as const) })),
+    ];
+  }),
   agents: router({
     list: protectedProcedure.query(async ({ ctx }) => (await dbOrThrow()).select().from(agents).where(companyScope(agents.companyId, ctx.user.companyId)).orderBy(agents.name)),
     detail: adminProcedure.input(z.object({ beneficiaryType: z.enum(["user", "agent"]), id: z.number().int().positive() })).query(async ({ ctx, input }) => {

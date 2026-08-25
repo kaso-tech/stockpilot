@@ -27,6 +27,10 @@ Après le lot multi-entrepôts, un administrateur historique s’est retrouvé d
 
 Le compte vendeur actif, encore dans le périmètre legacy après le rétablissement administrateur, a ensuite été rattaché à la même entreprise après signalement de l’utilisateur. Son rôle vendeur et son statut actif ont été conservés; le rattachement est également audité. Une reconnexion du vendeur est nécessaire pour actualiser sa session.
 
+## Ajustements d’interface récents
+
+La connexion ne présente plus qu’une seule action d’inscription : celle située sous le bouton de connexion. Les agents appliqués automatiquement par les réglages POS sont désormais cachés complètement dans l’écran d’encaissement, tout en restant appliqués côté serveur. Les filtres et exports CSV des factures, devis et tickets proposent maintenant les vendeurs, agents commerciaux et caissiers, avec des clés de filtre distinctes pour éviter toute collision d’identifiants.
+
 ## 2. Environnement et exploitation
 
 | Élément | Valeur / règle |
