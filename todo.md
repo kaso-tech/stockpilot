@@ -644,3 +644,8 @@
 - [x] Permettre à l’administrateur de gérer plusieurs taux de TVA prédéfinis par entreprise.
 - [x] Proposer la sélection de ces taux dans les factures et devis, avec une validation serveur du taux choisi.
 - [x] Tester les calculs et publier le correctif.
+
+## Taux TVA par défaut
+- [x] Permettre de définir un taux TVA prédéfini par défaut dans les réglages de l’entreprise.
+- [x] Appliquer automatiquement ce taux aux nouveaux documents et couvrir les calculs associés.
+- [x] Valider et publier le correctif.
