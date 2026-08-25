@@ -50,6 +50,7 @@ import { inventoryRouter } from "./routers/inventory";
 import { payrollRouter } from "./routers/payroll";
 import { printingSettingsRouter } from "./routers/printingSettings";
 import { vatRatesRouter } from "./routers/vatRates";
+import { sellerDiscountPermissionsRouter } from "./routers/sellerDiscountPermissions";
 
 const STANDARD_AUTH_SESSION_MS = 24 * 60 * 60 * 1000;
 const REMEMBERED_AUTH_SESSION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -184,6 +185,7 @@ async function syncStockAlert(productId: number, companyId: number | null) {
 export const appRouter = router({
   printingSettings: printingSettingsRouter,
   vatRates: vatRatesRouter,
+  sellerDiscountPermissions: sellerDiscountPermissionsRouter,
   system: systemRouter,
   commerce: commerceRouter,
   inventory: inventoryRouter,

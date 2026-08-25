@@ -665,3 +665,7 @@
 - [x] Masquer les agents sélectionnés par défaut et supprimer les messages de règles ou d’interdiction non actionnables.
 - [x] Remplacer le bouton de livraison par un contrôle Activer/Désactiver et masquer la remise facture au vendeur non autorisé.
 - [x] Tester les préférences, autorisations et parcours, puis publier le correctif.
+
+## Correctif — autorisations de remise vendeur
+- [x] Rétablir les contrôles distincts de remise par produit, facture et panier dans les paramètres vendeur.
+- [x] Rétablir les plafonds associés, vérifier la persistance et publier le correctif.
