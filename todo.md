@@ -726,3 +726,10 @@
 - [x] Ajouter les transferts de stock tracés avec validation du stock source, réception et historique.
 - [x] Raccorder les entrepôts aux ventes, mouvements et inventaires sans rupture du mode hors connexion.
 - [x] Tester le cloisonnement multi-entreprise, les transferts et publier le correctif.
+
+## Incident — données non visibles
+- [x] Préserver l’état courant et inventorier les données par périmètre entreprise sans écriture.
+- [x] Identifier le compte ou périmètre qui affiche une application vide.
+- [x] Proposer une récupération non destructive à valider avant toute modification.
+- [ ] Restaurer uniquement après accord explicite, vérifier les données récupérées et publier un checkpoint.
+- [x] Rattacher le compte administrateur confirmé au périmètre entreprise contenant les données existantes.

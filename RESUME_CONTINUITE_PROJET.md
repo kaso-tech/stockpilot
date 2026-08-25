@@ -21,6 +21,10 @@ Les transferts disposent des statuts brouillon, en transit, réceptionné et ann
 
 Les validations du lot sont : `pnpm check`, **206 tests Vitest** et `pnpm build` réussis. La vérification visuelle a confirmé le dépôt principal et les sélecteurs d’entrepôt dans la vente rapide et les documents commerciaux. Le warning PWA relatif au bundle principal d’environ 2,8 Mo reste non bloquant.
 
+## Incident résolu sous réserve de reconnexion — données non visibles
+
+Après le lot multi-entrepôts, un administrateur historique s’est retrouvé dans le périmètre legacy tandis que les données métier restaient intégralement dans l’entreprise `companyId = 1`. L’inventaire non destructif a confirmé la conservation des produits, clients, fournisseurs, ventes, mouvements, achats, inventaires, dépenses et stocks localisés. Après confirmation explicite de l’utilisateur, le compte administrateur legacy récemment connecté a été rattaché transactionnellement à l’entreprise concernée, avec une trace d’audit. Les données n’ont été ni supprimées, ni déplacées, ni dupliquées. Une reconnexion est nécessaire pour renouveler la session et recharger le nouveau périmètre.
+
 ## 2. Environnement et exploitation
 
 | Élément | Valeur / règle |
