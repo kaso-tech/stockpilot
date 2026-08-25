@@ -705,3 +705,8 @@
 ## Tickets — priorité d’encaissement
 - [x] Placer et mettre en valeur le bouton Encaisser à droite dans la fenêtre des tickets non soldés.
 - [x] Tester le rendu et publier le correctif.
+
+## Correctif — livraison et taux TVA
+- [x] Retirer le réglage de frais de livraison par défaut sans retirer les frais appliqués au document.
+- [x] Corriger la résolution de l’entreprise active qui bloque la création de taux TVA prédéfinis.
+- [x] Tester les réglages, la persistance multi-entreprise et publier le correctif.

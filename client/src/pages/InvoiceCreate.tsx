@@ -764,7 +764,7 @@ export default function InvoiceCreate({
                     <p className="text-xs text-muted-foreground">Ajoutez une adresse et des frais uniquement si nécessaire.</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2"><Label htmlFor="delivery-enabled" className="text-sm font-medium">{deliveryEnabled ? "Activée" : "Désactivée"}</Label><Switch id="delivery-enabled" checked={deliveryEnabled} onCheckedChange={next => { if (next) setDeliveryFeeInput(String((settings?.defaultDeliveryFeeCents ?? 0) / 100)); setDeliveryEnabled(next); }} /></div>
+                <div className="flex items-center gap-2"><Label htmlFor="delivery-enabled" className="text-sm font-medium">{deliveryEnabled ? "Activée" : "Désactivée"}</Label><Switch id="delivery-enabled" checked={deliveryEnabled} onCheckedChange={setDeliveryEnabled} /></div>
               </div>
               {deliveryEnabled && <div className="mt-4 grid gap-3 md:grid-cols-[1fr_220px]">
                 <div className="space-y-2">
