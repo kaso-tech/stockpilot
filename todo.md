@@ -655,6 +655,10 @@
 - [x] Ajouter des permissions distinctes de remise par produit, facture et panier, ainsi que de modification de prix par facture et panier, avec un taux maximum configurable par permission.
 - [x] Appliquer les contrôles côté serveur, tester les plafonds et publier le correctif.
 
+## Correctif — application effective des permissions vendeur
+- [x] Exposer et raccorder réellement les contrôles TVA, remises et prix aux parcours facture, devis et Vente rapide pour les vendeurs autorisés.
+- [x] Vérifier les plafonds et les refus avec des scénarios de parcours vendeur, puis publier le correctif.
+
 ## Correctif — secret de session
 - [x] Diagnostiquer et corriger l’erreur « Session secret is not configured securely » sans exposer ni affaiblir le secret de session ; retirer des journaux de rejet les métadonnées d’identifiants non nécessaires.
 - [x] Ajouter une couverture de test de la validation de configuration, valider connexion et build, puis publier un checkpoint.

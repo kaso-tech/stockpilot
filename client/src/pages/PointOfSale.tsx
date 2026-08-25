@@ -1,5 +1,6 @@
 import { BarcodeCameraDialog } from "@/components/BarcodeCameraDialog";
 import { calculateDiscount, DiscountEditor, discountPayload, noDiscount, type DiscountForm } from "@/components/DiscountEditor";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { CheckoutSheet } from "@/components/CheckoutSheet";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -14,11 +15,12 @@ import { AlertTriangle, Camera, ChevronDown, ChevronUp, ClipboardList, Keyboard,
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-type CartItem = { productId: number; quantity: number; discount: DiscountForm };
+type CartItem = { productId: number; quantity: number; manualUnitPriceCents?: number | null; discount: DiscountForm };
 type PurchaseItem = { id: number; name: string; reference: string; unit: string; quantity: number; minimumQuantity: number; quantityToOrder: number; supplierId: number | null; supplierName: string; estimateCents: number };
 type CheckoutSale = { id: number | null; totalCents: number; invoiceNumber: string; channel: "pos"; offlineDraft?: OfflinePosDraft };
 
 export default function PointOfSale() {
+  const { user } = useAuth();
   const utils = trpc.useUtils();
   const { isOnline, pendingProductQuantities } = useOffline();
   const { data: products = [] } = trpc.products.list.useQuery();
@@ -58,11 +60,11 @@ export default function PointOfSale() {
     const product = products.find(value => value.id === item.productId);
     if (!product) return null;
     const pricing = priceForQuantityTier(product.retailPriceCents, item.quantity, product.retailPriceTiers ?? product.priceTiers);
-    const subtotalCents = pricing.unitPriceCents * item.quantity;
+    const unitPriceCents = item.manualUnitPriceCents ?? pricing.unitPriceCents; const subtotalCents = unitPriceCents * item.quantity;
     const discountCents = calculateDiscount(subtotalCents, item.discount);
     const { remainingAfterSale, isLowStock: lineIsLowStock } = stockAfterCartSelection(product.quantity, item.quantity, product.minimumQuantity);
-    return { ...item, product, unitPriceCents: pricing.unitPriceCents, tierMinQuantity: pricing.tierMinQuantity, subtotalCents, discountCents, totalCents: subtotalCents - discountCents, remainingAfterSale, isLowStock: lineIsLowStock };
-  }).filter(Boolean) as Array<CartItem & { product: typeof products[number]; unitPriceCents: number; tierMinQuantity: number | null; subtotalCents: number; discountCents: number; totalCents: number; remainingAfterSale: number; isLowStock: boolean }>;
+    return { ...item, product, tariffCents: pricing.unitPriceCents, unitPriceCents, tierMinQuantity: pricing.tierMinQuantity, subtotalCents, discountCents, totalCents: subtotalCents - discountCents, remainingAfterSale, isLowStock: lineIsLowStock };
+  }).filter(Boolean) as Array<CartItem & { product: typeof products[number]; tariffCents: number; unitPriceCents: number; tierMinQuantity: number | null; subtotalCents: number; discountCents: number; totalCents: number; remainingAfterSale: number; isLowStock: boolean }>;
   const subtotalCents = lines.reduce((sum, line) => sum + line.subtotalCents, 0);
   const lineNetCents = lines.reduce((sum, line) => sum + line.totalCents, 0);
   const invoiceDiscountCents = calculateDiscount(lineNetCents, invoiceDiscount);
@@ -71,24 +73,25 @@ export default function PointOfSale() {
   const vatCents = Math.round((taxableSubtotalCents * vatRateBasisPoints) / 10000);
   const totalCents = taxableSubtotalCents + vatCents;
 
-  const add = (productId: number) => setCart(current => {
+  const add = (productId: number) => { const product = products.find(item => item.id === productId); const shouldOfferManualPrice = user?.role === "seller" && settings?.sellerCanEditCartItemPrice && product; const enteredPrice = shouldOfferManualPrice ? window.prompt(`Prix de vente pour ${product.name} (laissez vide pour conserver le tarif)`, String(Math.round(product.retailPriceCents / 100))) : null; const manualUnitPriceCents = enteredPrice && Number(enteredPrice) > 0 ? Math.round(Number(enteredPrice) * 100) : null; setCart(current => {
     const product = products.find(item => item.id === productId);
     const item = current.find(value => value.productId === productId);
     if (!product) return current;
     const availableQuantity = Math.max(0, product.quantity - (pendingProductQuantities[productId] ?? 0));
     setCartCollapsed(false);
-    return item ? current.map(value => value.productId === productId ? { ...value, quantity: Math.min(value.quantity + 1, availableQuantity) } : value) : availableQuantity > 0 ? [...current, { productId, quantity: 1, discount: noDiscount }] : current;
-  });
+    return item ? current.map(value => value.productId === productId ? { ...value, quantity: Math.min(value.quantity + 1, availableQuantity), ...(manualUnitPriceCents !== null ? { manualUnitPriceCents } : {}) } : value) : availableQuantity > 0 ? [...current, { productId, quantity: 1, manualUnitPriceCents, discount: noDiscount }] : current;
+  }); };
   const quantity = (productId: number, next: number) => setCart(current => next <= 0 ? current.filter(item => item.productId !== productId) : current.map(item => item.productId === productId ? { ...item, quantity: Math.min(next, Math.max(0, (products.find(product => product.id === productId)?.quantity ?? next) - (pendingProductQuantities[productId] ?? 0))) } : item));
   const setLineDiscount = (productId: number, discount: DiscountForm) => setCart(current => current.map(item => item.productId === productId ? { ...item, discount } : item));
   const clearCart = () => { setCart([]); setInvoiceDiscount(noDiscount); setCartCollapsed(false); };
   const draft = trpc.transactions.createDraft.useMutation({ onSuccess: result => { utils.transactions.list.invalidate(); setCheckoutSale({ ...result, channel: "pos" }); }, onError: error => toast.error(error.message) });
+  const chooseVat = () => user?.role === "seller" && settings?.sellerCanToggleVat ? window.confirm(`Appliquer la TVA de ${((settings.vatRateBasisPoints ?? 0) / 100).toFixed(2)} % à ce panier ?`) : Boolean(settings?.vatEnabled);
   const openCheckout = useCallback(() => {
     if (!cart.length) return toast.error("Ajoutez au moins un produit au panier.");
-    const offlineDraft: OfflinePosDraft = { channel: "pos", customerId: null, salesAgentId: null, cashierId: null, salesAgentSelectionMade: false, cashierSelectionMade: false, note: null, deliveryAddress: null, invoiceDiscount: discountPayload(invoiceDiscount), items: lines.map(line => ({ productId: line.productId, productName: line.product.name, productReference: line.product.reference, unitPriceCents: line.unitPriceCents, lineTotalCents: line.totalCents, quantity: line.quantity, discount: discountPayload(line.discount) })) };
-    if (!isOnline) { setCheckoutSale({ id: null, totalCents, invoiceNumber: "Vente hors connexion", channel: "pos", offlineDraft }); return; }
-    draft.mutate({ channel: "pos", customerId: null, salesAgentId: null, cashierId: null, note: null, invoiceDiscount: discountPayload(invoiceDiscount), items: cart.map(item => ({ productId: item.productId, quantity: item.quantity, discount: discountPayload(item.discount) })) });
-  }, [cart, draft, invoiceDiscount, isOnline, lines, totalCents]);
+    const applyVat = chooseVat(); const selectedTotalCents = taxableSubtotalCents + (applyVat ? Math.round((taxableSubtotalCents * (settings?.vatRateBasisPoints ?? 0)) / 10000) : 0); const offlineDraft: OfflinePosDraft = { channel: "pos", customerId: null, salesAgentId: null, cashierId: null, salesAgentSelectionMade: false, cashierSelectionMade: false, note: null, deliveryAddress: null, applyVat, invoiceDiscount: discountPayload(invoiceDiscount), items: lines.map(line => ({ productId: line.productId, productName: line.product.name, productReference: line.product.reference, unitPriceCents: line.unitPriceCents, manualUnitPriceCents: line.manualUnitPriceCents ?? null, lineTotalCents: line.totalCents, quantity: line.quantity, discount: discountPayload(line.discount) })) };
+    if (!isOnline) { setCheckoutSale({ id: null, totalCents: selectedTotalCents, invoiceNumber: "Vente hors connexion", channel: "pos", offlineDraft }); return; }
+    draft.mutate({ channel: "pos", customerId: null, salesAgentId: null, cashierId: null, note: null, applyVat, invoiceDiscount: discountPayload(invoiceDiscount), items: cart.map(item => ({ productId: item.productId, quantity: item.quantity, manualUnitPriceCents: item.manualUnitPriceCents ?? null, discount: discountPayload(item.discount) })) });
+  }, [cart, chooseVat, draft, invoiceDiscount, isOnline, lines, settings?.vatRateBasisPoints, taxableSubtotalCents]);
   const handleCode = (code: string) => { const product = products.find(item => item.reference.toLowerCase() === code.trim().toLowerCase()); if (!product) return toast.error("Aucun produit ne correspond à ce code."); add(product.id); setQuery(""); toast.success(`${product.name} ajouté au panier.`); };
 
   useEffect(() => {
