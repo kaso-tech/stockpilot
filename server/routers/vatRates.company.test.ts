@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { resolveVatCompanyId } from "./vatRates";
+import { createdVatRateId, resolveVatCompanyId } from "./vatRates";
 
 describe("résolution d'entreprise des taux TVA", () => {
   it("réassocie strictement un administrateur hérité à l'entreprise dont il est propriétaire", async () => {
@@ -10,5 +10,10 @@ describe("résolution d'entreprise des taux TVA", () => {
 
   it("refuse un compte sans entreprise propriétaire au lieu de choisir une entreprise arbitraire", async () => {
     await expect(resolveVatCompanyId({ id: 42, companyId: null }, async () => null, async () => undefined)).rejects.toThrow("Aucune entreprise active");
+  });
+
+  it("retourne l’identifiant relu plutôt que de dépendre du format du résultat d’insertion", () => {
+    expect(createdVatRateId({ id: 15 })).toBe(15);
+    expect(() => createdVatRateId(undefined)).toThrow("n’a pas pu être relu");
   });
 });

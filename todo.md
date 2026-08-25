@@ -715,3 +715,8 @@
 - [x] Ajouter dans Documents, tickets et imprimantes les options de personnalisation du modèle de facture.
 - [x] Prévisualiser et appliquer les options aux impressions de documents.
 - [x] Tester la persistance multi-entreprise et publier le correctif.
+
+## Correctif critique — création des taux TVA
+- [x] Corriger le refus silencieux lors de l’ajout d’un taux TVA prédéfini.
+- [x] Rafraîchir la liste après ajout et afficher un retour explicite de réussite ou d’erreur.
+- [x] Tester la mutation et publier le correctif.
