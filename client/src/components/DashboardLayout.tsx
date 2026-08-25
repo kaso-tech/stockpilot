@@ -3,7 +3,9 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DocumentVatRateSelector } from "@/components/DocumentVatRateSelector";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { readNotificationIds, unreadNotificationCount, writeNotificationIds } from "@/lib/notificationReadState";
 import { visibleNotificationsForRole, type RoleNotification } from "@/lib/roleNotifications";
 import { getPasswordStrength } from "@/lib/passwordStrength";
@@ -178,6 +180,9 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const isCollapsed = state === "collapsed";
   const isMobile = useIsMobile();
   const { data: sellerPermissions } = trpc.commerce.settings.get.useQuery(undefined, { enabled: user?.role === "seller" });
+  const isDocumentCreation = location === "/factures/nouvelle" || location === "/devis/nouveau";
+  const { data: documentVatSettings } = trpc.commerce.settings.get.useQuery(undefined, { enabled: Boolean(user) && isDocumentCreation });
+  const { data: vatRatePresets = [] } = trpc.vatRates.list.useQuery(undefined, { enabled: Boolean(user) && isDocumentCreation });
   const sellerMenuItems = [
     ...menuItems.filter(item => item.path === "/" || item.path === "/pos" || item.path === "/factures" || item.path === "/devis" || item.path === "/clients" || item.path === "/mouvements" || item.path === "/synchronisation" || (item.path === "/produits" && sellerPermissions?.sellerCanEditPurchasePrice)),
     { icon: Settings2, label: "Apparence", path: "/parametres/apparence" },
@@ -285,17 +290,10 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
 
       <SidebarInset className="min-w-0 bg-[#090c13] text-slate-100">
         <header className="app-header sticky top-0 z-40 flex h-16 items-center gap-3 border-b border-slate-200 bg-white/95 px-4 text-slate-900 shadow-sm shadow-slate-950/5 backdrop-blur dark:border-white/[0.07] dark:bg-[#0e141f]/95 dark:text-slate-100 dark:shadow-black/20 sm:px-6"><div className="lg:hidden"><SidebarTrigger className="h-9 w-9 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 dark:border-white/10 dark:bg-[#111722] dark:text-slate-200 dark:hover:bg-white/[0.07]" /></div><div className="flex min-w-0 items-center gap-2"><activeMenuItem.icon className="h-4 w-4 shrink-0 text-primary" /><span className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{activeMenuItem.label}</span></div><div className="ml-auto"><HeaderActions canRunBackup={canRunBackup} compact={isMobile} pending={runBackup.isPending} onBackup={() => runBackup.mutate()} notifications={notifications} readNotificationIds={readNotificationIdsState} onNotification={setLocation} onMarkNotificationRead={markNotificationRead} onMarkAllNotificationsRead={markAllNotificationsRead} isOnline={isOnline} pendingOfflineSales={pendingCount} hasFailedOfflineSale={offlineSales.some(sale => sale.status === "failed")} onSync={() => void syncNow()} /></div></header>
-        <main key={currency} className="min-h-screen bg-[radial-gradient(circle_at_80%_-5%,rgba(34,211,238,0.05),transparent_24%),linear-gradient(rgba(255,255,255,0.012)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.012)_1px,transparent_1px)] bg-[size:auto,44px_44px,44px_44px] p-4 sm:p-6 lg:p-8">{user?.role === "seller" && sellerPermissions?.sellerCanToggleVat && ["/factures/nouvelle", "/devis/nouveau", "/pos"].includes(location) ? <VatPermissionSwitch rateBasisPoints={sellerPermissions.vatRateBasisPoints ?? 0} defaultChecked={sellerPermissions.vatEnabled ?? false} /> : null}{children}</main>
+        <main key={currency} className="min-h-screen bg-[radial-gradient(circle_at_80%_-5%,rgba(34,211,238,0.05),transparent_24%),linear-gradient(rgba(255,255,255,0.012)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.012)_1px,transparent_1px)] bg-[size:auto,44px_44px,44px_44px] p-4 sm:p-6 lg:p-8">{isDocumentCreation && documentVatSettings?.vatEnabled && vatRatePresets.length ? <DocumentVatRateSelector rates={vatRatePresets} defaultRateBasisPoints={documentVatSettings.vatRateBasisPoints} canToggle={user?.role === "admin" || Boolean(documentVatSettings.sellerCanToggleVat)} /> : null}{children}</main>
       </SidebarInset>
     </>
   );
-}
-
-function VatPermissionSwitch({ rateBasisPoints, defaultChecked }: { rateBasisPoints: number; defaultChecked: boolean }) {
-  const [checked, setChecked] = useState(defaultChecked);
-  const applyChoice = (next: boolean) => { setChecked(next); sessionStorage.setItem("stockpilot-vat-choice", String(next)); window.dispatchEvent(new Event("stockpilot-vat-choice-change")); };
-  useEffect(() => { applyChoice(defaultChecked); }, [defaultChecked]);
-  return <label className="mb-4 inline-flex cursor-pointer items-center gap-3 rounded-xl border border-primary/25 bg-primary/[0.08] px-4 py-3 text-sm font-medium text-foreground"><Checkbox checked={checked} onCheckedChange={value => applyChoice(value === true)} /><span>TVA ({(rateBasisPoints / 100).toFixed(2)} %) appliquée à ce document</span></label>;
 }
 
 function HeaderActions({ canRunBackup, compact = false, pending, onBackup, notifications, readNotificationIds, onNotification, onMarkNotificationRead, onMarkAllNotificationsRead, isOnline, pendingOfflineSales, hasFailedOfflineSale, onSync }: { canRunBackup: boolean; compact?: boolean; pending: boolean; onBackup: () => void; notifications: Array<{ id: string; title: string; detail: string; tone: "amber" | "violet" | "rose"; path: string }>; readNotificationIds: string[]; onNotification: (path: string) => void; onMarkNotificationRead: (id: string) => void; onMarkAllNotificationsRead: () => void; isOnline: boolean; pendingOfflineSales: number; hasFailedOfflineSale: boolean; onSync: () => void }) {

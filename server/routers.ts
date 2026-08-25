@@ -49,6 +49,7 @@ import { commerceRouter } from "./routers/commerce";
 import { inventoryRouter } from "./routers/inventory";
 import { payrollRouter } from "./routers/payroll";
 import { printingSettingsRouter } from "./routers/printingSettings";
+import { vatRatesRouter } from "./routers/vatRates";
 
 const STANDARD_AUTH_SESSION_MS = 24 * 60 * 60 * 1000;
 const REMEMBERED_AUTH_SESSION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -93,7 +94,6 @@ import { categoryCanBeRemoved } from "./categoryRules";
 import { assertSellerSensitiveAction } from "./sellerActionRules";
 import { companyScope } from "./companyScope";
 import { consumeRateLimit } from "./rateLimit";
-import { filterSettingsAuditLogs } from "./settingsAudit";
 
 const productInput = z.object({
   reference: z.string().trim().min(2).max(80),
@@ -183,6 +183,7 @@ async function syncStockAlert(productId: number, companyId: number | null) {
 
 export const appRouter = router({
   printingSettings: printingSettingsRouter,
+  vatRates: vatRatesRouter,
   system: systemRouter,
   commerce: commerceRouter,
   inventory: inventoryRouter,
@@ -767,7 +768,6 @@ export const appRouter = router({
 
   audit: router({
     list: adminProcedure.query(({ ctx }) => listAuditLogs(ctx.user.companyId)),
-    settings: adminProcedure.query(async ({ ctx }) => filterSettingsAuditLogs(await listAuditLogs(ctx.user.companyId))),
   }),
 
   users: router({

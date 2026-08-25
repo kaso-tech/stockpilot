@@ -636,38 +636,11 @@
 - [x] Importer et valider le checkpoint GitHub 54911b1, appliquer les migrations 0041 et 0042, puis préparer sa publication.
 - [x] Comparer et intégrer la nouvelle mise à jour déposée sur GitHub, appliquer les migrations éventuelles, valider et publier le checkpoint.
 
-## Réorganisation — paramètres et historique
-- [x] Retirer les descriptions sous les titres des cartes de paramètres et réduire légèrement les espacements.
-- [x] Réorganiser les paramètres en rubriques professionnelles, séparer l’impression de l’entreprise et supprimer les doublons de tickets/impression.
-- [x] Isoler l’historique des modifications par entreprise, compléter les tests et publier le correctif.
-
-## Harmonisation — devis et factures
-- [x] Aligner les listes, fiches et actions des devis sur le modèle professionnel des factures.
-- [x] Remplacer l’action Email+PDF par un menu « Envoyer » proposant WhatsApp, SMS et e-mail avec les informations du client et du document préremplies.
-- [x] Tester les parcours de partage des devis et factures, puis publier le correctif.
-
-## Prévisualisation — envois clients
-- [x] Ajouter une fenêtre de prévisualisation éditable avant chaque envoi WhatsApp, SMS ou e-mail de devis et facture.
-- [x] Tester la personnalisation du contenu et les liens d’envoi, puis publier le correctif.
-
-## Permissions vendeur — TVA, remises et prix
-- [x] Ajouter la permission de modification de TVA par vendeur avec application aux factures, devis et paniers.
-- [x] Ajouter des permissions distinctes de remise par produit, facture et panier, ainsi que de modification de prix par facture et panier, avec un taux maximum configurable par permission.
-- [x] Appliquer les contrôles côté serveur, tester les plafonds et publier le correctif.
-
-## Correctif — application effective des permissions vendeur
-- [x] Exposer et raccorder réellement les contrôles TVA, remises et prix aux parcours facture, devis et Vente rapide pour les vendeurs autorisés.
-- [x] Vérifier les plafonds et les refus avec des scénarios de parcours vendeur, puis publier le correctif.
-
-## Correctif — contrôles vendeur conditionnels
-- [x] Masquer les champs de prix et de remise lorsqu’ils ne sont pas autorisés, sans afficher de récapitulatif d’options interdites.
-- [x] Remplacer la confirmation TVA par une case visible dans les factures, devis et paniers autorisés, puis tester et publier le correctif.
-
-## Correctif — TVA et dépendance d’autorisation
-- [x] Corriger l’application effective de la TVA dans les factures, devis et Vente rapide pour les vendeurs autorisés.
-- [x] Désactiver et réinitialiser l’autorisation vendeur de sélection TVA tant que la TVA globale est inactive, avec validation côté serveur.
-- [x] Tester les calculs et la dépendance des réglages TVA, puis publier le correctif.
-
 ## Correctif — secret de session
 - [x] Diagnostiquer et corriger l’erreur « Session secret is not configured securely » sans exposer ni affaiblir le secret de session ; retirer des journaux de rejet les métadonnées d’identifiants non nécessaires.
 - [x] Ajouter une couverture de test de la validation de configuration, valider connexion et build, puis publier un checkpoint.
+
+## Taux de TVA prédéfinis
+- [x] Permettre à l’administrateur de gérer plusieurs taux de TVA prédéfinis par entreprise.
+- [x] Proposer la sélection de ces taux dans les factures et devis, avec une validation serveur du taux choisi.
+- [x] Tester les calculs et publier le correctif.

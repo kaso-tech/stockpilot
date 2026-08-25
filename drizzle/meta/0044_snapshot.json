@@ -1,7 +1,7 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "43931ac2-eb06-4763-a979-5ee130cc8475",
+  "id": "80e602d6-d5f5-4904-a7b1-2bcecf70a179",
   "prevId": "115ffbb7-2779-4a26-ae96-54fde6b4a78d",
   "tables": {
     "adminFallbackPasswords": {
@@ -2368,94 +2368,6 @@
           "autoincrement": false,
           "default": 0
         },
-        "sellerCanToggleVat": {
-          "name": "sellerCanToggleVat",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        },
-        "sellerCanLineDiscount": {
-          "name": "sellerCanLineDiscount",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        },
-        "sellerMaxLineDiscountPercent": {
-          "name": "sellerMaxLineDiscountPercent",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "sellerCanInvoiceDiscount": {
-          "name": "sellerCanInvoiceDiscount",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        },
-        "sellerMaxInvoiceDiscountPercent": {
-          "name": "sellerMaxInvoiceDiscountPercent",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "sellerCanCartDiscount": {
-          "name": "sellerCanCartDiscount",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        },
-        "sellerMaxCartDiscountPercent": {
-          "name": "sellerMaxCartDiscountPercent",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "sellerCanEditInvoiceItemPrice": {
-          "name": "sellerCanEditInvoiceItemPrice",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        },
-        "sellerMaxInvoiceItemPriceChangePercent": {
-          "name": "sellerMaxInvoiceItemPriceChangePercent",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "sellerCanEditCartItemPrice": {
-          "name": "sellerCanEditCartItemPrice",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        },
-        "sellerMaxCartItemPriceChangePercent": {
-          "name": "sellerMaxCartItemPriceChangePercent",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
         "sellerCanCancelInvoice": {
           "name": "sellerCanCancelInvoice",
           "type": "boolean",
@@ -3437,6 +3349,85 @@
           ]
         }
       },
+      "checkConstraint": {}
+    },
+    "vatRatePresets": {
+      "name": "vatRatePresets",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "companyId": {
+          "name": "companyId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "label": {
+          "name": "label",
+          "type": "varchar(80)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "rateBasisPoints": {
+          "name": "rateBasisPoints",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "onUpdate": true,
+          "default": "(now())"
+        }
+      },
+      "indexes": {
+        "vat_rate_presets_company_rate_idx": {
+          "name": "vat_rate_presets_company_rate_idx",
+          "columns": [
+            "companyId",
+            "rateBasisPoints"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "vatRatePresets_id": {
+          "name": "vatRatePresets_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
       "checkConstraint": {}
     }
   },

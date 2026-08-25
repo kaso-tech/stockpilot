@@ -48,13 +48,13 @@ export default function SettingsPrinting() {
     <Link href="/parametres" className="inline-flex items-center gap-1 text-sm text-primary hover:underline"><ChevronLeft className="h-4 w-4" />Retour aux paramètres</Link>
     <header><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Périphériques</p><h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">Impression et imprimante</h1></header>
     <Card><CardContent className="space-y-5 p-6">
-      <div className="flex items-center gap-3"><ReceiptText className="h-5 w-5 text-primary" /><h2 className="font-semibold text-card-foreground">Tickets de caisse</h2></div>
+      <div className="flex items-center gap-3"><ReceiptText className="h-5 w-5 text-primary" /><div><h2 className="font-semibold text-card-foreground">Tickets de caisse</h2><p className="mt-1 text-sm text-muted-foreground">Configurez le format et les textes imprimés sur les tickets.</p></div></div>
       <Field label="Largeur du ticket"><Select value={ticketWidthMm} onValueChange={value => setTicketWidthMm(value as "58" | "80")}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="58">58 mm</SelectItem><SelectItem value="80">80 mm</SelectItem></SelectContent></Select></Field>
       <Field label="En-tête du ticket"><Input value={ticketHeader} onChange={event => setTicketHeader(event.target.value)} maxLength={160} /></Field>
       <Field label="Pied du ticket"><Input value={ticketFooter} onChange={event => setTicketFooter(event.target.value)} maxLength={240} /></Field>
     </CardContent></Card>
     <Card><CardContent className="space-y-5 p-6">
-      <div className="flex items-center gap-3"><Printer className="h-5 w-5 text-primary" /><h2 className="font-semibold text-card-foreground">Imprimante par défaut</h2></div>
+      <div className="flex items-center gap-3"><Printer className="h-5 w-5 text-primary" /><div><h2 className="font-semibold text-card-foreground">Imprimante par défaut</h2><p className="mt-1 text-sm text-muted-foreground">Choisissez le comportement d’impression utilisé par votre entreprise.</p></div></div>
       <Field label="Nom de l’imprimante"><Input value={printerName} onChange={event => setPrinterName(event.target.value)} maxLength={120} placeholder="Imprimante caisse principale" /></Field>
       <Field label="Type d’impression"><Select value={printerType} onValueChange={value => setPrinterType(value as PrinterType)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="browser">Impression via le navigateur</SelectItem><SelectItem value="thermal">Imprimante thermique</SelectItem></SelectContent></Select></Field>
       <div className="rounded-xl border border-primary/20 bg-primary/[0.06] p-4 text-sm text-muted-foreground">Le mode navigateur ouvre la boîte d’impression standard. Le mode thermique conserve la préférence pour une intégration caisse compatible, sans stocker d’adresse réseau ni de secret.</div>

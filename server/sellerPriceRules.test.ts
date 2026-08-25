@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { assertSellerDiscount, assertSellerUnitPrice, assertSellerVatSelection } from "./sellerPriceRules";
+import { assertSellerDiscount, assertSellerUnitPrice } from "./sellerPriceRules";
 
-const locked = { sellerCanLineDiscount: false, sellerMaxLineDiscountPercent: 0, sellerCanInvoiceDiscount: false, sellerMaxInvoiceDiscountPercent: 0, sellerCanCartDiscount: false, sellerMaxCartDiscountPercent: 0, sellerCanEditInvoiceItemPrice: false, sellerMaxInvoiceItemPriceChangePercent: 0, sellerCanEditCartItemPrice: false, sellerMaxCartItemPriceChangePercent: 0 };
+const locked = { sellerCanOverridePrice: false, sellerCanSellBelowPrice: false, sellerMaxDiscountPercent: 5 };
 describe("règles de prix vendeur", () => {
-  it("refuse un tarif différent sans autorisation", () => expect(() => assertSellerUnitPrice(locked, 10000, 11000, "invoice")).toThrow("modification du prix"));
-  it("applique un plafond de modification distinct pour une facture", () => { const permissions = { ...locked, sellerCanEditInvoiceItemPrice: true, sellerMaxInvoiceItemPriceChangePercent: 10 }; expect(() => assertSellerUnitPrice(permissions, 10000, 11000, "invoice")).not.toThrow(); expect(() => assertSellerUnitPrice(permissions, 10000, 11100, "invoice")).toThrow("dépasse"); });
-  it("ne transfère pas une permission de prix facture au panier", () => expect(() => assertSellerUnitPrice({ ...locked, sellerCanEditInvoiceItemPrice: true, sellerMaxInvoiceItemPriceChangePercent: 20 }, 10000, 10500, "cart")).toThrow("modification du prix"));
-  it("applique les plafonds de remise par contexte", () => { const permissions = { ...locked, sellerCanLineDiscount: true, sellerMaxLineDiscountPercent: 5, sellerCanInvoiceDiscount: true, sellerMaxInvoiceDiscountPercent: 10, sellerCanCartDiscount: true, sellerMaxCartDiscountPercent: 15 }; expect(() => assertSellerDiscount(permissions, 10000, 500, "line")).not.toThrow(); expect(() => assertSellerDiscount(permissions, 10000, 501, "line")).toThrow("dépasse"); expect(() => assertSellerDiscount(permissions, 10000, 1000, "invoice")).not.toThrow(); expect(() => assertSellerDiscount(permissions, 10000, 1500, "cart")).not.toThrow(); });
-  it("bloque la bascule TVA sans permission et l’autorise avec la permission dédiée", () => { expect(() => assertSellerVatSelection({}, true, false)).toThrow("TVA"); expect(() => assertSellerVatSelection({ sellerCanToggleVat: true }, true, false)).not.toThrow(); });
+  it("refuse un tarif différent sans autorisation", () => expect(() => assertSellerUnitPrice(locked, 10000, 11000)).toThrow("modification du prix"));
+  it("accepte un prix autorisé et bloque un prix inférieur non autorisé", () => { expect(() => assertSellerUnitPrice({ ...locked, sellerCanOverridePrice: true }, 10000, 11000)).not.toThrow(); expect(() => assertSellerUnitPrice({ ...locked, sellerCanOverridePrice: true }, 10000, 9000)).toThrow("prix inférieur"); });
+  it("accepte un prix inférieur lorsque l’autorisation dédiée est active", () => expect(() => assertSellerUnitPrice({ ...locked, sellerCanSellBelowPrice: true }, 10000, 9000)).not.toThrow());
+  it("applique le plafond de remise vendeur", () => { expect(() => assertSellerDiscount(locked, 10000, 500)).not.toThrow(); expect(() => assertSellerDiscount(locked, 10000, 501)).toThrow("dépasse"); });
 });

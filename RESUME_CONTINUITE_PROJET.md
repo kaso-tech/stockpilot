@@ -4,7 +4,7 @@
 **Projet Manus :** StockPilot SaaS  
 **Chemin de travail :** `/home/ubuntu/stockpilot-pro`  
 **Domaine publié :** `https://stockpilot-gpaoheuz.manus.space`  
-**Dernier checkpoint fonctionnel avant la réorganisation actuelle :** `e5e1e9ff`  
+**Dernier checkpoint fonctionnel avant la synchronisation GitHub actuelle :** `20eefcc1`  
 **Dernière archive source fournie :** `/home/ubuntu/stockpilot-pro-current.zip`
 
 ## 1. Objectif produit
@@ -57,7 +57,6 @@ Un registre `companies` a été ajouté, et les utilisateurs, paramètres et pri
 | Inventaires | Comptage, validation, lignes, produits et mouvements filtrés |
 | Fichiers d’identité | Logo, signature et cachet stockés sous `company/<companyId>/...` |
 | Sauvegardes | Création, contenu, stockage, tâches automatiques, paramètres, rétention, téléchargement, suppression, aperçu et restauration isolés par entreprise |
-| Historique des paramètres | La procédure dédiée `audit.settings` charge d’abord les journaux de l’entreprise active, puis limite les entrées aux modifications de paramètres |
 
 Les tests couvrent notamment les refus d’accès à une facture et à un encaissement POS hors entreprise. Le dernier audit de sécurité détaillé est dans `tenant-isolation-audit.md`.
 
@@ -91,8 +90,6 @@ L’identité principale est le bleu **`#2563EB`**. Les thèmes clair et sombre 
 
 Les conventions permanentes sont les suivantes : interface professionnelle et responsive, pas de description longue sous les titres de page, boutons et icônes cohérents avec la couleur primaire, formulations d’erreur non révélatrices pour l’authentification.
 
-La page `/parametres` est organisée en rubriques courtes : **Entreprise**, **Vente rapide**, **Impression**, **Monnaie et fiscalité**, **Expérience de travail**, **Sécurité et traçabilité**, puis **Données et continuité**. Les tickets ne sont configurables que dans la rubrique Impression ; les routes historiques restent disponibles mais redirigent vers cette page unique.
-
 ## 7. Fichiers essentiels
 
 | Fichier / dossier | Rôle |
@@ -102,7 +99,6 @@ La page `/parametres` est organisée en rubriques courtes : **Entreprise**, **Ve
 | `server/routers.ts` | Routeur principal, inscription, auth, dashboard |
 | `server/routers/commerce.ts` | Clients, agents, vendeurs, réglages, factures, rémunérations |
 | `server/routers/printingSettings.ts` | Réglages multi-entreprises des tickets et de l’imprimante par défaut |
-| `server/settingsAudit.ts` | Filtrage fonctionnel des entrées propres aux paramètres |
 | `server/routers/transactions.ts` | POS, brouillons, encaissements, remboursements |
 | `server/routers/inventory.ts` | Inventaires et mouvements |
 | `server/backups.ts` | Création et restauration sélective d’archives |
@@ -117,7 +113,7 @@ La page `/parametres` est organisée en rubriques courtes : **Entreprise**, **Ve
 
 ## 8. Tests et état de validation
 
-Le dernier état validé comprend **191 tests Vitest**, `pnpm check` et `pnpm build` réussis. La synchronisation GitHub récente ajoute une page dédiée « Impression et imprimante », des préférences de ticket et d’imprimante isolées par entreprise, une trace d’audit et la migration Drizzle `0043_loving_boom_boom.sql`, déjà appliquée. La réorganisation suivante supprime les doublons de tickets et impose une consultation d’historique par entreprise active. Les warnings de chunks PWA volumineux sont non bloquants, mais une future optimisation du découpage du bundle est recommandée.
+Le dernier état validé comprend **190 tests Vitest**, `pnpm check` et `pnpm build` réussis. La synchronisation GitHub récente ajoute une page dédiée « Impression et imprimante », des préférences de ticket et d’imprimante isolées par entreprise, une trace d’audit et la migration Drizzle `0043_loving_boom_boom.sql`, déjà appliquée. Les warnings de chunks PWA volumineux sont non bloquants, mais une future optimisation du découpage du bundle est recommandée.
 
 Les commandes à exécuter après chaque lot significatif sont :
 

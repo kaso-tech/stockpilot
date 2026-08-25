@@ -180,8 +180,6 @@
   }
 }
 
-.border-primary\/20.bg-primary\/\[0\.05\].text-xs.text-muted-foreground:has(> p.font-semibold) { display: none; }
-
 html:not(.dark) .bg-\[\#090c13\], html:not(.dark) .bg-\[\#0e141f\] { background-color: #eff6ff !important; }
 html:not(.dark) .bg-\[\#111722\], html:not(.dark) .bg-\[\#141b27\] { background-color: #ffffff !important; }
 html:not(.dark) .text-white, html:not(.dark) .text-slate-100 { color: #0b2545 !important; }

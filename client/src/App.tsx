@@ -57,8 +57,7 @@ function DashboardRouter() {
         <Route path={"/clients"} component={Customers} />
         <Route path={"/factures/nouvelle"} component={() => <InvoiceCreate />} />
         <Route path={"/devis/nouveau"} component={() => <InvoiceCreate documentType="quote" />} />
-        <Route path={"/factures/:id"} component={() => <InvoiceDetail />} />
-        <Route path={"/devis/:id"} component={() => <InvoiceDetail documentType="quote" />} />
+        <Route path={"/factures/:id"} component={InvoiceDetail} />
         <Route path={"/factures"} component={Invoices} />
         <Route path={"/devis"} component={Quotes} />
         <Route path={"/inventaires"} component={Inventories} />
@@ -71,7 +70,7 @@ function DashboardRouter() {
         <Route path={"/parametres/identite"} component={SettingsIdentity} />
         <Route path={"/parametres/impression"} component={SettingsPrinting} />
         <Route path={"/parametres/pos/rattachement"} component={() => <SettingsPosSection section="assignment" />} />
-        <Route path={"/parametres/pos/tickets"} component={SettingsPrinting} />
+        <Route path={"/parametres/pos/tickets"} component={() => <SettingsPosSection section="ticket" />} />
         <Route path={"/parametres/pos/paiements"} component={() => <SettingsPosSection section="payments" />} />
         <Route path={"/parametres/pos/actions-vendeurs"} component={() => <SettingsPosSection section="seller" />} />
         <Route path={"/parametres/pos"} component={SettingsPos} />

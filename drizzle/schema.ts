@@ -250,6 +250,16 @@ export const saleSettings = mysqlTable("saleSettings", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+export const vatRatePresets = mysqlTable("vatRatePresets", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  label: varchar("label", { length: 80 }).notNull(),
+  rateBasisPoints: int("rateBasisPoints").notNull(),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [index("vat_rate_presets_company_rate_idx").on(table.companyId, table.rateBasisPoints)]);
+
 export const sales = mysqlTable("sales", {
   id: int("id").autoincrement().primaryKey(),
   companyId: int("companyId"),
