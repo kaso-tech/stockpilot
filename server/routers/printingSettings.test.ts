@@ -27,8 +27,8 @@ describe("printingSettingsRouter", () => {
 
   it("enregistre la préférence d’imprimante dans l’entreprise active et crée une trace", async () => {
     const caller = printingSettingsRouter.createCaller(adminContext(4));
-    await expect(caller.save({ ticketHeader: "Merci", ticketFooter: "À bientôt", ticketWidthMm: "58", printerName: "Caisse principale", printerType: "thermal" })).resolves.toEqual({ success: true });
-    expect(inserts.find(item => item.table === saleSettings)?.values).toMatchObject({ companyId: 4, printerName: "Caisse principale", printerType: "thermal", ticketWidthMm: "58", updatedByUserId: 9 });
+    await expect(caller.save({ ticketHeader: "Merci", ticketFooter: "À bientôt", ticketWidthMm: "58", printerName: "Caisse principale", printerType: "thermal", invoiceTemplate: "modern", invoiceShowLogo: false, invoiceShowSignature: true, invoiceShowPaymentDetails: false, invoiceShowDelivery: true })).resolves.toEqual({ success: true });
+    expect(inserts.find(item => item.table === saleSettings)?.values).toMatchObject({ companyId: 4, printerName: "Caisse principale", printerType: "thermal", ticketWidthMm: "58", invoiceTemplate: "modern", invoiceShowLogo: false, invoiceShowPaymentDetails: false, invoiceShowDelivery: true, updatedByUserId: 9 });
     expect(inserts.find(item => item.table === auditLogs)?.values).toMatchObject({ companyId: 4, actorUserId: 9, action: "Paramètres d’impression mis à jour" });
   });
 

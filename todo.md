@@ -710,3 +710,8 @@
 - [x] Retirer le réglage de frais de livraison par défaut sans retirer les frais appliqués au document.
 - [x] Corriger la résolution de l’entreprise active qui bloque la création de taux TVA prédéfinis.
 - [x] Tester les réglages, la persistance multi-entreprise et publier le correctif.
+
+## Personnalisation — modèle de facture
+- [x] Ajouter dans Documents, tickets et imprimantes les options de personnalisation du modèle de facture.
+- [x] Prévisualiser et appliquer les options aux impressions de documents.
+- [x] Tester la persistance multi-entreprise et publier le correctif.

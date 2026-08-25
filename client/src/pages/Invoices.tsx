@@ -139,7 +139,7 @@ export default function Invoices() {
     if (format === "ticket")
       copy.querySelectorAll(".a4-only").forEach(element => element.remove());
     popup.document.write(
-      `<!doctype html><html><head><title>Facture</title><style>@page{size:${format === "ticket" ? "80mm auto" : "A4"};margin:12mm}body{font-family:Arial,sans-serif;color:#172033;max-width:${format === "ticket" ? "80mm" : "100%"};margin:0 auto}.row{display:flex;justify-content:space-between;gap:12px}.muted{color:#64748b;font-size:12px}.line{border-top:1px solid #dbe3ea;padding-top:12px;margin-top:12px}.signature{margin-top:32px;text-align:right}.signature.center{text-align:center}.signature.left{text-align:left}.signature img{max-width:180px;max-height:80px;object-fit:contain}</style></head><body>${copy.innerHTML}</body></html>`
+      `<!doctype html><html><head><title>Facture</title><style>@page{size:${format === "ticket" ? "80mm auto" : "A4"};margin:12mm}body{font-family:Arial,sans-serif;color:#172033;max-width:${format === "ticket" ? "80mm" : "100%"};margin:0 auto}.row{display:flex;justify-content:space-between;gap:12px}.muted{color:#64748b;font-size:12px}.line{border-top:1px solid #dbe3ea;padding-top:12px;margin-top:12px}.signature{margin-top:32px;text-align:right}.signature.center{text-align:center}.signature.left{text-align:left}.signature img{max-width:180px;max-height:80px;object-fit:contain}.invoice-logo{max-height:56px;max-width:150px;object-fit:contain}.invoice-template.modern{border-top:5px solid #2563eb;padding-top:16px}.invoice-template.minimal .line{border-top:0;padding-top:8px;margin-top:8px}.invoice-template.minimal header{padding-bottom:8px;border-bottom:1px solid #dbe3ea}</style></head><body>${copy.innerHTML}</body></html>`
     );
     let printTriggered = false;
     const triggerPrint = () => {
@@ -538,8 +538,13 @@ export function InvoiceDocument({
   );
   const vatCents = detail.sale.vatCents || 0;
   const deliveryFeeCents = detail.sale.deliveryFeeCents || 0;
+  const template = identity?.invoiceTemplate || "classic";
+  const showLogo = identity?.invoiceShowLogo !== false;
+  const showSignature = identity?.invoiceShowSignature !== false;
+  const showPaymentDetails = identity?.invoiceShowPaymentDetails !== false;
+  const showDelivery = identity?.invoiceShowDelivery !== false;
   return (
-    <article>
+    <article className={`invoice-template ${template}`}>
       <header className="row">
         <div>
           <p className="muted">{identity?.companyName || "StockPilot"}</p>
@@ -550,7 +555,10 @@ export function InvoiceDocument({
           </h2>
           <p className="muted">{formatDate(detail.sale.createdAt, true)}</p>
         </div>
-        <StatusBadge status={detail.sale.status} />
+        <div className="flex items-start gap-3">
+          {showLogo && identity?.companyLogoUrl && <img className="invoice-logo a4-only" src={identity.companyLogoUrl} alt="Logo de l’entreprise" />}
+          <StatusBadge status={detail.sale.status} />
+        </div>
       </header>
       <section className="line row">
         <div>
@@ -558,19 +566,11 @@ export function InvoiceDocument({
           <p>
             <b>{customer?.name || "Client comptoir"}</b>
           </p>
-          {detail.sale.deliveryAddress && (
+          {showDelivery && detail.sale.deliveryAddress && (
             <p className="muted">Livraison : {detail.sale.deliveryAddress}</p>
           )}
         </div>
-        <div className="text-right">
-          <p className="muted">Total encaissé</p>
-          <p>
-            <b>
-              {formatCurrency(detail.sale.amountPaidCents || 0)} /{" "}
-              {formatCurrency(detail.sale.totalCents)}
-            </b>
-          </p>
-        </div>
+        {showPaymentDetails && <div className="text-right"><p className="muted">Total encaissé</p><p><b>{formatCurrency(detail.sale.amountPaidCents || 0)} / {formatCurrency(detail.sale.totalCents)}</b></p></div>}
       </section>
       <section className="line space-y-3">
         {detail.items.map((item: any) => (
@@ -621,7 +621,7 @@ export function InvoiceDocument({
           <b>{formatCurrency(detail.sale.totalCents)}</b>
         </div>
       </section>
-      <section
+      {showSignature && <section
         className={`a4-only signature ${identity?.companySignatureAlignment || "right"}`}
       >
         <p className="muted">
@@ -630,7 +630,7 @@ export function InvoiceDocument({
         {identity?.companySignatureUrl && (
           <img src={identity.companySignatureUrl} alt="Signature ou cachet" />
         )}
-      </section>
+      </section>}
     </article>
   );
 }
@@ -641,9 +641,12 @@ export function createInvoicePdf(
   documentLabel?: string
 ) {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
+  const template = identity?.invoiceTemplate || "classic";
+  const showDelivery = identity?.invoiceShowDelivery !== false;
+  const accentColor: [number, number, number] = template === "modern" ? [37, 99, 235] : template === "minimal" ? [30, 41, 59] : [0, 123, 139];
   let y = 56;
   doc.setFontSize(20);
-  doc.setTextColor(0, 123, 139);
+  doc.setTextColor(...accentColor);
   doc.text(identity?.companyName || "StockPilot", 44, y);
   y += 26;
   doc.setFontSize(13);
@@ -665,7 +668,7 @@ export function createInvoicePdf(
   doc.setFontSize(10);
   doc.text(`Client : ${detail.customer?.name || "Client comptoir"}`, 44, y);
   y += 16;
-  if (detail.sale.deliveryAddress) {
+  if (showDelivery && detail.sale.deliveryAddress) {
     doc.setFontSize(9);
     doc.setTextColor(90, 101, 115);
     doc.text(`Livraison : ${detail.sale.deliveryAddress}`, 44, y, {

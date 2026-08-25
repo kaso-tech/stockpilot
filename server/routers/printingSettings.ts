@@ -11,6 +11,11 @@ const printingSettingsInput = z.object({
   ticketWidthMm: z.enum(["58", "80"]),
   printerName: z.string().trim().min(2).max(120),
   printerType: z.enum(["browser", "thermal"]),
+  invoiceTemplate: z.enum(["classic", "modern", "minimal"]).default("classic"),
+  invoiceShowLogo: z.boolean().default(true),
+  invoiceShowSignature: z.boolean().default(true),
+  invoiceShowPaymentDetails: z.boolean().default(true),
+  invoiceShowDelivery: z.boolean().default(true),
 });
 
 async function dbOrThrow() {
@@ -26,6 +31,11 @@ function defaults(settings: typeof saleSettings.$inferSelect | undefined) {
     ticketWidthMm: settings?.ticketWidthMm ?? "80",
     printerName: settings?.printerName ?? "Imprimante système",
     printerType: settings?.printerType ?? "browser",
+    invoiceTemplate: settings?.invoiceTemplate ?? "classic",
+    invoiceShowLogo: settings?.invoiceShowLogo ?? true,
+    invoiceShowSignature: settings?.invoiceShowSignature ?? true,
+    invoiceShowPaymentDetails: settings?.invoiceShowPaymentDetails ?? true,
+    invoiceShowDelivery: settings?.invoiceShowDelivery ?? true,
   };
 }
 
