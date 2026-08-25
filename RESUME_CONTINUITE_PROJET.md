@@ -13,6 +13,14 @@ StockPilot Pro est un SaaS de gestion commerciale pour petites et moyennes entre
 
 > La priorité technique est désormais d’avoir une plateforme **multi-entreprise sûre**, puis un fonctionnement **offline-first** capable de supporter plusieurs jours sans réseau.
 
+## Mise à jour — multi-entrepôts et transferts
+
+Le lot multi-entrepôts est désormais implémenté. Les tables `warehouses`, `warehouseStocks`, `stockTransfers` et `stockTransferItems` portent le périmètre entreprise et la migration `0048_outgoing_rage.sql` a été appliquée sans suppression de données. Un entrepôt principal est créé pour chaque entreprise existante, pour les comptes historiques legacy et lors de chaque nouvelle inscription; le stock historique a été initialisé dans ce dépôt sans double comptage.
+
+Les transferts disposent des statuts brouillon, en transit, réceptionné et annulé. L’expédition vérifie atomiquement le stock source; réception et annulation sont idempotentes, et les opérations sont consignées dans l’audit. Les accès **Entrepôts** et **Transferts** sont présents dans la navigation administrateur. Les ventes rapides, factures, devis, mouvements manuels, inventaires, réceptions fournisseurs et chemin de vente hérité utilisent le dépôt sélectionné ou le dépôt principal. Les opérations POS et facture hors connexion conservent aussi `warehouseId`, avec réservations locales segmentées par entrepôt.
+
+Les validations du lot sont : `pnpm check`, **206 tests Vitest** et `pnpm build` réussis. La vérification visuelle a confirmé le dépôt principal et les sélecteurs d’entrepôt dans la vente rapide et les documents commerciaux. Le warning PWA relatif au bundle principal d’environ 2,8 Mo reste non bloquant.
+
 ## 2. Environnement et exploitation
 
 | Élément | Valeur / règle |

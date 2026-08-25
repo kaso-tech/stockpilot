@@ -65,6 +65,7 @@ import {
   Truck,
   TriangleAlert,
   UserRound,
+  Warehouse,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useEffect, useState } from "react";
@@ -79,6 +80,8 @@ const menuItems = [
   { icon: FileText, label: "Devis", path: "/devis" },
   { icon: UserRound, label: "Clients", path: "/clients" },
   { icon: PackageSearch, label: "Produits", path: "/produits" },
+  { icon: Warehouse, label: "Entrepôts", path: "/entrepots" },
+  { icon: ArrowLeftRight, label: "Transferts", path: "/transferts-stock" },
   { icon: Boxes, label: "Catégories", path: "/categories" },
   { icon: Ruler, label: "Unités", path: "/unites" },
   { icon: ArrowLeftRight, label: "Mouvements", path: "/mouvements" },

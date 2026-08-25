@@ -1,4 +1,4 @@
-import { boolean, index, int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { boolean, index, int, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 
 export const companies = mysqlTable("companies", {
   id: int("id").autoincrement().primaryKey(),
@@ -81,6 +81,7 @@ export const purchaseOrders = mysqlTable("purchaseOrders", {
   companyId: int("companyId"),
   orderNumber: varchar("orderNumber", { length: 60 }).notNull().unique(),
   supplierId: int("supplierId").notNull(),
+  warehouseId: int("warehouseId"),
   status: mysqlEnum("status", ["draft", "sent", "received", "cancelled"]).notNull().default("draft"),
   subtotalCents: int("subtotalCents").notNull().default(0),
   vatRateBasisPoints: int("vatRateBasisPoints").notNull().default(0),
@@ -128,6 +129,78 @@ export const products = mysqlTable("products", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
+
+/** Entrepôt physique ou point de stockage d'une entreprise. */
+export const warehouses = mysqlTable("warehouses", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId"),
+  name: varchar("name", { length: 160 }).notNull(),
+  code: varchar("code", { length: 40 }).notNull(),
+  address: text("address"),
+  active: boolean("active").notNull().default(true),
+  isDefault: boolean("isDefault").notNull().default(false),
+  createdByUserId: int("createdByUserId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  uniqueIndex("warehouses_company_code_unique").on(table.companyId, table.code),
+  index("warehouses_company_active_idx").on(table.companyId, table.active),
+]);
+
+/** Stock porté par un produit dans un entrepôt précis. */
+export const warehouseStocks = mysqlTable("warehouseStocks", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId"),
+  warehouseId: int("warehouseId").notNull(),
+  productId: int("productId").notNull(),
+  quantity: int("quantity").notNull().default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  uniqueIndex("warehouse_stocks_warehouse_product_unique").on(table.warehouseId, table.productId),
+  index("warehouse_stocks_company_warehouse_idx").on(table.companyId, table.warehouseId),
+  index("warehouse_stocks_company_product_idx").on(table.companyId, table.productId),
+]);
+
+/** Les transferts internes sont expédiés puis reçus dans une transaction distincte. */
+export const stockTransfers = mysqlTable("stockTransfers", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId"),
+  transferNumber: varchar("transferNumber", { length: 60 }).notNull().unique(),
+  sourceWarehouseId: int("sourceWarehouseId").notNull(),
+  destinationWarehouseId: int("destinationWarehouseId").notNull(),
+  status: mysqlEnum("status", ["draft", "in_transit", "received", "cancelled"]).notNull().default("draft"),
+  notes: text("notes"),
+  cancellationReason: text("cancellationReason"),
+  createdByUserId: int("createdByUserId").notNull(),
+  dispatchedByUserId: int("dispatchedByUserId"),
+  receivedByUserId: int("receivedByUserId"),
+  cancelledByUserId: int("cancelledByUserId"),
+  dispatchedAt: timestamp("dispatchedAt"),
+  receivedAt: timestamp("receivedAt"),
+  cancelledAt: timestamp("cancelledAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  index("stock_transfers_company_status_idx").on(table.companyId, table.status),
+  index("stock_transfers_company_created_idx").on(table.companyId, table.createdAt),
+  index("stock_transfers_source_idx").on(table.sourceWarehouseId),
+  index("stock_transfers_destination_idx").on(table.destinationWarehouseId),
+]);
+
+export const stockTransferItems = mysqlTable("stockTransferItems", {
+  id: int("id").autoincrement().primaryKey(),
+  stockTransferId: int("stockTransferId").notNull(),
+  productId: int("productId").notNull(),
+  productName: varchar("productName", { length: 200 }).notNull(),
+  productReference: varchar("productReference", { length: 80 }).notNull(),
+  unit: varchar("unit", { length: 30 }).notNull(),
+  quantity: int("quantity").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [
+  uniqueIndex("stock_transfer_items_transfer_product_unique").on(table.stockTransferId, table.productId),
+  index("stock_transfer_items_transfer_idx").on(table.stockTransferId),
+]);
 
 export const productPriceTiers = mysqlTable("productPriceTiers", {
   id: int("id").autoincrement().primaryKey(),
@@ -275,6 +348,7 @@ export const sales = mysqlTable("sales", {
   offlineOperationId: varchar("offlineOperationId", { length: 80 }).unique(),
   channel: mysqlEnum("channel", ["pos", "invoice", "quote"]).notNull().default("invoice"),
   customerId: int("customerId"),
+  warehouseId: int("warehouseId"),
   sellerUserId: int("sellerUserId").notNull(),
   salesAgentId: int("salesAgentId"),
   cashierId: int("cashierId"),
@@ -381,6 +455,7 @@ export const inventorySessions = mysqlTable("inventorySessions", {
   id: int("id").autoincrement().primaryKey(),
   companyId: int("companyId"),
   name: varchar("name", { length: 160 }).notNull(),
+  warehouseId: int("warehouseId"),
   status: mysqlEnum("status", ["draft", "validated"]).notNull().default("draft"),
   createdByUserId: int("createdByUserId").notNull(),
   validatedByUserId: int("validatedByUserId"),
@@ -402,6 +477,7 @@ export const stockMovements = mysqlTable("stockMovements", {
   id: int("id").autoincrement().primaryKey(),
   companyId: int("companyId"),
   productId: int("productId").notNull(),
+  warehouseId: int("warehouseId"),
   supplierId: int("supplierId"),
   type: mysqlEnum("type", ["entry", "exit", "adjustment"]).notNull(),
   quantity: int("quantity").notNull(),

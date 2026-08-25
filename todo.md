@@ -720,3 +720,9 @@
 - [x] Corriger le refus silencieux lors de l’ajout d’un taux TVA prédéfini.
 - [x] Rafraîchir la liste après ajout et afficher un retour explicite de réussite ou d’erreur.
 - [x] Tester la mutation et publier le correctif.
+
+## Multi-entrepôts et transferts de stock
+- [x] Ajouter des entrepôts par entreprise, le stock par produit et par entrepôt, et un entrepôt principal.
+- [x] Ajouter les transferts de stock tracés avec validation du stock source, réception et historique.
+- [x] Raccorder les entrepôts aux ventes, mouvements et inventaires sans rupture du mode hors connexion.
+- [x] Tester le cloisonnement multi-entreprise, les transferts et publier le correctif.

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { auditLogs, inventoryItems, inventorySessions, products, stockMovements } from "../../drizzle/schema";
+import { auditLogs, inventoryItems, inventorySessions, products, stockMovements, warehouses, warehouseStocks } from "../../drizzle/schema";
 import type { TrpcContext } from "../_core/context";
 
 vi.mock("../db", () => ({ getDb: vi.fn() }));
@@ -23,17 +23,18 @@ describe("inventory.validate", () => {
 
   beforeEach(() => {
     inserts.length = 0; updates.length = 0;
-    const session = { id: 42, name: "Inventaire test", status: "draft" as const };
+    const session = { id: 42, name: "Inventaire test", warehouseId: 99, status: "draft" as const };
     const item = { id: 81, inventorySessionId: 42, productId: 12, expectedQuantity: 10, countedQuantity: 8 };
     const product = { id: 12, quantity: 10, name: "Produit inventorié" };
+    const warehouseStock = { id: 1, companyId: 1, warehouseId: 99, productId: 12, quantity: 10 };
     const tx: any = {
       select: () => ({ from: (table: unknown) => {
-        const rows = table === inventorySessions ? [session] : table === inventoryItems ? [item] : table === products ? [product] : [];
+        const rows = table === inventorySessions ? [session] : table === inventoryItems ? [item] : table === products ? [product] : table === warehouses ? [{ id: 99, companyId: 1, name: "Entrepôt principal", code: "PRINCIPAL", active: true, isDefault: true }] : table === warehouseStocks ? [warehouseStock] : [];
         const chainableRows = Object.assign(rows, { limit: async () => rows });
         return { where: () => chainableRows, limit: async () => rows };
       }}),
-      update: (table: unknown) => ({ set: (values: unknown) => ({ where: async () => { updates.push({ table, values }); } }) }),
-      insert: (table: unknown) => ({ values: async (values: unknown) => { inserts.push({ table, values }); return [{ insertId: 1 }]; } }),
+      update: (table: unknown) => ({ set: (values: unknown) => ({ where: async () => { updates.push({ table, values }); if (table === warehouseStocks) warehouseStock.quantity -= 2; return [{ affectedRows: 1 }]; } }) }),
+      insert: (table: unknown) => ({ values: (values: unknown) => { inserts.push({ table, values }); return table === warehouseStocks ? { onDuplicateKeyUpdate: async () => [] } : [{ insertId: 1 }]; } }),
     };
     mockedGetDb.mockResolvedValue({ transaction: async (callback: (value: unknown) => Promise<void>) => callback(tx) } as any);
   });
@@ -43,7 +44,7 @@ describe("inventory.validate", () => {
     await expect(caller.validate({ id: 42 })).resolves.toEqual({ success: true });
 
     expect(updates.find(item => item.table === products)?.values).toEqual({ quantity: 8 });
-    expect(inserts.find(item => item.table === stockMovements)?.values).toMatchObject({ productId: 12, type: "adjustment", quantity: -2, previousQuantity: 10, resultingQuantity: 8, createdByUserId: 3 });
+    expect(inserts.find(item => item.table === stockMovements)?.values).toMatchObject({ productId: 12, warehouseId: 99, type: "adjustment", quantity: -2, previousQuantity: 10, resultingQuantity: 8, createdByUserId: 3 });
     expect(updates.find(item => item.table === inventorySessions)?.values).toMatchObject({ status: "validated", validatedByUserId: 3 });
     expect(inserts.find(item => item.table === auditLogs)?.values).toMatchObject({ action: "Inventaire validé", entityId: "42" });
   });

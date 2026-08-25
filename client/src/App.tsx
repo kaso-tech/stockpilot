@@ -47,6 +47,8 @@ import SyncJournal from "./pages/SyncJournal";
 import Tickets from "./pages/Tickets";
 import TermsOfUse from "./pages/TermsOfUse";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
+import Warehouses from "./pages/Warehouses";
+import StockTransfers from "./pages/StockTransfers";
 
 function DashboardRouter() {
   return (
@@ -84,6 +86,8 @@ function DashboardRouter() {
         <Route path={"/depenses"} component={Expenses} />
         <Route path={"/produits/:id"} component={ProductDetail} />
         <Route path={"/produits"} component={Products} />
+        <Route path={"/entrepots"} component={Warehouses} />
+        <Route path={"/transferts-stock"} component={StockTransfers} />
         <Route path={"/categories"} component={Categories} />
         <Route path={"/unites"} component={Units} />
         <Route path={"/mouvements"} component={Movements} />

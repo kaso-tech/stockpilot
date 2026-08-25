@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   auditLogs,
@@ -9,6 +9,7 @@ import {
   suppliers,
   userSessions,
   users,
+  warehouseStocks,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { companyScope } from "./companyScope";
@@ -70,15 +71,20 @@ export async function touchUserSession(sessionId: string) {
   await db.update(userSessions).set({ lastSeenAt: new Date() }).where(eq(userSessions.id, sessionId));
 }
 
-export async function listProducts(companyId: number | null) {
+export async function listProducts(companyId: number | null, warehouseId?: number) {
   const db = await getDb();
   if (!db) return [];
-  const [rows, tiers] = await Promise.all([db.select().from(products).where(companyScope(products.companyId, companyId)).orderBy(products.name), db.select().from(productPriceTiers)]);
+  const [rows, tiers, stockRows] = await Promise.all([
+    db.select().from(products).where(companyScope(products.companyId, companyId)).orderBy(products.name),
+    db.select().from(productPriceTiers),
+    warehouseId ? db.select().from(warehouseStocks).where(and(companyScope(warehouseStocks.companyId, companyId), eq(warehouseStocks.warehouseId, warehouseId))) : Promise.resolve([]),
+  ]);
   return rows.map(product => {
     const productTiers = tiers.filter(tier => tier.productId === product.id).sort((left, right) => left.minQuantity - right.minQuantity);
     const retailPriceTiers = productTiers.filter(tier => tier.customerType === "retail");
     const wholesalePriceTiers = productTiers.filter(tier => tier.customerType === "wholesale");
-    return { ...product, priceTiers: retailPriceTiers, retailPriceTiers, wholesalePriceTiers };
+    const localizedQuantity = warehouseId === undefined ? product.quantity : stockRows.find(stock => stock.productId === product.id)?.quantity ?? 0;
+    return { ...product, quantity: localizedQuantity, priceTiers: retailPriceTiers, retailPriceTiers, wholesalePriceTiers };
   });
 }
 

@@ -76,7 +76,10 @@ export default function InvoiceCreate({
   const { isOnline, queueInvoiceDraft } = useOffline();
   const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
-  const { data: products = [] } = trpc.products.list.useQuery();
+  const { data: warehouses = [] } = trpc.warehouses.list.useQuery();
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | null>(null);
+  useEffect(() => { if (selectedWarehouseId === null && warehouses.length) setSelectedWarehouseId(warehouses.find(warehouse => warehouse.isDefault)?.id ?? warehouses.find(warehouse => warehouse.active)?.id ?? null); }, [selectedWarehouseId, warehouses]);
+  const { data: products = [] } = trpc.products.list.useQuery(selectedWarehouseId ? { warehouseId: selectedWarehouseId } : undefined);
   const { data: customers = [] } = trpc.commerce.customers.list.useQuery();
   const { data: agents = [] } = trpc.commerce.agents.list.useQuery();
   const { data: settings } = trpc.commerce.settings.get.useQuery();
@@ -391,6 +394,7 @@ export default function InvoiceCreate({
   });
   const payload = () => ({
     channel: documentType,
+    warehouseId: selectedWarehouseId ?? undefined,
     customerId: customerId ? Number(customerId) : null,
     salesAgentId:
       showSalesAgentSelect && salesAgentId !== "none"
@@ -414,6 +418,10 @@ export default function InvoiceCreate({
     })),
   });
   const ensure = () => {
+    if (!selectedWarehouseId) {
+      toast.error("Sélectionnez un entrepôt opérationnel.");
+      return false;
+    }
     if (!customerId) {
       toast.error(
         `Sélectionnez un client pour créer le ${documentType === "quote" ? "devis" : "facture"}.`
@@ -443,6 +451,7 @@ export default function InvoiceCreate({
       if (!next.customerId) return;
       queueInvoiceDraft({
         ...next,
+        warehouseId: next.warehouseId ?? 0,
         customerId: next.customerId,
       } as OfflineInvoiceDraft);
       toast.success(
@@ -480,6 +489,7 @@ export default function InvoiceCreate({
         cashierId: next.cashierId,
         offlineDraft: {
           ...next,
+          warehouseId: next.warehouseId ?? 0,
           customerId: next.customerId,
         } as OfflineInvoiceDraft,
       });
@@ -521,6 +531,7 @@ export default function InvoiceCreate({
       <section className="grid gap-5 lg:grid-cols-2">
         <div className="space-y-4 rounded-2xl border border-border bg-card p-5">
           <h2 className="font-semibold">Client et intervenants</h2>
+          <div className="space-y-2"><Label>Entrepôt opérationnel</Label><Select value={selectedWarehouseId ? String(selectedWarehouseId) : "unselected"} onValueChange={value => { const nextId = value === "unselected" ? null : Number(value); if (nextId !== selectedWarehouseId && cart.length && !window.confirm("Changer d’entrepôt videra les produits ajoutés. Continuer ?")) return; if (nextId !== selectedWarehouseId) setCart([]); setSelectedWarehouseId(nextId); }}><SelectTrigger><SelectValue placeholder="Sélectionner un entrepôt" /></SelectTrigger><SelectContent><SelectItem value="unselected">Sélectionner un entrepôt</SelectItem>{warehouses.filter(warehouse => warehouse.active).map(warehouse => <SelectItem key={warehouse.id} value={String(warehouse.id)}>{warehouse.name}{warehouse.isDefault ? " · Principal" : ""}</SelectItem>)}</SelectContent></Select><p className="text-xs text-slate-500">Les disponibilités et le mouvement de sortie seront enregistrés pour ce dépôt.</p></div>
           <div className="space-y-2">
             <Label>
               Client <span className="text-rose-500">*</span>

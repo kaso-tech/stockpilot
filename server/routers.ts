@@ -26,6 +26,8 @@ import {
   stockAlerts,
   stockMovements,
   suppliers,
+  warehouses,
+  warehouseStocks,
   userDashboardPreferences,
   userSessions,
   users,
@@ -51,6 +53,8 @@ import { payrollRouter } from "./routers/payroll";
 import { printingSettingsRouter } from "./routers/printingSettings";
 import { vatRatesRouter } from "./routers/vatRates";
 import { sellerDiscountPermissionsRouter } from "./routers/sellerDiscountPermissions";
+import { warehousesRouter } from "./routers/warehouses";
+import { stockTransfersRouter } from "./routers/stockTransfers";
 
 const STANDARD_AUTH_SESSION_MS = 24 * 60 * 60 * 1000;
 const REMEMBERED_AUTH_SESSION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -95,6 +99,7 @@ import { categoryCanBeRemoved } from "./categoryRules";
 import { assertSellerSensitiveAction } from "./sellerActionRules";
 import { companyScope } from "./companyScope";
 import { consumeRateLimit } from "./rateLimit";
+import { creditWarehouseStock, debitWarehouseStock, getDefaultWarehouse, getScopedWarehouse } from "./warehouseStock";
 
 const productInput = z.object({
   reference: z.string().trim().min(2).max(80),
@@ -186,6 +191,8 @@ export const appRouter = router({
   printingSettings: printingSettingsRouter,
   vatRates: vatRatesRouter,
   sellerDiscountPermissions: sellerDiscountPermissionsRouter,
+  warehouses: warehousesRouter,
+  stockTransfers: stockTransfersRouter,
   system: systemRouter,
   commerce: commerceRouter,
   inventory: inventoryRouter,
@@ -262,6 +269,7 @@ export const appRouter = router({
         await tx.update(companies).set({ ownerUserId: administratorId }).where(eq(companies.id, companyId));
         await tx.insert(adminFallbackPasswords).values({ ownerOpenId: openId, passwordHash, updatedByUserId: administratorId });
         await tx.insert(saleSettings).values({ companyId, companyName: input.companyName, companyEmail: email, updatedByUserId: administratorId });
+        await tx.insert(warehouses).values({ companyId, name: "Entrepôt principal", code: "PRINCIPAL", active: true, isDefault: true, createdByUserId: administratorId });
         return { companyId, administratorId };
       });
       const sessionId = randomUUID();
@@ -463,7 +471,14 @@ export const appRouter = router({
   }),
 
   products: router({
-    list: protectedProcedure.query(({ ctx }) => listProducts(ctx.user.companyId)),
+    list: protectedProcedure.input(z.object({ warehouseId: z.number().int().positive().optional() }).optional()).query(async ({ ctx, input }) => {
+      const db = await requireDb();
+      if (input?.warehouseId) {
+        const warehouse = (await db.select({ id: warehouses.id }).from(warehouses).where(and(eq(warehouses.id, input.warehouseId), companyScope(warehouses.companyId, ctx.user.companyId))).limit(1))[0];
+        if (!warehouse) throw new TRPCError({ code: "NOT_FOUND", message: "Entrepôt introuvable." });
+      }
+      return listProducts(ctx.user.companyId, input?.warehouseId);
+    }),
     detail: protectedProcedure.input(z.object({ id: z.number().int().positive() })).query(async ({ ctx, input }) => {
       const db = await requireDb();
       const product = (await db.select().from(products).where(and(eq(products.id, input.id), companyScope(products.companyId, ctx.user.companyId))).limit(1))[0];
@@ -486,7 +501,7 @@ export const appRouter = router({
       try {
         const { priceTiers, retailPriceTiers, wholesalePriceTiers, ...productData } = input;
         const retailTiers = retailPriceTiers.length ? retailPriceTiers : priceTiers;
-        const productId = await db.transaction(async tx => { const result = await tx.insert(products).values({ ...productData, companyId: ctx.user.companyId }); const id = Number(result[0].insertId); const tiers = [...retailTiers.map(tier => ({ ...tier, productId: id, customerType: "retail" as const })), ...wholesalePriceTiers.map(tier => ({ ...tier, productId: id, customerType: "wholesale" as const }))]; if (tiers.length) await tx.insert(productPriceTiers).values(tiers); return id; });
+        const productId = await db.transaction(async tx => { const result = await tx.insert(products).values({ ...productData, companyId: ctx.user.companyId }); const id = Number(result[0].insertId); const defaultWarehouse = await getDefaultWarehouse(tx, ctx.user.companyId); await tx.insert(warehouseStocks).values({ companyId: ctx.user.companyId, warehouseId: defaultWarehouse.id, productId: id, quantity: productData.quantity }); const tiers = [...retailTiers.map(tier => ({ ...tier, productId: id, customerType: "retail" as const })), ...wholesalePriceTiers.map(tier => ({ ...tier, productId: id, customerType: "wholesale" as const }))]; if (tiers.length) await tx.insert(productPriceTiers).values(tiers); return id; });
         await syncStockAlert(productId, ctx.user.companyId);
         await createAudit(ctx.user.id, "Création", "Produit", productId, `Produit ${input.reference} créé`);
         return { success: true, id: productId };
@@ -606,6 +621,7 @@ export const appRouter = router({
     }),
     create: adminProcedure.input(z.object({
       supplierId: z.number().int().positive(),
+      warehouseId: z.number().int().positive().optional(),
       notes: z.string().trim().max(2000).nullable().optional(),
       expectedDeliveryDate: z.coerce.date().nullable().optional(),
       items: z.array(z.object({ productId: z.number().int().positive(), quantity: z.number().int().positive().max(MAX_QUANTITY) })).min(1).max(100),
@@ -614,6 +630,7 @@ export const appRouter = router({
       const db = await requireDb();
       const supplier = (await db.select().from(suppliers).where(and(eq(suppliers.id, input.supplierId), companyScope(suppliers.companyId, ctx.user.companyId))).limit(1))[0];
       if (!supplier) throw new TRPCError({ code: "NOT_FOUND", message: "Fournisseur introuvable." });
+      const receivingWarehouse = input.warehouseId ? await getScopedWarehouse(db, ctx.user.companyId, input.warehouseId, { requireActive: true }) : await getDefaultWarehouse(db, ctx.user.companyId);
       const settings = (await db.select().from(saleSettings).where(companyScope(saleSettings.companyId, ctx.user.companyId)).limit(1))[0];
       const catalog = await db.select().from(products).where(companyScope(products.companyId, ctx.user.companyId));
       const selected = input.items.map(item => {
@@ -625,7 +642,7 @@ export const appRouter = router({
       const totals = calculateCommercialTotals({ subtotalCents, vatRateBasisPoints: settings?.vatEnabled ? settings.vatRateBasisPoints : 0, deliveryFeeCents: input.deliveryFeeCents });
       const orderNumber = `BC-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
       const orderId = await db.transaction(async tx => {
-        const result = await tx.insert(purchaseOrders).values({ companyId: ctx.user.companyId, orderNumber, supplierId: input.supplierId, subtotalCents: totals.subtotalCents, vatRateBasisPoints: totals.vatRateBasisPoints, vatCents: totals.vatCents, deliveryFeeCents: totals.deliveryFeeCents, totalCents: totals.totalCents, notes: input.notes ?? null, expectedDeliveryDate: input.expectedDeliveryDate ?? null, createdByUserId: ctx.user.id });
+        const result = await tx.insert(purchaseOrders).values({ companyId: ctx.user.companyId, orderNumber, supplierId: input.supplierId, warehouseId: receivingWarehouse.id, subtotalCents: totals.subtotalCents, vatRateBasisPoints: totals.vatRateBasisPoints, vatCents: totals.vatCents, deliveryFeeCents: totals.deliveryFeeCents, totalCents: totals.totalCents, notes: input.notes ?? null, expectedDeliveryDate: input.expectedDeliveryDate ?? null, createdByUserId: ctx.user.id });
         const id = Number(result[0].insertId);
         await tx.insert(purchaseOrderItems).values(selected.map(item => ({ purchaseOrderId: id, productId: item.product.id, productName: item.product.name, productReference: item.product.reference, unit: item.product.unit, quantity: item.quantity, purchasePriceCents: item.product.purchasePriceCents, lineTotalCents: item.lineTotalCents })));
         return id;
@@ -691,16 +708,18 @@ export const appRouter = router({
         if (line.quantity > item.quantity - item.receivedQuantity) throw new TRPCError({ code: "BAD_REQUEST", message: `La quantité reçue dépasse le reliquat de ${item.productName}.` });
       }
       const result = await db.transaction(async tx => {
+        const receivingWarehouse = order.warehouseId ? await getScopedWarehouse(tx, ctx.user.companyId, order.warehouseId, { requireActive: true }) : await getDefaultWarehouse(tx, ctx.user.companyId);
         for (const item of items.filter(value => requestedByItemId.has(value.id))) {
           const receivedNow = requestedByItemId.get(item.id) ?? 0;
           const product = (await tx.select().from(products).where(and(eq(products.id, item.productId), companyScope(products.companyId, ctx.user.companyId))).limit(1))[0];
           if (!product) throw new TRPCError({ code: "NOT_FOUND", message: `Produit ${item.productName} introuvable.` });
           const resultingQuantity = product.quantity + receivedNow;
+          const localStock = await creditWarehouseStock(tx, ctx.user.companyId, receivingWarehouse.id, product.id, receivedNow);
           await tx.update(products).set({ quantity: resultingQuantity }).where(and(eq(products.id, product.id), companyScope(products.companyId, ctx.user.companyId)));
           const quantityUpdate = await tx.update(purchaseOrderItems).set({ receivedQuantity: item.receivedQuantity + receivedNow }).where(and(eq(purchaseOrderItems.id, item.id), eq(purchaseOrderItems.purchaseOrderId, input.id), eq(purchaseOrderItems.receivedQuantity, item.receivedQuantity)));
           const affected = Number((quantityUpdate as unknown as Array<{ affectedRows?: number }>)[0]?.affectedRows ?? 0);
           if (!affected) throw new TRPCError({ code: "CONFLICT", message: "Ce bon a été modifié. Actualisez la page avant de poursuivre." });
-          await tx.insert(stockMovements).values({ companyId: ctx.user.companyId, productId: product.id, supplierId: order.supplierId, type: "entry", quantity: receivedNow, previousQuantity: product.quantity, resultingQuantity, reason: `Réception partielle du bon ${order.orderNumber}`, createdByUserId: ctx.user.id });
+          await tx.insert(stockMovements).values({ companyId: ctx.user.companyId, productId: product.id, warehouseId: receivingWarehouse.id, supplierId: order.supplierId, type: "entry", quantity: receivedNow, previousQuantity: localStock.previousQuantity, resultingQuantity: localStock.resultingQuantity, reason: `Réception partielle du bon ${order.orderNumber}`, createdByUserId: ctx.user.id });
         }
         const complete = items.every(item => item.receivedQuantity + (requestedByItemId.get(item.id) ?? 0) >= item.quantity);
         const status = complete ? "received" : "sent";
@@ -716,6 +735,7 @@ export const appRouter = router({
     list: protectedProcedure.query(({ ctx }) => listMovements(ctx.user.companyId)),
     create: protectedProcedure.input(z.object({
       productId: z.number().int().positive(),
+      warehouseId: z.number().int().positive().optional(),
       supplierId: z.number().int().positive().nullable(),
       type: z.enum(["entry", "exit", "adjustment"]),
       quantity: z.number().int().refine(value => value !== 0, "La quantité doit être différente de zéro."),
@@ -732,6 +752,7 @@ export const appRouter = router({
         try { assertSellerSensitiveAction(settings, "stock_correction"); } catch (error) { throw new TRPCError({ code: "FORBIDDEN", message: error instanceof Error ? error.message : "Correction de stock non autorisée." }); }
       }
       await db.transaction(async tx => {
+        const warehouse = input.warehouseId ? await getScopedWarehouse(tx, ctx.user.companyId, input.warehouseId, { requireActive: true }) : await getDefaultWarehouse(tx, ctx.user.companyId);
         const row = await tx.select().from(products).where(and(eq(products.id, input.productId), companyScope(products.companyId, ctx.user.companyId))).limit(1);
         const product = row[0];
         if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Produit introuvable." });
@@ -742,15 +763,19 @@ export const appRouter = router({
         } catch (error) {
           throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "Mouvement invalide." });
         }
+        const localStock = signedQuantity > 0
+          ? await creditWarehouseStock(tx, ctx.user.companyId, warehouse.id, product.id, signedQuantity)
+          : await debitWarehouseStock(tx, ctx.user.companyId, warehouse.id, product.id, Math.abs(signedQuantity));
         await tx.update(products).set({ quantity: resultingQuantity }).where(and(eq(products.id, product.id), companyScope(products.companyId, ctx.user.companyId)));
         await tx.insert(stockMovements).values({
           companyId: ctx.user.companyId,
           productId: product.id,
+          warehouseId: warehouse.id,
           supplierId: input.supplierId,
           type: input.type,
           quantity: signedQuantity,
-          previousQuantity: product.quantity,
-          resultingQuantity,
+          previousQuantity: localStock.previousQuantity,
+          resultingQuantity: localStock.resultingQuantity,
           reason: input.reason,
           createdByUserId: ctx.user.id,
         });
@@ -760,7 +785,7 @@ export const appRouter = router({
           action: "Mouvement enregistré",
           entityType: "Mouvement de stock",
           entityId: String(product.id),
-          detail: `${input.type} de ${Math.abs(signedQuantity)} ${product.unit} pour ${product.reference} : ${input.reason}`,
+          detail: `${input.type} de ${Math.abs(signedQuantity)} ${product.unit} pour ${product.reference} dans ${warehouse.code} : ${input.reason}`,
         });
       });
       await syncStockAlert(input.productId, ctx.user.companyId);

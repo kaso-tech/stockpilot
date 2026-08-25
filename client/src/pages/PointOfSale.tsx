@@ -74,8 +74,12 @@ export default function PointOfSale() {
   const utils = trpc.useUtils();
   const [, setLocation] = useLocation();
   const { user } = useAuth();
-  const { isOnline, pendingProductQuantities } = useOffline();
-  const { data: products = [] } = trpc.products.list.useQuery();
+  const { isOnline, pendingProductQuantitiesByWarehouse } = useOffline();
+  const { data: warehouses = [] } = trpc.warehouses.list.useQuery();
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | null>(null);
+  useEffect(() => { if (selectedWarehouseId === null && warehouses.length) setSelectedWarehouseId(warehouses.find(warehouse => warehouse.isDefault)?.id ?? warehouses.find(warehouse => warehouse.active)?.id ?? null); }, [selectedWarehouseId, warehouses]);
+  const { data: products = [] } = trpc.products.list.useQuery(selectedWarehouseId ? { warehouseId: selectedWarehouseId } : undefined);
+  const pendingProductQuantities = pendingProductQuantitiesByWarehouse[selectedWarehouseId ?? 0] ?? {};
   const { data: suppliers = [] } = trpc.suppliers.list.useQuery();
   const { data: agents = [] } = trpc.commerce.agents.list.useQuery();
   const { data: settings } = trpc.commerce.settings.get.useQuery();
@@ -100,7 +104,7 @@ export default function PointOfSale() {
     useState<DiscountForm>(noDiscount);
   const [posApplyVat, setPosApplyVat] = useState(true);
   const [checkoutSale, setCheckoutSale] = useState<CheckoutSale | null>(null);
-  const pendingTickets = useMemo(() => transactions.filter(ticket => ticket.channel === "pos" && (ticket.status === "draft" || ticket.status === "partial")).slice(0, 4), [transactions]);
+  const pendingTickets = useMemo(() => transactions.filter(ticket => ticket.channel === "pos" && (ticket.status === "draft" || ticket.status === "partial") && (!selectedWarehouseId || ticket.warehouseId === selectedWarehouseId)).slice(0, 4), [selectedWarehouseId, transactions]);
 
   const isLowStock = useCallback(
     (product: (typeof products)[number]) =>
@@ -297,6 +301,7 @@ export default function PointOfSale() {
       return toast.error("Ajoutez au moins un produit au panier.");
     const offlineDraft: OfflinePosDraft = {
       channel: "pos",
+      warehouseId: selectedWarehouseId ?? 0,
       customerId: null,
       salesAgentId: null,
       cashierId: null,
@@ -329,6 +334,7 @@ export default function PointOfSale() {
     }
     draft.mutate({
       channel: "pos",
+      warehouseId: selectedWarehouseId ?? undefined,
       customerId: null,
       salesAgentId: null,
       cashierId: null,
@@ -342,7 +348,7 @@ export default function PointOfSale() {
         discount: discountPayload(item.discount),
       })),
     });
-  }, [cart, draft, invoiceDiscount, isOnline, lines, totalCents]);
+  }, [cart, draft, invoiceDiscount, isOnline, lines, selectedWarehouseId, totalCents]);
   const handleCode = (code: string) => {
     const product = products.find(
       item => item.reference.toLowerCase() === code.trim().toLowerCase()
@@ -357,6 +363,7 @@ export default function PointOfSale() {
     if (!isOnline) return toast.error("Connectez-vous pour enregistrer un ticket à encaisser plus tard.");
     savePendingTicket.mutate({
       channel: "pos",
+      warehouseId: selectedWarehouseId ?? undefined,
       customerId: null,
       salesAgentId: null,
       cashierId: null,
@@ -406,6 +413,7 @@ export default function PointOfSale() {
           <h1 className="mt-2 text-2xl font-semibold text-slate-950 dark:text-white sm:text-3xl">
             Vente Rapide
           </h1>
+          <label className="mt-3 flex max-w-sm items-center gap-2 text-xs font-medium text-slate-500">Entrepôt opérationnel<select value={selectedWarehouseId ? String(selectedWarehouseId) : ""} onChange={event => { const nextId = Number(event.target.value); if (nextId && nextId !== selectedWarehouseId && cart.length && !window.confirm("Changer d’entrepôt videra le panier en cours. Continuer ?")) return; if (nextId !== selectedWarehouseId) clearCart(); setSelectedWarehouseId(nextId || null); }} className="min-w-0 flex-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary" disabled={!warehouses.length}>{warehouses.filter(warehouse => warehouse.active).map(warehouse => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}{warehouse.isDefault ? " · Principal" : ""}</option>)}</select></label>
         </div>
         {cart.length > 0 && (
           <button

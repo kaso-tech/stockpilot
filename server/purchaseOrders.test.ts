@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { products, purchaseOrderItems, purchaseOrders, stockMovements, suppliers } from "../drizzle/schema";
+import { products, purchaseOrderItems, purchaseOrders, stockMovements, suppliers, warehouses, warehouseStocks } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
 
 vi.mock("./db", () => ({ getDb: vi.fn() }));
@@ -44,16 +44,17 @@ describe("purchaseOrders.list", () => {
 });
 
 describe("purchaseOrders transitions", () => {
-  const order = { id: 9, companyId: 1, orderNumber: "BC-2026-001", supplierId: 4, status: "draft", totalCents: 54000, notes: null, expectedDeliveryDate: null, createdAt: new Date("2026-08-22") };
+  const order = { id: 9, companyId: 1, orderNumber: "BC-2026-001", supplierId: 4, warehouseId: 5, status: "draft", totalCents: 54000, notes: null, expectedDeliveryDate: null, createdAt: new Date("2026-08-22") };
   const item = { id: 1, purchaseOrderId: 9, productId: 12, productName: "Produit A", productReference: "SKU-A", unit: "pièce", quantity: 6, receivedQuantity: 0, purchasePriceCents: 9000, lineTotalCents: 54000 };
   let productUpdates: unknown[];
   let stockRows: unknown[];
   beforeEach(() => {
     productUpdates = [];
     stockRows = [];
-    const tableRows = new Map<unknown, unknown[]>([[purchaseOrders, [order]], [purchaseOrderItems, [item]], [products, [{ id: 12, companyId: 1, name: "Produit A", quantity: 3 }]]]);
+    const warehouseStockRow = { id: 1, companyId: 1, warehouseId: 5, productId: 12, quantity: 3 };
+    const tableRows = new Map<unknown, unknown[]>([[purchaseOrders, [order]], [purchaseOrderItems, [item]], [products, [{ id: 12, companyId: 1, name: "Produit A", quantity: 3 }]], [warehouses, [{ id: 5, companyId: 1, code: "PRINCIPAL", name: "Entrepôt principal", active: true, isDefault: true }]], [warehouseStocks, [warehouseStockRow]]]);
     const update = (table: unknown) => ({ set: (values: unknown) => ({ where: async () => { if (table === products) productUpdates.push(values); return [{ affectedRows: 1 }]; } }) });
-    const insert = (table: unknown) => ({ values: async (values: unknown) => { if (table === stockMovements) stockRows.push(values); return []; } });
+    const insert = (table: unknown) => ({ values: (values: unknown) => { if (table === stockMovements) stockRows.push(values); return table === warehouseStocks ? { onDuplicateKeyUpdate: async () => { warehouseStockRow.quantity += 2; return []; } } : []; } });
     const select = () => ({ from: (table: unknown) => ({ where: () => chain(tableRows.get(table) ?? []), then: (resolve: (value: unknown[]) => unknown) => resolve([...(tableRows.get(table) ?? [])]), limit: async () => tableRows.get(table) ?? [] }) });
     const tx: any = { select, update, insert };
     const db: any = { select, update, insert, transaction: async (callback: (transaction: typeof tx) => unknown) => callback(tx) };
@@ -71,7 +72,7 @@ describe("purchaseOrders transitions", () => {
     const result = await appRouter.createCaller(context()).purchaseOrders.receive({ id: 9, lines: [{ id: 1, quantity: 2 }] });
     expect(result).toEqual({ success: true, alreadyReceived: false, status: "sent", complete: false });
     expect(productUpdates).toContainEqual({ quantity: 5 });
-    expect(stockRows).toContainEqual(expect.objectContaining({ companyId: 1, productId: 12, supplierId: 4, type: "entry", quantity: 2, previousQuantity: 3, resultingQuantity: 5 }));
+    expect(stockRows).toContainEqual(expect.objectContaining({ companyId: 1, productId: 12, warehouseId: 5, supplierId: 4, type: "entry", quantity: 2, previousQuantity: 3, resultingQuantity: 5 }));
   });
   it("annule le bon avec un motif explicite", async () => {
     const result = await appRouter.createCaller(context()).purchaseOrders.cancel({ id: 9, reason: "Délai fournisseur dépassé" });
