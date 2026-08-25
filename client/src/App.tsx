@@ -54,7 +54,6 @@ function DashboardRouter() {
       <Switch>
         <Route path={"/"} component={Home} />
         <Route path={"/pos"} component={PointOfSale} />
-        <Route path={"/tickets/:id"} component={() => <InvoiceDetail documentType="ticket" />} />
         <Route path={"/tickets"} component={Tickets} />
         <Route path={"/clients/:id"} component={CustomerDetail} />
         <Route path={"/clients"} component={Customers} />

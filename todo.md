@@ -690,3 +690,8 @@
 ## Export CSV — documents commerciaux
 - [x] Exporter les résultats filtrés des factures, devis et tickets avec les colonnes comptables essentielles.
 - [x] Tester la génération CSV, les filtres appliqués et publier le correctif.
+
+## Tickets — actions rapides
+- [x] Ouvrir les tickets dans une fenêtre de détail rapide au lieu d’une page dédiée.
+- [x] Permettre depuis cette fenêtre l’encaissement, l’impression et la conversion préremplie en facture.
+- [x] Tester les actions et publier le correctif.

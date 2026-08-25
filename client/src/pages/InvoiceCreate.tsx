@@ -32,6 +32,7 @@ import { formatCurrency } from "@/lib/format";
 import { shouldPromptForAssignment } from "@/lib/assignmentRules";
 import { priceForQuantityTier } from "@/lib/priceTiers";
 import { invoiceCustomerPrefill } from "@/lib/invoicePrefill";
+import { parseTicketInvoicePrefill } from "@/lib/ticketInvoicePrefill";
 import {
   isMaximumInvoiceQuantity,
   nextInvoiceQuantity,
@@ -84,6 +85,7 @@ export default function InvoiceCreate({
   const documentPath = documentType === "quote" ? "/devis" : "/factures";
   const prefilledCustomerId = invoiceCustomerPrefill(window.location.search);
   const prefillApplied = useRef(false);
+  const ticketConversionApplied = useRef(false);
   const [customerId, setCustomerId] = useState("");
   const [salesAgentId, setSalesAgentId] = useState("");
   const [cashierId, setCashierId] = useState("");
@@ -117,6 +119,25 @@ export default function InvoiceCreate({
     setCustomerId(prefilledCustomerId);
     prefillApplied.current = true;
   }, [customers, prefilledCustomerId]);
+  useEffect(() => {
+    if (documentType !== "invoice" || ticketConversionApplied.current || !products.length) return;
+    const raw = sessionStorage.getItem("stockpilot-ticket-to-invoice");
+    if (!raw) return;
+    try {
+      const prefill = parseTicketInvoicePrefill(raw);
+      if (!prefill) throw new Error("Brouillon ticket invalide");
+      const hydratedItems = prefill.items.filter(item => products.some(product => product.id === item.productId)).map(item => ({ productId: item.productId, quantity: item.quantity, manualUnitPriceCents: item.unitPriceCents ?? null, discount: noDiscount }));
+      if (hydratedItems.length) setCart(hydratedItems);
+      if (prefill.customerId && customers.some(customer => customer.id === prefill.customerId)) setCustomerId(String(prefill.customerId));
+      if (prefill.salesAgentId) setSalesAgentId(String(prefill.salesAgentId));
+      if (prefill.cashierId) setCashierId(String(prefill.cashierId));
+      sessionStorage.removeItem("stockpilot-ticket-to-invoice");
+      ticketConversionApplied.current = true;
+      toast.success("Ticket converti en brouillon de facture.");
+    } catch {
+      sessionStorage.removeItem("stockpilot-ticket-to-invoice");
+    }
+  }, [customers, documentType, products]);
   const customer = customers.find(item => item.id === Number(customerId));
   const priceType =
     customer?.type === "wholesale" ? "wholesalePriceCents" : "retailPriceCents";
