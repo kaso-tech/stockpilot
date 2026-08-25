@@ -789,7 +789,7 @@ export default function InvoiceCreate({
                     <p className="text-xs text-muted-foreground">Ajoutez une adresse et des frais uniquement si nécessaire.</p>
                   </div>
                 </div>
-                <Button type="button" size="sm" variant={deliveryEnabled ? "outline" : "default"} onClick={() => setDeliveryEnabled(current => !current)} className={!deliveryEnabled ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""}>
+                <Button type="button" size="sm" variant={deliveryEnabled ? "outline" : "default"} onClick={() => setDeliveryEnabled(current => { const next = !current; if (next) setDeliveryFeeInput(String((settings?.defaultDeliveryFeeCents ?? 0) / 100)); return next; })} className={!deliveryEnabled ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""}>
                   {deliveryEnabled ? "Retirer la livraison" : "Ajouter une livraison"}
                 </Button>
               </div>

@@ -654,3 +654,8 @@
 - [x] Déplacer les options de livraison après les lignes produits et les masquer derrière une activation désactivée par défaut.
 - [x] Placer la remise facture sous la livraison, puis la TVA sous la remise, sans modifier les calculs existants.
 - [x] Tester les totaux, les affichages conditionnels et publier le correctif.
+
+## Frais de livraison par défaut
+- [x] Ajouter un réglage des frais de livraison par défaut par entreprise.
+- [x] Préremplir ce montant à l’activation de la livraison dans les factures et devis, tout en le laissant modifiable.
+- [x] Tester les calculs et publier le correctif.

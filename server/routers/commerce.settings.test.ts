@@ -48,6 +48,11 @@ describe("commerce.settings.save", () => {
     await caller.settings.save({ defaultSalesAgentId: null, defaultCashierId: null, requireSalesAgent: false, requireCashier: false, currency: "XOF", paymentCashEnabled: true, paymentMobileMoneyEnabled: false, paymentCardEnabled: true, paymentBankTransferEnabled: false, paymentCreditEnabled: false });
     expect(inserts.find(item => item.table === saleSettings)?.values).toMatchObject({ paymentCashEnabled: true, paymentMobileMoneyEnabled: false, paymentCardEnabled: true, paymentBankTransferEnabled: false, paymentCreditEnabled: false });
   });
+  it("persiste les frais de livraison par défaut de l’entreprise", async () => {
+    const caller = commerceRouter.createCaller(adminContext());
+    await caller.settings.save({ defaultSalesAgentId: null, defaultCashierId: null, requireSalesAgent: false, requireCashier: false, currency: "XOF", defaultDeliveryFeeCents: 250000 });
+    expect(inserts.find(item => item.table === saleSettings)?.values).toMatchObject({ defaultDeliveryFeeCents: 250000, companyId: 1 });
+  });
   it("persiste individuellement toutes les permissions sensibles vendeur", async () => {
     const caller = commerceRouter.createCaller(adminContext());
     await caller.settings.save({ defaultSalesAgentId: null, defaultCashierId: null, requireSalesAgent: false, requireCashier: false, currency: "XOF", sellerCanOverridePrice: true, sellerCanSellBelowPrice: true, sellerMaxDiscountPercent: 15, sellerCanCancelInvoice: true, sellerCanRefund: true, sellerCanCorrectStock: true, sellerCanEditPurchasePrice: true });
