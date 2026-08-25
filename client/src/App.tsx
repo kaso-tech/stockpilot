@@ -7,6 +7,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { PreferencesProvider } from "./contexts/PreferencesContext";
 import { OfflineProvider } from "./contexts/OfflineContext";
+import { ActiveWarehouseProvider } from "./contexts/ActiveWarehouseContext";
 import Alerts from "./pages/Alerts";
 import Agents from "./pages/Agents";
 import AgentDetail from "./pages/AgentDetail";
@@ -120,7 +121,7 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider defaultTheme="dark" switchable>
         <TooltipProvider>
-          <PreferencesProvider><OfflineProvider><Toaster richColors closeButton position="top-right" /><Router /></OfflineProvider></PreferencesProvider>
+          <PreferencesProvider><OfflineProvider><ActiveWarehouseProvider><Toaster richColors closeButton position="top-right" /><Router /></ActiveWarehouseProvider></OfflineProvider></PreferencesProvider>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

@@ -35,6 +35,10 @@ La connexion ne présente plus qu’une seule action d’inscription : celle sit
 
 La page « Import & export » comporte un espace réservé aux administrateurs permettant de sélectionner en masse des produits, fournisseurs ou clients. L’aperçu vérifie les dépendances avant la suppression : les produits avec mouvements, les fournisseurs liés à des produits ou bons de commande, et les clients liés à des documents commerciaux restent protégés. Une suppression ne peut être exécutée que si toute la sélection est admissible, après saisie exacte de `SUPPRIMER`. Toute opération utilise le périmètre `companyId`, est réévaluée dans une transaction et crée une entrée de journal d’audit.
 
+## Entrepôt actif de l’administrateur
+
+Un sélecteur global d’entrepôt est disponible dans l’en-tête pour les administrateurs. Le choix est persistant par couple utilisateur/entreprise dans `userWarehousePreferences`, validé contre les entrepôts actifs du périmètre courant et tracé dans l’audit. Les produits, alertes de stock, mouvements et inventaires affichent désormais les quantités et historiques de l’entrepôt actif. La création d’un produit depuis cette gestion affecte son stock initial à ce même entrepôt. Les flux POS et facture conservent leur propre sélection opérationnelle afin de ne pas modifier les ventes en cours.
+
 ## 2. Environnement et exploitation
 
 | Élément | Valeur / règle |

@@ -113,6 +113,7 @@ const productInput = z.object({
   wholesalePriceCents: z.number().int().min(0),
   quantity: z.number().int().min(0),
   minimumQuantity: z.number().int().min(0),
+  warehouseId: z.number().int().positive().optional(),
   supplierId: z.number().int().positive().nullable(),
   priceTiers: z.array(z.object({ minQuantity: z.number().int().min(2), unitPriceCents: z.number().int().min(0) })).max(12).default([]),
   retailPriceTiers: z.array(z.object({ minQuantity: z.number().int().min(2), unitPriceCents: z.number().int().min(0) })).max(12).default([]),
@@ -539,9 +540,9 @@ export const appRouter = router({
     create: adminProcedure.input(productInput).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
       try {
-        const { priceTiers, retailPriceTiers, wholesalePriceTiers, ...productData } = input;
+        const { priceTiers, retailPriceTiers, wholesalePriceTiers, warehouseId, ...productData } = input;
         const retailTiers = retailPriceTiers.length ? retailPriceTiers : priceTiers;
-        const productId = await db.transaction(async tx => { const result = await tx.insert(products).values({ ...productData, companyId: ctx.user.companyId }); const id = Number(result[0].insertId); const defaultWarehouse = await getDefaultWarehouse(tx, ctx.user.companyId); await tx.insert(warehouseStocks).values({ companyId: ctx.user.companyId, warehouseId: defaultWarehouse.id, productId: id, quantity: productData.quantity }); const tiers = [...retailTiers.map(tier => ({ ...tier, productId: id, customerType: "retail" as const })), ...wholesalePriceTiers.map(tier => ({ ...tier, productId: id, customerType: "wholesale" as const }))]; if (tiers.length) await tx.insert(productPriceTiers).values(tiers); return id; });
+        const productId = await db.transaction(async tx => { const result = await tx.insert(products).values({ ...productData, companyId: ctx.user.companyId }); const id = Number(result[0].insertId); const targetWarehouse = warehouseId ? await getScopedWarehouse(tx, ctx.user.companyId, warehouseId, { requireActive: true }) : await getDefaultWarehouse(tx, ctx.user.companyId); await tx.insert(warehouseStocks).values({ companyId: ctx.user.companyId, warehouseId: targetWarehouse.id, productId: id, quantity: productData.quantity }); const tiers = [...retailTiers.map(tier => ({ ...tier, productId: id, customerType: "retail" as const })), ...wholesalePriceTiers.map(tier => ({ ...tier, productId: id, customerType: "wholesale" as const }))]; if (tiers.length) await tx.insert(productPriceTiers).values(tiers); return id; });
         await syncStockAlert(productId, ctx.user.companyId);
         await createAudit(ctx.user.id, "Création", "Produit", productId, `Produit ${input.reference} créé`);
         return { success: true, id: productId };
@@ -551,7 +552,7 @@ export const appRouter = router({
     }),
     update: adminProcedure.input(productInput.safeExtend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
-      const { id, priceTiers, retailPriceTiers, wholesalePriceTiers, ...values } = input;
+      const { id, priceTiers, retailPriceTiers, wholesalePriceTiers, warehouseId: _warehouseId, ...values } = input;
       const retailTiers = retailPriceTiers.length ? retailPriceTiers : priceTiers;
       const current = (await db.select({ id: products.id }).from(products).where(and(eq(products.id, id), companyScope(products.companyId, ctx.user.companyId))).limit(1))[0];
       if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Produit introuvable." });
@@ -772,7 +773,11 @@ export const appRouter = router({
   }),
 
   movements: router({
-    list: protectedProcedure.query(({ ctx }) => listMovements(ctx.user.companyId)),
+    list: protectedProcedure.input(z.object({ warehouseId: z.number().int().positive().optional() }).optional()).query(async ({ ctx, input }) => {
+      const db = await requireDb();
+      if (input?.warehouseId) await getScopedWarehouse(db, ctx.user.companyId, input.warehouseId, { requireActive: true });
+      return listMovements(ctx.user.companyId, 100, input?.warehouseId);
+    }),
     create: protectedProcedure.input(z.object({
       productId: z.number().int().positive(),
       warehouseId: z.number().int().positive().optional(),

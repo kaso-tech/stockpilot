@@ -746,3 +746,9 @@
 - [x] Ajouter les mutations groupées avec aperçu, confirmation renforcée et journal d’audit.
 - [x] Ajouter la sélection multiple et les confirmations dans les listes concernées.
 - [x] Tester les refus vendeur, les accès inter-entreprises, les données liées et publier le correctif.
+
+## Entrepôt actif pour l’administration
+- [x] Définir une préférence d’entrepôt actif isolée par utilisateur et entreprise.
+- [x] Ajouter un sélecteur d’entrepôt global réservé à l’administrateur.
+- [x] Raccorder les vues de gestion des stocks, produits, mouvements et inventaires au dépôt actif.
+- [x] Tester la persistance, le cloisonnement et publier le correctif.

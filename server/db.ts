@@ -94,7 +94,7 @@ export async function listSuppliers(companyId: number | null) {
   return db.select().from(suppliers).where(companyScope(suppliers.companyId, companyId)).orderBy(suppliers.name);
 }
 
-export async function listMovements(companyId: number | null, limit = 100) {
+export async function listMovements(companyId: number | null, limit = 100, warehouseId?: number) {
   const db = await getDb();
   if (!db) return [];
   return db
@@ -117,7 +117,7 @@ export async function listMovements(companyId: number | null, limit = 100) {
     .innerJoin(products, eq(stockMovements.productId, products.id))
     .leftJoin(suppliers, eq(stockMovements.supplierId, suppliers.id))
     .leftJoin(users, eq(stockMovements.createdByUserId, users.id))
-    .where(companyScope(stockMovements.companyId, companyId))
+    .where(warehouseId === undefined ? companyScope(stockMovements.companyId, companyId) : and(companyScope(stockMovements.companyId, companyId), eq(stockMovements.warehouseId, warehouseId)))
     .orderBy(desc(stockMovements.occurredAt))
     .limit(limit);
 }

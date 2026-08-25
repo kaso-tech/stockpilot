@@ -43,6 +43,18 @@ export const userDashboardPreferences = mysqlTable("userDashboardPreferences", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+/** Entrepôt de travail retenu par un administrateur dans une entreprise. */
+export const userWarehousePreferences = mysqlTable("userWarehousePreferences", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  companyId: int("companyId").notNull(),
+  warehouseId: int("warehouseId").notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  uniqueIndex("user_warehouse_preferences_user_company_unique").on(table.userId, table.companyId),
+  index("user_warehouse_preferences_company_warehouse_idx").on(table.companyId, table.warehouseId),
+]);
+
 export const sellerCredentials = mysqlTable("sellerCredentials", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull().unique(),

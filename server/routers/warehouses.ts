@@ -1,11 +1,12 @@
 import { and, asc, eq, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { auditLogs, products, stockTransfers, warehouseStocks, warehouses } from "../../drizzle/schema";
+import { auditLogs, products, stockTransfers, userWarehousePreferences, warehouseStocks, warehouses } from "../../drizzle/schema";
 import { getDb } from "../db";
 import { adminProcedure, protectedProcedure, router } from "../_core/trpc";
 import { companyScope } from "../companyScope";
 import { getScopedWarehouse } from "../warehouseStock";
+import { resolveActiveWarehouse } from "../activeWarehouseRules";
 
 const warehouseInput = z.object({
   name: z.string().trim().min(2).max(160),
@@ -25,6 +26,29 @@ async function audit(tx: any, companyId: number | null, actorUserId: number, act
 }
 
 export const warehousesRouter = router({
+  active: adminProcedure.query(async ({ ctx }) => {
+    const db = await dbOrThrow();
+    if (ctx.user.companyId === null) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Aucune entreprise active n’est associée à ce compte." });
+    const [preference, fallback] = await Promise.all([
+      db.select().from(userWarehousePreferences).where(and(eq(userWarehousePreferences.userId, ctx.user.id), eq(userWarehousePreferences.companyId, ctx.user.companyId))).limit(1),
+      db.select().from(warehouses).where(and(companyScope(warehouses.companyId, ctx.user.companyId), eq(warehouses.active, true))).orderBy(asc(warehouses.isDefault), asc(warehouses.name)),
+    ]);
+    const preferredId = preference[0]?.warehouseId;
+    const warehouse = resolveActiveWarehouse(preferredId, fallback);
+    return { warehouseId: warehouse?.id ?? null, warehouse: warehouse ? { id: warehouse.id, name: warehouse.name, code: warehouse.code, isDefault: warehouse.isDefault } : null };
+  }),
+
+  setActive: adminProcedure.input(z.object({ warehouseId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+    const db = await dbOrThrow();
+    if (ctx.user.companyId === null) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Aucune entreprise active n’est associée à ce compte." });
+    const warehouse = await getScopedWarehouse(db, ctx.user.companyId, input.warehouseId, { requireActive: true });
+    const current = (await db.select().from(userWarehousePreferences).where(and(eq(userWarehousePreferences.userId, ctx.user.id), eq(userWarehousePreferences.companyId, ctx.user.companyId))).limit(1))[0];
+    if (current) await db.update(userWarehousePreferences).set({ warehouseId: warehouse.id }).where(eq(userWarehousePreferences.id, current.id));
+    else await db.insert(userWarehousePreferences).values({ userId: ctx.user.id, companyId: ctx.user.companyId, warehouseId: warehouse.id });
+    await db.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Entrepôt actif modifié", entityType: "Préférence utilisateur", entityId: String(warehouse.id), detail: `Entrepôt actif défini sur ${warehouse.name} (${warehouse.code}).` });
+    return { success: true, warehouseId: warehouse.id };
+  }),
+
   list: protectedProcedure.query(async ({ ctx }) => {
     const db = await dbOrThrow();
     const rows = await db.select({
