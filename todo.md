@@ -765,3 +765,8 @@
 - [x] Restreindre les sélections opérationnelles d’un vendeur aux entrepôts qui lui sont attribués.
 - [x] Ajouter le tableau de bord comparatif et l’interface d’affectation administrateur.
 - [x] Tester les calculs, l’isolation et les accès vendeur, puis publier le correctif.
+
+## Correctif — affectations des vendeurs
+- [x] Corriger la boucle de rendu à l’ouverture de la fenêtre « Gérer les dépôts ».
+- [x] Tester l’ouverture, la sélection et l’enregistrement d’affectations vendeur-entrepôt.
+- [x] Publier le correctif sans modifier les affectations existantes.

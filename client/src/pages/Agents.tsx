@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatCurrency } from "@/lib/format";
+import { normalizeSellerWarehouseIds } from "@/lib/sellerAssignments";
 import { trpc } from "@/lib/trpc";
 import { useActiveWarehouse } from "@/contexts/ActiveWarehouseContext";
 import { Banknote, BriefcaseBusiness, ChevronRight, Plus, UserRoundCheck } from "lucide-react";
@@ -20,6 +21,7 @@ export type Beneficiary = { type: "user" | "agent"; id: number; name: string; ro
 export type AgentForm = { name: string; type: AgentKind; email: string; phone: string; username: string; password: string; remunerationMode: "fixed" | "commission" | "fixed_plus_commission"; fixed: string; basis: "revenue" | "net_profit"; rate: string };
 
 export const blankAgentForm: AgentForm = { name: "", type: "seller", email: "", phone: "", username: "", password: "", remunerationMode: "commission", fixed: "0", basis: "revenue", rate: "0" };
+const emptyAssignments: Array<{ warehouseId: number }> = [];
 const remunerationPayload = (form: AgentForm) => ({ remunerationMode: form.remunerationMode, fixedMonthlyCents: form.remunerationMode === "commission" ? 0 : Math.round(Number(form.fixed || 0) * 100), commissionBasis: form.basis, rateBasisPoints: form.remunerationMode === "fixed" ? 0 : Math.round(Number(form.rate || 0) * 100), active: true });
 
 export default function Agents() {
@@ -35,9 +37,13 @@ export default function Agents() {
   const [editing, setEditing] = useState<Beneficiary | null>(null);
   const [form, setForm] = useState<AgentForm>(blankAgentForm);
   const [assignmentSellerId, setAssignmentSellerId] = useState<number | null>(null);
-  const { data: assignmentRows = [] } = trpc.commerce.sellers.assignments.get.useQuery({ sellerId: assignmentSellerId ?? 0 }, { enabled: Boolean(assignmentSellerId) });
+  const assignmentQuery = trpc.commerce.sellers.assignments.get.useQuery({ sellerId: assignmentSellerId ?? 0 }, { enabled: Boolean(assignmentSellerId) });
+  const assignmentRows = assignmentQuery.data ?? emptyAssignments;
   const [assignmentIds, setAssignmentIds] = useState<number[]>([]);
-  useEffect(() => { setAssignmentIds(assignmentRows.map(item => item.warehouseId)); }, [assignmentRows]);
+  useEffect(() => {
+    if (assignmentSellerId === null) { setAssignmentIds([]); return; }
+    if (assignmentQuery.data) setAssignmentIds(normalizeSellerWarehouseIds(assignmentRows));
+  }, [assignmentSellerId, assignmentQuery.data, assignmentRows]);
   const refresh = () => { utils.payroll.overview.invalidate(); utils.commerce.agents.list.invalidate(); utils.commerce.sellers.list.invalidate(); };
   const closeForm = () => { setOpen(false); setEditing(null); setForm(blankAgentForm); };
   const createAgent = trpc.commerce.agents.create.useMutation({ onSuccess: () => { refresh(); closeForm(); toast.success("Agent créé avec sa rémunération."); }, onError: error => toast.error(error.message) });

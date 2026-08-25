@@ -49,6 +49,10 @@ La migration `0052` crée `sellerWarehouseAssignments`, avec unicité par entrep
 
 La route « Pilotage consolidé » compare les entrepôts actifs d’une entreprise sur une période mensuelle : chiffre d’affaires encaissé, marge, dépenses incluant la paie, résultat opérationnel, nombre de documents, panier moyen, valeur de stock, alertes de seuil et budget. Elle reste réservée aux administrateurs; chaque ligne permet de basculer vers la vue opérationnelle du dépôt sélectionné.
 
+## Correctif de la fenêtre d’affectation vendeur
+
+La fenêtre « Gérer les dépôts » des vendeurs utilise désormais une valeur de repli stable lorsque la requête d’affectations est en attente. L’état des cases à cocher n’est synchronisé qu’à la réception des données ou à la fermeture de la fenêtre, ce qui évite une boucle de rendu React. La normalisation dédoublonne aussi les identifiants d’entrepôt avant affichage; aucune affectation persistée n’est modifiée par ce correctif.
+
 ## 2. Environnement et exploitation
 
 | Élément | Valeur / règle |
