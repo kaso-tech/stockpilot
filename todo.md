@@ -701,3 +701,7 @@
 - [x] Afficher la TVA uniquement si elle est activée globalement et autoriser sa bascule seulement pour les vendeurs habilités.
 - [x] Ajouter la saisie directe de quantité dans le panier Vente rapide entre les boutons − et +.
 - [x] Tester les contrôles et publier le correctif.
+
+## Tickets — priorité d’encaissement
+- [x] Placer et mettre en valeur le bouton Encaisser à droite dans la fenêtre des tickets non soldés.
+- [x] Tester le rendu et publier le correctif.
