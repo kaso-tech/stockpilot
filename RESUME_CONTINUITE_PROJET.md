@@ -31,6 +31,10 @@ Le compte vendeur actif, encore dans le périmètre legacy après le rétablisse
 
 La connexion ne présente plus qu’une seule action d’inscription : celle située sous le bouton de connexion. Les agents appliqués automatiquement par les réglages POS sont désormais cachés complètement dans l’écran d’encaissement, tout en restant appliqués côté serveur. Les filtres et exports CSV des factures, devis et tickets proposent maintenant les vendeurs, agents commerciaux et caissiers, avec des clés de filtre distinctes pour éviter toute collision d’identifiants.
 
+## Suppression en masse sécurisée
+
+La page « Import & export » comporte un espace réservé aux administrateurs permettant de sélectionner en masse des produits, fournisseurs ou clients. L’aperçu vérifie les dépendances avant la suppression : les produits avec mouvements, les fournisseurs liés à des produits ou bons de commande, et les clients liés à des documents commerciaux restent protégés. Une suppression ne peut être exécutée que si toute la sélection est admissible, après saisie exacte de `SUPPRIMER`. Toute opération utilise le périmètre `companyId`, est réévaluée dans une transaction et crée une entrée de journal d’audit.
+
 ## 2. Environnement et exploitation
 
 | Élément | Valeur / règle |

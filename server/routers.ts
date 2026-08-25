@@ -55,6 +55,7 @@ import { vatRatesRouter } from "./routers/vatRates";
 import { sellerDiscountPermissionsRouter } from "./routers/sellerDiscountPermissions";
 import { warehousesRouter } from "./routers/warehouses";
 import { stockTransfersRouter } from "./routers/stockTransfers";
+import { BULK_DELETE_CONFIRMATION, hasBulkDeleteConfirmation, normalizeBulkDeleteIds, type BulkDeleteResource } from "./bulkDeleteRules";
 
 const STANDARD_AUTH_SESSION_MS = 24 * 60 * 60 * 1000;
 const REMEMBERED_AUTH_SESSION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -151,6 +152,45 @@ async function createAudit(
     entityId: entityId === null ? null : String(entityId),
     detail,
   });
+}
+
+const bulkDeleteSelectionInput = z.object({
+  resource: z.enum(["products", "suppliers", "customers"]),
+  ids: z.array(z.number().int().positive()).min(1).max(100),
+});
+
+type BulkDeleteCandidate = { id: number; label: string };
+
+async function inspectBulkDeleteSelection(db: any, companyId: number | null, resource: BulkDeleteResource, rawIds: number[]) {
+  const ids = normalizeBulkDeleteIds(rawIds);
+  if (resource === "products") {
+    const rows = await db.select({ id: products.id, reference: products.reference, name: products.name }).from(products).where(and(inArray(products.id, ids), companyScope(products.companyId, companyId)));
+    const movementRows = rows.length ? await db.select({ productId: stockMovements.productId }).from(stockMovements).where(and(inArray(stockMovements.productId, rows.map((row: any) => row.id)), companyScope(stockMovements.companyId, companyId))) : [];
+    const protectedIds = new Set(movementRows.map((movement: any) => movement.productId));
+    const found = new Set(rows.map((row: any) => row.id));
+    const candidates: BulkDeleteCandidate[] = rows.map((row: any) => ({ id: row.id, label: `${row.reference} — ${row.name}` }));
+    return { resource, requestedCount: ids.length, eligible: candidates.filter(candidate => !protectedIds.has(candidate.id)), blocked: candidates.filter(candidate => protectedIds.has(candidate.id)).map(candidate => ({ ...candidate, reason: "Ce produit possède déjà des mouvements de stock." })), missingIds: ids.filter(id => !found.has(id)) };
+  }
+  if (resource === "suppliers") {
+    const rows = await db.select({ id: suppliers.id, name: suppliers.name }).from(suppliers).where(and(inArray(suppliers.id, ids), companyScope(suppliers.companyId, companyId)));
+    const found = new Set(rows.map((row: any) => row.id));
+    const foundIds = rows.map((row: any) => row.id);
+    const [productLinks, orderLinks] = foundIds.length ? await Promise.all([
+      db.select({ supplierId: products.supplierId }).from(products).where(and(inArray(products.supplierId, foundIds), companyScope(products.companyId, companyId))),
+      db.select({ supplierId: purchaseOrders.supplierId }).from(purchaseOrders).where(and(inArray(purchaseOrders.supplierId, foundIds), companyScope(purchaseOrders.companyId, companyId))),
+    ]) : [[], []];
+    const linkedProducts = new Set(productLinks.map((row: any) => row.supplierId));
+    const linkedOrders = new Set(orderLinks.map((row: any) => row.supplierId));
+    const candidates: BulkDeleteCandidate[] = rows.map((row: any) => ({ id: row.id, label: row.name }));
+    const reasonFor = (id: number) => linkedProducts.has(id) ? "Ce fournisseur est encore rattaché à des produits." : linkedOrders.has(id) ? "Ce fournisseur possède un historique de bons de commande." : null;
+    return { resource, requestedCount: ids.length, eligible: candidates.filter(candidate => !reasonFor(candidate.id)), blocked: candidates.filter(candidate => reasonFor(candidate.id)).map(candidate => ({ ...candidate, reason: reasonFor(candidate.id)! })), missingIds: ids.filter(id => !found.has(id)) };
+  }
+  const rows = await db.select({ id: customers.id, name: customers.name }).from(customers).where(and(inArray(customers.id, ids), companyScope(customers.companyId, companyId)));
+  const found = new Set(rows.map((row: any) => row.id));
+  const salesRows = rows.length ? await db.select({ customerId: sales.customerId }).from(sales).where(and(inArray(sales.customerId, rows.map((row: any) => row.id)), companyScope(sales.companyId, companyId))) : [];
+  const protectedIds = new Set(salesRows.map((sale: any) => sale.customerId));
+  const candidates: BulkDeleteCandidate[] = rows.map((row: any) => ({ id: row.id, label: row.name }));
+  return { resource, requestedCount: ids.length, eligible: candidates.filter(candidate => !protectedIds.has(candidate.id)), blocked: candidates.filter(candidate => protectedIds.has(candidate.id)).map(candidate => ({ ...candidate, reason: "Ce client est lié à un historique de documents commerciaux." })), missingIds: ids.filter(id => !found.has(id)) };
 }
 
 async function syncStockAlert(productId: number, companyId: number | null) {
@@ -790,6 +830,25 @@ export const appRouter = router({
       });
       await syncStockAlert(input.productId, ctx.user.companyId);
       return { success: true };
+    }),
+  }),
+
+  bulkDelete: router({
+    preview: adminProcedure.input(bulkDeleteSelectionInput).query(async ({ ctx, input }) => inspectBulkDeleteSelection(await requireDb(), ctx.user.companyId, input.resource, input.ids)),
+    execute: adminProcedure.input(bulkDeleteSelectionInput.extend({ confirmation: z.string().max(40) })).mutation(async ({ ctx, input }) => {
+      if (!hasBulkDeleteConfirmation(input.confirmation)) throw new TRPCError({ code: "BAD_REQUEST", message: `Saisissez exactement « ${BULK_DELETE_CONFIRMATION} » pour confirmer cette suppression.` });
+      const db = await requireDb();
+      return db.transaction(async tx => {
+        const preview = await inspectBulkDeleteSelection(tx, ctx.user.companyId, input.resource, input.ids);
+        if (preview.missingIds.length || preview.blocked.length || preview.eligible.length !== preview.requestedCount) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "La sélection contient des données protégées, inexistantes ou sorties de votre entreprise. Actualisez l’aperçu avant de recommencer." });
+        const ids = preview.eligible.map(candidate => candidate.id);
+        if (input.resource === "products") await tx.delete(products).where(and(inArray(products.id, ids), companyScope(products.companyId, ctx.user.companyId)));
+        if (input.resource === "suppliers") await tx.delete(suppliers).where(and(inArray(suppliers.id, ids), companyScope(suppliers.companyId, ctx.user.companyId)));
+        if (input.resource === "customers") await tx.delete(customers).where(and(inArray(customers.id, ids), companyScope(customers.companyId, ctx.user.companyId)));
+        const labels = preview.eligible.map(candidate => candidate.label).join(" · ");
+        await tx.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Suppression groupée", entityType: input.resource === "products" ? "Produits" : input.resource === "suppliers" ? "Fournisseurs" : "Clients", entityId: null, detail: `${ids.length} élément(s) supprimé(s) : ${labels.slice(0, 1400)}` });
+        return { success: true, deletedCount: ids.length };
+      });
     }),
   }),
 

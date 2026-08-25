@@ -740,3 +740,9 @@
 - [x] Masquer entièrement les agents définis par défaut dans l’écran d’encaissement.
 - [x] Ajouter le vendeur aux filtres par agent dans les listes de documents concernées.
 - [x] Tester les ajustements et publier le correctif.
+
+## Suppression en masse sécurisée
+- [x] Définir les ressources admissibles, les dépendances protégées et le contrôle administrateur par entreprise.
+- [x] Ajouter les mutations groupées avec aperçu, confirmation renforcée et journal d’audit.
+- [x] Ajouter la sélection multiple et les confirmations dans les listes concernées.
+- [x] Tester les refus vendeur, les accès inter-entreprises, les données liées et publier le correctif.
