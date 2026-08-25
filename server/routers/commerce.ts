@@ -34,7 +34,8 @@ async function dbOrThrow() {
 async function companySettings(db: any, companyId: number | null | undefined) {
   const query = db.select().from(saleSettings);
   if (typeof query.where !== "function") return query[0] ?? null;
-  return (await query.where(companyScope(saleSettings.companyId, companyId ?? null)).limit(1))[0] ?? null;
+  const settings = (await query.where(companyScope(saleSettings.companyId, companyId ?? null)).limit(1))[0] ?? null;
+  return settings ? { ...settings, sellerCanToggleVat: Boolean(settings.vatEnabled && settings.sellerCanToggleVat) } : null;
 }
 
 async function audit(actorUserId: number, action: string, entityType: string, entityId: string | number | null, detail: string) {

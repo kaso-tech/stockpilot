@@ -122,7 +122,7 @@ export const transactionsRouter = router({
       const taxableSubtotalCents = assertSafeDatabaseInt(lineNetCents - invoiceDiscountCents, "Base taxable");
       const defaultVatApplied = Boolean(permissions?.vatEnabled);
       const applyVat = input.applyVat ?? defaultVatApplied;
-      if (ctx.user.role === "seller") { try { assertSellerVatSelection(permissions ?? {}, defaultVatApplied, applyVat); } catch (error) { throw new TRPCError({ code: "FORBIDDEN", message: error instanceof Error ? error.message : "Modification de TVA non autorisée." }); } }
+      if (ctx.user.role === "seller") { try { assertSellerVatSelection({ ...permissions, sellerCanToggleVat: Boolean(permissions?.vatEnabled && permissions?.sellerCanToggleVat) }, defaultVatApplied, applyVat); } catch (error) { throw new TRPCError({ code: "FORBIDDEN", message: error instanceof Error ? error.message : "Modification de TVA non autorisée." }); } }
       const commercialTotals = calculateCommercialTotals({ subtotalCents: taxableSubtotalCents, vatRateBasisPoints: applyVat ? permissions?.vatRateBasisPoints ?? 0 : 0, deliveryFeeCents: input.deliveryFeeCents });
       const totalCents = commercialTotals.totalCents;
       const totalCostCents = assertSafeDatabaseInt(lines.reduce((sum, line) => sum + line.lineCostCents, 0), "Coût total");

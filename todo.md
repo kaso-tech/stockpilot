@@ -663,6 +663,11 @@
 - [x] Masquer les champs de prix et de remise lorsqu’ils ne sont pas autorisés, sans afficher de récapitulatif d’options interdites.
 - [x] Remplacer la confirmation TVA par une case visible dans les factures, devis et paniers autorisés, puis tester et publier le correctif.
 
+## Correctif — TVA et dépendance d’autorisation
+- [x] Corriger l’application effective de la TVA dans les factures, devis et Vente rapide pour les vendeurs autorisés.
+- [x] Désactiver et réinitialiser l’autorisation vendeur de sélection TVA tant que la TVA globale est inactive, avec validation côté serveur.
+- [x] Tester les calculs et la dépendance des réglages TVA, puis publier le correctif.
+
 ## Correctif — secret de session
 - [x] Diagnostiquer et corriger l’erreur « Session secret is not configured securely » sans exposer ni affaiblir le secret de session ; retirer des journaux de rejet les métadonnées d’identifiants non nécessaires.
 - [x] Ajouter une couverture de test de la validation de configuration, valider connexion et build, puis publier un checkpoint.

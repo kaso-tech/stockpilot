@@ -27,7 +27,7 @@ export default function PointOfSale() {
   const { data: suppliers = [] } = trpc.suppliers.list.useQuery();
   const { data: agents = [] } = trpc.commerce.agents.list.useQuery();
   const { data: settings } = trpc.commerce.settings.get.useQuery();
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(""); const [applyVat, setApplyVat] = useState(false);
   const [lowStockOnly, setLowStockOnly] = useState(false);
   const [purchaseListOpen, setPurchaseListOpen] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -69,7 +69,8 @@ export default function PointOfSale() {
   const lineNetCents = lines.reduce((sum, line) => sum + line.totalCents, 0);
   const invoiceDiscountCents = calculateDiscount(lineNetCents, invoiceDiscount);
   const taxableSubtotalCents = lineNetCents - invoiceDiscountCents;
-  const vatRateBasisPoints = settings?.vatEnabled ? settings.vatRateBasisPoints ?? 0 : 0;
+  useEffect(() => { const syncVatChoice = () => setApplyVat(user?.role === "seller" && settings?.sellerCanToggleVat && settings.vatEnabled ? sessionStorage.getItem("stockpilot-vat-choice") !== "false" : Boolean(settings?.vatEnabled)); syncVatChoice(); window.addEventListener("stockpilot-vat-choice-change", syncVatChoice); return () => window.removeEventListener("stockpilot-vat-choice-change", syncVatChoice); }, [settings?.sellerCanToggleVat, settings?.vatEnabled, user?.role]);
+  const vatRateBasisPoints = applyVat ? settings?.vatRateBasisPoints ?? 0 : 0;
   const vatCents = Math.round((taxableSubtotalCents * vatRateBasisPoints) / 10000);
   const totalCents = taxableSubtotalCents + vatCents;
 
@@ -85,7 +86,7 @@ export default function PointOfSale() {
   const setLineDiscount = (productId: number, discount: DiscountForm) => setCart(current => current.map(item => item.productId === productId ? { ...item, discount } : item));
   const clearCart = () => { setCart([]); setInvoiceDiscount(noDiscount); setCartCollapsed(false); };
   const draft = trpc.transactions.createDraft.useMutation({ onSuccess: result => { utils.transactions.list.invalidate(); setCheckoutSale({ ...result, channel: "pos" }); }, onError: error => toast.error(error.message) });
-  const chooseVat = () => user?.role === "seller" && settings?.sellerCanToggleVat ? sessionStorage.getItem("stockpilot-vat-choice") !== "false" : Boolean(settings?.vatEnabled);
+  const chooseVat = () => applyVat;
   const openCheckout = useCallback(() => {
     if (!cart.length) return toast.error("Ajoutez au moins un produit au panier.");
     const applyVat = chooseVat(); const selectedTotalCents = taxableSubtotalCents + (applyVat ? Math.round((taxableSubtotalCents * (settings?.vatRateBasisPoints ?? 0)) / 10000) : 0); const offlineDraft: OfflinePosDraft = { channel: "pos", customerId: null, salesAgentId: null, cashierId: null, salesAgentSelectionMade: false, cashierSelectionMade: false, note: null, deliveryAddress: null, applyVat, invoiceDiscount: discountPayload(invoiceDiscount), items: lines.map(line => ({ productId: line.productId, productName: line.product.name, productReference: line.product.reference, unitPriceCents: line.unitPriceCents, manualUnitPriceCents: line.manualUnitPriceCents ?? null, lineTotalCents: line.totalCents, quantity: line.quantity, discount: discountPayload(line.discount) })) };

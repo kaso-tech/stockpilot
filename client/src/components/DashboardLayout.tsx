@@ -293,9 +293,9 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
 
 function VatPermissionSwitch({ rateBasisPoints, defaultChecked }: { rateBasisPoints: number; defaultChecked: boolean }) {
   const [checked, setChecked] = useState(defaultChecked);
-  useEffect(() => { setChecked(defaultChecked); }, [defaultChecked]);
-  useEffect(() => { sessionStorage.setItem("stockpilot-vat-choice", String(checked)); }, [checked]);
-  return <label className="mb-4 inline-flex cursor-pointer items-center gap-3 rounded-xl border border-primary/25 bg-primary/[0.08] px-4 py-3 text-sm font-medium text-foreground"><Checkbox checked={checked} onCheckedChange={value => setChecked(value === true)} /><span>TVA ({(rateBasisPoints / 100).toFixed(2)} %) appliquée à ce document</span></label>;
+  const applyChoice = (next: boolean) => { setChecked(next); sessionStorage.setItem("stockpilot-vat-choice", String(next)); window.dispatchEvent(new Event("stockpilot-vat-choice-change")); };
+  useEffect(() => { applyChoice(defaultChecked); }, [defaultChecked]);
+  return <label className="mb-4 inline-flex cursor-pointer items-center gap-3 rounded-xl border border-primary/25 bg-primary/[0.08] px-4 py-3 text-sm font-medium text-foreground"><Checkbox checked={checked} onCheckedChange={value => applyChoice(value === true)} /><span>TVA ({(rateBasisPoints / 100).toFixed(2)} %) appliquée à ce document</span></label>;
 }
 
 function HeaderActions({ canRunBackup, compact = false, pending, onBackup, notifications, readNotificationIds, onNotification, onMarkNotificationRead, onMarkAllNotificationsRead, isOnline, pendingOfflineSales, hasFailedOfflineSale, onSync }: { canRunBackup: boolean; compact?: boolean; pending: boolean; onBackup: () => void; notifications: Array<{ id: string; title: string; detail: string; tone: "amber" | "violet" | "rose"; path: string }>; readNotificationIds: string[]; onNotification: (path: string) => void; onMarkNotificationRead: (id: string) => void; onMarkAllNotificationsRead: () => void; isOnline: boolean; pendingOfflineSales: number; hasFailedOfflineSale: boolean; onSync: () => void }) {
