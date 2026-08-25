@@ -14,8 +14,8 @@ import { toast } from "sonner";
 import { useLocation, useRoute } from "wouter";
 import { InvoiceDocument, StatusBadge, createInvoicePdf, downloadFile } from "./Invoices";
 
-export default function InvoiceDetail({ documentType = "invoice" }: { documentType?: "invoice" | "quote" }) {
-  const [, params] = useRoute(documentType === "quote" ? "/devis/:id" : "/factures/:id");
+export default function InvoiceDetail({ documentType = "invoice" }: { documentType?: "invoice" | "quote" | "ticket" }) {
+  const [, params] = useRoute(documentType === "quote" ? "/devis/:id" : documentType === "ticket" ? "/tickets/:id" : "/factures/:id");
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   const id = Number(params?.id);
@@ -26,8 +26,8 @@ export default function InvoiceDetail({ documentType = "invoice" }: { documentTy
   const [checkout, setCheckout] = useState<any>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmRefund, setConfirmRefund] = useState(false);
-  const documentLabel = documentType === "quote" ? "Devis" : "Facture";
-  const collectionPath = documentType === "quote" ? "/devis" : "/factures";
+  const documentLabel = documentType === "quote" ? "Devis" : documentType === "ticket" ? "Ticket de caisse" : "Facture";
+  const collectionPath = documentType === "quote" ? "/devis" : documentType === "ticket" ? "/tickets" : "/factures";
   const removeDraft = trpc.transactions.removeDraft.useMutation({ onSuccess: () => { utils.transactions.list.invalidate(); toast.success(`${documentLabel} supprimé.`); setLocation(collectionPath); }, onError: error => toast.error(error.message) });
   const refund = trpc.transactions.refund.useMutation({ onSuccess: () => { utils.transactions.list.invalidate(); utils.movements.list.invalidate(); utils.products.list.invalidate(); utils.dashboard.get.invalidate(); setConfirmRefund(false); toast.success("Remboursement enregistré. Le stock a été réintégré."); }, onError: error => toast.error(error.message) });
   if (isLoading || !detail) return <div className="mx-auto max-w-6xl py-16 text-center text-sm text-muted-foreground">Chargement de la facture…</div>;
@@ -39,7 +39,7 @@ export default function InvoiceDetail({ documentType = "invoice" }: { documentTy
   const paid = sale.amountPaidCents || 0; const remaining = Math.max(0, sale.totalCents - paid);
   return <div className="mx-auto max-w-6xl space-y-6">
     <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <Button variant="outline" onClick={() => setLocation(collectionPath)}><ArrowLeft className="mr-2 h-4 w-4" />Retour aux {documentType === "quote" ? "devis" : "factures"}</Button>
+      <Button variant="outline" onClick={() => setLocation(collectionPath)}><ArrowLeft className="mr-2 h-4 w-4" />Retour aux {documentType === "quote" ? "devis" : documentType === "ticket" ? "tickets" : "factures"}</Button>
       <StatusBadge status={sale.status} />
     </header>
     <section className="rounded-2xl border border-white/[0.07] bg-[#111722] p-5 sm:p-6">

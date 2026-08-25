@@ -680,3 +680,9 @@
 - [x] Restaurer un historique de modifications isolé par entreprise.
 - [x] Restaurer l’harmonisation complète devis/factures et le menu d’envoi WhatsApp, SMS et e-mail prérempli.
 - [x] Vérifier les parcours restaurés et publier le correctif.
+
+## Tickets Vente rapide et recherche documentaire
+- [x] Enregistrer les tickets Vente rapide dans un registre latéral avec liste minimaliste cliquable et fiche détaillée.
+- [x] Permettre de différer l’encaissement de paniers POS et de les reprendre dans des paniers flottants minimalistes.
+- [x] Ajouter des recherches et filtres professionnels sur les factures, devis et tickets : période, agent, statut d’encaissement, retour et statut commercial.
+- [x] Tester les parcours, le cloisonnement entreprise et publier le correctif.

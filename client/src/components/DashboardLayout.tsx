@@ -74,6 +74,7 @@ import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 const menuItems = [
   { icon: LayoutDashboard, label: "Vue d’ensemble", path: "/" },
   { icon: ShoppingCart, label: "Vente Rapide", path: "/pos" },
+  { icon: ReceiptText, label: "Tickets", path: "/tickets" },
   { icon: ReceiptText, label: "Factures", path: "/factures" },
   { icon: FileText, label: "Devis", path: "/devis" },
   { icon: UserRound, label: "Clients", path: "/clients" },
@@ -184,13 +185,13 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const { data: documentVatSettings } = trpc.commerce.settings.get.useQuery(undefined, { enabled: Boolean(user) && isDocumentCreation });
   const { data: vatRatePresets = [] } = trpc.vatRates.list.useQuery(undefined, { enabled: Boolean(user) && isDocumentCreation });
   const sellerMenuItems = [
-    ...menuItems.filter(item => item.path === "/" || item.path === "/pos" || item.path === "/factures" || item.path === "/devis" || item.path === "/clients" || item.path === "/mouvements" || item.path === "/synchronisation" || (item.path === "/produits" && sellerPermissions?.sellerCanEditPurchasePrice)),
+    ...menuItems.filter(item => item.path === "/" || item.path === "/pos" || item.path === "/tickets" || item.path === "/factures" || item.path === "/devis" || item.path === "/clients" || item.path === "/mouvements" || item.path === "/synchronisation" || (item.path === "/produits" && sellerPermissions?.sellerCanEditPurchasePrice)),
     { icon: Settings2, label: "Apparence", path: "/parametres/apparence" },
     { icon: LayoutDashboard, label: "Mon tableau de bord", path: "/parametres/tableau-de-bord" },
     { icon: ShieldCheck, label: "Sécurité", path: "/parametres/securite" },
   ];
   const visibleMenuItems = user?.role === "admin" ? menuItems : sellerMenuItems;
-  const activeMenuItem = visibleMenuItems.find(item => item.path === location || (item.path === "/produits" && location.startsWith("/produits/")) || (item.path === "/clients" && location.startsWith("/clients/")) || (item.path === "/fournisseurs" && location.startsWith("/fournisseurs/")) || (item.path === "/bons-commande" && location.startsWith("/bons-commande/")) || (item.path === "/devis" && location.startsWith("/devis/"))) ?? visibleMenuItems[0];
+  const activeMenuItem = visibleMenuItems.find(item => item.path === location || (item.path === "/produits" && location.startsWith("/produits/")) || (item.path === "/clients" && location.startsWith("/clients/")) || (item.path === "/fournisseurs" && location.startsWith("/fournisseurs/")) || (item.path === "/bons-commande" && location.startsWith("/bons-commande/")) || (item.path === "/devis" && location.startsWith("/devis/")) || (item.path === "/tickets" && location.startsWith("/tickets/"))) ?? visibleMenuItems[0];
   const initials = (user?.name || user?.email || "U").slice(0, 2).toUpperCase();
   const isAdmin = user?.role === "admin";
   const canRunBackup = Boolean(user);

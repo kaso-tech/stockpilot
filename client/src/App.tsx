@@ -44,6 +44,7 @@ import SettingsDashboard from "./pages/SettingsDashboard";
 import SettingsSecurity from "./pages/SettingsSecurity";
 import DataExchange from "./pages/DataExchange";
 import SyncJournal from "./pages/SyncJournal";
+import Tickets from "./pages/Tickets";
 import TermsOfUse from "./pages/TermsOfUse";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 
@@ -53,6 +54,8 @@ function DashboardRouter() {
       <Switch>
         <Route path={"/"} component={Home} />
         <Route path={"/pos"} component={PointOfSale} />
+        <Route path={"/tickets/:id"} component={() => <InvoiceDetail documentType="ticket" />} />
+        <Route path={"/tickets"} component={Tickets} />
         <Route path={"/clients/:id"} component={CustomerDetail} />
         <Route path={"/clients"} component={Customers} />
         <Route path={"/factures/nouvelle"} component={() => <InvoiceCreate />} />
