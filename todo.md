@@ -646,6 +646,10 @@
 - [x] Remplacer l’action Email+PDF par un menu « Envoyer » proposant WhatsApp, SMS et e-mail avec les informations du client et du document préremplies.
 - [x] Tester les parcours de partage des devis et factures, puis publier le correctif.
 
+## Prévisualisation — envois clients
+- [x] Ajouter une fenêtre de prévisualisation éditable avant chaque envoi WhatsApp, SMS ou e-mail de devis et facture.
+- [x] Tester la personnalisation du contenu et les liens d’envoi, puis publier le correctif.
+
 ## Correctif — secret de session
 - [x] Diagnostiquer et corriger l’erreur « Session secret is not configured securely » sans exposer ni affaiblir le secret de session ; retirer des journaux de rejet les métadonnées d’identifiants non nécessaires.
 - [x] Ajouter une couverture de test de la validation de configuration, valider connexion et build, puis publier un checkpoint.

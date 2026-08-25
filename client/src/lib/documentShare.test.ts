@@ -18,4 +18,11 @@ describe("documentShare", () => {
     expect(smsShareUrl("+226 70 00 00 00", message)).toContain("sms:22670000000?body=");
     expect(emailShareUrl("awa@example.test", documentShareSubject(invoice), documentEmailMessage(invoice))).toContain("mailto:awa%40example.test?subject=");
   });
+
+  it("conserve les modifications manuelles du message dans chaque lien de partage", () => {
+    const amended = "Bonjour Awa, votre document est prêt. Merci.";
+    expect(whatsappShareUrl("+226 70 00 00 00", amended)).toContain(encodeURIComponent(amended));
+    expect(smsShareUrl("+226 70 00 00 00", amended)).toContain(encodeURIComponent(amended));
+    expect(emailShareUrl("awa@example.test", "Objet modifié", amended)).toContain(encodeURIComponent(amended));
+  });
 });
