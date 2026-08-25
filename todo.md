@@ -686,3 +686,7 @@
 - [x] Permettre de différer l’encaissement de paniers POS et de les reprendre dans des paniers flottants minimalistes.
 - [x] Ajouter des recherches et filtres professionnels sur les factures, devis et tickets : période, agent, statut d’encaissement, retour et statut commercial.
 - [x] Tester les parcours, le cloisonnement entreprise et publier le correctif.
+
+## Export CSV — documents commerciaux
+- [x] Exporter les résultats filtrés des factures, devis et tickets avec les colonnes comptables essentielles.
+- [x] Tester la génération CSV, les filtres appliqués et publier le correctif.
