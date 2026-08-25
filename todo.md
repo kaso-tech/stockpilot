@@ -733,3 +733,4 @@
 - [x] Proposer une récupération non destructive à valider avant toute modification.
 - [ ] Restaurer uniquement après accord explicite, vérifier les données récupérées et publier un checkpoint.
 - [x] Rattacher le compte administrateur confirmé au périmètre entreprise contenant les données existantes.
+- [x] Vérifier et rattacher le compte vendeur au périmètre entreprise confirmé sans modifier ses autorisations.
