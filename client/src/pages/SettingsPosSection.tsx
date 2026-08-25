@@ -14,94 +14,24 @@ import { Restricted } from "./AuditLog";
 
 type AssignmentMode = "default" | "prompt";
 export type SettingsPosSectionKind = "all" | "assignment" | "payments" | "seller";
+type LimitedPermissionKey = "sellerCanLineDiscount" | "sellerCanInvoiceDiscount" | "sellerCanCartDiscount" | "sellerCanEditInvoiceItemPrice" | "sellerCanEditCartItemPrice";
+type LimitedPermission = Record<LimitedPermissionKey, { enabled: boolean; maximum: number }>;
 
 export default function SettingsPosSection({ section = "all" }: { section?: SettingsPosSectionKind }) {
-  const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
-  const utils = trpc.useUtils();
-  const { data: settings } = trpc.commerce.settings.get.useQuery(undefined, { enabled: isAdmin });
-  const { data: agents = [] } = trpc.commerce.agents.list.useQuery(undefined, { enabled: isAdmin });
-  const [salesAgentId, setSalesAgentId] = useState("none");
-  const [cashierId, setCashierId] = useState("none");
-  const [salesAgentMode, setSalesAgentMode] = useState<AssignmentMode>("prompt");
-  const [cashierMode, setCashierMode] = useState<AssignmentMode>("prompt");
-  const [paymentCashEnabled, setPaymentCashEnabled] = useState(true);
-  const [paymentMobileMoneyEnabled, setPaymentMobileMoneyEnabled] = useState(true);
-  const [paymentCardEnabled, setPaymentCardEnabled] = useState(true);
-  const [paymentBankTransferEnabled, setPaymentBankTransferEnabled] = useState(true);
-  const [paymentCreditEnabled, setPaymentCreditEnabled] = useState(true);
-  const [sellerCanOverridePrice, setSellerCanOverridePrice] = useState(false);
-  const [sellerCanSellBelowPrice, setSellerCanSellBelowPrice] = useState(false);
-  const [sellerMaxDiscountPercent, setSellerMaxDiscountPercent] = useState(0);
-  const [sellerCanCancelInvoice, setSellerCanCancelInvoice] = useState(false);
-  const [sellerCanRefund, setSellerCanRefund] = useState(false);
-  const [sellerCanCorrectStock, setSellerCanCorrectStock] = useState(false);
-  const [sellerCanEditPurchasePrice, setSellerCanEditPurchasePrice] = useState(false);
-
-  useEffect(() => {
-    if (!settings) return;
-    setSalesAgentId(settings.defaultSalesAgentId ? String(settings.defaultSalesAgentId) : "none");
-    setCashierId(settings.defaultCashierId ? String(settings.defaultCashierId) : "none");
-    setSalesAgentMode(settings.defaultSalesAgentId ? "default" : "prompt");
-    setCashierMode(settings.defaultCashierId ? "default" : "prompt");
-    setPaymentCashEnabled(settings.paymentCashEnabled ?? true);
-    setPaymentMobileMoneyEnabled(settings.paymentMobileMoneyEnabled ?? true);
-    setPaymentCardEnabled(settings.paymentCardEnabled ?? true);
-    setPaymentBankTransferEnabled(settings.paymentBankTransferEnabled ?? true);
-    setPaymentCreditEnabled(settings.paymentCreditEnabled ?? true);
-    setSellerCanOverridePrice(settings.sellerCanOverridePrice ?? false);
-    setSellerCanSellBelowPrice(settings.sellerCanSellBelowPrice ?? false);
-    setSellerMaxDiscountPercent(settings.sellerMaxDiscountPercent ?? 0);
-    setSellerCanCancelInvoice(settings.sellerCanCancelInvoice ?? false);
-    setSellerCanRefund(settings.sellerCanRefund ?? false);
-    setSellerCanCorrectStock(settings.sellerCanCorrectStock ?? false);
-    setSellerCanEditPurchasePrice(settings.sellerCanEditPurchasePrice ?? false);
-  }, [settings]);
-
-  const save = trpc.commerce.settings.save.useMutation({
-    onSuccess: () => { utils.commerce.settings.get.invalidate(); toast.success("Réglages enregistrés."); },
-    onError: error => toast.error(error.message),
-  });
-
+  const { user } = useAuth(); const isAdmin = user?.role === "admin"; const utils = trpc.useUtils(); const { data: settings } = trpc.commerce.settings.get.useQuery(undefined, { enabled: isAdmin }); const { data: agents = [] } = trpc.commerce.agents.list.useQuery(undefined, { enabled: isAdmin });
+  const [salesAgentId, setSalesAgentId] = useState("none"); const [cashierId, setCashierId] = useState("none"); const [salesAgentMode, setSalesAgentMode] = useState<AssignmentMode>("prompt"); const [cashierMode, setCashierMode] = useState<AssignmentMode>("prompt");
+  const [payments, setPayments] = useState({ cash: true, mobile: true, card: true, transfer: true, credit: true });
+  const [limited, setLimited] = useState<LimitedPermission>({ sellerCanLineDiscount: { enabled: false, maximum: 0 }, sellerCanInvoiceDiscount: { enabled: false, maximum: 0 }, sellerCanCartDiscount: { enabled: false, maximum: 0 }, sellerCanEditInvoiceItemPrice: { enabled: false, maximum: 0 }, sellerCanEditCartItemPrice: { enabled: false, maximum: 0 } });
+  const [sellerCanCancelInvoice, setSellerCanCancelInvoice] = useState(false); const [sellerCanRefund, setSellerCanRefund] = useState(false); const [sellerCanCorrectStock, setSellerCanCorrectStock] = useState(false); const [sellerCanEditPurchasePrice, setSellerCanEditPurchasePrice] = useState(false);
+  useEffect(() => { if (!settings) return; setSalesAgentId(settings.defaultSalesAgentId ? String(settings.defaultSalesAgentId) : "none"); setCashierId(settings.defaultCashierId ? String(settings.defaultCashierId) : "none"); setSalesAgentMode(settings.defaultSalesAgentId ? "default" : "prompt"); setCashierMode(settings.defaultCashierId ? "default" : "prompt"); setPayments({ cash: settings.paymentCashEnabled ?? true, mobile: settings.paymentMobileMoneyEnabled ?? true, card: settings.paymentCardEnabled ?? true, transfer: settings.paymentBankTransferEnabled ?? true, credit: settings.paymentCreditEnabled ?? true }); setLimited({ sellerCanLineDiscount: { enabled: settings.sellerCanLineDiscount ?? false, maximum: settings.sellerMaxLineDiscountPercent ?? 0 }, sellerCanInvoiceDiscount: { enabled: settings.sellerCanInvoiceDiscount ?? false, maximum: settings.sellerMaxInvoiceDiscountPercent ?? 0 }, sellerCanCartDiscount: { enabled: settings.sellerCanCartDiscount ?? false, maximum: settings.sellerMaxCartDiscountPercent ?? 0 }, sellerCanEditInvoiceItemPrice: { enabled: settings.sellerCanEditInvoiceItemPrice ?? false, maximum: settings.sellerMaxInvoiceItemPriceChangePercent ?? 0 }, sellerCanEditCartItemPrice: { enabled: settings.sellerCanEditCartItemPrice ?? false, maximum: settings.sellerMaxCartItemPriceChangePercent ?? 0 } }); setSellerCanCancelInvoice(settings.sellerCanCancelInvoice ?? false); setSellerCanRefund(settings.sellerCanRefund ?? false); setSellerCanCorrectStock(settings.sellerCanCorrectStock ?? false); setSellerCanEditPurchasePrice(settings.sellerCanEditPurchasePrice ?? false); }, [settings]);
+  const save = trpc.commerce.settings.save.useMutation({ onSuccess: () => { utils.commerce.settings.get.invalidate(); toast.success("Réglages enregistrés."); }, onError: error => toast.error(error.message) });
   if (!isAdmin) return <Restricted title="Réglages de Vente rapide" description="Ces réglages sont réservés aux administrateurs." />;
-
-  const salesAgents = agents.filter(agent => agent.type === "sales_agent" && agent.active);
-  const cashiers = agents.filter(agent => agent.type === "cashier" && agent.active);
-  const show = (value: Exclude<SettingsPosSectionKind, "all">) => section === "all" || section === value;
-  const titles: Record<SettingsPosSectionKind, string> = { all: "Réglages de Vente rapide", assignment: "Rattachement des ventes", payments: "Moyens de paiement", seller: "Autorisations des vendeurs" };
-  const saveSettings = () => save.mutate({
-    defaultSalesAgentId: salesAgentMode === "default" && salesAgentId !== "none" ? Number(salesAgentId) : null,
-    defaultCashierId: cashierMode === "default" && cashierId !== "none" ? Number(cashierId) : null,
-    requireSalesAgent: false,
-    requireCashier: false,
-    currency: settings?.currency ?? "XOF",
-    paymentCashEnabled,
-    paymentMobileMoneyEnabled,
-    paymentCardEnabled,
-    paymentBankTransferEnabled,
-    paymentCreditEnabled,
-    sellerCanOverridePrice,
-    sellerCanSellBelowPrice,
-    sellerMaxDiscountPercent,
-    sellerCanCancelInvoice,
-    sellerCanRefund,
-    sellerCanCorrectStock,
-    sellerCanEditPurchasePrice,
-  });
-
-  return <div className="mx-auto max-w-4xl space-y-5">
-    <Link href="/parametres" className="inline-flex items-center gap-1 text-sm text-primary hover:underline"><ChevronLeft className="h-4 w-4" />Retour aux paramètres</Link>
-    <header><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Vente rapide</p><h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">{titles[section]}</h1></header>
-    {show("assignment") && <Card><CardContent className="space-y-5 p-5"><div className="flex items-center gap-3"><UsersRound className="h-5 w-5 text-primary" /><h2 className="font-semibold text-card-foreground">Rattachement des ventes</h2></div><div className="grid gap-4 lg:grid-cols-2"><AssignmentCard title="Caissier" mode={cashierMode} onModeChange={setCashierMode} value={cashierId} onValueChange={setCashierId} agents={cashiers} agentNoun="caissier" /><AssignmentCard title="Agent commercial" mode={salesAgentMode} onModeChange={setSalesAgentMode} value={salesAgentId} onValueChange={setSalesAgentId} agents={salesAgents} agentNoun="agent commercial" /></div></CardContent></Card>}
-    {show("payments") && <Card><CardContent className="space-y-4 p-5"><div className="flex items-center gap-3"><Settings2 className="h-5 w-5 text-primary" /><h2 className="font-semibold text-card-foreground">Moyens de paiement</h2></div><Toggle label="Espèces" checked={paymentCashEnabled} onChange={setPaymentCashEnabled} /><Toggle label="Mobile money" checked={paymentMobileMoneyEnabled} onChange={setPaymentMobileMoneyEnabled} /><Toggle label="Carte" checked={paymentCardEnabled} onChange={setPaymentCardEnabled} /><Toggle label="Virement" checked={paymentBankTransferEnabled} onChange={setPaymentBankTransferEnabled} /><Toggle label="Crédit" checked={paymentCreditEnabled} onChange={setPaymentCreditEnabled} /></CardContent></Card>}
-    {show("seller") && <Card className="border-primary/20 bg-primary/[0.04]"><CardContent className="space-y-4 p-5"><div className="flex items-center gap-3"><ShieldCheck className="h-5 w-5 text-primary" /><h2 className="font-semibold text-card-foreground">Autorisations des vendeurs</h2></div><div className="grid gap-1 sm:grid-cols-2"><Toggle label="Autoriser un prix différent du tarif" checked={sellerCanOverridePrice} onChange={setSellerCanOverridePrice} /><Toggle label="Autoriser un prix inférieur au tarif" checked={sellerCanSellBelowPrice} onChange={setSellerCanSellBelowPrice} /><Toggle label="Autoriser l’annulation d’une facture non encaissée" checked={sellerCanCancelInvoice} onChange={setSellerCanCancelInvoice} /><Toggle label="Autoriser le remboursement d’une facture encaissée" checked={sellerCanRefund} onChange={setSellerCanRefund} /><Toggle label="Autoriser la correction de stock" checked={sellerCanCorrectStock} onChange={setSellerCanCorrectStock} /><Toggle label="Autoriser la modification du coût d’achat" checked={sellerCanEditPurchasePrice} onChange={setSellerCanEditPurchasePrice} /></div><Field label="Remise maximale autorisée au vendeur (%)"><Input type="number" min={0} max={100} value={sellerMaxDiscountPercent} onChange={event => setSellerMaxDiscountPercent(Math.max(0, Math.min(100, Number(event.target.value) || 0)))} /></Field></CardContent></Card>}
-    <Button onClick={saveSettings} disabled={save.isPending}>{save.isPending ? "Enregistrement…" : "Enregistrer"}</Button>
-  </div>;
+  const show = (value: Exclude<SettingsPosSectionKind, "all">) => section === "all" || section === value; const titles: Record<SettingsPosSectionKind, string> = { all: "Réglages de Vente rapide", assignment: "Rattachement des ventes", payments: "Moyens de paiement", seller: "Autorisations des vendeurs" }; const updateLimited = (key: LimitedPermissionKey, next: Partial<{ enabled: boolean; maximum: number }>) => setLimited(current => ({ ...current, [key]: { ...current[key], ...next } }));
+  const saveSettings = () => save.mutate({ defaultSalesAgentId: salesAgentMode === "default" && salesAgentId !== "none" ? Number(salesAgentId) : null, defaultCashierId: cashierMode === "default" && cashierId !== "none" ? Number(cashierId) : null, requireSalesAgent: false, requireCashier: false, currency: settings?.currency ?? "XOF", paymentCashEnabled: payments.cash, paymentMobileMoneyEnabled: payments.mobile, paymentCardEnabled: payments.card, paymentBankTransferEnabled: payments.transfer, paymentCreditEnabled: payments.credit, sellerCanOverridePrice: limited.sellerCanEditInvoiceItemPrice.enabled, sellerCanSellBelowPrice: limited.sellerCanEditInvoiceItemPrice.enabled, sellerMaxDiscountPercent: limited.sellerCanInvoiceDiscount.maximum, sellerCanLineDiscount: limited.sellerCanLineDiscount.enabled, sellerMaxLineDiscountPercent: limited.sellerCanLineDiscount.maximum, sellerCanInvoiceDiscount: limited.sellerCanInvoiceDiscount.enabled, sellerMaxInvoiceDiscountPercent: limited.sellerCanInvoiceDiscount.maximum, sellerCanCartDiscount: limited.sellerCanCartDiscount.enabled, sellerMaxCartDiscountPercent: limited.sellerCanCartDiscount.maximum, sellerCanEditInvoiceItemPrice: limited.sellerCanEditInvoiceItemPrice.enabled, sellerMaxInvoiceItemPriceChangePercent: limited.sellerCanEditInvoiceItemPrice.maximum, sellerCanEditCartItemPrice: limited.sellerCanEditCartItemPrice.enabled, sellerMaxCartItemPriceChangePercent: limited.sellerCanEditCartItemPrice.maximum, sellerCanCancelInvoice, sellerCanRefund, sellerCanCorrectStock, sellerCanEditPurchasePrice });
+  const salesAgents = agents.filter(agent => agent.type === "sales_agent" && agent.active); const cashiers = agents.filter(agent => agent.type === "cashier" && agent.active);
+  return <div className="mx-auto max-w-4xl space-y-5"><Link href="/parametres" className="inline-flex items-center gap-1 text-sm text-primary hover:underline"><ChevronLeft className="h-4 w-4" />Retour aux paramètres</Link><header><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Vente rapide</p><h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">{titles[section]}</h1></header>{show("assignment") && <Card><CardContent className="space-y-5 p-5"><div className="flex items-center gap-3"><UsersRound className="h-5 w-5 text-primary" /><h2 className="font-semibold text-card-foreground">Rattachement des ventes</h2></div><div className="grid gap-4 lg:grid-cols-2"><AssignmentCard title="Caissier" mode={cashierMode} onModeChange={setCashierMode} value={cashierId} onValueChange={setCashierId} agents={cashiers} agentNoun="caissier" /><AssignmentCard title="Agent commercial" mode={salesAgentMode} onModeChange={setSalesAgentMode} value={salesAgentId} onValueChange={setSalesAgentId} agents={salesAgents} agentNoun="agent commercial" /></div></CardContent></Card>}{show("payments") && <Card><CardContent className="space-y-4 p-5"><div className="flex items-center gap-3"><Settings2 className="h-5 w-5 text-primary" /><h2 className="font-semibold text-card-foreground">Moyens de paiement</h2></div>{([['cash','Espèces'],['mobile','Mobile money'],['card','Carte'],['transfer','Virement'],['credit','Crédit']] as const).map(([key,label]) => <Toggle key={key} label={label} checked={payments[key]} onChange={value => setPayments(current => ({ ...current, [key]: value }))} />)}</CardContent></Card>}{show("seller") && <Card className="border-primary/20 bg-primary/[0.04]"><CardContent className="space-y-4 p-5"><div className="flex items-center gap-3"><ShieldCheck className="h-5 w-5 text-primary" /><h2 className="font-semibold text-card-foreground">Autorisations des vendeurs</h2></div><div className="grid gap-3 lg:grid-cols-2"><LimitedPermissionRow label="Remise par produit" value={limited.sellerCanLineDiscount} onChange={next => updateLimited("sellerCanLineDiscount", next)} /><LimitedPermissionRow label="Remise sur la facture" value={limited.sellerCanInvoiceDiscount} onChange={next => updateLimited("sellerCanInvoiceDiscount", next)} /><LimitedPermissionRow label="Remise sur le panier" value={limited.sellerCanCartDiscount} onChange={next => updateLimited("sellerCanCartDiscount", next)} /><LimitedPermissionRow label="Modifier le prix de l’article sur la facture" value={limited.sellerCanEditInvoiceItemPrice} onChange={next => updateLimited("sellerCanEditInvoiceItemPrice", next)} /><LimitedPermissionRow label="Modifier le prix de l’article sur le panier" value={limited.sellerCanEditCartItemPrice} onChange={next => updateLimited("sellerCanEditCartItemPrice", next)} /></div><div className="grid gap-1 sm:grid-cols-2"><Toggle label="Autoriser l’annulation d’une facture non encaissée" checked={sellerCanCancelInvoice} onChange={setSellerCanCancelInvoice} /><Toggle label="Autoriser le remboursement d’une facture encaissée" checked={sellerCanRefund} onChange={setSellerCanRefund} /><Toggle label="Autoriser la correction de stock" checked={sellerCanCorrectStock} onChange={setSellerCanCorrectStock} /><Toggle label="Autoriser la modification du coût d’achat" checked={sellerCanEditPurchasePrice} onChange={setSellerCanEditPurchasePrice} /></div></CardContent></Card>}<Button onClick={saveSettings} disabled={save.isPending}>{save.isPending ? "Enregistrement…" : "Enregistrer"}</Button></div>;
 }
 
-function AssignmentCard({ title, mode, onModeChange, value, onValueChange, agents, agentNoun }: { title: string; mode: AssignmentMode; onModeChange: (mode: AssignmentMode) => void; value: string; onValueChange: (value: string) => void; agents: Array<{ id: number; name: string }>; agentNoun: string }) {
-  return <section className="space-y-3 rounded-xl border border-border bg-muted/20 p-4"><h3 className="font-semibold text-card-foreground">{title}</h3><div className="grid grid-cols-1 gap-2 sm:grid-cols-2"><Button type="button" variant="outline" onClick={() => onModeChange("default")} className={mode === "default" ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90" : "border-border"}>Compte par défaut</Button><Button type="button" variant="outline" onClick={() => onModeChange("prompt")} className={mode === "prompt" ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90" : "border-border"}>Choix à la vente</Button></div>{mode === "default" && <div className="space-y-2"><Label className="text-sm">Compte appliqué par défaut</Label><Select value={value} onValueChange={onValueChange}><SelectTrigger><SelectValue placeholder={`Choisir un ${agentNoun}`} /></SelectTrigger><SelectContent><SelectItem value="none">Aucun</SelectItem>{agents.map(agent => <SelectItem key={agent.id} value={String(agent.id)}>{agent.name}</SelectItem>)}</SelectContent></Select></div>}</section>;
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) { return <div className="space-y-2"><Label className="text-sm">{label}</Label>{children}</div>; }
+function LimitedPermissionRow({ label, value, onChange }: { label: string; value: { enabled: boolean; maximum: number }; onChange: (next: Partial<{ enabled: boolean; maximum: number }>) => void }) { return <section className="rounded-xl border border-border bg-card p-4"><div className="flex items-center justify-between gap-3"><Label className="text-sm font-medium">{label}</Label><Switch checked={value.enabled} onCheckedChange={enabled => onChange({ enabled })} /></div>{value.enabled && <div className="mt-3 space-y-2"><Label className="text-xs text-muted-foreground">Taux maximum autorisé (%)</Label><Input type="number" min="0" max="100" value={value.maximum} onChange={event => onChange({ maximum: Math.max(0, Math.min(100, Number(event.target.value) || 0)) })} /></div>}</section>; }
+function AssignmentCard({ title, mode, onModeChange, value, onValueChange, agents, agentNoun }: { title: string; mode: AssignmentMode; onModeChange: (mode: AssignmentMode) => void; value: string; onValueChange: (value: string) => void; agents: Array<{ id: number; name: string }>; agentNoun: string }) { return <section className="space-y-3 rounded-xl border border-border bg-muted/20 p-4"><h3 className="font-semibold text-card-foreground">{title}</h3><div className="grid grid-cols-1 gap-2 sm:grid-cols-2"><Button type="button" variant="outline" onClick={() => onModeChange("default")} className={mode === "default" ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90" : "border-border"}>Compte par défaut</Button><Button type="button" variant="outline" onClick={() => onModeChange("prompt")} className={mode === "prompt" ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90" : "border-border"}>Choix à la vente</Button></div>{mode === "default" && <div className="space-y-2"><Label className="text-sm">Compte appliqué par défaut</Label><Select value={value} onValueChange={onValueChange}><SelectTrigger><SelectValue placeholder={`Choisir un ${agentNoun}`} /></SelectTrigger><SelectContent><SelectItem value="none">Aucun</SelectItem>{agents.map(agent => <SelectItem key={agent.id} value={String(agent.id)}>{agent.name}</SelectItem>)}</SelectContent></Select></div>}</section>; }
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) { return <div className="flex items-center justify-between gap-4 border-t border-border py-2.5"><Label className="text-sm">{label}</Label><Switch checked={checked} onCheckedChange={onChange} /></div>; }

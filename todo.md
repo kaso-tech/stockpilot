@@ -650,6 +650,11 @@
 - [x] Ajouter une fenêtre de prévisualisation éditable avant chaque envoi WhatsApp, SMS ou e-mail de devis et facture.
 - [x] Tester la personnalisation du contenu et les liens d’envoi, puis publier le correctif.
 
+## Permissions vendeur — TVA, remises et prix
+- [x] Ajouter la permission de modification de TVA par vendeur avec application aux factures, devis et paniers.
+- [x] Ajouter des permissions distinctes de remise par produit, facture et panier, ainsi que de modification de prix par facture et panier, avec un taux maximum configurable par permission.
+- [x] Appliquer les contrôles côté serveur, tester les plafonds et publier le correctif.
+
 ## Correctif — secret de session
 - [x] Diagnostiquer et corriger l’erreur « Session secret is not configured securely » sans exposer ni affaiblir le secret de session ; retirer des journaux de rejet les métadonnées d’identifiants non nécessaires.
 - [x] Ajouter une couverture de test de la validation de configuration, valider connexion et build, puis publier un checkpoint.
