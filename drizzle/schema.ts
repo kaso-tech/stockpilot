@@ -247,6 +247,8 @@ export const saleSettings = mysqlTable("saleSettings", {
   vatEnabled: boolean("vatEnabled").notNull().default(false),
   vatRateBasisPoints: int("vatRateBasisPoints").notNull().default(0),
   defaultDeliveryFeeCents: int("defaultDeliveryFeeCents").notNull().default(0),
+  customerSuggestionsEnabled: boolean("customerSuggestionsEnabled").notNull().default(true),
+  customerSuggestionsLimit: int("customerSuggestionsLimit").notNull().default(4),
   updatedByUserId: int("updatedByUserId"),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

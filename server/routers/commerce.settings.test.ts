@@ -53,6 +53,11 @@ describe("commerce.settings.save", () => {
     await caller.settings.save({ defaultSalesAgentId: null, defaultCashierId: null, requireSalesAgent: false, requireCashier: false, currency: "XOF", defaultDeliveryFeeCents: 250000 });
     expect(inserts.find(item => item.table === saleSettings)?.values).toMatchObject({ defaultDeliveryFeeCents: 250000, companyId: 1 });
   });
+  it("persiste l’activation et la limite des recommandations client", async () => {
+    const caller = commerceRouter.createCaller(adminContext());
+    await caller.settings.save({ defaultSalesAgentId: null, defaultCashierId: null, requireSalesAgent: false, requireCashier: false, currency: "XOF", customerSuggestionsEnabled: false, customerSuggestionsLimit: 8 });
+    expect(inserts.find(item => item.table === saleSettings)?.values).toMatchObject({ customerSuggestionsEnabled: false, customerSuggestionsLimit: 8, companyId: 1 });
+  });
   it("persiste individuellement toutes les permissions sensibles vendeur", async () => {
     const caller = commerceRouter.createCaller(adminContext());
     await caller.settings.save({ defaultSalesAgentId: null, defaultCashierId: null, requireSalesAgent: false, requireCashier: false, currency: "XOF", sellerCanOverridePrice: true, sellerCanSellBelowPrice: true, sellerMaxDiscountPercent: 15, sellerCanCancelInvoice: true, sellerCanRefund: true, sellerCanCorrectStock: true, sellerCanEditPurchasePrice: true });

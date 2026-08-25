@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { formatCurrency } from "@/lib/format";
 import { shouldPromptForAssignment } from "@/lib/assignmentRules";
 import { priceForQuantityTier } from "@/lib/priceTiers";
@@ -530,7 +531,7 @@ export default function InvoiceCreate({
               </div>
             )}
           </div>
-          {customerContext?.suggestions.length ? (
+          {settings?.customerSuggestionsEnabled !== false && customerContext?.suggestions.length ? (
             <div className="rounded-xl border border-[#007B8B]/20 bg-[#007B8B]/[0.045] p-3">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-[#007B8B]" />
@@ -539,7 +540,7 @@ export default function InvoiceCreate({
                 </p>
               </div>
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                {customerContext.suggestions.map(item => (
+                {customerContext.suggestions.slice(0, settings?.customerSuggestionsLimit ?? 4).map(item => (
                   <button
                     type="button"
                     key={item.productId}
@@ -612,22 +613,6 @@ export default function InvoiceCreate({
               )}
             </div>
           )}
-          {(defaultSalesAgent || defaultCashier) && (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {defaultSalesAgent && (
-                <DefaultAssignment
-                  label="Agent commercial appliqué"
-                  name={defaultSalesAgent.name}
-                />
-              )}
-              {defaultCashier && (
-                <DefaultAssignment
-                  label="Caissier appliqué"
-                  name={defaultCashier.name}
-                />
-              )}
-            </div>
-          )}
         </div>
         <div className="rounded-2xl border border-border bg-card p-5">
           <div className="flex items-center justify-between">
@@ -645,24 +630,6 @@ export default function InvoiceCreate({
               Ajouter un produit
             </Button>
           </div>
-          {user?.role === "seller" && (
-            <div className="mt-4 rounded-xl border border-primary/20 bg-primary/[0.05] p-3 text-xs text-muted-foreground">
-              <p className="font-semibold text-foreground">
-                Règles de vente applicables
-              </p>
-              <p className="mt-1">
-                Modification de prix :{" "}
-                {settings?.sellerCanOverridePrice
-                  ? "autorisée"
-                  : "non autorisée"}{" "}
-                · Prix inférieur :{" "}
-                {settings?.sellerCanSellBelowPrice
-                  ? "autorisé"
-                  : "non autorisé"}{" "}
-                · Remise maximale : {settings?.sellerMaxDiscountPercent ?? 0} %.
-              </p>
-            </div>
-          )}
           <div className="mt-5 space-y-3">
             {lines.length ? (
               lines.map(line => (
@@ -749,13 +716,7 @@ export default function InvoiceCreate({
                     </div>
                   </div>
                   <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                    <span>
-                      {user?.role === "seller" &&
-                      !settings?.sellerCanOverridePrice &&
-                      !settings?.sellerCanSellBelowPrice
-                        ? "La modification du prix est désactivée par l’administrateur."
-                        : `Tarif appliqué : ${formatCurrency(line.tariffCents)}`}
-                    </span>
+                    <span>Tarif appliqué : {formatCurrency(line.tariffCents)}</span>
                     {line.tierMinQuantity && (
                       <span>
                         Palier dès {line.tierMinQuantity} {line.product.unit}
@@ -789,9 +750,7 @@ export default function InvoiceCreate({
                     <p className="text-xs text-muted-foreground">Ajoutez une adresse et des frais uniquement si nécessaire.</p>
                   </div>
                 </div>
-                <Button type="button" size="sm" variant={deliveryEnabled ? "outline" : "default"} onClick={() => setDeliveryEnabled(current => { const next = !current; if (next) setDeliveryFeeInput(String((settings?.defaultDeliveryFeeCents ?? 0) / 100)); return next; })} className={!deliveryEnabled ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""}>
-                  {deliveryEnabled ? "Retirer la livraison" : "Ajouter une livraison"}
-                </Button>
+                <div className="flex items-center gap-2"><Label htmlFor="delivery-enabled" className="text-sm font-medium">{deliveryEnabled ? "Activée" : "Désactivée"}</Label><Switch id="delivery-enabled" checked={deliveryEnabled} onCheckedChange={next => { if (next) setDeliveryFeeInput(String((settings?.defaultDeliveryFeeCents ?? 0) / 100)); setDeliveryEnabled(next); }} /></div>
               </div>
               {deliveryEnabled && <div className="mt-4 grid gap-3 md:grid-cols-[1fr_220px]">
                 <div className="space-y-2">
@@ -804,11 +763,7 @@ export default function InvoiceCreate({
                 </div>
               </div>}
             </div>
-            <DiscountEditor
-              label="Remise facture"
-              value={invoiceDiscount}
-              onChange={setInvoiceDiscount}
-            />
+            {(user?.role !== "seller" || settings?.sellerCanInvoiceDiscount) && <DiscountEditor label="Remise facture" value={invoiceDiscount} onChange={setInvoiceDiscount} />}
             {settings?.vatEnabled ? <DocumentVatRateSelector rates={vatRatePresets} defaultRateBasisPoints={settings.vatRateBasisPoints} canToggle={user?.role === "admin" || Boolean(settings.sellerCanToggleVat)} /> : null}
             <div className="space-y-1 text-sm text-muted-foreground">
               <div className="flex justify-between">

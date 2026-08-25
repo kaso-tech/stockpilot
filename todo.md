@@ -659,3 +659,9 @@
 - [x] Ajouter un réglage des frais de livraison par défaut par entreprise.
 - [x] Préremplir ce montant à l’activation de la livraison dans les factures et devis, tout en le laissant modifiable.
 - [x] Tester les calculs et publier le correctif.
+
+## Allègement — création de facture et devis
+- [x] Limiter les produits habituellement achetés à quatre par défaut et permettre de régler leur nombre ou de les désactiver dans les paramètres.
+- [x] Masquer les agents sélectionnés par défaut et supprimer les messages de règles ou d’interdiction non actionnables.
+- [x] Remplacer le bouton de livraison par un contrôle Activer/Désactiver et masquer la remise facture au vendeur non autorisé.
+- [x] Tester les préférences, autorisations et parcours, puis publier le correctif.

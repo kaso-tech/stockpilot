@@ -40,6 +40,8 @@ export default function SettingsPosSection({ section = "all" }: { section?: Sett
   const [sellerCanRefund, setSellerCanRefund] = useState(false);
   const [sellerCanCorrectStock, setSellerCanCorrectStock] = useState(false);
   const [sellerCanEditPurchasePrice, setSellerCanEditPurchasePrice] = useState(false);
+  const [customerSuggestionsEnabled, setCustomerSuggestionsEnabled] = useState(true);
+  const [customerSuggestionsLimit, setCustomerSuggestionsLimit] = useState(4);
 
   useEffect(() => {
     if (!settings) return;
@@ -62,6 +64,8 @@ export default function SettingsPosSection({ section = "all" }: { section?: Sett
     setSellerCanRefund(settings.sellerCanRefund ?? false);
     setSellerCanCorrectStock(settings.sellerCanCorrectStock ?? false);
     setSellerCanEditPurchasePrice(settings.sellerCanEditPurchasePrice ?? false);
+    setCustomerSuggestionsEnabled(settings.customerSuggestionsEnabled ?? true);
+    setCustomerSuggestionsLimit(settings.customerSuggestionsLimit ?? 4);
   }, [settings]);
 
   const save = trpc.commerce.settings.save.useMutation({
@@ -93,6 +97,8 @@ export default function SettingsPosSection({ section = "all" }: { section?: Sett
     sellerCanRefund,
     sellerCanCorrectStock,
     sellerCanEditPurchasePrice,
+    customerSuggestionsEnabled,
+    customerSuggestionsLimit,
   });
 
   const titles: Record<SettingsPosSectionKind, string> = { all: "POS et impression ticket", assignment: "Rattachement des ventes", ticket: "Tickets de caisse", payments: "Moyens de paiement", seller: "Actions sensibles des vendeurs" };
@@ -103,6 +109,7 @@ export default function SettingsPosSection({ section = "all" }: { section?: Sett
     <Link href="/parametres" className="inline-flex items-center gap-1 text-sm text-primary hover:underline"><ChevronLeft className="h-4 w-4" />Retour aux paramètres</Link>
     <header><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Vente rapide</p><h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">{titles[section]}</h1><p className="mt-2 text-sm text-slate-400">{descriptions[section]}</p></header>
     {show("assignment") && <Card className="border-white/[0.07] bg-[#111722]"><CardContent className="space-y-6 p-6"><div className="flex items-center gap-3"><UsersRound className="h-5 w-5 text-primary" /><div><h2 className="font-semibold text-slate-100">Rattachement des ventes</h2><p className="mt-1 text-sm text-slate-400">Le vendeur connecté est toujours rattaché automatiquement à sa vente et à sa rémunération.</p></div></div><div className="grid gap-6 lg:grid-cols-2"><AssignmentCard title="Caissier" description="Rémunéré sur les ventes qu’il encaisse." mode={cashierMode} onModeChange={setCashierMode} value={cashierId} onValueChange={setCashierId} agents={cashiers} agentNoun="caissier" /><AssignmentCard title="Agent commercial" description="Commissionné sur les ventes qu’il apporte." mode={salesAgentMode} onModeChange={setSalesAgentMode} value={salesAgentId} onValueChange={setSalesAgentId} agents={salesAgents} agentNoun="agent commercial" /></div></CardContent></Card>}
+    {show("assignment") && <Card className="border-white/[0.07] bg-[#111722]"><CardContent className="space-y-5 p-6"><div className="flex items-center justify-between gap-4"><div><h2 className="font-semibold text-slate-100">Produits habituellement achetés</h2><p className="mt-1 text-sm text-slate-400">Proposez les derniers produits du client lors de la création de facture ou de devis.</p></div><Switch checked={customerSuggestionsEnabled} onCheckedChange={setCustomerSuggestionsEnabled} /></div>{customerSuggestionsEnabled && <Field label="Nombre de produits affichés"><Input type="number" min={1} max={12} value={customerSuggestionsLimit} onChange={event => setCustomerSuggestionsLimit(Math.max(1, Math.min(12, Number(event.target.value) || 4)))} /></Field>}</CardContent></Card>}
     {(show("ticket") || show("payments")) && <div className="grid gap-6 lg:grid-cols-2">
       {show("ticket") && <Card className="border-white/[0.07] bg-[#111722]"><CardContent className="space-y-5 p-6"><div className="flex items-center gap-3"><ReceiptText className="h-5 w-5 text-primary" /><h2 className="font-semibold text-slate-100">Tickets de caisse</h2></div><Field label="Largeur"><Select value={ticketWidthMm} onValueChange={value => setTicketWidthMm(value as "58" | "80")}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="58">58 mm</SelectItem><SelectItem value="80">80 mm</SelectItem></SelectContent></Select></Field><Field label="En-tête du ticket"><Input value={ticketHeader} onChange={event => setTicketHeader(event.target.value)} maxLength={160} /></Field><Field label="Pied du ticket"><Input value={ticketFooter} onChange={event => setTicketFooter(event.target.value)} maxLength={240} /></Field></CardContent></Card>}
       {show("payments") && <Card className="border-white/[0.07] bg-[#111722]"><CardContent className="space-y-5 p-6"><div className="flex items-center gap-3"><Settings2 className="h-5 w-5 text-primary" /><h2 className="font-semibold text-slate-100">Moyens de paiement</h2></div><Toggle label="Espèces" checked={paymentCashEnabled} onChange={setPaymentCashEnabled} /><Toggle label="Mobile money" checked={paymentMobileMoneyEnabled} onChange={setPaymentMobileMoneyEnabled} /><Toggle label="Carte" checked={paymentCardEnabled} onChange={setPaymentCardEnabled} /><Toggle label="Virement" checked={paymentBankTransferEnabled} onChange={setPaymentBankTransferEnabled} /><Toggle label="Crédit" checked={paymentCreditEnabled} onChange={setPaymentCreditEnabled} /></CardContent></Card>}
