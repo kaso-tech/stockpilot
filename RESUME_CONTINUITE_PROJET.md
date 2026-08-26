@@ -99,6 +99,10 @@ La création d’un taux TVA prédéfini ne vérifie désormais que les taux act
 
 Les contrôles prioritaires, dont l’encaissement, la création de facture, les boutons d’action, les états actifs de navigation et la page tarifaire, utilisent les tokens `primary` et `primary-foreground` pour garder un texte contrasté sur toute couleur choisie. Le code de l’entrepôt n’est plus affiché sous le sélecteur de l’en-tête. Un bouton clair/sombre est présent dans le header, et les réglages Apparence proposent les modes manuel, suivant le système et automatique selon une plage horaire locale (sombre à 19:00, clair à 07:00 par défaut).
 
+## Correctif final de contraste
+
+Les actions « Ajouter un produit » et « Encaisser » de facture/devis, ainsi que l’encaissement POS, utilisent maintenant uniquement les tokens `primary` et `primary-foreground`. Le menu actif applique ces mêmes tokens de manière forcée sur le bouton et son icône afin d’empêcher une règle héritée de rendre le texte sombre. Les alertes de seuil utilisent des variantes ambre, orange et rouge avec texte foncé en thème clair et texte clair en thème sombre; l’action « Créer une entrée » conserve la couleur principale pour éviter une combinaison jaune sur jaune.
+
 ## 2. Environnement et exploitation
 
 | Élément | Valeur / règle |

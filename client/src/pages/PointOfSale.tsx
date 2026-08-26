@@ -776,7 +776,7 @@ export default function PointOfSale() {
                     {formatCurrency(totalCents)}
                   </span>
                 </div>
-                <div className="grid gap-2 sm:grid-cols-2"><Button variant="outline" onClick={holdTicket} disabled={savePendingTicket.isPending || !isOnline} className="h-12 border-amber-400/35 text-amber-700 hover:bg-amber-400/10 dark:text-amber-200"><TicketCheck className="mr-2 h-4 w-4" />{savePendingTicket.isPending ? "Enregistrement…" : "Mettre en attente"}</Button><Button onClick={openCheckout} disabled={draft.isPending} className="h-12 bg-[#007B8B] text-base text-white hover:bg-[#006976]">{draft.isPending ? "Préparation…" : <><Keyboard className="mr-2 h-4 w-4" />{isOnline ? "Encaisser" : "Encaisser hors connexion"} <span className="ml-2 rounded bg-white/20 px-1.5 py-0.5 text-xs">F9</span></>}</Button></div>
+                <div className="grid gap-2 sm:grid-cols-2"><Button variant="outline" onClick={holdTicket} disabled={savePendingTicket.isPending || !isOnline} className="h-12 border-amber-400/35 text-amber-700 hover:bg-amber-400/10 dark:text-amber-200"><TicketCheck className="mr-2 h-4 w-4" />{savePendingTicket.isPending ? "Enregistrement…" : "Mettre en attente"}</Button><Button onClick={openCheckout} disabled={draft.isPending} className="h-12 bg-primary text-base text-primary-foreground hover:bg-primary/90">{draft.isPending ? "Préparation…" : <><Keyboard className="mr-2 h-4 w-4" />{isOnline ? "Encaisser" : "Encaisser hors connexion"} <span className="ml-2 rounded bg-white/20 px-1.5 py-0.5 text-xs">F9</span></>}</Button></div>
               </div>
             </>
           )}

@@ -844,3 +844,9 @@
 - [x] Ajouter la bascule clair/sombre au header.
 - [x] Ajouter les modes manuel, suivant le système et automatique selon l’heure dans les paramètres.
 - [x] Tester thèmes, TVA et affichage puis publier le correctif.
+
+## Correctif de lisibilité des thèmes
+- [x] Corriger les boutons bleus de facture et devis dont le texte reste sombre.
+- [x] Corriger l’indicateur actif du menu latéral avec le texte contrasté.
+- [x] Corriger les alertes de seuil dont le texte jaune manque de contraste.
+- [x] Tester les contrastes en thème bleu et publier le correctif.

@@ -551,7 +551,7 @@ export default function InvoiceCreate({
             </Select>
             {customer && (
               <div className="flex flex-wrap items-center gap-2">
-                <Badge className="border-0 bg-[#007B8B]/10 text-[#007B8B]">
+                <Badge className="border-0 bg-primary/10 text-primary">
                   Tarif {customer.type === "wholesale" ? "grossiste" : "détail"}{" "}
                   appliqué
                 </Badge>
@@ -564,9 +564,9 @@ export default function InvoiceCreate({
             )}
           </div>
           {settings?.customerSuggestionsEnabled !== false && customerContext?.suggestions.length ? (
-            <div className="rounded-xl border border-[#007B8B]/20 bg-[#007B8B]/[0.045] p-3">
+            <div className="rounded-xl border border-primary/20 bg-primary/[0.045] p-3">
               <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-[#007B8B]" />
+                <Sparkles className="h-4 w-4 text-primary" />
                 <p className="text-sm font-semibold">
                   Produits habituellement achetés
                 </p>
@@ -577,7 +577,7 @@ export default function InvoiceCreate({
                     type="button"
                     key={item.productId}
                     onClick={() => add(item.productId)}
-                    className="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2 text-left transition hover:border-[#007B8B]/40 hover:bg-[#007B8B]/[0.05]"
+                    className="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2 text-left transition hover:border-primary/40 hover:bg-primary/[0.05]"
                   >
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-medium">
@@ -589,7 +589,7 @@ export default function InvoiceCreate({
                         {item.availableQuantity}
                       </span>
                     </span>
-                    <Plus className="h-4 w-4 shrink-0 text-[#007B8B]" />
+                    <Plus className="h-4 w-4 shrink-0 text-primary" />
                   </button>
                 ))}
               </div>
@@ -656,7 +656,7 @@ export default function InvoiceCreate({
             </div>
             <Button
               onClick={() => setPickerOpen(true)}
-              className="bg-[#007B8B] text-white hover:bg-[#006976]"
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
               <Plus className="mr-2 h-4 w-4" />
               Ajouter un produit
@@ -866,7 +866,7 @@ export default function InvoiceCreate({
                   <Button
                     onClick={collect}
                     disabled={draft.isPending}
-                    className="bg-[#007B8B] text-white hover:bg-[#006976]"
+                    className="bg-primary text-primary-foreground hover:bg-primary/90"
                   >
                     Encaisser
                   </Button>
