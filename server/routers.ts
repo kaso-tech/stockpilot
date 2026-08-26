@@ -55,6 +55,7 @@ import { vatRatesRouter } from "./routers/vatRates";
 import { sellerDiscountPermissionsRouter } from "./routers/sellerDiscountPermissions";
 import { warehousesRouter } from "./routers/warehouses";
 import { stockTransfersRouter } from "./routers/stockTransfers";
+import { supportRouter } from "./routers/support";
 import { BULK_DELETE_CONFIRMATION, hasBulkDeleteConfirmation, normalizeBulkDeleteIds, type BulkDeleteResource } from "./bulkDeleteRules";
 
 const STANDARD_AUTH_SESSION_MS = 24 * 60 * 60 * 1000;
@@ -913,6 +914,7 @@ export const appRouter = router({
       return { success: true };
     }),
   }),
+  support: supportRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -51,6 +51,7 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import Help from "./pages/Help";
 import SecurityPolicy from "./pages/SecurityPolicy";
 import ContactUs from "./pages/ContactUs";
+import SupportRequests from "./pages/SupportRequests";
 import Warehouses from "./pages/Warehouses";
 import StockTransfers from "./pages/StockTransfers";
 import WarehouseComparison from "./pages/WarehouseComparison";
@@ -113,7 +114,7 @@ function DashboardRouter() {
 }
 
 function Router() {
-  return <Switch><Route path="/aide" component={Help} /><Route path="/conditions-utilisation" component={TermsOfUse} /><Route path="/politique-confidentialite" component={PrivacyPolicy} /><Route path="/politique-securite" component={SecurityPolicy} /><Route path="/contactez-nous" component={ContactUs} /><Route component={DashboardRouter} /></Switch>;
+  return <Switch><Route path="/aide" component={Help} /><Route path="/conditions-utilisation" component={TermsOfUse} /><Route path="/politique-confidentialite" component={PrivacyPolicy} /><Route path="/politique-securite" component={SecurityPolicy} /><Route path="/contactez-nous" component={ContactUs} /><Route path="/support" component={SupportRequests} /><Route component={DashboardRouter} /></Switch>;
 }
 
 // NOTE: About Theme

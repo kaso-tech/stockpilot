@@ -25,6 +25,29 @@ export const users = mysqlTable("users", {
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
 }, table => [index("users_company_active_idx").on(table.companyId, table.active)]);
 
+/** Demande d’assistance interne créée par un utilisateur de l’entreprise. */
+export const supportRequests = mysqlTable("supportRequests", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId"),
+  requesterUserId: int("requesterUserId").notNull(),
+  warehouseId: int("warehouseId"),
+  subject: varchar("subject", { length: 180 }).notNull(),
+  message: text("message").notNull(),
+  status: mysqlEnum("status", ["open", "in_progress", "closed"]).notNull().default("open"),
+  attachmentKey: varchar("attachmentKey", { length: 720 }),
+  attachmentUrl: varchar("attachmentUrl", { length: 1024 }),
+  attachmentName: varchar("attachmentName", { length: 180 }),
+  attachmentMimeType: varchar("attachmentMimeType", { length: 80 }),
+  handledByUserId: int("handledByUserId"),
+  resolvedAt: timestamp("resolvedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  index("support_requests_company_status_created_idx").on(table.companyId, table.status, table.createdAt),
+  index("support_requests_requester_created_idx").on(table.requesterUserId, table.createdAt),
+  index("support_requests_company_warehouse_idx").on(table.companyId, table.warehouseId),
+]);
+
 export const userSessions = mysqlTable("userSessions", {
   id: varchar("id", { length: 64 }).primaryKey(),
   userId: int("userId").notNull(),

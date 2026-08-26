@@ -816,3 +816,10 @@
 - [x] Ajouter la Politique de sécurité.
 - [x] Ajouter la page Contactez-nous et les liens de navigation associés.
 - [x] Tester la navigation et publier les pages.
+
+## Demandes d’assistance sécurisées
+- [x] Définir les données de demande, les statuts et les limites de pièces jointes image.
+- [x] Ajouter une persistance cloisonnée par entreprise et un stockage S3 des captures.
+- [x] Créer le formulaire sécurisé de contact avec validation et protection contre les abus.
+- [x] Ajouter un registre administratif des demandes d’assistance.
+- [x] Tester validation, autorisations, pièce jointe et publication.
