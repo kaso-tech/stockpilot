@@ -274,12 +274,26 @@ export const agents = mysqlTable("agents", {
   companyId: int("companyId"),
   name: varchar("name", { length: 160 }).notNull(),
   type: mysqlEnum("type", ["sales_agent", "cashier"]).notNull(),
+  warehouseScope: mysqlEnum("warehouseScope", ["all", "selected", "attribution_only"]).notNull().default("all"),
   email: varchar("email", { length: 320 }),
   phone: varchar("phone", { length: 50 }),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
+
+/** Dépôts retenus lorsqu’un agent commercial est limité à une sélection. */
+export const salesAgentWarehouseAssignments = mysqlTable("salesAgentWarehouseAssignments", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  agentId: int("agentId").notNull(),
+  warehouseId: int("warehouseId").notNull(),
+  createdByUserId: int("createdByUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [
+  uniqueIndex("sales_agent_warehouse_assignments_unique").on(table.companyId, table.agentId, table.warehouseId),
+  index("sales_agent_warehouse_assignments_company_warehouse_idx").on(table.companyId, table.warehouseId),
+]);
 
 export const remunerationProfiles = mysqlTable("remunerationProfiles", {
   id: int("id").autoincrement().primaryKey(),

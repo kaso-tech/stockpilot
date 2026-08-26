@@ -85,7 +85,7 @@ export default function PointOfSale() {
   const { data: products = [] } = trpc.products.list.useQuery(selectedWarehouseId ? { warehouseId: selectedWarehouseId } : undefined);
   const pendingProductQuantities = pendingProductQuantitiesByWarehouse[selectedWarehouseId ?? 0] ?? {};
   const { data: suppliers = [] } = trpc.suppliers.list.useQuery();
-  const { data: agents = [] } = trpc.commerce.agents.list.useQuery();
+  const { data: agents = [] } = trpc.commerce.agents.list.useQuery(selectedWarehouseId ? { warehouseId: selectedWarehouseId } : undefined);
   const { data: settings } = trpc.commerce.settings.get.useQuery();
   const { data: transactions = [] } = trpc.transactions.list.useQuery(selectedWarehouseId ? { warehouseId: selectedWarehouseId } : undefined);
   const { data: sellerDiscountPermissions } =

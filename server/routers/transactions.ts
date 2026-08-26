@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { agents, auditLogs, customers, productPriceTiers, products, remunerationProfiles, saleCommissions, saleItems, salePayments, saleSettings, sales, stockAlerts, stockMovements, vatRatePresets } from "../../drizzle/schema";
+import { agents, auditLogs, customers, productPriceTiers, products, remunerationProfiles, saleCommissions, saleItems, salePayments, saleSettings, sales, salesAgentWarehouseAssignments, stockAlerts, stockMovements, vatRatePresets } from "../../drizzle/schema";
 import { commissionCents, priceForCustomer, priceForQuantityTier } from "../commerceRules";
 import { getDb } from "../db";
 import { protectedProcedure, router } from "../_core/trpc";
@@ -17,6 +17,7 @@ import { calculateCommercialTotals } from "../commercialTotals";
 import { assertVatPresetSelection } from "../vatRateRules";
 import { creditWarehouseStock, debitWarehouseStock, getDefaultWarehouse, getScopedWarehouse } from "../warehouseStock";
 import { assignedWarehouseIds, assertSellerWarehouseAccess } from "../sellerWarehouseAccess";
+import { canCoordinateSaleFromWarehouse } from "../salesAgentWarehouseScope";
 
 const paymentMethod = z.enum(["cash", "card", "mobile_money", "bank_transfer", "credit"]);
 const discountInput = z.object({ type: z.enum(["none", "percent", "fixed"]), value: z.number().int().min(0).max(MAX_CENTS) }).superRefine((value, ctx) => { if (value.type === "percent" && value.value > MAX_DISCOUNT_BASIS_POINTS) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Le pourcentage de remise est invalide." }); });
@@ -35,7 +36,7 @@ function invoiceNumber(channel: "pos" | "invoice" | "quote") {
   return `${prefix}-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-${Date.now().toString().slice(-7)}`;
 }
 
-async function validateAgents(tx: any, companyId: number | null, selected: { salesAgentId: number | null; cashierId: number | null; salesAgentSelectionMade?: boolean; cashierSelectionMade?: boolean }, channel?: "pos" | "invoice" | "quote") {
+async function validateAgents(tx: any, companyId: number | null, warehouseId: number, selected: { salesAgentId: number | null; cashierId: number | null; salesAgentSelectionMade?: boolean; cashierSelectionMade?: boolean }, channel?: "pos" | "invoice" | "quote") {
   const settings = (await tx.select().from(saleSettings).where(companyScope(saleSettings.companyId, companyId)).limit(1))[0];
   const salesAgentId = selected.salesAgentId ?? settings?.defaultSalesAgentId ?? null;
   const cashierId = selected.cashierId ?? settings?.defaultCashierId ?? null;
@@ -46,7 +47,12 @@ async function validateAgents(tx: any, companyId: number | null, selected: { sal
   if (settings?.requireCashier && !cashierId) throw new TRPCError({ code: "BAD_REQUEST", message: "Un caissier est requis." });
   const ids = [salesAgentId, cashierId].filter((id): id is number => id !== null);
   const selectedAgents = ids.length ? await tx.select().from(agents).where(and(inArray(agents.id, ids), companyScope(agents.companyId, companyId))) : [];
-  if (salesAgentId && !selectedAgents.some((agent: any) => agent.id === salesAgentId && agent.type === "sales_agent" && agent.active)) throw new TRPCError({ code: "BAD_REQUEST", message: "Agent commercial invalide." });
+  const salesAgent = selectedAgents.find((agent: any) => agent.id === salesAgentId);
+  if (salesAgentId && (!salesAgent || salesAgent.type !== "sales_agent" || !salesAgent.active)) throw new TRPCError({ code: "BAD_REQUEST", message: "Agent commercial invalide." });
+  if (salesAgentId && salesAgent?.warehouseScope === "selected") {
+    const assignments = await tx.select({ warehouseId: salesAgentWarehouseAssignments.warehouseId }).from(salesAgentWarehouseAssignments).where(and(companyScope(salesAgentWarehouseAssignments.companyId, companyId), eq(salesAgentWarehouseAssignments.agentId, salesAgentId)));
+    if (!canCoordinateSaleFromWarehouse("selected", assignments.map((assignment: any) => assignment.warehouseId), warehouseId)) throw new TRPCError({ code: "FORBIDDEN", message: "Cet agent commercial n’est pas autorisé pour l’entrepôt sélectionné." });
+  }
   if (cashierId && !selectedAgents.some((agent: any) => agent.id === cashierId && agent.type === "cashier" && agent.active)) throw new TRPCError({ code: "BAD_REQUEST", message: "Caissier invalide." });
   return { salesAgentId, cashierId };
 }
@@ -137,7 +143,7 @@ export const transactionsRouter = router({
       const commercialTotals = calculateCommercialTotals({ subtotalCents: taxableSubtotalCents, vatRateBasisPoints: applyVat ? input.vatRateBasisPoints ?? permissions?.vatRateBasisPoints ?? 0 : 0, deliveryFeeCents: input.deliveryFeeCents });
       const totalCents = commercialTotals.totalCents;
       const totalCostCents = assertSafeDatabaseInt(lines.reduce((sum, line) => sum + line.lineCostCents, 0), "Coût total");
-      const assigned = await validateAgents(tx, ctx.user.companyId, input, input.channel);
+      const assigned = await validateAgents(tx, ctx.user.companyId, warehouse.id, input, input.channel);
       const number = invoiceNumber(input.channel);
       const result = await tx.insert(sales).values({ companyId: ctx.user.companyId, invoiceNumber: number, offlineOperationId: input.offlineOperationId, channel: input.channel, customerId: customer?.id ?? null, warehouseId: warehouse.id, sellerUserId: ctx.user.id, ...assigned, paymentMethod: "cash", amountPaidCents: 0, subtotalCents, invoiceDiscountType: input.invoiceDiscount.type, invoiceDiscountValue: input.invoiceDiscount.value, invoiceDiscountCents, vatRateBasisPoints: commercialTotals.vatRateBasisPoints, vatCents: commercialTotals.vatCents, deliveryFeeCents: commercialTotals.deliveryFeeCents, totalCents, totalCostCents, netProfitCents: assertSafeDatabaseInt(totalCents - totalCostCents, "Bénéfice net"), note: input.note, deliveryAddress: input.deliveryAddress?.trim() || null, status: "draft" });
       const saleId = Number(result[0].insertId);
@@ -167,12 +173,13 @@ export const transactionsRouter = router({
       try { assertPaymentMethodsEnabled(input.payments.map(payment => payment.method), settings); } catch (error) { throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "Moyen de paiement invalide." }); }
       let settlement: ReturnType<typeof settlementResult>;
       try { settlement = settlementResult(remainingBefore, input.settlementMode, input.payments.map(payment => payment.amountCents)); } catch (error) { throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "Règlement invalide." }); }
-      const assigned = await validateAgents(tx, ctx.user.companyId, input);
+      const saleWarehouse = sale.warehouseId ? await getScopedWarehouse(tx, ctx.user.companyId, sale.warehouseId) : await getDefaultWarehouse(tx, ctx.user.companyId);
+      const assigned = await validateAgents(tx, ctx.user.companyId, saleWarehouse.id, input);
       const isFirstCollection = sale.status === "draft";
       if (isFirstCollection) {
         const items = await tx.select().from(saleItems).where(eq(saleItems.saleId, sale.id));
         const productRows = await tx.select().from(products).where(and(inArray(products.id, items.map((item: any) => item.productId)), companyScope(products.companyId, ctx.user.companyId)));
-        const warehouse = sale.warehouseId ? await getScopedWarehouse(tx, ctx.user.companyId, sale.warehouseId, { requireActive: true }) : await getDefaultWarehouse(tx, ctx.user.companyId);
+        const warehouse = saleWarehouse;
         for (const item of items) { const product = productRows.find((row: any) => row.id === item.productId); if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Produit introuvable." }); const quantity = resultingStock(product.quantity, "exit", item.quantity); const localStock = await debitWarehouseStock(tx, ctx.user.companyId, warehouse.id, product.id, item.quantity); await tx.update(products).set({ quantity }).where(and(eq(products.id, product.id), companyScope(products.companyId, ctx.user.companyId))); await tx.insert(stockMovements).values({ companyId: ctx.user.companyId, productId: product.id, warehouseId: warehouse.id, type: "exit", quantity: signedMovementQuantity("exit", item.quantity), previousQuantity: localStock.previousQuantity, resultingQuantity: localStock.resultingQuantity, reason: `Vente ${sale.invoiceNumber}`, createdByUserId: ctx.user.id }); if (quantity <= product.minimumQuantity) await tx.insert(stockAlerts).values({ companyId: ctx.user.companyId, productId: product.id, threshold: product.minimumQuantity, observedQuantity: quantity, status: "active" }).onDuplicateKeyUpdate({ set: { observedQuantity: quantity, threshold: product.minimumQuantity, status: "active", resolvedAt: null } }); }
         const profiles = await tx.select().from(remunerationProfiles).where(and(eq(remunerationProfiles.active, true), companyScope(remunerationProfiles.companyId, ctx.user.companyId)));
         const beneficiaries = [{ type: "user" as const, id: sale.sellerUserId }, ...(assigned.salesAgentId ? [{ type: "agent" as const, id: assigned.salesAgentId }] : []), ...(assigned.cashierId ? [{ type: "agent" as const, id: assigned.cashierId }] : [])];

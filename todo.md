@@ -775,3 +775,10 @@
 - [x] Ajouter une recherche de vendeur dans la liste d’affectation des entrepôts.
 - [x] Afficher un état explicite lorsqu’aucun vendeur ne correspond.
 - [x] Tester la recherche et publier le correctif.
+
+## Portée multi-entrepôts des agents commerciaux
+- [x] Définir les modes Tous les entrepôts, Entrepôts sélectionnés et Attribution commerciale seule.
+- [x] Ajouter la persistance et l’audit de la portée ainsi que des entrepôts sélectionnés.
+- [x] Appliquer la portée aux consultations, actions opérationnelles et statistiques des agents commerciaux.
+- [x] Ajouter la configuration administrateur dans la gestion des agents.
+- [x] Tester les rôles, l’isolation et publier le correctif.

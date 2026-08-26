@@ -85,7 +85,7 @@ export default function InvoiceCreate({
   useEffect(() => { if (isAdmin && activeWarehouseId && activeWarehouseId !== selectedWarehouseId) { setCart([]); setSelectedWarehouseId(activeWarehouseId); } }, [activeWarehouseId, isAdmin, selectedWarehouseId]);
   const { data: products = [] } = trpc.products.list.useQuery(selectedWarehouseId ? { warehouseId: selectedWarehouseId } : undefined);
   const { data: customers = [] } = trpc.commerce.customers.list.useQuery();
-  const { data: agents = [] } = trpc.commerce.agents.list.useQuery();
+  const { data: agents = [] } = trpc.commerce.agents.list.useQuery(selectedWarehouseId ? { warehouseId: selectedWarehouseId } : undefined);
   const { data: settings } = trpc.commerce.settings.get.useQuery();
   const { data: sellerDiscountPermissions } = trpc.sellerDiscountPermissions.get.useQuery(undefined, { enabled: user?.role === "seller" });
   const { data: vatRatePresets = [] } = trpc.vatRates.list.useQuery();
@@ -148,12 +148,6 @@ export default function InvoiceCreate({
   const customer = customers.find(item => item.id === Number(customerId));
   const priceType =
     customer?.type === "wholesale" ? "wholesalePriceCents" : "retailPriceCents";
-  const showSalesAgentSelect = shouldPromptForAssignment(
-    settings?.defaultSalesAgentId
-  );
-  const showCashierSelect = shouldPromptForAssignment(
-    settings?.defaultCashierId
-  );
   const defaultSalesAgent = agents.find(
     agent =>
       agent.id === settings?.defaultSalesAgentId &&
@@ -166,6 +160,8 @@ export default function InvoiceCreate({
       agent.active &&
       agent.type === "cashier"
   );
+  const showSalesAgentSelect = shouldPromptForAssignment(settings?.defaultSalesAgentId) || Boolean(settings?.defaultSalesAgentId && !defaultSalesAgent);
+  const showCashierSelect = shouldPromptForAssignment(settings?.defaultCashierId) || Boolean(settings?.defaultCashierId && !defaultCashier);
   const { data: customerContext } =
     trpc.commerce.customers.invoiceContext.useQuery(
       { id: Number(customerId) },

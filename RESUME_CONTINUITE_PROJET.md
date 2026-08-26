@@ -57,6 +57,10 @@ La fenêtre « Gérer les dépôts » des vendeurs utilise désormais une valeur
 
 La zone « Affectations des vendeurs » comporte une recherche instantanée par nom, identifiant interne ou e-mail. La recherche ne modifie aucune affectation et affiche un état vide explicite lorsqu’aucun vendeur actif ne correspond. La logique de recherche est couverte par les tests unitaires des utilitaires d’affectation.
 
+## Portée multi-entrepôts des agents commerciaux
+
+La migration `0053` ajoute le mode `warehouseScope` aux agents et la table `salesAgentWarehouseAssignments`. Les agents commerciaux peuvent être configurés depuis « Agents & paie » en trois modes : `all` pour coordonner des ventes dans tous les dépôts, `selected` pour n’être sélectionnables que dans les entrepôts attribués, et `attribution_only` pour rester attachables commercialement aux ventes de tous les dépôts sans accès opérationnel aux stocks. La validation est effectuée côté serveur lors de la création de brouillons, de l’encaissement et du chemin de vente hérité. Les sélecteurs POS et facture/devis ne présentent que les agents admissibles au dépôt opérationnel choisi; un agent par défaut devenu non admissible force une nouvelle sélection plutôt que de contourner la portée.
+
 ## 2. Environnement et exploitation
 
 | Élément | Valeur / règle |
