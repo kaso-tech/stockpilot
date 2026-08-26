@@ -18,7 +18,7 @@ export type SettingsSection = "appearance" | "currency" | "identity";
 type Identity = { companyName: string; companyLogoUrl: string | null; companySignatureUrl: string | null; companySignatureLabel: string; companyAgreementLabel: string; companySignatureAlignment: "left" | "center" | "right"; companyAddress: string; companyPhone: string; companyEmail: string; companyFooter: string };
 const blankIdentity: Identity = { companyName: "StockPilot", companyLogoUrl: null, companySignatureUrl: null, companySignatureLabel: "Signature & cachet", companyAgreementLabel: "Bon pour accord", companySignatureAlignment: "right", companyAddress: "", companyPhone: "", companyEmail: "", companyFooter: "" };
 const currencies: Array<{ code: Currency; name: string; display: string; symbol: string }> = [{ code: "XOF", name: "Franc CFA", display: "FCFA", symbol: "FCFA" }, { code: "USD", name: "Dollar américain", display: "USD", symbol: "$" }, { code: "EUR", name: "Euro", display: "EUR", symbol: "€" }];
-const primaryPresets = ["#007B8B", "#2563EB", "#6D28D9", "#BE123C", "#B45309", "#15803D"];
+const primaryPresets = ["#2563EB", "#007B8B", "#6D28D9", "#BE123C", "#B45309", "#15803D"];
 const groupingOptions: Array<{ value: PriceGrouping; label: string; preview: string }> = [{ value: "space", label: "Espace", preview: "2 500 000" }, { value: "comma", label: "Virgule", preview: "2,500,000" }, { value: "none", label: "Sans séparateur", preview: "2500000" }];
 const roundingOptions: Array<{ value: PriceRounding; label: string }> = [{ value: "none", label: "Valeur exacte" }, { value: "unit", label: "À l’unité" }, { value: "ten", label: "À la dizaine" }, { value: "hundred", label: "À la centaine" }, { value: "thousand", label: "Au millier" }];
 

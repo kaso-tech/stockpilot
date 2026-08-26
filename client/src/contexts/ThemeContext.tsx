@@ -1,65 +1,71 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { readPreference, writePreference } from "@/lib/preferenceStorage";
+import { resolveTheme, type Theme, type ThemeMode } from "@/lib/themeRules";
 
-type Theme = "light" | "dark";
+type ThemeSchedule = { darkStartHour: number; lightStartHour: number };
 
 interface ThemeContextType {
   theme: Theme;
+  themeMode: ThemeMode;
+  schedule: ThemeSchedule;
   toggleTheme?: () => void;
   setTheme: (theme: Theme) => void;
+  setThemeMode: (mode: ThemeMode) => void;
+  setSchedule: (schedule: ThemeSchedule) => void;
   switchable: boolean;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+const modeValues: readonly ThemeMode[] = ["manual", "system", "schedule"];
+const themeValues: readonly Theme[] = ["light", "dark"];
+const hourValues = Array.from({ length: 24 }, (_, hour) => String(hour));
 
-interface ThemeProviderProps {
-  children: React.ReactNode;
-  defaultTheme?: Theme;
-  switchable?: boolean;
+function readHour(key: string, fallback: number) {
+  const value = readPreference(typeof window === "undefined" ? undefined : localStorage, key, hourValues, String(fallback));
+  return Number(value);
 }
 
-export function ThemeProvider({
-  children,
-  defaultTheme = "light",
-  switchable = false,
-}: ThemeProviderProps) {
-  const [theme, setThemeState] = useState<Theme>(() => {
-    if (switchable) {
-      return readPreference(typeof window === "undefined" ? undefined : localStorage, "theme", ["light", "dark"], defaultTheme);
-    }
-    return defaultTheme;
-  });
+interface ThemeProviderProps { children: React.ReactNode; defaultTheme?: Theme; switchable?: boolean; }
+
+export function ThemeProvider({ children, defaultTheme = "light", switchable = false }: ThemeProviderProps) {
+  const [manualTheme, setManualTheme] = useState<Theme>(() => switchable ? readPreference(typeof window === "undefined" ? undefined : localStorage, "theme", themeValues, defaultTheme) : defaultTheme);
+  const [themeMode, setThemeModeState] = useState<ThemeMode>(() => switchable ? readPreference(typeof window === "undefined" ? undefined : localStorage, "theme-mode", modeValues, "manual") : "manual");
+  const [schedule, setScheduleState] = useState<ThemeSchedule>(() => ({ darkStartHour: readHour("theme-dark-start-hour", 19), lightStartHour: readHour("theme-light-start-hour", 7) }));
+  const [systemPrefersDark, setSystemPrefersDark] = useState(() => typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const [hour, setHour] = useState(() => new Date().getHours());
 
   useEffect(() => {
-    const root = document.documentElement;
-    if (theme === "dark") {
-      root.classList.add("dark");
-    } else {
-      root.classList.remove("dark");
-    }
+    if (typeof window === "undefined") return;
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const updateSystem = () => setSystemPrefersDark(media.matches);
+    updateSystem();
+    media.addEventListener("change", updateSystem);
+    const timer = window.setInterval(() => setHour(new Date().getHours()), 60_000);
+    return () => { media.removeEventListener("change", updateSystem); window.clearInterval(timer); };
+  }, []);
 
-    if (switchable) {
-      writePreference(typeof window === "undefined" ? undefined : localStorage, "theme", theme);
-    }
-  }, [theme, switchable]);
+  const theme = useMemo(() => resolveTheme(themeMode, manualTheme, systemPrefersDark, hour, schedule.darkStartHour, schedule.lightStartHour), [themeMode, manualTheme, systemPrefersDark, hour, schedule]);
 
-  const toggleTheme = switchable
-    ? () => {
-        setThemeState(prev => (prev === "light" ? "dark" : "light"));
-      }
-    : undefined;
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    if (!switchable) return;
+    const storage = typeof window === "undefined" ? undefined : localStorage;
+    writePreference(storage, "theme", manualTheme);
+    writePreference(storage, "theme-mode", themeMode);
+    writePreference(storage, "theme-dark-start-hour", String(schedule.darkStartHour));
+    writePreference(storage, "theme-light-start-hour", String(schedule.lightStartHour));
+  }, [theme, switchable, manualTheme, themeMode, schedule]);
 
-  return (
-    <ThemeContext.Provider value={{ theme, setTheme: setThemeState, toggleTheme, switchable }}>
-      {children}
-    </ThemeContext.Provider>
-  );
+  const setTheme = (next: Theme) => { setManualTheme(next); setThemeModeState("manual"); };
+  const setThemeMode = (mode: ThemeMode) => setThemeModeState(mode);
+  const setSchedule = (next: ThemeSchedule) => setScheduleState({ darkStartHour: Math.min(23, Math.max(0, next.darkStartHour)), lightStartHour: Math.min(23, Math.max(0, next.lightStartHour)) });
+  const toggleTheme = switchable ? () => setTheme(theme === "light" ? "dark" : "light") : undefined;
+
+  return <ThemeContext.Provider value={{ theme, themeMode, schedule, toggleTheme, setTheme, setThemeMode, setSchedule, switchable }}>{children}</ThemeContext.Provider>;
 }
 
 export function useTheme() {
   const context = useContext(ThemeContext);
-  if (!context) {
-    throw new Error("useTheme must be used within ThemeProvider");
-  }
+  if (!context) throw new Error("useTheme must be used within ThemeProvider");
   return context;
 }

@@ -93,6 +93,12 @@ Les actions critiques renforcées affichent désormais un état de chargement cl
 
 La route publique `/tarifs` présente les offres Pilote accompagné, Pro opérationnel et Entreprise. Elle est volontairement informative : les prix restent sur devis tant qu’un véritable système d’abonnement et de paiement n’est pas mis en production. La barre latérale est organisée en sections Pilotage, Ventes, Stocks & logistique, Équipe & finance et Administration; le vendeur voit une version limitée et son propre groupe Mon compte.
 
+## Correctifs TVA et thèmes
+
+La création d’un taux TVA prédéfini ne vérifie désormais que les taux actifs de la même entreprise. Un taux retiré ou archivé avec la même valeur ne bloque plus la création d’un nouveau taux de 5 % ou 10 %. La couleur principale de repli est `#2563EB`; l’ancien bleu-vert historique est interprété comme une valeur héritée afin que les installations existantes adoptent ce nouveau défaut sans remplacer les autres couleurs personnalisées.
+
+Les contrôles prioritaires, dont l’encaissement, la création de facture, les boutons d’action, les états actifs de navigation et la page tarifaire, utilisent les tokens `primary` et `primary-foreground` pour garder un texte contrasté sur toute couleur choisie. Le code de l’entrepôt n’est plus affiché sous le sélecteur de l’en-tête. Un bouton clair/sombre est présent dans le header, et les réglages Apparence proposent les modes manuel, suivant le système et automatique selon une plage horaire locale (sombre à 19:00, clair à 07:00 par défaut).
+
 ## 2. Environnement et exploitation
 
 | Élément | Valeur / règle |

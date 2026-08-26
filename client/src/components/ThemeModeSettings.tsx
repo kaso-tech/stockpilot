@@ -1,0 +1,14 @@
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { useTheme } from "@/contexts/ThemeContext";
+import { Clock3, Monitor, SunMoon } from "lucide-react";
+
+const hourLabel = (hour: number) => `${String(hour).padStart(2, "0")}:00`;
+
+export default function ThemeModeSettings() {
+  const { themeMode, setThemeMode, schedule, setSchedule } = useTheme();
+  return <Card className="mx-auto mt-6 max-w-5xl border-border bg-card"><CardContent className="space-y-5 p-6"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Bascule de thème</p><h2 className="mt-1 font-semibold">Mode d’affichage</h2><p className="mt-1 text-sm text-muted-foreground">Choisissez un thème fixe, l’apparence du système ou une bascule programmée.</p></div><div className="grid gap-3 sm:grid-cols-3"><ModeButton active={themeMode === "manual"} icon={SunMoon} title="Manuel" description="Le bouton du header alterne clair et sombre." onClick={() => setThemeMode("manual")} /><ModeButton active={themeMode === "system"} icon={Monitor} title="Selon le système" description="Suit la préférence claire ou sombre de l’appareil." onClick={() => setThemeMode("system")} /><ModeButton active={themeMode === "schedule"} icon={Clock3} title="Automatique" description="Bascule selon les heures choisies." onClick={() => setThemeMode("schedule")} /></div>{themeMode === "schedule" && <div className="grid gap-4 rounded-xl border border-primary/20 bg-primary/[0.05] p-4 sm:grid-cols-2"><label className="grid gap-2 text-sm font-medium"><span>Passer en sombre à</span><select value={schedule.darkStartHour} onChange={event => setSchedule({ ...schedule, darkStartHour: Number(event.target.value) })} className="h-10 rounded-md border border-input bg-background px-3 text-sm"><Hours /></select></label><label className="grid gap-2 text-sm font-medium"><span>Repasser en clair à</span><select value={schedule.lightStartHour} onChange={event => setSchedule({ ...schedule, lightStartHour: Number(event.target.value) })} className="h-10 rounded-md border border-input bg-background px-3 text-sm"><Hours /></select></label></div>}</CardContent></Card>;
+}
+
+function Hours() { return <>{Array.from({ length: 24 }, (_, hour) => <option key={hour} value={hour}>{hourLabel(hour)}</option>)}</>; }
+function ModeButton({ active, icon: Icon, title, description, onClick }: { active: boolean; icon: typeof SunMoon; title: string; description: string; onClick: () => void }) { return <Button type="button" variant="outline" onClick={onClick} className={`h-auto justify-start whitespace-normal p-4 text-left ${active ? "border-primary bg-primary/10 text-foreground" : "border-border text-foreground hover:bg-muted"}`}><Icon className="mr-3 h-5 w-5 shrink-0 text-primary" /><span><span className="block font-semibold">{title}</span><span className="mt-1 block text-xs font-normal text-muted-foreground">{description}</span></span></Button>; }

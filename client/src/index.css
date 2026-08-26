@@ -206,6 +206,9 @@ html:not(.dark) .onboarding-step .text-emerald-300 { color: #087a55 !important; 
 html:not(.dark) .onboarding-hero button.text-slate-400 { color: #28516b !important; }
 html:not(.dark) .onboarding-hero button.text-slate-400:hover { color: #003f4a !important; background-color: #d8eef2 !important; }
 html:not(.dark) .quick-action-sale { background-color: #2563EB !important; color: #ffffff !important; border-color: #2563EB !important; }
+button.bg-\[\#007B8B\], button.bg-\[\#00bcd4\], button.bg-cyan-400, [data-slot="button"].bg-cyan-400 { background-color: var(--app-primary) !important; color: var(--app-primary-foreground) !important; border-color: var(--app-primary) !important; }
+button.bg-\[\#007B8B\]:hover, button.bg-\[\#00bcd4\]:hover, button.bg-cyan-400:hover, [data-slot="button"].bg-cyan-400:hover { background-color: color-mix(in srgb, var(--app-primary), black 10%) !important; color: var(--app-primary-foreground) !important; }
+button.bg-primary, [data-slot="button"].bg-primary, .bg-primary.text-white, .bg-primary .text-white { color: var(--app-primary-foreground) !important; }
 html:not(.dark) .quick-action-invoice { background-color: #f0edff !important; color: #4c2b8c !important; border-color: #b9ace8 !important; box-shadow: 0 5px 14px rgba(76, 43, 140, .10) !important; }
 html:not(.dark) .quick-action-client { background-color: #e7f8ef !important; color: #087a55 !important; border-color: #8bd3b5 !important; box-shadow: 0 5px 14px rgba(8, 122, 85, .10) !important; }
 html:not(.dark) .quick-action-invoice:hover { background-color: #e2dcfb !important; color: #382067 !important; }

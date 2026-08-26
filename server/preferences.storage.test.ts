@@ -23,7 +23,7 @@ describe("persistance des préférences", () => {
   });
   it("normalise une couleur principale et préserve le contraste du texte", () => {
     expect(normalizePrimaryColor("#6d28d9")).toBe("#6D28D9");
-    expect(normalizePrimaryColor("violet")).toBe("#007B8B");
+    expect(normalizePrimaryColor("violet")).toBe("#2563EB");
     expect(primaryForeground("#FDE047")).toBe("#102030");
     expect(primaryForeground("#007B8B")).toBe("#FFFFFF");
   });

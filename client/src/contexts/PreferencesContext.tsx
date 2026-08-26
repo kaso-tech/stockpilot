@@ -54,7 +54,7 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     if (!scope || !data) return;
     const next: StoredPreferences = {
       currency: data.currency ?? DEFAULT_PREFERENCES.currency,
-      primaryColor: normalizePrimaryColor(data.primaryColor),
+      primaryColor: data.primaryColor?.toUpperCase() === "#007B8B" ? DEFAULT_PRIMARY_COLOR : normalizePrimaryColor(data.primaryColor),
       priceGrouping: preferences.priceGrouping,
       priceRounding: preferences.priceRounding,
     };

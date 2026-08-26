@@ -836,3 +836,11 @@
 - [x] Créer une page de tarification SaaS claire et accessible.
 - [x] Réorganiser la navigation latérale par sections professionnelles.
 - [x] Tester les parcours et publier le correctif.
+
+## Correctifs TVA, thème et entrepôt
+- [x] Corriger le faux doublon lors de la création des taux TVA prédéfinis.
+- [x] Définir #2563EB comme couleur principale par défaut et corriger les contrastes des boutons.
+- [x] Retirer le code affiché sous le sélecteur d’entrepôt dans le pied de page.
+- [x] Ajouter la bascule clair/sombre au header.
+- [x] Ajouter les modes manuel, suivant le système et automatique selon l’heure dans les paramètres.
+- [x] Tester thèmes, TVA et affichage puis publier le correctif.
