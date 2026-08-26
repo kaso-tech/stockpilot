@@ -87,6 +87,12 @@ Les routes publiques `/aide`, `/conditions-utilisation`, `/politique-securite` e
 
 La migration `0057` ajoute la table multi-entreprise `supportRequests`. Les utilisateurs authentifiés créent une demande avec sujet, message et capture facultative; la capture est limitée à PNG, JPEG ou WEBP de 3 Mo, validée côté client puis côté serveur par type, taille et signature binaire avant stockage S3 sous une clé propre à l’entreprise et à l’utilisateur. Les demandes sont limitées à six créations par quart d’heure et inscrites dans l’audit. Chaque utilisateur consulte seulement ses demandes, tandis que les administrateurs disposent du registre `/support`, filtrent les statuts et les mettent à jour. Les liens des fichiers ne sont affichés qu’aux auteurs ou aux administrateurs de la même entreprise.
 
+## Expérience, exports et tarification
+
+Les actions critiques renforcées affichent désormais un état de chargement clair et bloquent les doubles actions pendant l’exécution : création et validation d’inventaire, encaissement et suppression en masse. Les exports CSV signalent également leur réussite. L’inventaire sélectionné peut être exporté avec les quantités théoriques, comptées et écarts; « Import & export » fournit un rapport des ventes du dépôt actif, avec total, encaissé et solde. Les cellules CSV sont protégées contre l’interprétation de formules.
+
+La route publique `/tarifs` présente les offres Pilote accompagné, Pro opérationnel et Entreprise. Elle est volontairement informative : les prix restent sur devis tant qu’un véritable système d’abonnement et de paiement n’est pas mis en production. La barre latérale est organisée en sections Pilotage, Ventes, Stocks & logistique, Équipe & finance et Administration; le vendeur voit une version limitée et son propre groupe Mon compte.
+
 ## 2. Environnement et exploitation
 
 | Élément | Valeur / règle |

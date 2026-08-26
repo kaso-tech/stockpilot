@@ -75,31 +75,15 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 
-const menuItems = [
-  { icon: LayoutDashboard, label: "Vue d’ensemble", path: "/" },
-  { icon: LayoutDashboard, label: "Pilotage consolidé", path: "/pilotage-entrepots" },
-  { icon: ShoppingCart, label: "Vente Rapide", path: "/pos" },
-  { icon: ReceiptText, label: "Tickets", path: "/tickets" },
-  { icon: ReceiptText, label: "Factures", path: "/factures" },
-  { icon: FileText, label: "Devis", path: "/devis" },
-  { icon: UserRound, label: "Clients", path: "/clients" },
-  { icon: PackageSearch, label: "Produits", path: "/produits" },
-  { icon: Warehouse, label: "Entrepôts", path: "/entrepots" },
-  { icon: ArrowLeftRight, label: "Transferts", path: "/transferts-stock" },
-  { icon: Boxes, label: "Catégories", path: "/categories" },
-  { icon: Ruler, label: "Unités", path: "/unites" },
-  { icon: ArrowLeftRight, label: "Mouvements", path: "/mouvements" },
-  { icon: ClipboardCheck, label: "Inventaires", path: "/inventaires" },
-  { icon: Truck, label: "Fournisseurs", path: "/fournisseurs" },
-  { icon: FileText, label: "Bons de commande", path: "/bons-commande" },
-  { icon: UsersRound, label: "Agents & paie", path: "/agents" },
-  { icon: WalletCards, label: "Dépenses", path: "/depenses" },
-  { icon: Archive, label: "Import & export", path: "/donnees" },
-  { icon: SlidersHorizontal, label: "Paramètres", path: "/parametres" },
-  { icon: DatabaseBackup, label: "Sauvegardes", path: "/sauvegardes" },
-  { icon: TriangleAlert, label: "Alertes", path: "/alertes" },
-  { icon: ClipboardList, label: "Journal", path: "/journal" },
-  { icon: CloudUpload, label: "Synchronisation", path: "/synchronisation" },
+type MenuItem = { icon: typeof LayoutDashboard; label: string; path: string };
+type MenuSection = { label: string; items: MenuItem[] };
+
+const menuSections: MenuSection[] = [
+  { label: "Pilotage", items: [{ icon: LayoutDashboard, label: "Vue d’ensemble", path: "/" }, { icon: LayoutDashboard, label: "Pilotage consolidé", path: "/pilotage-entrepots" }, { icon: TriangleAlert, label: "Alertes", path: "/alertes" }] },
+  { label: "Ventes", items: [{ icon: ShoppingCart, label: "Vente Rapide", path: "/pos" }, { icon: ReceiptText, label: "Tickets", path: "/tickets" }, { icon: ReceiptText, label: "Factures", path: "/factures" }, { icon: FileText, label: "Devis", path: "/devis" }, { icon: UserRound, label: "Clients", path: "/clients" }] },
+  { label: "Stocks & logistique", items: [{ icon: PackageSearch, label: "Produits", path: "/produits" }, { icon: Warehouse, label: "Entrepôts", path: "/entrepots" }, { icon: ArrowLeftRight, label: "Transferts", path: "/transferts-stock" }, { icon: ArrowLeftRight, label: "Mouvements", path: "/mouvements" }, { icon: ClipboardCheck, label: "Inventaires", path: "/inventaires" }, { icon: Truck, label: "Fournisseurs", path: "/fournisseurs" }, { icon: FileText, label: "Bons de commande", path: "/bons-commande" }, { icon: Boxes, label: "Catégories", path: "/categories" }, { icon: Ruler, label: "Unités", path: "/unites" }] },
+  { label: "Équipe & finance", items: [{ icon: UsersRound, label: "Agents & paie", path: "/agents" }, { icon: WalletCards, label: "Dépenses", path: "/depenses" }] },
+  { label: "Administration", items: [{ icon: Archive, label: "Import & export", path: "/donnees" }, { icon: CloudUpload, label: "Synchronisation", path: "/synchronisation" }, { icon: DatabaseBackup, label: "Sauvegardes", path: "/sauvegardes" }, { icon: ClipboardList, label: "Journal", path: "/journal" }, { icon: SlidersHorizontal, label: "Paramètres", path: "/parametres" }] },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -191,13 +175,14 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const isDocumentCreation = location === "/factures/nouvelle" || location === "/devis/nouveau";
   const { data: documentVatSettings } = trpc.commerce.settings.get.useQuery(undefined, { enabled: Boolean(user) && isDocumentCreation });
   const { data: vatRatePresets = [] } = trpc.vatRates.list.useQuery(undefined, { enabled: Boolean(user) && isDocumentCreation });
-  const sellerMenuItems = [
-    ...menuItems.filter(item => item.path === "/" || item.path === "/pos" || item.path === "/tickets" || item.path === "/factures" || item.path === "/devis" || item.path === "/clients" || item.path === "/mouvements" || item.path === "/synchronisation" || (item.path === "/produits" && sellerPermissions?.sellerCanEditPurchasePrice)),
-    { icon: Settings2, label: "Apparence", path: "/parametres/apparence" },
-    { icon: LayoutDashboard, label: "Mon tableau de bord", path: "/parametres/tableau-de-bord" },
-    { icon: ShieldCheck, label: "Sécurité", path: "/parametres/securite" },
+  const sellerAllowedPaths = new Set(["/", "/pos", "/tickets", "/factures", "/devis", "/clients", "/mouvements", "/synchronisation"]);
+  if (sellerPermissions?.sellerCanEditPurchasePrice) sellerAllowedPaths.add("/produits");
+  const sellerMenuSections: MenuSection[] = [
+    ...menuSections.map(section => ({ ...section, items: section.items.filter(item => sellerAllowedPaths.has(item.path)) })).filter(section => section.items.length > 0),
+    { label: "Mon compte", items: [{ icon: Settings2, label: "Apparence", path: "/parametres/apparence" }, { icon: LayoutDashboard, label: "Mon tableau de bord", path: "/parametres/tableau-de-bord" }, { icon: ShieldCheck, label: "Sécurité", path: "/parametres/securite" }] },
   ];
-  const visibleMenuItems = user?.role === "admin" ? menuItems : sellerMenuItems;
+  const visibleMenuSections = user?.role === "admin" ? menuSections : sellerMenuSections;
+  const visibleMenuItems = visibleMenuSections.flatMap(section => section.items);
   const activeMenuItem = visibleMenuItems.find(item => item.path === location || (item.path === "/produits" && location.startsWith("/produits/")) || (item.path === "/clients" && location.startsWith("/clients/")) || (item.path === "/fournisseurs" && location.startsWith("/fournisseurs/")) || (item.path === "/bons-commande" && location.startsWith("/bons-commande/")) || (item.path === "/devis" && location.startsWith("/devis/")) || (item.path === "/tickets" && location.startsWith("/tickets/"))) ?? visibleMenuItems[0];
   const initials = (user?.name || user?.email || "U").slice(0, 2).toUpperCase();
   const isAdmin = user?.role === "admin";
@@ -243,25 +228,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         </SidebarHeader>
 
         <SidebarContent className="px-3 py-5">
-          {!isCollapsed && <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Pilotage</p>}
-          <SidebarMenu className="gap-1">
-            {visibleMenuItems.map(item => {
-              const isActive = location === item.path || (item.path === "/clients" && location.startsWith("/clients/")) || (item.path === "/fournisseurs" && location.startsWith("/fournisseurs/")) || (item.path === "/bons-commande" && location.startsWith("/bons-commande/")) || (item.path === "/devis" && location.startsWith("/devis/"));
-              return (
-                <SidebarMenuItem key={item.path}>
-                  <SidebarMenuButton
-                    isActive={isActive}
-                    tooltip={item.label}
-                    onClick={() => setLocation(item.path)}
-                    className="h-10 rounded-xl px-3 text-slate-400 hover:bg-white/[0.06] hover:text-white data-[active=true]:bg-cyan-400 data-[active=true]:text-slate-950"
-                  >
-                    <item.icon className="h-[18px] w-[18px]" />
-                    <span className="font-medium">{item.label}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              );
-            })}
-          </SidebarMenu>
+          <div className="space-y-5">{visibleMenuSections.map(section => <section key={section.label}>{!isCollapsed && <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">{section.label}</p>}<SidebarMenu className="gap-1">{section.items.map(item => { const isActive = location === item.path || (item.path === "/produits" && location.startsWith("/produits/")) || (item.path === "/clients" && location.startsWith("/clients/")) || (item.path === "/fournisseurs" && location.startsWith("/fournisseurs/")) || (item.path === "/bons-commande" && location.startsWith("/bons-commande/")) || (item.path === "/devis" && location.startsWith("/devis/")) || (item.path === "/tickets" && location.startsWith("/tickets/")) || (item.path === "/factures" && location.startsWith("/factures/")); return <SidebarMenuItem key={item.path}><SidebarMenuButton isActive={isActive} tooltip={item.label} onClick={() => setLocation(item.path)} className="h-10 rounded-xl px-3 text-slate-400 hover:bg-white/[0.06] hover:text-white data-[active=true]:bg-cyan-400 data-[active=true]:text-slate-950"><item.icon className="h-[18px] w-[18px]" /><span className="font-medium">{item.label}</span></SidebarMenuButton></SidebarMenuItem>; })}</SidebarMenu></section>)}</div>
         </SidebarContent>
 
         <SidebarFooter className="border-t border-white/[0.07] p-3">
@@ -291,6 +258,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
               </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-white/10" />
               <DropdownMenuItem onClick={() => setLocation("/aide")} className="cursor-pointer focus:bg-white/[0.06]"><CircleHelp className="mr-2 h-4 w-4" />Aide</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setLocation("/tarifs")} className="cursor-pointer focus:bg-white/[0.06]"><WalletCards className="mr-2 h-4 w-4" />Tarification</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setLocation("/politique-securite")} className="cursor-pointer focus:bg-white/[0.06]"><ShieldCheck className="mr-2 h-4 w-4" />Politique de sécurité</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setLocation("/contactez-nous")} className="cursor-pointer focus:bg-white/[0.06]"><Mail className="mr-2 h-4 w-4" />Contactez-nous</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setLocation("/conditions-utilisation")} className="cursor-pointer focus:bg-white/[0.06]"><FileText className="mr-2 h-4 w-4" />Conditions d’utilisation</DropdownMenuItem>

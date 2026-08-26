@@ -1,0 +1,58 @@
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Check, ChevronLeft, ShieldCheck, Sparkles } from "lucide-react";
+import { Link } from "wouter";
+
+const plans = [
+  {
+    name: "Pilote accompagné",
+    description: "Pour lancer StockPilot dans une première entreprise avec accompagnement au paramétrage.",
+    price: "Sur devis",
+    detail: "Déploiement contrôlé",
+    features: ["Une entreprise", "Produits, ventes et factures", "Un entrepôt principal", "Accompagnement de démarrage", "Support prioritaire pendant le pilote"],
+  },
+  {
+    name: "Pro opérationnel",
+    description: "Pour les équipes qui pilotent les ventes, stocks et utilisateurs au quotidien.",
+    price: "Sur devis",
+    detail: "Forfait mensuel adapté",
+    featured: true,
+    features: ["Multi-entrepôts et transferts", "Vendeurs, caissiers et responsables", "Inventaires, alertes et réapprovisionnement", "Factures, devis, tickets et exports CSV", "Support applicatif"],
+  },
+  {
+    name: "Entreprise",
+    description: "Pour les organisations multi-sites qui souhaitent un accompagnement et une gouvernance renforcés.",
+    price: "Sur mesure",
+    detail: "Selon utilisateurs et dépôts",
+    features: ["Tous les modules Pro", "Pilotage consolidé multi-entrepôts", "Rôles, commissions et rapports avancés", "Assistance de déploiement", "Revue des besoins d’intégration"],
+  },
+];
+
+export default function Pricing() {
+  return (
+    <main className="min-h-screen bg-[#090c13] px-5 py-8 text-slate-100 sm:px-8 lg:px-12">
+      <div className="mx-auto max-w-6xl">
+        <header className="flex items-center justify-between gap-4">
+          <Link href="/" className="inline-flex items-center gap-2 text-sm font-medium text-cyan-300 transition hover:text-cyan-200"><ChevronLeft className="h-4 w-4" />Retour à StockPilot</Link>
+          <Badge className="border-cyan-400/20 bg-cyan-400/10 text-cyan-200 hover:bg-cyan-400/10"><ShieldCheck className="mr-1.5 h-3.5 w-3.5" />Déploiement professionnel</Badge>
+        </header>
+        <section className="mx-auto max-w-3xl py-16 text-center sm:py-24">
+          <div className="mx-auto mb-5 grid h-12 w-12 place-items-center rounded-2xl bg-cyan-400 text-slate-950"><Sparkles className="h-6 w-6" /></div>
+          <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-5xl">Des forfaits adaptés à votre exploitation</h1>
+          <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-slate-400">Choisissez un accompagnement selon le nombre de dépôts, d’utilisateurs et le niveau de pilotage souhaité. Les tarifs sont établis après qualification pour correspondre à vos besoins opérationnels.</p>
+        </section>
+        <section className="grid gap-5 lg:grid-cols-3">
+          {plans.map(plan => <article key={plan.name} className={`relative flex flex-col rounded-3xl border p-6 ${plan.featured ? "border-cyan-400/60 bg-cyan-400/[0.07] shadow-2xl shadow-cyan-950/20" : "border-white/[0.09] bg-[#111722]"}`}>
+            {plan.featured && <Badge className="absolute -top-3 left-6 border-0 bg-cyan-400 text-slate-950 hover:bg-cyan-400">Le plus complet</Badge>}
+            <h2 className="text-xl font-semibold text-white">{plan.name}</h2>
+            <p className="mt-3 min-h-14 text-sm leading-6 text-slate-400">{plan.description}</p>
+            <div className="mt-7 border-y border-white/[0.08] py-5"><p className="text-2xl font-semibold text-white">{plan.price}</p><p className="mt-1 text-xs text-slate-500">{plan.detail}</p></div>
+            <ul className="mt-6 flex-1 space-y-3">{plan.features.map(feature => <li key={feature} className="flex gap-3 text-sm text-slate-300"><Check className="mt-0.5 h-4 w-4 shrink-0 text-cyan-300" />{feature}</li>)}</ul>
+            <Link href="/contactez-nous" className="mt-8 block"><Button className={`w-full ${plan.featured ? "bg-cyan-400 text-slate-950 hover:bg-cyan-300" : "bg-white/[0.07] text-white hover:bg-white/[0.12]"}`}>Demander une proposition</Button></Link>
+          </article>)}
+        </section>
+        <p className="mx-auto mt-10 max-w-3xl text-center text-xs leading-5 text-slate-500">La page présente les niveaux de service et ne constitue pas encore un paiement en ligne. Une proposition contractuelle précise les tarifs, la durée, les données traitées et l’accompagnement inclus.</p>
+      </div>
+    </main>
+  );
+}

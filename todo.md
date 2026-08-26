@@ -829,3 +829,10 @@
 - [x] Auditer sauvegardes, exploitation, support et conformité de production.
 - [x] Évaluer les éléments commerciaux indispensables avant la vente.
 - [x] Produire une feuille de route priorisée de mise sur le marché.
+
+## Expérience utilisateur, exports et tarification
+- [x] Standardiser les chargements et confirmations des actions critiques.
+- [x] Ajouter les exports CSV d’inventaire et de rapports de ventes.
+- [x] Créer une page de tarification SaaS claire et accessible.
+- [x] Réorganiser la navigation latérale par sections professionnelles.
+- [x] Tester les parcours et publier le correctif.
