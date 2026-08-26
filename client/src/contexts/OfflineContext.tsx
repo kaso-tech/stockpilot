@@ -168,13 +168,28 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
     }
   }, [persistState, upsertLog]);
 
+  const reportSyncHealth = useCallback(async () => {
+    if (!navigator.onLine || !user || !offlineScope) return;
+    const scopedSales = salesRef.current.filter(item => item.ownerUserId === user.id && item.companyId === offlineScope.companyId);
+    try {
+      await syncClient.syncHealth.report.mutate({
+        isOnline: true,
+        pendingOperations: scopedSales.length,
+        failedOperations: scopedSales.filter(item => item.status === "failed").length,
+      });
+    } catch {
+      // Le signal de santé est non bloquant : la synchronisation métier garde sa propre reprise fiable.
+    }
+  }, [offlineScope, user]);
+
   const syncNow = useCallback(() => syncSingleFlightRef.current(async () => {
     if (!navigator.onLine || !user) return;
     const queue = salesRef.current.filter(item => item.ownerUserId === user.id && item.companyId === (user.companyId ?? null));
     let synced = 0;
     for (const item of queue) if (await syncOperation(item)) synced += 1;
+    await reportSyncHealth();
     if (synced) { window.dispatchEvent(new Event("stockpilot-offline-sync")); toast.success(`${synced} opération${synced > 1 ? "s" : ""} synchronisée${synced > 1 ? "s" : ""}.`); }
-  }), [syncOperation, user]);
+  }), [reportSyncHealth, syncOperation, user]);
 
   const retryOperation = useCallback((operationId: string) => syncSingleFlightRef.current(async () => {
     const item = salesRef.current.find(record => record.id === operationId && record.ownerUserId === user?.id && record.companyId === (user?.companyId ?? null));

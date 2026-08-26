@@ -65,6 +65,18 @@ export const companyLifecycleEvents = mysqlTable("companyLifecycleEvents", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, table => [index("company_lifecycle_company_created_idx").on(table.companyId, table.createdAt)]);
 
+/** État agrégé de synchronisation remonté par l’application d’une entreprise, sans contenu d’opération. */
+export const companySyncHealth = mysqlTable("companySyncHealth", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull().unique(),
+  status: mysqlEnum("status", ["healthy", "pending", "failed", "offline"]).notNull().default("healthy"),
+  pendingOperations: int("pendingOperations").notNull().default(0),
+  failedOperations: int("failedOperations").notNull().default(0),
+  lastSyncedAt: timestamp("lastSyncedAt"),
+  reportedByUserId: int("reportedByUserId"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [index("company_sync_health_status_updated_idx").on(table.status, table.updatedAt)]);
+
 /** Demande d’assistance interne créée par un utilisateur de l’entreprise. */
 export const supportRequests = mysqlTable("supportRequests", {
   id: int("id").autoincrement().primaryKey(),

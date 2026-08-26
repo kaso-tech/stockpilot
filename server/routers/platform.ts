@@ -1,9 +1,10 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNotNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
-import { companies, companyLifecycleEvents, platformAuditLogs, supportRequests, users } from "../../drizzle/schema";
+import { backupSettings, companies, companyLifecycleEvents, companySyncHealth, platformAuditLogs, supportRequests, users } from "../../drizzle/schema";
 import { authenticatedProcedure, router } from "../_core/trpc";
 import { canManagePlatformCompanies, requirePlatformAccess } from "../platformAccess";
+import { resolveCompanyHealth } from "../platformHealth";
 
 async function auditPlatform(db: { insert: (...args: any[]) => any }, actorUserId: number, action: string, companyId: number | null, reason?: string, metadata?: Record<string, unknown>) {
   await db.insert(platformAuditLogs).values({ actorUserId, action, entityType: "company", entityId: companyId, companyId, reason: reason ?? null, metadataJson: metadata ? JSON.stringify(metadata) : null });
@@ -63,6 +64,33 @@ export const platformRouter = router({
       const rows = await db.select({ id: companies.id, name: companies.name, platformStatus: companies.platformStatus, suspendedAt: companies.suspendedAt, suspensionReason: companies.suspensionReason, onboardingCompletedAt: companies.onboardingCompletedAt, createdAt: companies.createdAt, ownerName: users.name, ownerEmail: users.email, lastSignedIn: users.lastSignedIn }).from(companies).leftJoin(users, eq(companies.ownerUserId, users.id)).orderBy(desc(companies.createdAt));
       const term = input?.search?.toLocaleLowerCase("fr") ?? "";
       return rows.filter(row => !term || row.name.toLocaleLowerCase("fr").includes(term) || row.ownerName?.toLocaleLowerCase("fr").includes(term) || row.ownerEmail?.toLocaleLowerCase("fr").includes(term));
+    }),
+    health: authenticatedProcedure.query(async ({ ctx }) => {
+      const { db } = await requirePlatformAccess(ctx);
+      const [companyRows, supportRows, activityRows] = await Promise.all([
+        db.select({ id: companies.id, name: companies.name, platformStatus: companies.platformStatus, createdAt: companies.createdAt, onboardingCompletedAt: companies.onboardingCompletedAt, automaticEnabled: backupSettings.automaticEnabled, frequencyHours: backupSettings.frequencyHours, lastBackupAt: backupSettings.lastBackupAt, lastBackupStatus: backupSettings.lastBackupStatus, syncStatus: companySyncHealth.status, syncUpdatedAt: companySyncHealth.updatedAt }).from(companies).leftJoin(backupSettings, eq(companies.id, backupSettings.companyId)).leftJoin(companySyncHealth, eq(companies.id, companySyncHealth.companyId)).orderBy(desc(companies.createdAt)),
+        db.select({ companyId: supportRequests.companyId, total: sql<number>`count(*)` }).from(supportRequests).where(and(isNotNull(supportRequests.companyId), ne(supportRequests.status, "closed"))).groupBy(supportRequests.companyId),
+        db.select({ companyId: users.companyId, lastSignedIn: sql<Date>`max(${users.lastSignedIn})` }).from(users).where(isNotNull(users.companyId)).groupBy(users.companyId),
+      ]);
+      const supportByCompany = new Map(supportRows.filter(row => row.companyId !== null).map(row => [row.companyId as number, Number(row.total)]));
+      const activityByCompany = new Map(activityRows.filter(row => row.companyId !== null).map(row => [row.companyId as number, row.lastSignedIn]));
+
+      return companyRows.map(company => {
+        const openSupportCount = supportByCompany.get(company.id) ?? 0;
+        const health = resolveCompanyHealth({ ...company, openSupportCount });
+        return {
+          id: company.id,
+          name: company.name,
+          platformStatus: company.platformStatus,
+          createdAt: company.createdAt,
+          onboardingCompletedAt: company.onboardingCompletedAt,
+          lastActivityAt: activityByCompany.get(company.id) ?? null,
+          openSupportCount,
+          backupHealth: health.backupHealth,
+          syncHealth: health.syncHealth,
+          attentionRequired: health.attentionRequired,
+        };
+      });
     }),
     setStatus: authenticatedProcedure.input(z.object({ companyId: z.number().int().positive(), status: z.enum(["active", "suspended"]), reason: z.string().trim().min(3).max(400).optional() })).mutation(async ({ ctx, input }) => {
       const { db, access } = await requirePlatformAccess(ctx);
