@@ -123,7 +123,7 @@ export const transactionsRouter = router({
       const customer = input.customerId ? (await tx.select().from(customers).where(and(eq(customers.id, input.customerId), companyScope(customers.companyId, ctx.user.companyId))).limit(1))[0] : null;
       if (input.customerId && !customer) throw new TRPCError({ code: "NOT_FOUND", message: "Client introuvable." });
       const defaultWarehouse = input.warehouseId ? null : await getDefaultWarehouse(tx, ctx.user.companyId);
-      const warehouse = input.warehouseId ? await assertSellerWarehouseAccess(tx, ctx.user, input.warehouseId, { requireActive: true }) : ctx.user.role === "seller" ? await assertSellerWarehouseAccess(tx, ctx.user, defaultWarehouse!.id, { requireActive: true }) : defaultWarehouse!;
+      const warehouse = input.warehouseId ? await assertSellerWarehouseAccess(tx, ctx.user, input.warehouseId, { requireActive: true, permission: "sell" }) : ctx.user.role === "seller" ? await assertSellerWarehouseAccess(tx, ctx.user, defaultWarehouse!.id, { requireActive: true, permission: "sell" }) : defaultWarehouse!;
       const productIds = input.items.map(item => item.productId);
       const productRows = await tx.select().from(products).where(and(inArray(products.id, productIds), companyScope(products.companyId, ctx.user.companyId)));
       if (productRows.length !== productIds.length) throw new TRPCError({ code: "NOT_FOUND", message: "Un produit est introuvable." });
@@ -173,7 +173,7 @@ export const transactionsRouter = router({
       try { assertPaymentMethodsEnabled(input.payments.map(payment => payment.method), settings); } catch (error) { throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "Moyen de paiement invalide." }); }
       let settlement: ReturnType<typeof settlementResult>;
       try { settlement = settlementResult(remainingBefore, input.settlementMode, input.payments.map(payment => payment.amountCents)); } catch (error) { throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "Règlement invalide." }); }
-      const saleWarehouse = sale.warehouseId ? await getScopedWarehouse(tx, ctx.user.companyId, sale.warehouseId) : await getDefaultWarehouse(tx, ctx.user.companyId);
+      const saleWarehouse = sale.warehouseId ? await assertSellerWarehouseAccess(tx, ctx.user, sale.warehouseId, { permission: "checkout" }) : ctx.user.role === "seller" ? await assertSellerWarehouseAccess(tx, ctx.user, (await getDefaultWarehouse(tx, ctx.user.companyId)).id, { permission: "checkout" }) : await getDefaultWarehouse(tx, ctx.user.companyId);
       const assigned = await validateAgents(tx, ctx.user.companyId, saleWarehouse.id, input);
       const isFirstCollection = sale.status === "draft";
       if (isFirstCollection) {

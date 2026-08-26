@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { auditLogs, products, stockTransfers, userWarehousePreferences, warehouseStocks, warehouses } from "../../drizzle/schema";
+import { auditLogs, products, sellerCredentials, sellerWarehouseAssignments, stockTransfers, userWarehousePreferences, users, warehouseReorderThresholds, warehouseStockAlerts, warehouseStocks, warehouses } from "../../drizzle/schema";
 import { getDb } from "../db";
 import { adminProcedure, protectedProcedure, router } from "../_core/trpc";
 import { companyScope } from "../companyScope";
@@ -88,6 +88,65 @@ export const warehousesRouter = router({
       .where(companyScope(products.companyId, ctx.user.companyId))
       .orderBy(asc(products.name));
     return { warehouse, products: rows };
+  }),
+
+  thresholds: router({
+    list: protectedProcedure.input(z.object({ warehouseId: z.number().int().positive() })).query(async ({ ctx, input }) => {
+      const db = await dbOrThrow();
+      const warehouse = await assertSellerWarehouseAccess(db, ctx.user, input.warehouseId, { permission: "view_stock" });
+      const [thresholds, alerts] = await Promise.all([
+        db.select().from(warehouseReorderThresholds).where(and(companyScope(warehouseReorderThresholds.companyId, ctx.user.companyId), eq(warehouseReorderThresholds.warehouseId, warehouse.id))),
+        db.select().from(warehouseStockAlerts).where(and(companyScope(warehouseStockAlerts.companyId, ctx.user.companyId), eq(warehouseStockAlerts.warehouseId, warehouse.id), eq(warehouseStockAlerts.status, "active"))),
+      ]);
+      const productsWithStock = await db.select({ productId: products.id, name: products.name, reference: products.reference, category: products.category, unit: products.unit, supplierId: products.supplierId, purchasePriceCents: products.purchasePriceCents, quantity: sql<number>`coalesce(${warehouseStocks.quantity}, 0)` }).from(products).leftJoin(warehouseStocks, and(eq(warehouseStocks.productId, products.id), eq(warehouseStocks.warehouseId, warehouse.id), companyScope(warehouseStocks.companyId, ctx.user.companyId))).where(companyScope(products.companyId, ctx.user.companyId)).orderBy(asc(products.name));
+      return productsWithStock.map(product => ({ ...product, threshold: thresholds.find(item => item.productId === product.productId)?.threshold ?? 0, alert: alerts.find(item => item.productId === product.productId) ?? null }));
+    }),
+    set: protectedProcedure.input(z.object({ warehouseId: z.number().int().positive(), productId: z.number().int().positive(), threshold: z.number().int().min(0).max(1_000_000) })).mutation(async ({ ctx, input }) => {
+      const db = await dbOrThrow();
+      await db.transaction(async tx => {
+        const warehouse = await assertSellerWarehouseAccess(tx, ctx.user, input.warehouseId, { requireActive: true, permission: "manage_thresholds" });
+        const product = (await tx.select({ id: products.id }).from(products).where(and(eq(products.id, input.productId), companyScope(products.companyId, ctx.user.companyId))).limit(1))[0];
+        if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Produit introuvable." });
+        await tx.insert(warehouseReorderThresholds).values({ companyId: ctx.user.companyId!, warehouseId: warehouse.id, productId: product.id, threshold: input.threshold, updatedByUserId: ctx.user.id }).onDuplicateKeyUpdate({ set: { threshold: input.threshold, updatedByUserId: ctx.user.id } });
+        const quantity = (await tx.select({ quantity: warehouseStocks.quantity }).from(warehouseStocks).where(and(companyScope(warehouseStocks.companyId, ctx.user.companyId), eq(warehouseStocks.warehouseId, warehouse.id), eq(warehouseStocks.productId, product.id))).limit(1))[0]?.quantity ?? 0;
+        if (input.threshold > 0 && quantity <= input.threshold) await tx.insert(warehouseStockAlerts).values({ companyId: ctx.user.companyId!, warehouseId: warehouse.id, productId: product.id, threshold: input.threshold, observedQuantity: quantity, status: "active" }).onDuplicateKeyUpdate({ set: { threshold: input.threshold, observedQuantity: quantity, status: "active", resolvedAt: null } });
+        else await tx.update(warehouseStockAlerts).set({ threshold: input.threshold, observedQuantity: quantity, status: "resolved", resolvedAt: new Date() }).where(and(companyScope(warehouseStockAlerts.companyId, ctx.user.companyId), eq(warehouseStockAlerts.warehouseId, warehouse.id), eq(warehouseStockAlerts.productId, product.id), eq(warehouseStockAlerts.status, "active")));
+        await audit(tx, ctx.user.companyId, ctx.user.id, "Seuil réapprovisionnement", warehouse.id, `Seuil du produit ${product.id} défini à ${input.threshold}.`);
+      });
+      return { success: true };
+    }),
+  }),
+
+  team: router({
+    list: adminProcedure.input(z.object({ warehouseId: z.number().int().positive() })).query(async ({ ctx, input }) => {
+      const db = await dbOrThrow();
+      const warehouse = await getScopedWarehouse(db, ctx.user.companyId, input.warehouseId);
+      const [members, assignments] = await Promise.all([
+        db.select({ id: users.id, name: users.name, email: users.email, username: sellerCredentials.username, active: users.active }).from(users).innerJoin(sellerCredentials, eq(sellerCredentials.userId, users.id)).where(and(eq(users.role, "seller"), companyScope(users.companyId, ctx.user.companyId))).orderBy(asc(users.name)),
+        db.select({ sellerUserId: sellerWarehouseAssignments.sellerUserId, warehouseRole: sellerWarehouseAssignments.warehouseRole }).from(sellerWarehouseAssignments).where(and(companyScope(sellerWarehouseAssignments.companyId, ctx.user.companyId), eq(sellerWarehouseAssignments.warehouseId, warehouse.id))),
+      ]);
+      return members.map(member => ({ ...member, warehouseRole: assignments.find(assignment => assignment.sellerUserId === member.id)?.warehouseRole ?? null }));
+    }),
+    setRole: adminProcedure.input(z.object({ warehouseId: z.number().int().positive(), sellerUserId: z.number().int().positive(), warehouseRole: z.enum(["manager", "cashier", "seller"]) })).mutation(async ({ ctx, input }) => {
+      const db = await dbOrThrow();
+      await db.transaction(async tx => {
+        const warehouse = await getScopedWarehouse(tx, ctx.user.companyId, input.warehouseId, { requireActive: true });
+        const seller = (await tx.select({ id: users.id }).from(users).where(and(eq(users.id, input.sellerUserId), eq(users.role, "seller"), companyScope(users.companyId, ctx.user.companyId))).limit(1))[0];
+        if (!seller) throw new TRPCError({ code: "NOT_FOUND", message: "Utilisateur opérationnel introuvable." });
+        await tx.insert(sellerWarehouseAssignments).values({ companyId: ctx.user.companyId!, sellerUserId: seller.id, warehouseId: warehouse.id, warehouseRole: input.warehouseRole, createdByUserId: ctx.user.id }).onDuplicateKeyUpdate({ set: { warehouseRole: input.warehouseRole, createdByUserId: ctx.user.id } });
+        await audit(tx, ctx.user.companyId, ctx.user.id, "Rôle entrepôt", warehouse.id, `Utilisateur ${seller.id} défini comme ${input.warehouseRole}.`);
+      });
+      return { success: true };
+    }),
+    remove: adminProcedure.input(z.object({ warehouseId: z.number().int().positive(), sellerUserId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      const db = await dbOrThrow();
+      await db.transaction(async tx => {
+        const warehouse = await getScopedWarehouse(tx, ctx.user.companyId, input.warehouseId);
+        await tx.delete(sellerWarehouseAssignments).where(and(companyScope(sellerWarehouseAssignments.companyId, ctx.user.companyId), eq(sellerWarehouseAssignments.warehouseId, warehouse.id), eq(sellerWarehouseAssignments.sellerUserId, input.sellerUserId)));
+        await audit(tx, ctx.user.companyId, ctx.user.id, "Retrait rôle entrepôt", warehouse.id, `Utilisateur ${input.sellerUserId} retiré de l’équipe du dépôt.`);
+      });
+      return { success: true };
+    }),
   }),
 
   create: adminProcedure.input(warehouseInput).mutation(async ({ ctx, input }) => {

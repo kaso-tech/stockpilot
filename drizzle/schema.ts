@@ -55,12 +55,13 @@ export const userWarehousePreferences = mysqlTable("userWarehousePreferences", {
   index("user_warehouse_preferences_company_warehouse_idx").on(table.companyId, table.warehouseId),
 ]);
 
-/** Dépôts auxquels un vendeur est explicitement autorisé à accéder. */
+/** Dépôts auxquels un utilisateur opérationnel est autorisé à accéder, avec son rôle local. */
 export const sellerWarehouseAssignments = mysqlTable("sellerWarehouseAssignments", {
   id: int("id").autoincrement().primaryKey(),
   companyId: int("companyId").notNull(),
   sellerUserId: int("sellerUserId").notNull(),
   warehouseId: int("warehouseId").notNull(),
+  warehouseRole: mysqlEnum("warehouseRole", ["manager", "cashier", "seller"]).notNull().default("seller"),
   createdByUserId: int("createdByUserId").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, table => [
@@ -185,6 +186,38 @@ export const warehouseStocks = mysqlTable("warehouseStocks", {
   uniqueIndex("warehouse_stocks_warehouse_product_unique").on(table.warehouseId, table.productId),
   index("warehouse_stocks_company_warehouse_idx").on(table.companyId, table.warehouseId),
   index("warehouse_stocks_company_product_idx").on(table.companyId, table.productId),
+]);
+
+/** Seuil de réapprovisionnement spécifique à un produit dans un entrepôt. */
+export const warehouseReorderThresholds = mysqlTable("warehouseReorderThresholds", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  warehouseId: int("warehouseId").notNull(),
+  productId: int("productId").notNull(),
+  threshold: int("threshold").notNull().default(0),
+  updatedByUserId: int("updatedByUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  uniqueIndex("warehouse_reorder_thresholds_unique").on(table.companyId, table.warehouseId, table.productId),
+  index("warehouse_reorder_thresholds_company_warehouse_idx").on(table.companyId, table.warehouseId),
+]);
+
+/** Alerte de seuil indépendante pour chaque couple produit-entrepôt. */
+export const warehouseStockAlerts = mysqlTable("warehouseStockAlerts", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  warehouseId: int("warehouseId").notNull(),
+  productId: int("productId").notNull(),
+  threshold: int("threshold").notNull(),
+  observedQuantity: int("observedQuantity").notNull(),
+  status: mysqlEnum("status", ["active", "resolved"]).notNull().default("active"),
+  triggeredAt: timestamp("triggeredAt").defaultNow().notNull(),
+  resolvedAt: timestamp("resolvedAt"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  uniqueIndex("warehouse_stock_alerts_unique").on(table.companyId, table.warehouseId, table.productId),
+  index("warehouse_stock_alerts_company_warehouse_status_idx").on(table.companyId, table.warehouseId, table.status),
 ]);
 
 /** Les transferts internes sont expédiés puis reçus dans une transaction distincte. */

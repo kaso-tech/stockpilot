@@ -30,7 +30,7 @@ describe("commerce.sales.create", () => {
     const profile = { id: 1, beneficiaryType: "user" as const, beneficiaryId: 7, remunerationMode: "commission" as const, fixedMonthlyCents: 0, commissionBasis: "revenue" as const, rateBasisPoints: 500, active: true };
     const tx: any = {
       select: () => ({ from: (table: unknown) => {
-        const rows = table === customers ? [customer] : table === products ? [product] : table === productPriceTiers ? tiers : table === warehouses ? [{ id: 99, companyId: 1, name: "Entrepôt principal", code: "PRINCIPAL", active: true, isDefault: true }] : table === sellerWarehouseAssignments ? [{ id: 1, companyId: 1, sellerUserId: 7, warehouseId: 99 }] : table === warehouseStocks ? [warehouseStock] : table === stockAlerts ? [] : table === remunerationProfiles ? [profile] : [];
+        const rows = table === customers ? [customer] : table === products ? [product] : table === productPriceTiers ? tiers : table === warehouses ? [{ id: 99, companyId: 1, name: "Entrepôt principal", code: "PRINCIPAL", active: true, isDefault: true }] : table === sellerWarehouseAssignments ? [{ id: 1, companyId: 1, sellerUserId: 7, warehouseId: 99, warehouseRole: "seller" }] : table === warehouseStocks ? [warehouseStock] : table === stockAlerts ? [] : table === remunerationProfiles ? [profile] : [];
         const chainableRows = Object.assign(rows, { limit: async () => rows });
         return { where: () => chainableRows, limit: async () => rows };
       }}),

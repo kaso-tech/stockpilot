@@ -788,3 +788,11 @@
 - [x] Créer une procédure sécurisée de rapport financier multi-entrepôts.
 - [x] Ajouter le tableau filtrable dans la gestion des agents et rémunérations.
 - [x] Tester les calculs et publier le correctif.
+
+## Exploitation multi-entrepôts : rôles, transferts et seuils
+- [x] Définir les rôles Responsable, Caissier et Vendeur par entrepôt avec permissions associées.
+- [x] Créer les affectations utilisateur-entrepôt sécurisées et auditables.
+- [x] Finaliser les transferts brouillon, en transit et réceptionnés avec leurs contrôles de cycle de vie.
+- [x] Ajouter les seuils de réapprovisionnement et alertes de stock bas par produit et entrepôt.
+- [x] Créer les interfaces d’administration des rôles, des transferts et des seuils locaux.
+- [x] Tester permissions, stocks, alertes, transfert et publication.

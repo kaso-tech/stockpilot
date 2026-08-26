@@ -65,6 +65,12 @@ La migration `0053` ajoute le mode `warehouseScope` aux agents et la table `sale
 
 La migration `0054` ajoute `paymentKind` à `agentPayments`, avec les valeurs `commission`, `salary` et `mixed`; les écritures existantes restent `mixed` pour préserver leur signification historique. La section « Commissions par agent et entrepôt » d’« Agents & rémunérations » filtre la période, l’entrepôt et le bénéficiaire. Elle compare les commissions générées à partir des ventes, les paiements explicitement qualifiés de commission et le solde de commission restant. Les versements mixtes et salariaux restent visibles séparément et ne diminuent jamais artificiellement le solde de commission. Les nouveaux paiements peuvent être catégorisés depuis la fiche de l’agent.
 
+## Exploitation multi-entrepôts : rôles, transferts et alertes locales
+
+La migration `0055` ajoute un rôle local à chaque affectation opérationnelle (`manager`, `cashier`, `seller`), les seuils `warehouseReorderThresholds` et les alertes `warehouseStockAlerts` par produit et entrepôt. Les affectations existantes restent au rôle vendeur pour conserver les accès actuels. Le responsable peut suivre le stock, encaisser, gérer les transferts et régler les seuils; le caissier peut vendre et encaisser; le vendeur peut préparer les ventes. Les contrôles sont centralisés côté serveur et les modifications sont journalisées.
+
+Les transferts disposent maintenant d’un cycle brouillon → en transit → réceptionné, avec annulation traçable et retour automatique du stock source pour les transferts annulés en transit. Les responsables concernés peuvent traiter les transferts de leurs dépôts; les autres utilisateurs ne voient que les mouvements portant sur leurs entrepôts attribués. L’écran Entrepôts permet d’attribuer le rôle local de chaque utilisateur opérationnel et de saisir les seuils de chaque produit. Toute entrée ou sortie de stock synchronise l’alerte locale, et la page Alertes ainsi que le bon de commande de réapprovisionnement utilisent exclusivement le dépôt actif.
+
 ## 2. Environnement et exploitation
 
 | Élément | Valeur / règle |

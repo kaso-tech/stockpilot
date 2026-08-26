@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, or } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { auditLogs, stockMovements, stockTransferItems, stockTransfers, warehouses } from "../../drizzle/schema";
@@ -6,6 +6,8 @@ import { getDb } from "../db";
 import { adminProcedure, protectedProcedure, router } from "../_core/trpc";
 import { companyScope } from "../companyScope";
 import { creditWarehouseStock, debitWarehouseStock, getScopedProduct, getScopedWarehouse, transferNumber } from "../warehouseStock";
+import { assertSellerWarehouseAccess } from "../sellerWarehouseAccess";
+import { assignedWarehouseIds } from "../sellerWarehouseAccess";
 
 const transferLineInput = z.object({ productId: z.number().int().positive(), quantity: z.number().int().positive().max(1_000_000) });
 
@@ -38,7 +40,9 @@ function affectedRows(result: unknown) {
 export const stockTransfersRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
     const db = await dbOrThrow();
-    const transfers = await db.select().from(stockTransfers).where(companyScope(stockTransfers.companyId, ctx.user.companyId)).orderBy(desc(stockTransfers.createdAt)).limit(200);
+    const allowedWarehouseIds = await assignedWarehouseIds(db, ctx.user);
+    const scope = allowedWarehouseIds === null ? companyScope(stockTransfers.companyId, ctx.user.companyId) : allowedWarehouseIds.length ? and(companyScope(stockTransfers.companyId, ctx.user.companyId), or(inArray(stockTransfers.sourceWarehouseId, allowedWarehouseIds), inArray(stockTransfers.destinationWarehouseId, allowedWarehouseIds))) : and(companyScope(stockTransfers.companyId, ctx.user.companyId), eq(stockTransfers.id, 0));
+    const transfers = await db.select().from(stockTransfers).where(scope).orderBy(desc(stockTransfers.createdAt)).limit(200);
     if (!transfers.length) return [];
     const [warehouseRows, lineRows] = await Promise.all([
       db.select().from(warehouses).where(companyScope(warehouses.companyId, ctx.user.companyId)),
@@ -55,6 +59,10 @@ export const stockTransfersRouter = router({
   get: protectedProcedure.input(z.object({ id: z.number().int().positive() })).query(async ({ ctx, input }) => {
     const db = await dbOrThrow();
     const transfer = await findTransfer(db, ctx.user.companyId, input.id);
+    await Promise.any([
+      assertSellerWarehouseAccess(db, ctx.user, transfer.sourceWarehouseId, { permission: "view_stock" }),
+      assertSellerWarehouseAccess(db, ctx.user, transfer.destinationWarehouseId, { permission: "view_stock" }),
+    ]).catch(() => { throw new TRPCError({ code: "FORBIDDEN", message: "Ce transfert ne concerne aucun de vos entrepôts." }); });
     const [sourceWarehouse, destinationWarehouse, items] = await Promise.all([
       getScopedWarehouse(db, ctx.user.companyId, transfer.sourceWarehouseId),
       getScopedWarehouse(db, ctx.user.companyId, transfer.destinationWarehouseId),
@@ -63,7 +71,7 @@ export const stockTransfersRouter = router({
     return { ...transfer, sourceWarehouse, destinationWarehouse, items };
   }),
 
-  create: adminProcedure.input(z.object({
+  create: protectedProcedure.input(z.object({
     sourceWarehouseId: z.number().int().positive(),
     destinationWarehouseId: z.number().int().positive(),
     notes: z.string().trim().max(2000).nullable().optional(),
@@ -74,8 +82,8 @@ export const stockTransfersRouter = router({
     const db = await dbOrThrow();
     const created = await db.transaction(async tx => {
       const [sourceWarehouse, destinationWarehouse] = await Promise.all([
-        getScopedWarehouse(tx, ctx.user.companyId, input.sourceWarehouseId, { requireActive: true }),
-        getScopedWarehouse(tx, ctx.user.companyId, input.destinationWarehouseId, { requireActive: true }),
+        assertSellerWarehouseAccess(tx, ctx.user, input.sourceWarehouseId, { requireActive: true, permission: "manage_transfers" }),
+        assertSellerWarehouseAccess(tx, ctx.user, input.destinationWarehouseId, { requireActive: true, permission: "view_stock" }),
       ]);
       const products = await Promise.all(input.items.map(item => getScopedProduct(tx, ctx.user.companyId, item.productId)));
       const number = transferNumber();
@@ -91,15 +99,15 @@ export const stockTransfersRouter = router({
     return { success: true, ...created };
   }),
 
-  dispatch: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+  dispatch: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
     const db = await dbOrThrow();
     return db.transaction(async tx => {
       const transfer = await findTransfer(tx, ctx.user.companyId, input.id);
       if (transfer.status === "in_transit") return { success: true, alreadyDispatched: true, status: "in_transit" as const };
       if (transfer.status !== "draft") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Seul un transfert brouillon peut être expédié." });
       const [sourceWarehouse, destinationWarehouse, items] = await Promise.all([
-        getScopedWarehouse(tx, ctx.user.companyId, transfer.sourceWarehouseId, { requireActive: true }),
-        getScopedWarehouse(tx, ctx.user.companyId, transfer.destinationWarehouseId, { requireActive: true }),
+        assertSellerWarehouseAccess(tx, ctx.user, transfer.sourceWarehouseId, { requireActive: true, permission: "manage_transfers" }),
+        assertSellerWarehouseAccess(tx, ctx.user, transfer.destinationWarehouseId, { requireActive: true, permission: "view_stock" }),
         transferLines(tx, transfer.id),
       ]);
       const lock = await tx.update(stockTransfers).set({ status: "in_transit", dispatchedAt: new Date(), dispatchedByUserId: ctx.user.id }).where(and(eq(stockTransfers.id, transfer.id), companyScope(stockTransfers.companyId, ctx.user.companyId), eq(stockTransfers.status, "draft")));
@@ -114,15 +122,15 @@ export const stockTransfersRouter = router({
     });
   }),
 
-  receive: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+  receive: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
     const db = await dbOrThrow();
     return db.transaction(async tx => {
       const transfer = await findTransfer(tx, ctx.user.companyId, input.id);
       if (transfer.status === "received") return { success: true, alreadyReceived: true, status: "received" as const };
       if (transfer.status !== "in_transit") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Seul un transfert en transit peut être réceptionné." });
       const [sourceWarehouse, destinationWarehouse, items] = await Promise.all([
-        getScopedWarehouse(tx, ctx.user.companyId, transfer.sourceWarehouseId),
-        getScopedWarehouse(tx, ctx.user.companyId, transfer.destinationWarehouseId, { requireActive: true }),
+        assertSellerWarehouseAccess(tx, ctx.user, transfer.sourceWarehouseId, { permission: "view_stock" }),
+        assertSellerWarehouseAccess(tx, ctx.user, transfer.destinationWarehouseId, { requireActive: true, permission: "manage_transfers" }),
         transferLines(tx, transfer.id),
       ]);
       const lock = await tx.update(stockTransfers).set({ status: "received", receivedAt: new Date(), receivedByUserId: ctx.user.id }).where(and(eq(stockTransfers.id, transfer.id), companyScope(stockTransfers.companyId, ctx.user.companyId), eq(stockTransfers.status, "in_transit")));
@@ -137,7 +145,7 @@ export const stockTransfersRouter = router({
     });
   }),
 
-  cancel: adminProcedure.input(z.object({ id: z.number().int().positive(), reason: z.string().trim().min(3).max(2000) })).mutation(async ({ ctx, input }) => {
+  cancel: protectedProcedure.input(z.object({ id: z.number().int().positive(), reason: z.string().trim().min(3).max(2000) })).mutation(async ({ ctx, input }) => {
     const db = await dbOrThrow();
     return db.transaction(async tx => {
       const transfer = await findTransfer(tx, ctx.user.companyId, input.id);
@@ -146,7 +154,7 @@ export const stockTransfersRouter = router({
       const wasInTransit = transfer.status === "in_transit";
       const lock = await tx.update(stockTransfers).set({ status: "cancelled", cancellationReason: input.reason, cancelledAt: new Date(), cancelledByUserId: ctx.user.id }).where(and(eq(stockTransfers.id, transfer.id), companyScope(stockTransfers.companyId, ctx.user.companyId), eq(stockTransfers.status, transfer.status)));
       if (!affectedRows(lock)) throw new TRPCError({ code: "CONFLICT", message: "Ce transfert a été modifié. Actualisez la page avant de poursuivre." });
-      const sourceWarehouse = await getScopedWarehouse(tx, ctx.user.companyId, transfer.sourceWarehouseId);
+      const sourceWarehouse = await assertSellerWarehouseAccess(tx, ctx.user, transfer.sourceWarehouseId, { permission: "manage_transfers" });
       if (wasInTransit) {
         const items = await transferLines(tx, transfer.id);
         for (const item of items) {

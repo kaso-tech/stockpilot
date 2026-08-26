@@ -26,11 +26,11 @@ const statusLabel = { draft: "Brouillon", in_transit: "En transit", received: "R
 
 export default function StockTransfers() {
   const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const canAccessTransfers = Boolean(user);
   const utils = trpc.useUtils();
-  const { data: warehouses = [] } = trpc.warehouses.list.useQuery(undefined, { enabled: isAdmin });
-  const { data: products = [] } = trpc.products.list.useQuery(undefined, { enabled: isAdmin });
-  const { data: transfers = [], isLoading } = trpc.stockTransfers.list.useQuery(undefined, { enabled: isAdmin });
+  const { data: warehouses = [] } = trpc.warehouses.list.useQuery(undefined, { enabled: canAccessTransfers });
+  const { data: products = [] } = trpc.products.list.useQuery(undefined, { enabled: canAccessTransfers });
+  const { data: transfers = [], isLoading } = trpc.stockTransfers.list.useQuery(undefined, { enabled: canAccessTransfers });
   const activeWarehouses = useMemo(() => warehouses.filter(warehouse => warehouse.active), [warehouses]);
   const [open, setOpen] = useState(false);
   const [sourceWarehouseId, setSourceWarehouseId] = useState("none");
@@ -56,7 +56,7 @@ export default function StockTransfers() {
   };
   const updateLine = (index: number, values: Partial<DraftLine>) => setLines(current => current.map((line, position) => position === index ? { ...line, ...values } : line));
 
-  if (!isAdmin) return <Restricted title="Transferts de stock" description="La préparation et la validation des transferts sont réservées aux administrateurs." />;
+  if (!canAccessTransfers) return <Restricted title="Transferts de stock" description="Connectez-vous pour consulter les transferts de vos entrepôts attribués." />;
 
   return <div className="mx-auto max-w-7xl space-y-6">
     <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Logistique interne</p><h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">Transferts de stock</h1><p className="mt-2 max-w-2xl text-sm text-slate-400">Préparez un transfert, expédiez uniquement le stock disponible et confirmez la réception dans l’entrepôt destinataire.</p></div><Button onClick={openCreate} disabled={activeWarehouses.length < 2} className="bg-primary text-primary-foreground hover:bg-primary/90"><PackagePlus className="mr-2 h-4 w-4" />Nouveau transfert</Button></header>
