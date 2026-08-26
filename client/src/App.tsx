@@ -56,6 +56,7 @@ import Warehouses from "./pages/Warehouses";
 import StockTransfers from "./pages/StockTransfers";
 import WarehouseComparison from "./pages/WarehouseComparison";
 import Pricing from "./pages/Pricing";
+import PlatformAdmin from "./pages/PlatformAdmin";
 
 function DashboardRouter() {
   return (
@@ -115,7 +116,7 @@ function DashboardRouter() {
 }
 
 function Router() {
-  return <Switch><Route path="/tarifs" component={Pricing} /><Route path="/aide" component={Help} /><Route path="/conditions-utilisation" component={TermsOfUse} /><Route path="/politique-confidentialite" component={PrivacyPolicy} /><Route path="/politique-securite" component={SecurityPolicy} /><Route path="/contactez-nous" component={ContactUs} /><Route path="/support" component={SupportRequests} /><Route component={DashboardRouter} /></Switch>;
+  return <Switch><Route path="/plateforme" component={PlatformAdmin} /><Route path="/tarifs" component={Pricing} /><Route path="/aide" component={Help} /><Route path="/conditions-utilisation" component={TermsOfUse} /><Route path="/politique-confidentialite" component={PrivacyPolicy} /><Route path="/politique-securite" component={SecurityPolicy} /><Route path="/contactez-nous" component={ContactUs} /><Route path="/support" component={SupportRequests} /><Route component={DashboardRouter} /></Switch>;
 }
 
 // NOTE: About Theme

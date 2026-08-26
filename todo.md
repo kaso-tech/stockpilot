@@ -856,3 +856,10 @@
 - [x] Définir le périmètre sécurisé du pilotage des entreprises, comptes, support et exploitation.
 - [x] Prioriser les fonctionnalités de production et les garde-fous requis.
 - [x] Produire un plan de réalisation du panneau d’administration.
+
+## P0 — Panneau d’administration plateforme
+- [x] Créer le rôle plateforme séparé et la liste blanche d’opérateurs.
+- [x] Créer l’audit plateforme immuable et les événements de cycle de vie des entreprises.
+- [x] Créer les procédures sécurisées de liste, détail minimal, activation et suspension d’entreprises.
+- [x] Créer l’interface séparée de gestion des entreprises sans accès aux données métier.
+- [x] Tester les accès inter-entreprises, l’audit et publier le lot P0.

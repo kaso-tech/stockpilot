@@ -4,6 +4,9 @@ export const companies = mysqlTable("companies", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 200 }).notNull(),
   ownerUserId: int("ownerUserId"),
+  platformStatus: mysqlEnum("platformStatus", ["active", "suspended"]).notNull().default("active"),
+  suspendedAt: timestamp("suspendedAt"),
+  suspensionReason: varchar("suspensionReason", { length: 400 }),
   onboardingCompletedAt: timestamp("onboardingCompletedAt"),
   onboardingSkippedAt: timestamp("onboardingSkippedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -24,6 +27,43 @@ export const users = mysqlTable("users", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
 }, table => [index("users_company_active_idx").on(table.companyId, table.active)]);
+
+/** Opérateurs explicitement autorisés à administrer la plateforme SaaS. */
+export const platformAdminUsers = mysqlTable("platformAdminUsers", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique(),
+  platformRole: mysqlEnum("platformRole", ["super_admin", "operator"]).notNull().default("operator"),
+  active: boolean("active").notNull().default(true),
+  createdByUserId: int("createdByUserId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+/** Journal append-only des actions de l’administration SaaS. */
+export const platformAuditLogs = mysqlTable("platformAuditLogs", {
+  id: int("id").autoincrement().primaryKey(),
+  actorUserId: int("actorUserId").notNull(),
+  action: varchar("action", { length: 120 }).notNull(),
+  entityType: varchar("entityType", { length: 80 }).notNull(),
+  entityId: int("entityId"),
+  companyId: int("companyId"),
+  reason: varchar("reason", { length: 400 }),
+  metadataJson: text("metadataJson"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [
+  index("platform_audit_company_created_idx").on(table.companyId, table.createdAt),
+  index("platform_audit_actor_created_idx").on(table.actorUserId, table.createdAt),
+]);
+
+/** Événements réversibles du cycle de vie d’une entreprise sur la plateforme. */
+export const companyLifecycleEvents = mysqlTable("companyLifecycleEvents", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  action: mysqlEnum("action", ["activated", "suspended"]).notNull(),
+  reason: varchar("reason", { length: 400 }),
+  actorUserId: int("actorUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [index("company_lifecycle_company_created_idx").on(table.companyId, table.createdAt)]);
 
 /** Demande d’assistance interne créée par un utilisateur de l’entreprise. */
 export const supportRequests = mysqlTable("supportRequests", {

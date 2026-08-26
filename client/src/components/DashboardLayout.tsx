@@ -58,6 +58,7 @@ import {
   LayoutDashboard,
   LogOut,
   Mail,
+  MonitorCog,
   Moon,
   PackageSearch,
   ReceiptText,
@@ -175,6 +176,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const isCollapsed = state === "collapsed";
   const isMobile = useIsMobile();
   const { data: sellerPermissions } = trpc.commerce.settings.get.useQuery(undefined, { enabled: user?.role === "seller" });
+  const platformAccess = trpc.platform.access.useQuery(undefined, { enabled: Boolean(user), retry: false });
   const isDocumentCreation = location === "/factures/nouvelle" || location === "/devis/nouveau";
   const { data: documentVatSettings } = trpc.commerce.settings.get.useQuery(undefined, { enabled: Boolean(user) && isDocumentCreation });
   const { data: vatRatePresets = [] } = trpc.vatRates.list.useQuery(undefined, { enabled: Boolean(user) && isDocumentCreation });
@@ -265,6 +267,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
               <DropdownMenuItem onClick={() => setLocation("/politique-securite")} className="cursor-pointer focus:bg-white/[0.06]"><ShieldCheck className="mr-2 h-4 w-4" />Politique de sécurité</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setLocation("/contactez-nous")} className="cursor-pointer focus:bg-white/[0.06]"><Mail className="mr-2 h-4 w-4" />Contactez-nous</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setLocation("/conditions-utilisation")} className="cursor-pointer focus:bg-white/[0.06]"><FileText className="mr-2 h-4 w-4" />Conditions d’utilisation</DropdownMenuItem>
+              {platformAccess.data?.platformRole && <DropdownMenuItem onClick={() => setLocation("/plateforme")} className="cursor-pointer focus:bg-white/[0.06]"><MonitorCog className="mr-2 h-4 w-4" />Console plateforme</DropdownMenuItem>}
               <DropdownMenuSeparator className="bg-white/10" />
               <DropdownMenuItem onClick={logout} className="cursor-pointer text-rose-300 focus:bg-rose-400/10 focus:text-rose-200">
                 <LogOut className="mr-2 h-4 w-4" /> Se déconnecter

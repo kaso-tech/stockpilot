@@ -103,6 +103,12 @@ Les contrôles prioritaires, dont l’encaissement, la création de facture, les
 
 Les actions « Ajouter un produit » et « Encaisser » de facture/devis, ainsi que l’encaissement POS, utilisent maintenant uniquement les tokens `primary` et `primary-foreground`. Le menu actif applique ces mêmes tokens de manière forcée sur le bouton et son icône afin d’empêcher une règle héritée de rendre le texte sombre. Les alertes de seuil utilisent des variantes ambre, orange et rouge avec texte foncé en thème clair et texte clair en thème sombre; l’action « Créer une entrée » conserve la couleur principale pour éviter une combinaison jaune sur jaune.
 
+## P0 — Console d’administration plateforme
+
+La migration `0058` ajoute le rôle séparé `platformAdminUsers`, le journal append-only `platformAuditLogs` et `companyLifecycleEvents`. Le propriétaire configuré peut amorcer uniquement son propre rôle `super_admin`; les autres opérateurs doivent être explicitement ajoutés à la liste blanche. Les routes plateforme utilisent `authenticatedProcedure`, distincte des procédures client, et la console `/plateforme` est hors du layout métier. Elle ne présente que les métadonnées opérationnelles des entreprises (statut, activité, administrateur, support ouvert) et ne donne aucun accès direct aux ventes, stocks, clients ou documents métier.
+
+La suspension exige un motif, est réversible, crée un événement de cycle de vie et une trace plateforme. Les procédures ordinaires de l’entreprise bloquent les comptes d’une entreprise suspendue en production. Le lien vers la console n’est affiché que lorsqu’un compte reçoit un rôle plateforme actif; les comptes clients reçoivent une réponse d’accès neutre sans erreur de réseau visible.
+
 ## 2. Environnement et exploitation
 
 | Élément | Valeur / règle |

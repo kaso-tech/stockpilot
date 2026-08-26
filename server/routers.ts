@@ -56,6 +56,7 @@ import { sellerDiscountPermissionsRouter } from "./routers/sellerDiscountPermiss
 import { warehousesRouter } from "./routers/warehouses";
 import { stockTransfersRouter } from "./routers/stockTransfers";
 import { supportRouter } from "./routers/support";
+import { platformRouter } from "./routers/platform";
 import { BULK_DELETE_CONFIRMATION, hasBulkDeleteConfirmation, normalizeBulkDeleteIds, type BulkDeleteResource } from "./bulkDeleteRules";
 
 const STANDARD_AUTH_SESSION_MS = 24 * 60 * 60 * 1000;
@@ -231,6 +232,7 @@ async function syncStockAlert(productId: number, companyId: number | null) {
 }
 
 export const appRouter = router({
+  platform: platformRouter,
   printingSettings: printingSettingsRouter,
   vatRates: vatRatesRouter,
   sellerDiscountPermissions: sellerDiscountPermissionsRouter,
