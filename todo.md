@@ -863,3 +863,8 @@
 - [x] Créer les procédures sécurisées de liste, détail minimal, activation et suspension d’entreprises.
 - [x] Créer l’interface séparée de gestion des entreprises sans accès aux données métier.
 - [x] Tester les accès inter-entreprises, l’audit et publier le lot P0.
+
+## Correctif — lisibilité de la console plateforme
+- [x] Auditer les surfaces, textes, badges, champs et actions de la console dans les thèmes clair et sombre.
+- [x] Remplacer les associations de couleurs insuffisamment contrastées par des tokens sémantiques accessibles.
+- [x] Vérifier les états normaux, focus, survol, chargement et dialogue de suspension, puis publier le correctif.
