@@ -1,4 +1,4 @@
-import { boolean, index, int, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
+import { boolean, decimal, index, int, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 
 export const companies = mysqlTable("companies", {
   id: int("id").autoincrement().primaryKey(),
@@ -211,7 +211,11 @@ export const warehouseStockAlerts = mysqlTable("warehouseStockAlerts", {
   productId: int("productId").notNull(),
   threshold: int("threshold").notNull(),
   observedQuantity: int("observedQuantity").notNull(),
+  coverageDays: decimal("coverageDays", { precision: 10, scale: 1 }),
+  urgency: mysqlEnum("urgency", ["critical", "high", "medium"]).notNull().default("medium"),
   status: mysqlEnum("status", ["active", "resolved"]).notNull().default("active"),
+  acknowledgedAt: timestamp("acknowledgedAt"),
+  acknowledgedByUserId: int("acknowledgedByUserId"),
   triggeredAt: timestamp("triggeredAt").defaultNow().notNull(),
   resolvedAt: timestamp("resolvedAt"),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

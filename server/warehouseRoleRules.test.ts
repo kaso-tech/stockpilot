@@ -12,4 +12,9 @@ describe("warehouseRoleCan", () => {
     expect(warehouseRoleCan("cashier", "checkout")).toBe(true);
     expect(warehouseRoleCan("seller", "checkout")).toBe(false);
   });
+
+  it("réserve l’accusé de réception des alertes au responsable", () => {
+    expect(warehouseRoleCan("manager", "acknowledge_alerts")).toBe(true);
+    expect(warehouseRoleCan("cashier", "acknowledge_alerts")).toBe(false);
+  });
 });

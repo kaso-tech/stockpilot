@@ -75,6 +75,14 @@ Les transferts disposent maintenant d’un cycle brouillon → en transit → r�
 
 Le centre de notifications de l’application reçoit désormais les alertes stock locales persistées dans `warehouseStockAlerts`. Un administrateur voit les alertes de tous les dépôts, tandis qu’un utilisateur opérationnel ne reçoit que celles des entrepôts où son rôle local est `manager`. Chaque notification porte l’état actif ou résolu, le produit, la quantité observée, le seuil et le dépôt concerné. L’identifiant contient l’horodatage de mise à jour : une alerte déjà lue n’est pas répétée tant qu’elle reste active, mais une nouvelle rupture après résolution est signalée à nouveau. Les alertes résolues restent visibles sept jours pour confirmer la remise à niveau.
 
+## Urgence et accusé de réception des ruptures
+
+La migration `0056` complète les alertes locales avec les champs de couverture estimée, urgence et accusé de réception. La couverture est calculée à partir des ventes encaissées ou partielles des trente derniers jours dans le dépôt concerné. Une rupture est `critical` si le stock est nul ou si la couverture est inférieure ou égale à un jour, `high` jusqu’à trois jours, puis `medium`. Un responsable d’entrepôt ou un administrateur peut accuser réception de l’alerte; cette action est tracée. L’envoi e-mail optionnel reste volontairement en attente d’une configuration de fournisseur transactionnel, conformément au choix de l’utilisateur.
+
+## Pages d’information publiques
+
+Les routes publiques `/aide`, `/conditions-utilisation`, `/politique-securite` et `/contactez-nous` sont disponibles sans connexion. Les liens Aide, Politique de sécurité, Contactez-nous et Conditions d’utilisation sont aussi disponibles dans le menu utilisateur de l’application. Les contenus légaux constituent des modèles à adapter à l’offre commerciale et à la juridiction applicables avant mise en service.
+
 ## 2. Environnement et exploitation
 
 | Élément | Valeur / règle |

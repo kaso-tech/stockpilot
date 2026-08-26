@@ -1,7 +1,8 @@
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { products, warehouseReorderThresholds, warehouseStockAlerts, warehouseStocks, warehouses } from "../drizzle/schema";
+import { products, saleItems, sales, warehouseReorderThresholds, warehouseStockAlerts, warehouseStocks, warehouses } from "../drizzle/schema";
 import { companyScope } from "./companyScope";
+import { classifyWarehouseAlertUrgency, normalizeCoverageDays } from "./warehouseAlertUrgency";
 
 type DbTransaction = any;
 
@@ -29,12 +30,24 @@ export async function warehouseStockQuantity(tx: DbTransaction, companyId: numbe
   return row?.quantity ?? 0;
 }
 
+async function warehouseCoverageDays(tx: DbTransaction, companyId: number | null, warehouseId: number, productId: number, quantity: number) {
+  const since = new Date(Date.now() - 1000 * 60 * 60 * 24 * 30);
+  const sold = (await tx.select({ quantity: sql<number>`coalesce(sum(${saleItems.quantity}), 0)` }).from(saleItems).innerJoin(sales, eq(sales.id, saleItems.saleId)).where(and(companyScope(sales.companyId, companyId), eq(sales.warehouseId, warehouseId), eq(saleItems.productId, productId), inArray(sales.status, ["paid", "partial"]), gte(sales.createdAt, since))))[0];
+  return normalizeCoverageDays(quantity, Number(sold?.quantity ?? 0));
+}
+
 export async function syncWarehouseStockAlert(tx: DbTransaction, companyId: number | null, warehouseId: number, productId: number, observedQuantity?: number) {
   const quantity = observedQuantity ?? await warehouseStockQuantity(tx, companyId, warehouseId, productId);
   const thresholdRow = (await tx.select({ threshold: warehouseReorderThresholds.threshold }).from(warehouseReorderThresholds).where(and(companyScope(warehouseReorderThresholds.companyId, companyId), eq(warehouseReorderThresholds.warehouseId, warehouseId), eq(warehouseReorderThresholds.productId, productId))).limit(1))[0];
   const threshold = thresholdRow?.threshold ?? 0;
   if (threshold > 0 && quantity <= threshold) {
-    await tx.insert(warehouseStockAlerts).values({ companyId: companyId!, warehouseId, productId, threshold, observedQuantity: quantity, status: "active" }).onDuplicateKeyUpdate({ set: { threshold, observedQuantity: quantity, status: "active", resolvedAt: null, updatedAt: new Date() } });
+    const coverageDays = await warehouseCoverageDays(tx, companyId, warehouseId, productId, quantity);
+    const urgency = classifyWarehouseAlertUrgency(coverageDays, quantity);
+    const existing = (await tx.select({ status: warehouseStockAlerts.status }).from(warehouseStockAlerts).where(and(companyScope(warehouseStockAlerts.companyId, companyId), eq(warehouseStockAlerts.warehouseId, warehouseId), eq(warehouseStockAlerts.productId, productId))).limit(1))[0];
+    const reactivated = existing?.status === "resolved";
+    const update: Record<string, unknown> = { threshold, observedQuantity: quantity, coverageDays: coverageDays === null ? null : String(coverageDays), urgency, status: "active", resolvedAt: null, updatedAt: new Date() };
+    if (reactivated) Object.assign(update, { triggeredAt: new Date(), acknowledgedAt: null, acknowledgedByUserId: null });
+    await tx.insert(warehouseStockAlerts).values({ companyId: companyId!, warehouseId, productId, threshold, observedQuantity: quantity, coverageDays: coverageDays === null ? null : String(coverageDays), urgency, status: "active" }).onDuplicateKeyUpdate({ set: update });
   } else {
     await tx.update(warehouseStockAlerts).set({ observedQuantity: quantity, threshold, status: "resolved", resolvedAt: new Date(), updatedAt: new Date() }).where(and(companyScope(warehouseStockAlerts.companyId, companyId), eq(warehouseStockAlerts.warehouseId, warehouseId), eq(warehouseStockAlerts.productId, productId), eq(warehouseStockAlerts.status, "active")));
   }

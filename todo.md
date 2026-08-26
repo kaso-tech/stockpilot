@@ -802,3 +802,17 @@
 - [x] Déclencher une notification unique lorsqu’une alerte locale devient active.
 - [x] Signaler la résolution aux responsables lorsque le seuil est de nouveau respecté.
 - [x] Tester le ciblage, la déduplication et publier le correctif.
+
+## Urgences, accusés et e-mails de rupture
+- [x] Définir les niveaux d’urgence à partir des jours de couverture estimés.
+- [x] Ajouter l’accusé de réception par un responsable d’entrepôt.
+- [ ] Ajouter un opt-in e-mail sécurisé, sans envoi lorsque le canal n’est pas configuré. *(En attente de configuration e-mail demandée ultérieurement.)*
+- [x] Afficher l’urgence et l’accusé de réception dans les alertes et notifications.
+- [x] Tester les règles, les destinataires et publier le correctif.
+
+## Pages d’information et assistance
+- [x] Ajouter la page Aide avec les parcours d’assistance essentiels.
+- [x] Ajouter les Conditions d’utilisation.
+- [x] Ajouter la Politique de sécurité.
+- [x] Ajouter la page Contactez-nous et les liens de navigation associés.
+- [x] Tester la navigation et publier les pages.

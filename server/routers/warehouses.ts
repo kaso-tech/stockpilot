@@ -102,14 +102,31 @@ export const warehousesRouter = router({
     }
     const cutoff = new Date(Date.now() - 1000 * 60 * 60 * 24 * 7);
     const scope = warehouseIds ? and(companyScope(warehouseStockAlerts.companyId, ctx.user.companyId), inArray(warehouseStockAlerts.warehouseId, warehouseIds), sql`(${warehouseStockAlerts.status} = 'active' OR (${warehouseStockAlerts.status} = 'resolved' AND ${warehouseStockAlerts.updatedAt} >= ${cutoff}))`) : and(companyScope(warehouseStockAlerts.companyId, ctx.user.companyId), sql`(${warehouseStockAlerts.status} = 'active' OR (${warehouseStockAlerts.status} = 'resolved' AND ${warehouseStockAlerts.updatedAt} >= ${cutoff}))`);
-    const rows = await db.select({ id: warehouseStockAlerts.id, warehouseId: warehouseStockAlerts.warehouseId, productId: warehouseStockAlerts.productId, status: warehouseStockAlerts.status, threshold: warehouseStockAlerts.threshold, observedQuantity: warehouseStockAlerts.observedQuantity, updatedAt: warehouseStockAlerts.updatedAt, warehouseName: warehouses.name, productName: products.name, productUnit: products.unit }).from(warehouseStockAlerts).innerJoin(warehouses, eq(warehouses.id, warehouseStockAlerts.warehouseId)).innerJoin(products, eq(products.id, warehouseStockAlerts.productId)).where(scope).orderBy(desc(warehouseStockAlerts.updatedAt)).limit(50);
+    const rows = await db.select({ id: warehouseStockAlerts.id, warehouseId: warehouseStockAlerts.warehouseId, productId: warehouseStockAlerts.productId, status: warehouseStockAlerts.status, urgency: warehouseStockAlerts.urgency, coverageDays: warehouseStockAlerts.coverageDays, threshold: warehouseStockAlerts.threshold, observedQuantity: warehouseStockAlerts.observedQuantity, acknowledgedAt: warehouseStockAlerts.acknowledgedAt, updatedAt: warehouseStockAlerts.updatedAt, warehouseName: warehouses.name, productName: products.name, productUnit: products.unit }).from(warehouseStockAlerts).innerJoin(warehouses, eq(warehouses.id, warehouseStockAlerts.warehouseId)).innerJoin(products, eq(products.id, warehouseStockAlerts.productId)).where(scope).orderBy(desc(warehouseStockAlerts.updatedAt)).limit(50);
     return rows.map(row => ({
       id: warehouseAlertNotificationId({ alertId: row.id, warehouseId: row.warehouseId, productId: row.productId, status: row.status, updatedAt: row.updatedAt }),
       title: warehouseAlertNotificationTitle(row.status),
-      detail: row.status === "active" ? `${row.productName} : ${row.observedQuantity} ${row.productUnit} pour un seuil de ${row.threshold} · ${row.warehouseName}.` : `${row.productName} est repassé au-dessus du seuil dans ${row.warehouseName}.`,
+      detail: row.status === "active" ? `${row.productName} : ${row.observedQuantity} ${row.productUnit} pour un seuil de ${row.threshold}${row.coverageDays === null ? "" : ` · couverture ${row.coverageDays} j` } · ${row.warehouseName}.` : `${row.productName} est repassé au-dessus du seuil dans ${row.warehouseName}.`,
       status: row.status,
+      urgency: row.urgency,
+      acknowledgedAt: row.acknowledgedAt,
       warehouseId: row.warehouseId,
     }));
+  }),
+
+  acknowledgeAlert: protectedProcedure.input(z.object({ alertId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+    const db = await dbOrThrow();
+    if (ctx.user.companyId === null) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Aucune entreprise active n’est associée à ce compte." });
+    await db.transaction(async tx => {
+      const alert = (await tx.select().from(warehouseStockAlerts).where(and(companyScope(warehouseStockAlerts.companyId, ctx.user.companyId), eq(warehouseStockAlerts.id, input.alertId))).limit(1))[0];
+      if (!alert) throw new TRPCError({ code: "NOT_FOUND", message: "Alerte introuvable." });
+      await assertSellerWarehouseAccess(tx, ctx.user, alert.warehouseId, { permission: "acknowledge_alerts" });
+      if (!alert.acknowledgedAt) {
+        await tx.update(warehouseStockAlerts).set({ acknowledgedAt: new Date(), acknowledgedByUserId: ctx.user.id }).where(and(companyScope(warehouseStockAlerts.companyId, ctx.user.companyId), eq(warehouseStockAlerts.id, alert.id)));
+        await audit(tx, ctx.user.companyId, ctx.user.id, "warehouse_alert_acknowledged", alert.id, `Alerte de stock accusée pour l’entrepôt ${alert.warehouseId}.`);
+      }
+    });
+    return { ok: true };
   }),
 
   thresholds: router({
@@ -121,7 +138,8 @@ export const warehousesRouter = router({
         db.select().from(warehouseStockAlerts).where(and(companyScope(warehouseStockAlerts.companyId, ctx.user.companyId), eq(warehouseStockAlerts.warehouseId, warehouse.id), eq(warehouseStockAlerts.status, "active"))),
       ]);
       const productsWithStock = await db.select({ productId: products.id, name: products.name, reference: products.reference, category: products.category, unit: products.unit, supplierId: products.supplierId, purchasePriceCents: products.purchasePriceCents, quantity: sql<number>`coalesce(${warehouseStocks.quantity}, 0)` }).from(products).leftJoin(warehouseStocks, and(eq(warehouseStocks.productId, products.id), eq(warehouseStocks.warehouseId, warehouse.id), companyScope(warehouseStocks.companyId, ctx.user.companyId))).where(companyScope(products.companyId, ctx.user.companyId)).orderBy(asc(products.name));
-      return productsWithStock.map(product => ({ ...product, threshold: thresholds.find(item => item.productId === product.productId)?.threshold ?? 0, alert: alerts.find(item => item.productId === product.productId) ?? null }));
+      const canAcknowledge = ctx.user.role === "admin" || Boolean((await db.select({ id: sellerWarehouseAssignments.id }).from(sellerWarehouseAssignments).where(and(companyScope(sellerWarehouseAssignments.companyId, ctx.user.companyId), eq(sellerWarehouseAssignments.sellerUserId, ctx.user.id), eq(sellerWarehouseAssignments.warehouseId, warehouse.id), eq(sellerWarehouseAssignments.warehouseRole, "manager"))).limit(1))[0]);
+      return productsWithStock.map(product => ({ ...product, threshold: thresholds.find(item => item.productId === product.productId)?.threshold ?? 0, alert: alerts.find(item => item.productId === product.productId) ?? null, canAcknowledge }));
     }),
     set: protectedProcedure.input(z.object({ warehouseId: z.number().int().positive(), productId: z.number().int().positive(), threshold: z.number().int().min(0).max(1_000_000) })).mutation(async ({ ctx, input }) => {
       const db = await dbOrThrow();

@@ -43,6 +43,7 @@ import {
   CheckCheck,
   ChevronDown,
   CircleAlert,
+  CircleHelp,
   CloudOff,
   CloudUpload,
   ClipboardList,
@@ -55,6 +56,7 @@ import {
   WalletCards,
   LayoutDashboard,
   LogOut,
+  Mail,
   PackageSearch,
   ReceiptText,
   Ruler,
@@ -287,6 +289,12 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
               <DropdownMenuItem className="cursor-default focus:bg-transparent">
                 <Badge className="border-0 bg-cyan-400/10 text-cyan-300 hover:bg-cyan-400/10">{user?.role === "admin" ? "Administrateur" : "Opérateur"}</Badge>
               </DropdownMenuItem>
+              <DropdownMenuSeparator className="bg-white/10" />
+              <DropdownMenuItem onClick={() => setLocation("/aide")} className="cursor-pointer focus:bg-white/[0.06]"><CircleHelp className="mr-2 h-4 w-4" />Aide</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setLocation("/politique-securite")} className="cursor-pointer focus:bg-white/[0.06]"><ShieldCheck className="mr-2 h-4 w-4" />Politique de sécurité</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setLocation("/contactez-nous")} className="cursor-pointer focus:bg-white/[0.06]"><Mail className="mr-2 h-4 w-4" />Contactez-nous</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setLocation("/conditions-utilisation")} className="cursor-pointer focus:bg-white/[0.06]"><FileText className="mr-2 h-4 w-4" />Conditions d’utilisation</DropdownMenuItem>
+              <DropdownMenuSeparator className="bg-white/10" />
               <DropdownMenuItem onClick={logout} className="cursor-pointer text-rose-300 focus:bg-rose-400/10 focus:text-rose-200">
                 <LogOut className="mr-2 h-4 w-4" /> Se déconnecter
               </DropdownMenuItem>
