@@ -782,3 +782,9 @@
 - [x] Appliquer la portée aux consultations, actions opérationnelles et statistiques des agents commerciaux.
 - [x] Ajouter la configuration administrateur dans la gestion des agents.
 - [x] Tester les rôles, l’isolation et publier le correctif.
+
+## Tableau des commissions par agent et entrepôt
+- [x] Définir les agrégats de commissions, paiements et soldes par agent, entrepôt et période.
+- [x] Créer une procédure sécurisée de rapport financier multi-entrepôts.
+- [x] Ajouter le tableau filtrable dans la gestion des agents et rémunérations.
+- [x] Tester les calculs et publier le correctif.

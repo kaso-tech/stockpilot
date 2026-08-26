@@ -61,6 +61,10 @@ La zone « Affectations des vendeurs » comporte une recherche instantanée par 
 
 La migration `0053` ajoute le mode `warehouseScope` aux agents et la table `salesAgentWarehouseAssignments`. Les agents commerciaux peuvent être configurés depuis « Agents & paie » en trois modes : `all` pour coordonner des ventes dans tous les dépôts, `selected` pour n’être sélectionnables que dans les entrepôts attribués, et `attribution_only` pour rester attachables commercialement aux ventes de tous les dépôts sans accès opérationnel aux stocks. La validation est effectuée côté serveur lors de la création de brouillons, de l’encaissement et du chemin de vente hérité. Les sélecteurs POS et facture/devis ne présentent que les agents admissibles au dépôt opérationnel choisi; un agent par défaut devenu non admissible force une nouvelle sélection plutôt que de contourner la portée.
 
+## Tableau de commissions par agent et entrepôt
+
+La migration `0054` ajoute `paymentKind` à `agentPayments`, avec les valeurs `commission`, `salary` et `mixed`; les écritures existantes restent `mixed` pour préserver leur signification historique. La section « Commissions par agent et entrepôt » d’« Agents & rémunérations » filtre la période, l’entrepôt et le bénéficiaire. Elle compare les commissions générées à partir des ventes, les paiements explicitement qualifiés de commission et le solde de commission restant. Les versements mixtes et salariaux restent visibles séparément et ne diminuent jamais artificiellement le solde de commission. Les nouveaux paiements peuvent être catégorisés depuis la fiche de l’agent.
+
 ## 2. Environnement et exploitation
 
 | Élément | Valeur / règle |

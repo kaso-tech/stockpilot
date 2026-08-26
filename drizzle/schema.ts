@@ -482,6 +482,7 @@ export const agentPayments = mysqlTable("agentPayments", {
   warehouseId: int("warehouseId"),
   beneficiaryType: mysqlEnum("beneficiaryType", ["user", "agent"]).notNull(),
   beneficiaryId: int("beneficiaryId").notNull(),
+  paymentKind: mysqlEnum("paymentKind", ["commission", "salary", "mixed"]).notNull().default("mixed"),
   amountCents: int("amountCents").notNull(),
   paidAt: timestamp("paidAt").defaultNow().notNull(),
   periodLabel: varchar("periodLabel", { length: 40 }),
