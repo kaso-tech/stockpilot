@@ -823,3 +823,9 @@
 - [x] Créer le formulaire sécurisé de contact avec validation et protection contre les abus.
 - [x] Ajouter un registre administratif des demandes d’assistance.
 - [x] Tester validation, autorisations, pièce jointe et publication.
+
+## Audit de préparation commerciale
+- [x] Auditer sécurité, isolation multi-entreprise et gestion des accès.
+- [x] Auditer sauvegardes, exploitation, support et conformité de production.
+- [x] Évaluer les éléments commerciaux indispensables avant la vente.
+- [x] Produire une feuille de route priorisée de mise sur le marché.
