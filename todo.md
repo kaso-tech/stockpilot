@@ -868,3 +868,15 @@
 - [x] Auditer les surfaces, textes, badges, champs et actions de la console dans les thèmes clair et sombre.
 - [x] Remplacer les associations de couleurs insuffisamment contrastées par des tokens sémantiques accessibles.
 - [x] Vérifier les états normaux, focus, survol, chargement et dialogue de suspension, puis publier le correctif.
+
+## P1 — Exploitation SaaS de la plateforme
+- [ ] Ajouter un tableau de santé par entreprise : statut, dernier accès, synchronisation, sauvegarde et incidents ouverts, sans données métier.
+- [ ] Ajouter un registre support plateforme avec triage, affectation, statut, priorité et journal d’actions, limité aux métadonnées de demande.
+- [ ] Ajouter une gestion sécurisée des opérateurs plateforme avec rôles granulaires, invitation contrôlée, révocation et audit immuable.
+- [ ] Ajouter une fiche entreprise plateforme avec plan, limites, statut administratif, contacts autorisés, événements de cycle de vie et actions auditées.
+- [ ] Ajouter des filtres, recherche avancée, pagination et exports administratifs ne contenant aucune donnée métier client.
+- [ ] Définir le socle abonnement et facturation SaaS côté serveur, sans activer de paiement avant la configuration d’un prestataire.
+- [ ] Tester les permissions plateforme, l’absence de fuite des données métier et les rendus clair/sombre avant publication par sous-lot.
+
+## Plan directeur de mise en place
+- [x] Rédiger et livrer un planning complet de mise en place de StockPilot Pro, couvrant produit, sécurité, données, offline, exploitation, support, abonnements, conformité et commercialisation.
