@@ -871,6 +871,7 @@
 
 ## P1 — Exploitation SaaS de la plateforme
 - [ ] Ajouter un tableau de santé par entreprise : statut, dernier accès, synchronisation, sauvegarde et incidents ouverts, sans données métier.
+- [x] Enrichir la console plateforme avec un tableau de bord global : répartition active/suspendue, inscriptions récentes, activité récente, demandes support et événements de cycle de vie, uniquement à partir de métadonnées SaaS.
 - [ ] Ajouter un registre support plateforme avec triage, affectation, statut, priorité et journal d’actions, limité aux métadonnées de demande.
 - [ ] Ajouter une gestion sécurisée des opérateurs plateforme avec rôles granulaires, invitation contrôlée, révocation et audit immuable.
 - [ ] Ajouter une fiche entreprise plateforme avec plan, limites, statut administratif, contacts autorisés, événements de cycle de vie et actions auditées.
@@ -880,3 +881,6 @@
 
 ## Plan directeur de mise en place
 - [x] Rédiger et livrer un planning complet de mise en place de StockPilot Pro, couvrant produit, sécurité, données, offline, exploitation, support, abonnements, conformité et commercialisation.
+
+## Exécution autonome de la feuille de route
+- [ ] Enchaîner automatiquement les sous-lots sûrs du panneau SaaS après leurs validations, tests, contrôles d’isolation et checkpoints, jusqu’aux seules décisions irréversibles ou intégrations nécessitant des secrets externes.

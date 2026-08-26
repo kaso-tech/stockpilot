@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { z } from "zod";
 import { companies, companyLifecycleEvents, platformAuditLogs, supportRequests, users } from "../../drizzle/schema";
 import { authenticatedProcedure, router } from "../_core/trpc";
@@ -21,16 +21,40 @@ export const platformRouter = router({
   }),
   overview: authenticatedProcedure.query(async ({ ctx }) => {
     const { db } = await requirePlatformAccess(ctx);
-    const [companyRows, supportRows] = await Promise.all([
+    const now = new Date();
+    const sevenDaysAgo = new Date(now);
+    sevenDaysAgo.setDate(now.getDate() - 7);
+    const thirtyDaysAgo = new Date(now);
+    thirtyDaysAgo.setDate(now.getDate() - 30);
+    const [companyRows, supportRows, onboardingRows, newCompanyRows, activeCompanyRows, lifecycleRows] = await Promise.all([
       db.select({ status: companies.platformStatus, total: sql<number>`count(*)` }).from(companies).groupBy(companies.platformStatus),
       db.select({ status: supportRequests.status, total: sql<number>`count(*)` }).from(supportRequests).groupBy(supportRequests.status),
+      db.select({ total: sql<number>`sum(case when ${companies.onboardingCompletedAt} is not null then 1 else 0 end)` }).from(companies),
+      db.select({ totalLast7Days: sql<number>`sum(case when ${companies.createdAt} >= ${sevenDaysAgo} then 1 else 0 end)`, totalLast30Days: sql<number>`sum(case when ${companies.createdAt} >= ${thirtyDaysAgo} then 1 else 0 end)` }).from(companies),
+      db.select({ total: sql<number>`count(distinct ${users.companyId})` }).from(users).where(and(eq(users.active, true), gte(users.lastSignedIn, sevenDaysAgo))),
+      db.select({ action: companyLifecycleEvents.action, total: sql<number>`count(*)` }).from(companyLifecycleEvents).where(gte(companyLifecycleEvents.createdAt, thirtyDaysAgo)).groupBy(companyLifecycleEvents.action),
     ]);
     const totalCompanies = companyRows.reduce((sum, row) => sum + Number(row.total), 0);
+    const supportOpen = Number(supportRows.find(row => row.status === "open")?.total ?? 0);
+    const supportInProgress = Number(supportRows.find(row => row.status === "in_progress")?.total ?? 0);
     return {
       totalCompanies,
       activeCompanies: Number(companyRows.find(row => row.status === "active")?.total ?? 0),
       suspendedCompanies: Number(companyRows.find(row => row.status === "suspended")?.total ?? 0),
-      openSupportRequests: Number(supportRows.filter(row => row.status !== "closed").reduce((sum, row) => sum + Number(row.total), 0)),
+      onboardedCompanies: Number(onboardingRows[0]?.total ?? 0),
+      newCompaniesLast7Days: Number(newCompanyRows[0]?.totalLast7Days ?? 0),
+      newCompaniesLast30Days: Number(newCompanyRows[0]?.totalLast30Days ?? 0),
+      activeCompaniesLast7Days: Number(activeCompanyRows[0]?.total ?? 0),
+      openSupportRequests: supportOpen + supportInProgress,
+      supportByStatus: {
+        open: supportOpen,
+        inProgress: supportInProgress,
+        closed: Number(supportRows.find(row => row.status === "closed")?.total ?? 0),
+      },
+      lifecycleLast30Days: {
+        activated: Number(lifecycleRows.find(row => row.action === "activated")?.total ?? 0),
+        suspended: Number(lifecycleRows.find(row => row.action === "suspended")?.total ?? 0),
+      },
     };
   }),
   companies: router({

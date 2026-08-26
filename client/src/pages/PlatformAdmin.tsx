@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
-import { Building2, CircleAlert, ClipboardList, Loader2, ShieldCheck, UsersRound } from "lucide-react";
+import { Activity, Building2, ChartNoAxesCombined, CircleAlert, ClipboardCheck, ClipboardList, Headphones, Loader2, ShieldCheck, UserCheck, UsersRound } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -48,6 +48,11 @@ export default function PlatformAdmin() {
     setStatus.mutate({ companyId: pendingCompany.id, status: nextStatus, reason: nextStatus === "suspended" ? reason : reason || undefined });
   };
 
+  const stats = overview.data;
+  const totalCompanies = stats?.totalCompanies ?? 0;
+  const activeShare = totalCompanies ? Math.round(((stats?.activeCompanies ?? 0) / totalCompanies) * 100) : 0;
+  const onboardingShare = totalCompanies ? Math.round(((stats?.onboardedCompanies ?? 0) / totalCompanies) * 100) : 0;
+
   return <main className="min-h-screen bg-background p-4 text-foreground sm:p-8">
     <div className="mx-auto max-w-7xl space-y-6">
       <header className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 text-card-foreground shadow-sm sm:flex-row sm:items-center sm:justify-between">
@@ -56,10 +61,35 @@ export default function PlatformAdmin() {
       </header>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric icon={Building2} label="Entreprises" value={overview.data?.totalCompanies ?? 0} />
-        <Metric icon={ShieldCheck} label="Actives" value={overview.data?.activeCompanies ?? 0} tone="text-emerald-700 dark:text-emerald-300" />
-        <Metric icon={CircleAlert} label="Suspendues" value={overview.data?.suspendedCompanies ?? 0} tone="text-amber-800 dark:text-amber-200" />
-        <Metric icon={ClipboardList} label="Support ouvert" value={overview.data?.openSupportRequests ?? 0} tone="text-violet-700 dark:text-violet-300" />
+        <Metric icon={Building2} label="Entreprises" value={totalCompanies} />
+        <Metric icon={ShieldCheck} label="Actives" value={stats?.activeCompanies ?? 0} tone="text-emerald-700 dark:text-emerald-300" />
+        <Metric icon={CircleAlert} label="Suspendues" value={stats?.suspendedCompanies ?? 0} tone="text-amber-800 dark:text-amber-200" />
+        <Metric icon={Headphones} label="Support à traiter" value={stats?.openSupportRequests ?? 0} tone="text-violet-700 dark:text-violet-300" />
+      </section>
+
+      <section aria-label="Vue globale des entreprises" className="space-y-4">
+        <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-end"><div><p className="text-sm font-semibold">Vue globale des entreprises</p><p className="text-sm text-muted-foreground">Indicateurs d’exploitation de la plateforme, sans données commerciales clientes.</p></div><Badge variant="outline" className="border-border bg-muted text-muted-foreground">Actualisé à l’ouverture</Badge></div>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <Metric icon={ChartNoAxesCombined} label="Nouvelles entreprises · 7 jours" value={stats?.newCompaniesLast7Days ?? 0} tone="text-primary" />
+          <Metric icon={Activity} label="Entreprises actives · 7 jours" value={stats?.activeCompaniesLast7Days ?? 0} tone="text-cyan-700 dark:text-cyan-300" />
+          <Metric icon={ClipboardCheck} label="Onboarding terminé" value={stats?.onboardedCompanies ?? 0} tone="text-emerald-700 dark:text-emerald-300" />
+          <Metric icon={UsersRound} label="Nouvelles entreprises · 30 jours" value={stats?.newCompaniesLast30Days ?? 0} tone="text-indigo-700 dark:text-indigo-300" />
+        </div>
+        <div className="grid gap-4 lg:grid-cols-3">
+          <StatusPanel title="Portefeuille entreprises" description="Répartition administrative actuelle" value={`${activeShare} %`} valueLabel="actives" icon={Building2}>
+            <DistributionRow label="Actives" value={stats?.activeCompanies ?? 0} total={totalCompanies} className="bg-emerald-600 dark:bg-emerald-400" />
+            <DistributionRow label="Suspendues" value={stats?.suspendedCompanies ?? 0} total={totalCompanies} className="bg-amber-600 dark:bg-amber-400" />
+          </StatusPanel>
+          <StatusPanel title="Adoption" description="Parcours initial finalisé" value={`${onboardingShare} %`} valueLabel="onboarding terminé" icon={UserCheck}>
+            <DistributionRow label="Terminés" value={stats?.onboardedCompanies ?? 0} total={totalCompanies} className="bg-primary" />
+            <DistributionRow label="À finaliser" value={Math.max(totalCompanies - (stats?.onboardedCompanies ?? 0), 0)} total={totalCompanies} className="bg-muted-foreground" />
+          </StatusPanel>
+          <StatusPanel title="Support" description="État global des demandes" value={String(stats?.openSupportRequests ?? 0)} valueLabel="demandes à traiter" icon={ClipboardList}>
+            <DistributionRow label="Ouvertes" value={stats?.supportByStatus.open ?? 0} total={Math.max((stats?.supportByStatus.open ?? 0) + (stats?.supportByStatus.inProgress ?? 0) + (stats?.supportByStatus.closed ?? 0), 1)} className="bg-rose-600 dark:bg-rose-400" />
+            <DistributionRow label="En cours" value={stats?.supportByStatus.inProgress ?? 0} total={Math.max((stats?.supportByStatus.open ?? 0) + (stats?.supportByStatus.inProgress ?? 0) + (stats?.supportByStatus.closed ?? 0), 1)} className="bg-amber-600 dark:bg-amber-400" />
+            <DistributionRow label="Clôturées" value={stats?.supportByStatus.closed ?? 0} total={Math.max((stats?.supportByStatus.open ?? 0) + (stats?.supportByStatus.inProgress ?? 0) + (stats?.supportByStatus.closed ?? 0), 1)} className="bg-emerald-600 dark:bg-emerald-400" />
+          </StatusPanel>
+        </div>
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.55fr_0.85fr]">
@@ -76,4 +106,13 @@ export default function PlatformAdmin() {
 
 function Metric({ icon: Icon, label, value, tone = "text-primary" }: { icon: typeof Building2; label: string; value: number; tone?: string }) {
   return <Card><CardContent className="flex items-center gap-3 p-4"><span className={`grid h-10 w-10 place-items-center rounded-xl bg-muted ${tone}`}><Icon className="h-5 w-5" /></span><div><p className="text-xs text-muted-foreground">{label}</p><p className="text-2xl font-semibold">{value}</p></div></CardContent></Card>;
+}
+
+function StatusPanel({ title, description, value, valueLabel, icon: Icon, children }: { title: string; description: string; value: string; valueLabel: string; icon: typeof Building2; children: React.ReactNode }) {
+  return <Card><CardHeader className="gap-1 pb-0"><div className="flex items-start justify-between gap-3"><div><CardTitle className="text-base">{title}</CardTitle><p className="mt-1 text-sm text-muted-foreground">{description}</p></div><span className="grid h-9 w-9 place-items-center rounded-xl bg-muted text-primary"><Icon className="h-4 w-4" /></span></div></CardHeader><CardContent className="space-y-3 pt-4"><div><p className="text-2xl font-semibold tabular-nums">{value}</p><p className="text-xs text-muted-foreground">{valueLabel}</p></div>{children}</CardContent></Card>;
+}
+
+function DistributionRow({ label, value, total, className }: { label: string; value: number; total: number; className: string }) {
+  const width = total > 0 ? Math.max(Math.round((value / total) * 100), value > 0 ? 4 : 0) : 0;
+  return <div className="space-y-1.5"><div className="flex items-center justify-between text-xs"><span className="text-muted-foreground">{label}</span><span className="font-medium tabular-nums">{value}</span></div><div className="h-1.5 overflow-hidden rounded-full bg-muted"><div className={`h-full rounded-full transition-[width] duration-200 ${className}`} style={{ width: `${width}%` }} /></div></div>;
 }
