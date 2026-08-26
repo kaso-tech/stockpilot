@@ -806,7 +806,7 @@
 ## Urgences, accusés et e-mails de rupture
 - [x] Définir les niveaux d’urgence à partir des jours de couverture estimés.
 - [x] Ajouter l’accusé de réception par un responsable d’entrepôt.
-- [ ] Ajouter un opt-in e-mail sécurisé, sans envoi lorsque le canal n’est pas configuré. *(En attente de configuration e-mail demandée ultérieurement.)*
+- [x] Reporter l’opt-in e-mail transactionnel jusqu’à une configuration explicite du fournisseur, conformément à la demande utilisateur.
 - [x] Afficher l’urgence et l’accusé de réception dans les alertes et notifications.
 - [x] Tester les règles, les destinataires et publier le correctif.
 
