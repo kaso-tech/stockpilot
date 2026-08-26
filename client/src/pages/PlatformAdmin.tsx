@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Activity, Building2, ChartNoAxesCombined, CircleAlert, ClipboardCheck, ClipboardList, Headphones, Loader2, ShieldCheck, UserCheck, UsersRound } from "lucide-react";
@@ -12,6 +13,7 @@ import { useLocation } from "wouter";
 import { toast } from "sonner";
 
 const formatDate = (value: Date | string | null | undefined) => value ? new Date(value).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+const formatDateTime = (value: Date | string | null | undefined) => value ? new Date(value).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "—";
 
 export default function PlatformAdmin() {
   const { user, loading } = useAuth();
@@ -20,18 +22,30 @@ export default function PlatformAdmin() {
   const [search, setSearch] = useState("");
   const [pendingCompany, setPendingCompany] = useState<{ id: number; name: string; status: "active" | "suspended" } | null>(null);
   const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(null);
+  const [supportStatusFilter, setSupportStatusFilter] = useState<"all" | "open" | "in_progress" | "closed">("all");
+  const [supportPriorityFilter, setSupportPriorityFilter] = useState<"all" | "low" | "normal" | "high" | "critical">("all");
+  const [selectedSupportId, setSelectedSupportId] = useState<number | null>(null);
   const [reason, setReason] = useState("");
   const access = trpc.platform.access.useQuery(undefined, { enabled: Boolean(user), retry: false });
   const overview = trpc.platform.overview.useQuery(undefined, { enabled: access.isSuccess });
   const companies = trpc.platform.companies.list.useQuery({ search }, { enabled: access.isSuccess });
   const companyHealth = trpc.platform.companies.health.useQuery(undefined, { enabled: access.isSuccess });
   const audits = trpc.platform.audit.useQuery({ limit: 12 }, { enabled: access.isSuccess });
+  const supportQueue = trpc.platform.support.list.useQuery({ status: supportStatusFilter === "all" ? undefined : supportStatusFilter, priority: supportPriorityFilter === "all" ? undefined : supportPriorityFilter, limit: 50 }, { enabled: access.isSuccess });
+  const supportEvents = trpc.platform.support.events.useQuery({ supportRequestId: selectedSupportId ?? 0 }, { enabled: access.isSuccess && selectedSupportId !== null });
   const setStatus = trpc.platform.companies.setStatus.useMutation({
     onSuccess: async () => {
       await Promise.all([utils.platform.overview.invalidate(), utils.platform.companies.list.invalidate(), utils.platform.audit.invalidate()]);
       toast.success("Statut de l’entreprise mis à jour.");
       setPendingCompany(null);
       setReason("");
+    },
+    onError: error => toast.error(error.message),
+  });
+  const triageSupport = trpc.platform.support.triage.useMutation({
+    onSuccess: async () => {
+      await Promise.all([utils.platform.support.list.invalidate(), utils.platform.support.events.invalidate(), utils.platform.overview.invalidate(), utils.platform.companies.health.invalidate(), utils.platform.audit.invalidate()]);
+      toast.success("Triage support mis à jour.");
     },
     onError: error => toast.error(error.message),
   });
@@ -103,6 +117,11 @@ export default function PlatformAdmin() {
         </CardContent></Card>
         <Card><CardHeader><CardTitle className="text-base">Journal plateforme</CardTitle></CardHeader><CardContent className="space-y-3">{filteredAudits.length ? filteredAudits.map(item => <div key={item.id} className="rounded-xl border border-border bg-muted/40 p-3"><p className="text-sm font-medium">{item.action}</p><p className="mt-1 text-xs text-muted-foreground">{item.actorName || "Opérateur plateforme"} · {formatDate(item.createdAt)}</p>{item.reason && <p className="mt-2 text-xs text-foreground">{item.reason}</p>}</div>) : <p className="py-10 text-center text-sm text-muted-foreground">Aucune action plateforme enregistrée.</p>}</CardContent></Card>
       </section>
+
+      <section className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
+        <Card><CardHeader className="gap-3"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><CardTitle className="text-base">Registre support plateforme</CardTitle><p className="mt-1 text-sm text-muted-foreground">Triage et suivi par métadonnées ; le contenu et les captures clients restent cloisonnés.</p></div><div className="flex flex-wrap gap-2"><Select value={supportStatusFilter} onValueChange={value => setSupportStatusFilter(value as typeof supportStatusFilter)}><SelectTrigger className="h-9 w-[145px]"><SelectValue placeholder="Statut" /></SelectTrigger><SelectContent><SelectItem value="all">Tous statuts</SelectItem><SelectItem value="open">Ouvertes</SelectItem><SelectItem value="in_progress">En cours</SelectItem><SelectItem value="closed">Clôturées</SelectItem></SelectContent></Select><Select value={supportPriorityFilter} onValueChange={value => setSupportPriorityFilter(value as typeof supportPriorityFilter)}><SelectTrigger className="h-9 w-[145px]"><SelectValue placeholder="Priorité" /></SelectTrigger><SelectContent><SelectItem value="all">Toutes priorités</SelectItem><SelectItem value="low">Basse</SelectItem><SelectItem value="normal">Normale</SelectItem><SelectItem value="high">Haute</SelectItem><SelectItem value="critical">Critique</SelectItem></SelectContent></Select></div></div></CardHeader><CardContent className="space-y-3">{supportQueue.isLoading ? <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div> : supportQueue.data?.length ? supportQueue.data.map(request => <article key={request.id} className="rounded-xl border border-border bg-muted/40 p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><div className="flex flex-wrap items-center gap-2"><p className="font-medium">{request.companyName || "Entreprise non disponible"}</p><SupportStatusBadge status={request.status} /><SupportPriorityBadge priority={request.priority} /></div><p className="mt-1 text-xs text-muted-foreground">Demande #{request.id} · Créée le {formatDateTime(request.createdAt)}{request.dueAt ? ` · Échéance ${formatDate(request.dueAt)}` : ""}</p></div><div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" disabled={triageSupport.isPending} onClick={() => setSelectedSupportId(request.id)}>Journal</Button>{request.status === "open" && <Button size="sm" variant="outline" disabled={triageSupport.isPending} onClick={() => triageSupport.mutate({ supportRequestId: request.id, status: "in_progress", takeOwnership: true })}>{triageSupport.isPending && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}Prendre en charge</Button>}{request.status === "in_progress" && <Button size="sm" disabled={triageSupport.isPending} onClick={() => triageSupport.mutate({ supportRequestId: request.id, status: "closed" })}>Clôturer</Button>}</div></div><div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_180px]"><Select value={request.priority} onValueChange={value => triageSupport.mutate({ supportRequestId: request.id, priority: value as "low" | "normal" | "high" | "critical" })}><SelectTrigger className="h-9 bg-background"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="low">Priorité basse</SelectItem><SelectItem value="normal">Priorité normale</SelectItem><SelectItem value="high">Priorité haute</SelectItem><SelectItem value="critical">Priorité critique</SelectItem></SelectContent></Select><Input type="date" aria-label={`Échéance de la demande ${request.id}`} className="h-9 bg-background" value={request.dueAt ? new Date(request.dueAt).toISOString().slice(0, 10) : ""} onChange={event => triageSupport.mutate({ supportRequestId: request.id, dueAt: event.target.value ? new Date(`${event.target.value}T12:00:00`) : null })} disabled={triageSupport.isPending} /></div></article>) : <p className="py-10 text-center text-sm text-muted-foreground">Aucune demande ne correspond aux filtres.</p>}</CardContent></Card>
+        <Card><CardHeader><CardTitle className="text-base">Journal de triage</CardTitle></CardHeader><CardContent className="space-y-3">{selectedSupportId === null ? <p className="py-10 text-center text-sm text-muted-foreground">Sélectionnez une demande pour consulter les actions de triage.</p> : supportEvents.isLoading ? <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div> : supportEvents.data?.length ? supportEvents.data.map(event => <div key={event.id} className="rounded-xl border border-border bg-muted/40 p-3"><p className="text-sm font-medium">{supportEventLabel(event.action)}</p><p className="mt-1 text-xs text-muted-foreground">{event.actorName || "Opérateur plateforme"} · {formatDateTime(event.createdAt)}</p></div>) : <p className="py-10 text-center text-sm text-muted-foreground">Aucune action de triage enregistrée.</p>}</CardContent></Card>
+      </section>
     </div>
 
     <Dialog open={Boolean(pendingCompany)} onOpenChange={open => { if (!open && !setStatus.isPending) { setPendingCompany(null); setReason(""); } }}><DialogContent><DialogHeader><DialogTitle>{pendingCompany?.status === "active" ? "Suspendre l’entreprise" : "Réactiver l’entreprise"}</DialogTitle></DialogHeader><div className="space-y-3"><p className="text-sm text-muted-foreground">{pendingCompany?.name}</p><Label htmlFor="platform-reason">Motif {pendingCompany?.status === "active" ? "de suspension" : "optionnel"}</Label><Input id="platform-reason" value={reason} onChange={event => setReason(event.target.value)} maxLength={400} placeholder={pendingCompany?.status === "active" ? "Motif requis" : "Motif de réactivation"} /></div><DialogFooter><Button variant="outline" disabled={setStatus.isPending} onClick={() => setPendingCompany(null)}>Annuler</Button><Button disabled={setStatus.isPending || (pendingCompany?.status === "active" && reason.trim().length < 3)} onClick={confirmStatus}>{setStatus.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{pendingCompany?.status === "active" ? "Confirmer la suspension" : "Confirmer la réactivation"}</Button></DialogFooter></DialogContent></Dialog>
@@ -157,4 +176,20 @@ function SyncHealthBadge({ health }: { health: "healthy" | "pending" | "failed" 
 
 function syncHealthLabel(health: "healthy" | "pending" | "failed" | "offline" | "stale" | "not_reported") {
   return { healthy: "À jour", pending: "En attente", failed: "En échec", offline: "Hors connexion", stale: "À vérifier", not_reported: "Non rapportée" }[health];
+}
+
+function SupportStatusBadge({ status }: { status: "open" | "in_progress" | "closed" }) {
+  const variants = { open: ["Ouverte", "border-rose-600/35 bg-rose-100 text-rose-900 dark:border-rose-400/30 dark:bg-rose-400/15 dark:text-rose-200"], in_progress: ["En cours", "border-amber-600/35 bg-amber-100 text-amber-900 dark:border-amber-400/30 dark:bg-amber-400/15 dark:text-amber-200"], closed: ["Clôturée", "border-emerald-600/35 bg-emerald-100 text-emerald-800 dark:border-emerald-400/30 dark:bg-emerald-400/15 dark:text-emerald-200"] } as const;
+  const [label, className] = variants[status];
+  return <Badge variant="outline" className={className}>{label}</Badge>;
+}
+
+function SupportPriorityBadge({ priority }: { priority: "low" | "normal" | "high" | "critical" }) {
+  const variants = { low: ["Basse", "border-border bg-background text-muted-foreground"], normal: ["Normale", "border-primary/35 bg-primary/10 text-primary"], high: ["Haute", "border-amber-600/35 bg-amber-100 text-amber-900 dark:border-amber-400/30 dark:bg-amber-400/15 dark:text-amber-200"], critical: ["Critique", "border-rose-600/35 bg-rose-100 text-rose-900 dark:border-rose-400/30 dark:bg-rose-400/15 dark:text-rose-200"] } as const;
+  const [label, className] = variants[priority];
+  return <Badge variant="outline" className={className}>{label}</Badge>;
+}
+
+function supportEventLabel(action: "assigned" | "priority_changed" | "status_changed" | "due_date_changed") {
+  return { assigned: "Affectation modifiée", priority_changed: "Priorité modifiée", status_changed: "Statut modifié", due_date_changed: "Échéance modifiée" }[action];
 }

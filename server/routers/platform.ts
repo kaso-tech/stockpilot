@@ -1,13 +1,13 @@
 import { TRPCError } from "@trpc/server";
 import { and, desc, eq, gte, isNotNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
-import { backupSettings, companies, companyLifecycleEvents, companySyncHealth, platformAuditLogs, supportRequests, users } from "../../drizzle/schema";
+import { backupSettings, companies, companyLifecycleEvents, companySyncHealth, platformAdminUsers, platformAuditLogs, supportAssignments, supportPlatformEvents, supportRequests, users } from "../../drizzle/schema";
 import { authenticatedProcedure, router } from "../_core/trpc";
 import { canManagePlatformCompanies, requirePlatformAccess } from "../platformAccess";
 import { resolveCompanyHealth } from "../platformHealth";
 
-async function auditPlatform(db: { insert: (...args: any[]) => any }, actorUserId: number, action: string, companyId: number | null, reason?: string, metadata?: Record<string, unknown>) {
-  await db.insert(platformAuditLogs).values({ actorUserId, action, entityType: "company", entityId: companyId, companyId, reason: reason ?? null, metadataJson: metadata ? JSON.stringify(metadata) : null });
+async function auditPlatform(db: { insert: (...args: any[]) => any }, actorUserId: number, action: string, companyId: number | null, reason?: string, metadata?: Record<string, unknown>, entityType = "company", entityId: number | null = companyId) {
+  await db.insert(platformAuditLogs).values({ actorUserId, action, entityType, entityId, companyId, reason: reason ?? null, metadataJson: metadata ? JSON.stringify(metadata) : null });
 }
 
 export const platformRouter = router({
@@ -112,5 +112,64 @@ export const platformRouter = router({
   audit: authenticatedProcedure.input(z.object({ limit: z.number().int().min(1).max(100).default(50) }).optional()).query(async ({ ctx, input }) => {
     const { db } = await requirePlatformAccess(ctx);
     return db.select({ id: platformAuditLogs.id, action: platformAuditLogs.action, companyId: platformAuditLogs.companyId, reason: platformAuditLogs.reason, createdAt: platformAuditLogs.createdAt, actorName: users.name }).from(platformAuditLogs).leftJoin(users, eq(platformAuditLogs.actorUserId, users.id)).orderBy(desc(platformAuditLogs.createdAt)).limit(input?.limit ?? 50);
+  }),
+  support: router({
+    list: authenticatedProcedure.input(z.object({ status: z.enum(["open", "in_progress", "closed"]).optional(), priority: z.enum(["low", "normal", "high", "critical"]).optional(), limit: z.number().int().min(1).max(100).default(50) }).optional()).query(async ({ ctx, input }) => {
+      const { db } = await requirePlatformAccess(ctx);
+      const rows = await db.select({
+        id: supportRequests.id,
+        companyId: supportRequests.companyId,
+        companyName: companies.name,
+        status: supportRequests.status,
+        createdAt: supportRequests.createdAt,
+        resolvedAt: supportRequests.resolvedAt,
+        priority: supportAssignments.priority,
+        assignedPlatformUserId: supportAssignments.assignedPlatformUserId,
+        dueAt: supportAssignments.dueAt,
+        firstRespondedAt: supportAssignments.firstRespondedAt,
+      }).from(supportRequests).leftJoin(companies, eq(supportRequests.companyId, companies.id)).leftJoin(supportAssignments, eq(supportRequests.id, supportAssignments.supportRequestId)).orderBy(desc(supportRequests.createdAt));
+      return rows.filter(row => (!input?.status || row.status === input.status) && (!input?.priority || (row.priority ?? "normal") === input.priority)).slice(0, input?.limit ?? 50).map(row => ({ ...row, priority: row.priority ?? "normal" }));
+    }),
+    events: authenticatedProcedure.input(z.object({ supportRequestId: z.number().int().positive() })).query(async ({ ctx, input }) => {
+      const { db } = await requirePlatformAccess(ctx);
+      return db.select({ id: supportPlatformEvents.id, action: supportPlatformEvents.action, metadataJson: supportPlatformEvents.metadataJson, createdAt: supportPlatformEvents.createdAt, actorName: users.name }).from(supportPlatformEvents).leftJoin(users, eq(supportPlatformEvents.actorPlatformUserId, users.id)).where(eq(supportPlatformEvents.supportRequestId, input.supportRequestId)).orderBy(desc(supportPlatformEvents.createdAt));
+    }),
+    triage: authenticatedProcedure.input(z.object({
+      supportRequestId: z.number().int().positive(),
+      status: z.enum(["open", "in_progress", "closed"]).optional(),
+      priority: z.enum(["low", "normal", "high", "critical"]).optional(),
+      assignedPlatformUserId: z.number().int().positive().nullable().optional(),
+      takeOwnership: z.boolean().optional(),
+      dueAt: z.coerce.date().nullable().optional(),
+    })).mutation(async ({ ctx, input }) => {
+      const { db } = await requirePlatformAccess(ctx);
+      const request = (await db.select({ id: supportRequests.id, companyId: supportRequests.companyId, status: supportRequests.status }).from(supportRequests).where(eq(supportRequests.id, input.supportRequestId)).limit(1))[0];
+      if (!request) throw new TRPCError({ code: "NOT_FOUND", message: "Demande d’assistance introuvable." });
+      const requestedAssignee = input.takeOwnership ? ctx.user.id : input.assignedPlatformUserId;
+      if (requestedAssignee) {
+        const operator = (await db.select({ userId: platformAdminUsers.userId }).from(platformAdminUsers).where(and(eq(platformAdminUsers.userId, requestedAssignee), eq(platformAdminUsers.active, true))).limit(1))[0];
+        if (!operator) throw new TRPCError({ code: "BAD_REQUEST", message: "Cet opérateur plateforme n’est pas actif." });
+      }
+      const assignment = (await db.select().from(supportAssignments).where(eq(supportAssignments.supportRequestId, input.supportRequestId)).limit(1))[0];
+      const events: Array<{ action: "assigned" | "priority_changed" | "status_changed" | "due_date_changed"; metadataJson: string }> = [];
+      if (input.status && input.status !== request.status) events.push({ action: "status_changed", metadataJson: JSON.stringify({ from: request.status, to: input.status }) });
+      if (input.priority && input.priority !== (assignment?.priority ?? "normal")) events.push({ action: "priority_changed", metadataJson: JSON.stringify({ from: assignment?.priority ?? "normal", to: input.priority }) });
+      if (requestedAssignee !== undefined && requestedAssignee !== (assignment?.assignedPlatformUserId ?? null)) events.push({ action: "assigned", metadataJson: JSON.stringify({ from: assignment?.assignedPlatformUserId ?? null, to: requestedAssignee }) });
+      if (input.dueAt !== undefined && input.dueAt?.getTime() !== assignment?.dueAt?.getTime()) events.push({ action: "due_date_changed", metadataJson: JSON.stringify({ dueAt: input.dueAt?.toISOString() ?? null }) });
+      if (!events.length) return { success: true, changed: false } as const;
+
+      await db.transaction(async tx => {
+        if (input.status && input.status !== request.status) {
+          await tx.update(supportRequests).set({ status: input.status, handledByUserId: ctx.user.id, resolvedAt: input.status === "closed" ? new Date() : null }).where(eq(supportRequests.id, input.supportRequestId));
+        }
+        if (input.priority !== undefined || requestedAssignee !== undefined || input.dueAt !== undefined) {
+          const firstRespondedAt = assignment?.firstRespondedAt ?? (input.status && input.status !== "open" ? new Date() : null);
+          await tx.insert(supportAssignments).values({ supportRequestId: input.supportRequestId, priority: input.priority ?? assignment?.priority ?? "normal", assignedPlatformUserId: requestedAssignee !== undefined ? requestedAssignee : assignment?.assignedPlatformUserId ?? null, dueAt: input.dueAt !== undefined ? input.dueAt : assignment?.dueAt ?? null, firstRespondedAt }).onDuplicateKeyUpdate({ set: { priority: input.priority ?? assignment?.priority ?? "normal", assignedPlatformUserId: requestedAssignee !== undefined ? requestedAssignee : assignment?.assignedPlatformUserId ?? null, dueAt: input.dueAt !== undefined ? input.dueAt : assignment?.dueAt ?? null, firstRespondedAt } });
+        }
+        await tx.insert(supportPlatformEvents).values(events.map(event => ({ supportRequestId: input.supportRequestId, actorPlatformUserId: ctx.user.id, action: event.action, metadataJson: event.metadataJson })));
+        await auditPlatform(tx, ctx.user.id, "support_triaged", request.companyId, undefined, { requestId: request.id, actions: events.map(event => event.action) }, "support_request", request.id);
+      });
+      return { success: true, changed: true } as const;
+    }),
   }),
 });

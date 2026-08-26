@@ -100,6 +100,27 @@ export const supportRequests = mysqlTable("supportRequests", {
   index("support_requests_company_warehouse_idx").on(table.companyId, table.warehouseId),
 ]);
 
+/** Triage plateforme d’une demande, séparé du contenu et des pièces jointes clients. */
+export const supportAssignments = mysqlTable("supportAssignments", {
+  id: int("id").autoincrement().primaryKey(),
+  supportRequestId: int("supportRequestId").notNull().unique(),
+  priority: mysqlEnum("priority", ["low", "normal", "high", "critical"]).notNull().default("normal"),
+  assignedPlatformUserId: int("assignedPlatformUserId"),
+  dueAt: timestamp("dueAt"),
+  firstRespondedAt: timestamp("firstRespondedAt"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [index("support_assignments_priority_due_idx").on(table.priority, table.dueAt)]);
+
+/** Journal append-only de triage plateforme, sans copie de message ou de capture client. */
+export const supportPlatformEvents = mysqlTable("supportPlatformEvents", {
+  id: int("id").autoincrement().primaryKey(),
+  supportRequestId: int("supportRequestId").notNull(),
+  actorPlatformUserId: int("actorPlatformUserId").notNull(),
+  action: mysqlEnum("action", ["assigned", "priority_changed", "status_changed", "due_date_changed"]).notNull(),
+  metadataJson: varchar("metadataJson", { length: 600 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [index("support_platform_events_request_created_idx").on(table.supportRequestId, table.createdAt)]);
+
 export const userSessions = mysqlTable("userSessions", {
   id: varchar("id", { length: 64 }).primaryKey(),
   userId: int("userId").notNull(),

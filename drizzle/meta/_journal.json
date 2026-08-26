@@ -421,6 +421,13 @@
       "when": 1787787885492,
       "tag": "0059_fearless_frog_thor",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "5",
+      "when": 1787788262175,
+      "tag": "0060_low_venom",
+      "breakpoints": true
     }
   ]
 }
