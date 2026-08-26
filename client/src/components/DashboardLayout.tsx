@@ -202,15 +202,16 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const canRunBackup = Boolean(user);
   const { data: dashboard } = trpc.dashboard.get.useQuery(activeWarehouseId ? { warehouseId: activeWarehouseId } : undefined, { enabled: isAdmin, refetchInterval: 60_000 });
   const { data: backups } = trpc.backups.get.useQuery(undefined, { enabled: isAdmin, refetchInterval: 60_000 });
+  const { data: warehouseAlerts = [] } = trpc.warehouses.managerAlerts.useQuery(undefined, { enabled: Boolean(user), refetchInterval: 60_000 });
   const runBackup = trpc.backups.runNow.useMutation({ onSuccess: archive => toast.success(`Sauvegarde ${archive.filename} créée.`), onError: error => toast.error(error.message) });
   const candidateNotifications: RoleNotification[] = [];
   if (isAdmin) {
-    if (dashboard?.lowStock?.length) candidateNotifications.push({ id: "stock", title: "Stock critique", detail: `${dashboard.lowStock.length} produit(s) au seuil minimum`, tone: "amber", path: "/alertes", audience: "admin" });
     if ((dashboard?.summary?.duePayrollCents ?? 0) > 0) candidateNotifications.push({ id: "payroll", title: "Paie à régler", detail: `${dashboard?.summary?.duePayrollCents ?? 0} centimes restent à payer`, tone: "violet", path: "/agents", audience: "admin" });
     if (dashboard?.summary?.expenseBudget?.exceeded) candidateNotifications.push({ id: "budget-over", title: "Budget dépassé", detail: "Les dépenses ont dépassé le plafond mensuel.", tone: "rose", path: "/depenses", audience: "admin" });
     else if (dashboard?.summary?.expenseBudget?.warningReached) candidateNotifications.push({ id: "budget-warning", title: "Seuil budget atteint", detail: "Le seuil d’alerte des dépenses est atteint.", tone: "amber", path: "/depenses", audience: "admin" });
     if (backups?.settings.lastBackupStatus === "failed") candidateNotifications.push({ id: "backup", title: "Sauvegarde à vérifier", detail: backups.settings.lastBackupError || "La dernière sauvegarde a échoué.", tone: "rose", path: "/sauvegardes", audience: "admin" });
   }
+  warehouseAlerts.forEach(alert => candidateNotifications.push({ id: alert.id, title: alert.title, detail: alert.detail, tone: alert.status === "active" ? "rose" : "violet", path: "/alertes", audience: user?.role === "admin" ? "admin" : "seller" }));
   const notifications = visibleNotificationsForRole(user?.role === "admin" ? "admin" : "seller", candidateNotifications);
   const [readNotificationIdsState, setReadNotificationIdsState] = useState<string[]>([]);
   useEffect(() => { setReadNotificationIdsState(readNotificationIds(user?.companyId ?? undefined, user?.id)); }, [user?.companyId, user?.id]);

@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { auditLogs, products, sellerCredentials, sellerWarehouseAssignments, stockTransfers, userWarehousePreferences, users, warehouseReorderThresholds, warehouseStockAlerts, warehouseStocks, warehouses } from "../../drizzle/schema";
@@ -8,6 +8,7 @@ import { companyScope } from "../companyScope";
 import { getScopedWarehouse } from "../warehouseStock";
 import { resolveActiveWarehouse } from "../activeWarehouseRules";
 import { assignedWarehouseIds, assertSellerWarehouseAccess } from "../sellerWarehouseAccess";
+import { warehouseAlertNotificationId, warehouseAlertNotificationTitle } from "../warehouseNotificationRules";
 
 const warehouseInput = z.object({
   name: z.string().trim().min(2).max(160),
@@ -88,6 +89,27 @@ export const warehousesRouter = router({
       .where(companyScope(products.companyId, ctx.user.companyId))
       .orderBy(asc(products.name));
     return { warehouse, products: rows };
+  }),
+
+  managerAlerts: protectedProcedure.query(async ({ ctx }) => {
+    const db = await dbOrThrow();
+    if (ctx.user.companyId === null) return [];
+    let warehouseIds: number[] | null = null;
+    if (ctx.user.role === "seller") {
+      const roles = await db.select({ warehouseId: sellerWarehouseAssignments.warehouseId }).from(sellerWarehouseAssignments).where(and(companyScope(sellerWarehouseAssignments.companyId, ctx.user.companyId), eq(sellerWarehouseAssignments.sellerUserId, ctx.user.id), eq(sellerWarehouseAssignments.warehouseRole, "manager")));
+      warehouseIds = roles.map(role => role.warehouseId);
+      if (!warehouseIds.length) return [];
+    }
+    const cutoff = new Date(Date.now() - 1000 * 60 * 60 * 24 * 7);
+    const scope = warehouseIds ? and(companyScope(warehouseStockAlerts.companyId, ctx.user.companyId), inArray(warehouseStockAlerts.warehouseId, warehouseIds), sql`(${warehouseStockAlerts.status} = 'active' OR (${warehouseStockAlerts.status} = 'resolved' AND ${warehouseStockAlerts.updatedAt} >= ${cutoff}))`) : and(companyScope(warehouseStockAlerts.companyId, ctx.user.companyId), sql`(${warehouseStockAlerts.status} = 'active' OR (${warehouseStockAlerts.status} = 'resolved' AND ${warehouseStockAlerts.updatedAt} >= ${cutoff}))`);
+    const rows = await db.select({ id: warehouseStockAlerts.id, warehouseId: warehouseStockAlerts.warehouseId, productId: warehouseStockAlerts.productId, status: warehouseStockAlerts.status, threshold: warehouseStockAlerts.threshold, observedQuantity: warehouseStockAlerts.observedQuantity, updatedAt: warehouseStockAlerts.updatedAt, warehouseName: warehouses.name, productName: products.name, productUnit: products.unit }).from(warehouseStockAlerts).innerJoin(warehouses, eq(warehouses.id, warehouseStockAlerts.warehouseId)).innerJoin(products, eq(products.id, warehouseStockAlerts.productId)).where(scope).orderBy(desc(warehouseStockAlerts.updatedAt)).limit(50);
+    return rows.map(row => ({
+      id: warehouseAlertNotificationId({ alertId: row.id, warehouseId: row.warehouseId, productId: row.productId, status: row.status, updatedAt: row.updatedAt }),
+      title: warehouseAlertNotificationTitle(row.status),
+      detail: row.status === "active" ? `${row.productName} : ${row.observedQuantity} ${row.productUnit} pour un seuil de ${row.threshold} · ${row.warehouseName}.` : `${row.productName} est repassé au-dessus du seuil dans ${row.warehouseName}.`,
+      status: row.status,
+      warehouseId: row.warehouseId,
+    }));
   }),
 
   thresholds: router({

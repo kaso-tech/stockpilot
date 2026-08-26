@@ -34,9 +34,9 @@ export async function syncWarehouseStockAlert(tx: DbTransaction, companyId: numb
   const thresholdRow = (await tx.select({ threshold: warehouseReorderThresholds.threshold }).from(warehouseReorderThresholds).where(and(companyScope(warehouseReorderThresholds.companyId, companyId), eq(warehouseReorderThresholds.warehouseId, warehouseId), eq(warehouseReorderThresholds.productId, productId))).limit(1))[0];
   const threshold = thresholdRow?.threshold ?? 0;
   if (threshold > 0 && quantity <= threshold) {
-    await tx.insert(warehouseStockAlerts).values({ companyId: companyId!, warehouseId, productId, threshold, observedQuantity: quantity, status: "active" }).onDuplicateKeyUpdate({ set: { threshold, observedQuantity: quantity, status: "active", resolvedAt: null } });
+    await tx.insert(warehouseStockAlerts).values({ companyId: companyId!, warehouseId, productId, threshold, observedQuantity: quantity, status: "active" }).onDuplicateKeyUpdate({ set: { threshold, observedQuantity: quantity, status: "active", resolvedAt: null, updatedAt: new Date() } });
   } else {
-    await tx.update(warehouseStockAlerts).set({ observedQuantity: quantity, threshold, status: "resolved", resolvedAt: new Date() }).where(and(companyScope(warehouseStockAlerts.companyId, companyId), eq(warehouseStockAlerts.warehouseId, warehouseId), eq(warehouseStockAlerts.productId, productId), eq(warehouseStockAlerts.status, "active")));
+    await tx.update(warehouseStockAlerts).set({ observedQuantity: quantity, threshold, status: "resolved", resolvedAt: new Date(), updatedAt: new Date() }).where(and(companyScope(warehouseStockAlerts.companyId, companyId), eq(warehouseStockAlerts.warehouseId, warehouseId), eq(warehouseStockAlerts.productId, productId), eq(warehouseStockAlerts.status, "active")));
   }
   return { quantity, threshold, active: threshold > 0 && quantity <= threshold };
 }

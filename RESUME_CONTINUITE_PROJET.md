@@ -71,6 +71,10 @@ La migration `0055` ajoute un rôle local à chaque affectation opérationnelle 
 
 Les transferts disposent maintenant d’un cycle brouillon → en transit → réceptionné, avec annulation traçable et retour automatique du stock source pour les transferts annulés en transit. Les responsables concernés peuvent traiter les transferts de leurs dépôts; les autres utilisateurs ne voient que les mouvements portant sur leurs entrepôts attribués. L’écran Entrepôts permet d’attribuer le rôle local de chaque utilisateur opérationnel et de saisir les seuils de chaque produit. Toute entrée ou sortie de stock synchronise l’alerte locale, et la page Alertes ainsi que le bon de commande de réapprovisionnement utilisent exclusivement le dépôt actif.
 
+## Notifications ciblées de rupture
+
+Le centre de notifications de l’application reçoit désormais les alertes stock locales persistées dans `warehouseStockAlerts`. Un administrateur voit les alertes de tous les dépôts, tandis qu’un utilisateur opérationnel ne reçoit que celles des entrepôts où son rôle local est `manager`. Chaque notification porte l’état actif ou résolu, le produit, la quantité observée, le seuil et le dépôt concerné. L’identifiant contient l’horodatage de mise à jour : une alerte déjà lue n’est pas répétée tant qu’elle reste active, mais une nouvelle rupture après résolution est signalée à nouveau. Les alertes résolues restent visibles sept jours pour confirmer la remise à niveau.
+
 ## 2. Environnement et exploitation
 
 | Élément | Valeur / règle |

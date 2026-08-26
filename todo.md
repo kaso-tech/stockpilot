@@ -796,3 +796,9 @@
 - [x] Ajouter les seuils de réapprovisionnement et alertes de stock bas par produit et entrepôt.
 - [x] Créer les interfaces d’administration des rôles, des transferts et des seuils locaux.
 - [x] Tester permissions, stocks, alertes, transfert et publication.
+
+## Notifications ciblées de rupture par entrepôt
+- [x] Identifier les responsables actifs de chaque dépôt et les notifications de stock existantes.
+- [x] Déclencher une notification unique lorsqu’une alerte locale devient active.
+- [x] Signaler la résolution aux responsables lorsque le seuil est de nouveau respecté.
+- [x] Tester le ciblage, la déduplication et publier le correctif.
