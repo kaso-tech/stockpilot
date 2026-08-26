@@ -770,3 +770,8 @@
 - [x] Corriger la boucle de rendu à l’ouverture de la fenêtre « Gérer les dépôts ».
 - [x] Tester l’ouverture, la sélection et l’enregistrement d’affectations vendeur-entrepôt.
 - [x] Publier le correctif sans modifier les affectations existantes.
+
+## Recherche vendeur dans les affectations
+- [x] Ajouter une recherche de vendeur dans la liste d’affectation des entrepôts.
+- [x] Afficher un état explicite lorsqu’aucun vendeur ne correspond.
+- [x] Tester la recherche et publier le correctif.

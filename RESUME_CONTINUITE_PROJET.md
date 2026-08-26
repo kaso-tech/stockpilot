@@ -53,6 +53,10 @@ La route « Pilotage consolidé » compare les entrepôts actifs d’une entrepr
 
 La fenêtre « Gérer les dépôts » des vendeurs utilise désormais une valeur de repli stable lorsque la requête d’affectations est en attente. L’état des cases à cocher n’est synchronisé qu’à la réception des données ou à la fermeture de la fenêtre, ce qui évite une boucle de rendu React. La normalisation dédoublonne aussi les identifiants d’entrepôt avant affichage; aucune affectation persistée n’est modifiée par ce correctif.
 
+## Recherche de vendeur dans les affectations
+
+La zone « Affectations des vendeurs » comporte une recherche instantanée par nom, identifiant interne ou e-mail. La recherche ne modifie aucune affectation et affiche un état vide explicite lorsqu’aucun vendeur actif ne correspond. La logique de recherche est couverte par les tests unitaires des utilitaires d’affectation.
+
 ## 2. Environnement et exploitation
 
 | Élément | Valeur / règle |
