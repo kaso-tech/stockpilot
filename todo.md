@@ -850,3 +850,9 @@
 - [x] Corriger l’indicateur actif du menu latéral avec le texte contrasté.
 - [x] Corriger les alertes de seuil dont le texte jaune manque de contraste.
 - [x] Tester les contrastes en thème bleu et publier le correctif.
+
+## Panneau d’administration SaaS
+- [x] Auditer les capacités, rôles et routes d’administration existants.
+- [x] Définir le périmètre sécurisé du pilotage des entreprises, comptes, support et exploitation.
+- [x] Prioriser les fonctionnalités de production et les garde-fous requis.
+- [x] Produire un plan de réalisation du panneau d’administration.
