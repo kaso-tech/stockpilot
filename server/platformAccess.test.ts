@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canManagePlatformCompanies, canManagePlatformOperators, canManagePlatformSupport } from "./platformAccess";
+import { canManagePlatformBilling, canManagePlatformCompanies, canManagePlatformOperators, canManagePlatformSupport } from "./platformAccess";
 
 describe("permissions plateforme", () => {
   it("autorise uniquement les rôles opérations à gérer les entreprises", () => {
@@ -15,5 +15,7 @@ describe("permissions plateforme", () => {
     expect(canManagePlatformSupport("billing")).toBe(false);
     expect(canManagePlatformOperators("super_admin")).toBe(true);
     expect(canManagePlatformOperators("operations")).toBe(false);
+    expect(canManagePlatformBilling("billing")).toBe(true);
+    expect(canManagePlatformBilling("support")).toBe(false);
   });
 });

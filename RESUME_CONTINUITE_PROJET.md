@@ -109,6 +109,14 @@ La migration `0058` ajoute le rôle séparé `platformAdminUsers`, le journal ap
 
 La suspension exige un motif, est réversible, crée un événement de cycle de vie et une trace plateforme. Les procédures ordinaires de l’entreprise bloquent les comptes d’une entreprise suspendue en production. Le lien vers la console n’est affiché que lorsqu’un compte reçoit un rôle plateforme actif; les comptes clients reçoivent une réponse d’accès neutre sans erreur de réseau visible.
 
+## P1 — Console SaaS d’exploitation enrichie
+
+Les migrations `0059` à `0062` étendent la console plateforme sans exposer les lignes métier clientes. Elle présente désormais un tableau de bord agrégé des entreprises, une santé par entreprise (statut, activité, sauvegarde, synchronisation agrégée et support), une fiche entreprise limitée aux contacts administratifs autorisés, au cycle de vie et à l’audit plateforme. La synchronisation offline remonte seulement des compteurs d’état par entreprise — jamais les contenus d’opérations.
+
+Le registre support plateforme permet de filtrer et trier les demandes par statut et priorité, de prendre une demande en charge, fixer une échéance et consulter un journal de triage. Les messages et captures des clients ne sont pas inclus dans ce contrat. Les super administrateurs peuvent désigner des opérateurs existants avec des rôles séparés `operations`, `support` et `billing`, révoquer leur accès ou modifier leur rôle; toute action est auditée côté plateforme.
+
+Le socle abonnement ajoute les tables `subscriptionPlans` et `companySubscriptions`, un catalogue administrable et une gestion manuelle de plan, statut, essai, période et délai de grâce dans la fiche entreprise. Aucun prestataire de paiement ni prélèvement n’est activé. Les listes d’entreprises disposent de recherche, filtres par statut/santé, pagination et export CSV administratif protégé contre les formules. La publication P1 a été validée par TypeScript, Vitest, build PWA et recette visuelle de la console; le warning historique de gros bundle PWA reste non bloquant.
+
 ## 2. Environnement et exploitation
 
 | Élément | Valeur / règle |

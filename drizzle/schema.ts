@@ -77,6 +77,35 @@ export const companySyncHealth = mysqlTable("companySyncHealth", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, table => [index("company_sync_health_status_updated_idx").on(table.status, table.updatedAt)]);
 
+/** Offre SaaS configurée par la plateforme ; aucun tarif ou paiement n’est activé sans prestataire validé. */
+export const subscriptionPlans = mysqlTable("subscriptionPlans", {
+  id: int("id").autoincrement().primaryKey(),
+  code: varchar("code", { length: 48 }).notNull().unique(),
+  name: varchar("name", { length: 120 }).notNull(),
+  description: varchar("description", { length: 500 }),
+  active: boolean("active").notNull().default(true),
+  sortOrder: int("sortOrder").notNull().default(0),
+  trialDays: int("trialDays").notNull().default(0),
+  limitsJson: varchar("limitsJson", { length: 4000 }).notNull().default("{}"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [index("subscription_plans_active_sort_idx").on(table.active, table.sortOrder)]);
+
+/** Souscription de l’entreprise, administrée côté serveur et indépendante des paiements métier du client. */
+export const companySubscriptions = mysqlTable("companySubscriptions", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull().unique(),
+  planId: int("planId"),
+  status: mysqlEnum("status", ["trial", "active", "past_due", "suspended", "cancelled", "manual"]).notNull().default("manual"),
+  trialEndsAt: timestamp("trialEndsAt"),
+  currentPeriodEndsAt: timestamp("currentPeriodEndsAt"),
+  graceEndsAt: timestamp("graceEndsAt"),
+  cancelledAt: timestamp("cancelledAt"),
+  updatedByPlatformUserId: int("updatedByPlatformUserId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [index("company_subscriptions_status_ends_idx").on(table.status, table.currentPeriodEndsAt)]);
+
 /** Demande d’assistance interne créée par un utilisateur de l’entreprise. */
 export const supportRequests = mysqlTable("supportRequests", {
   id: int("id").autoincrement().primaryKey(),

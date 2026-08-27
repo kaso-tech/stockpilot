@@ -38,3 +38,7 @@ export function canManagePlatformSupport(role: PlatformAccess["platformRole"]) {
 export function canManagePlatformOperators(role: PlatformAccess["platformRole"]) {
   return role === "super_admin";
 }
+
+export function canManagePlatformBilling(role: PlatformAccess["platformRole"]) {
+  return role === "super_admin" || role === "operator" || role === "billing";
+}

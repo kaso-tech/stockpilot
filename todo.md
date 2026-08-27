@@ -874,13 +874,13 @@
 - [x] Enrichir la console plateforme avec un tableau de bord global : répartition active/suspendue, inscriptions récentes, activité récente, demandes support et événements de cycle de vie, uniquement à partir de métadonnées SaaS.
 - [x] Ajouter un registre support plateforme avec triage, affectation, statut, priorité et journal d’actions, limité aux métadonnées de demande.
 - [x] Ajouter une gestion sécurisée des opérateurs plateforme avec rôles granulaires, invitation contrôlée, révocation et audit immuable.
-- [ ] Ajouter une fiche entreprise plateforme avec plan, limites, statut administratif, contacts autorisés, événements de cycle de vie et actions auditées.
+- [x] Ajouter une fiche entreprise plateforme avec plan, limites, statut administratif, contacts autorisés, événements de cycle de vie et actions auditées.
 - [x] Ajouter des filtres, recherche avancée, pagination et exports administratifs ne contenant aucune donnée métier client.
-- [ ] Définir le socle abonnement et facturation SaaS côté serveur, sans activer de paiement avant la configuration d’un prestataire.
-- [ ] Tester les permissions plateforme, l’absence de fuite des données métier et les rendus clair/sombre avant publication par sous-lot.
+- [x] Définir le socle abonnement et facturation SaaS côté serveur, sans activer de paiement avant la configuration d’un prestataire.
+- [x] Tester les permissions plateforme, l’absence de fuite des données métier et les rendus clair/sombre avant publication par sous-lot.
 
 ## Plan directeur de mise en place
 - [x] Rédiger et livrer un planning complet de mise en place de StockPilot Pro, couvrant produit, sécurité, données, offline, exploitation, support, abonnements, conformité et commercialisation.
 
 ## Exécution autonome de la feuille de route
-- [ ] Enchaîner automatiquement les sous-lots sûrs du panneau SaaS après leurs validations, tests, contrôles d’isolation et checkpoints, jusqu’aux seules décisions irréversibles ou intégrations nécessitant des secrets externes.
+- [x] Enchaîner automatiquement les sous-lots sûrs du panneau SaaS après leurs validations, tests, contrôles d’isolation et checkpoints, jusqu’aux seules décisions irréversibles ou intégrations nécessitant des secrets externes.

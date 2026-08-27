@@ -1,9 +1,9 @@
 import { TRPCError } from "@trpc/server";
 import { and, desc, eq, gte, isNotNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
-import { backupSettings, companies, companyLifecycleEvents, companySyncHealth, platformAdminUsers, platformAuditLogs, supportAssignments, supportPlatformEvents, supportRequests, users } from "../../drizzle/schema";
+import { backupSettings, companies, companyLifecycleEvents, companySubscriptions, companySyncHealth, platformAdminUsers, platformAuditLogs, subscriptionPlans, supportAssignments, supportPlatformEvents, supportRequests, users } from "../../drizzle/schema";
 import { authenticatedProcedure, router } from "../_core/trpc";
-import { canManagePlatformCompanies, canManagePlatformOperators, canManagePlatformSupport, requirePlatformAccess } from "../platformAccess";
+import { canManagePlatformBilling, canManagePlatformCompanies, canManagePlatformOperators, canManagePlatformSupport, requirePlatformAccess } from "../platformAccess";
 import { resolveCompanyHealth } from "../platformHealth";
 
 async function auditPlatform(db: { insert: (...args: any[]) => any }, actorUserId: number, action: string, companyId: number | null, reason?: string, metadata?: Record<string, unknown>, entityType = "company", entityId: number | null = companyId) {
@@ -92,6 +92,18 @@ export const platformRouter = router({
         };
       });
     }),
+    detail: authenticatedProcedure.input(z.object({ companyId: z.number().int().positive() })).query(async ({ ctx, input }) => {
+      const { db } = await requirePlatformAccess(ctx);
+      const company = (await db.select({ id: companies.id, name: companies.name, platformStatus: companies.platformStatus, createdAt: companies.createdAt, onboardingCompletedAt: companies.onboardingCompletedAt, suspendedAt: companies.suspendedAt, suspensionReason: companies.suspensionReason, ownerName: users.name, ownerEmail: users.email, subscriptionStatus: companySubscriptions.status, trialEndsAt: companySubscriptions.trialEndsAt, currentPeriodEndsAt: companySubscriptions.currentPeriodEndsAt, graceEndsAt: companySubscriptions.graceEndsAt, planId: subscriptionPlans.id, planCode: subscriptionPlans.code, planName: subscriptionPlans.name, planLimitsJson: subscriptionPlans.limitsJson }).from(companies).leftJoin(users, eq(companies.ownerUserId, users.id)).leftJoin(companySubscriptions, eq(companies.id, companySubscriptions.companyId)).leftJoin(subscriptionPlans, eq(companySubscriptions.planId, subscriptionPlans.id)).where(eq(companies.id, input.companyId)).limit(1))[0];
+      if (!company) throw new TRPCError({ code: "NOT_FOUND", message: "Entreprise introuvable." });
+      const [lifecycle, audits] = await Promise.all([
+        db.select({ id: companyLifecycleEvents.id, action: companyLifecycleEvents.action, reason: companyLifecycleEvents.reason, createdAt: companyLifecycleEvents.createdAt }).from(companyLifecycleEvents).where(eq(companyLifecycleEvents.companyId, input.companyId)).orderBy(desc(companyLifecycleEvents.createdAt)).limit(20),
+        db.select({ id: platformAuditLogs.id, action: platformAuditLogs.action, reason: platformAuditLogs.reason, createdAt: platformAuditLogs.createdAt, actorName: users.name }).from(platformAuditLogs).leftJoin(users, eq(platformAuditLogs.actorUserId, users.id)).where(eq(platformAuditLogs.companyId, input.companyId)).orderBy(desc(platformAuditLogs.createdAt)).limit(20),
+      ]);
+      let planLimits: Record<string, number> = {};
+      try { const parsed = company.planLimitsJson ? JSON.parse(company.planLimitsJson) : {}; if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) planLimits = parsed as Record<string, number>; } catch { planLimits = {}; }
+      return { ...company, planLimits, lifecycle, audits };
+    }),
     setStatus: authenticatedProcedure.input(z.object({ companyId: z.number().int().positive(), status: z.enum(["active", "suspended"]), reason: z.string().trim().min(3).max(400).optional() })).mutation(async ({ ctx, input }) => {
       const { db, access } = await requirePlatformAccess(ctx);
       if (!canManagePlatformCompanies(access.platformRole)) throw new TRPCError({ code: "FORBIDDEN" });
@@ -107,6 +119,51 @@ export const platformRouter = router({
         });
       }
       return { success: true, status: input.status };
+    }),
+  }),
+  subscriptions: router({
+    plans: router({
+      list: authenticatedProcedure.query(async ({ ctx }) => {
+        const { db, access } = await requirePlatformAccess(ctx);
+        if (!canManagePlatformBilling(access.platformRole)) throw new TRPCError({ code: "FORBIDDEN" });
+        const rows = await db.select().from(subscriptionPlans).orderBy(subscriptionPlans.sortOrder, subscriptionPlans.name);
+        return rows.map(row => { let limits: Record<string, number> = {}; try { const parsed = JSON.parse(row.limitsJson); if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) limits = parsed as Record<string, number>; } catch { limits = {}; } return { ...row, limits }; });
+      }),
+      save: authenticatedProcedure.input(z.object({ id: z.number().int().positive().optional(), code: z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9_-]{1,46}$/), name: z.string().trim().min(2).max(120), description: z.string().trim().max(500).nullable().optional(), active: z.boolean().default(true), sortOrder: z.number().int().min(0).max(1000).default(0), trialDays: z.number().int().min(0).max(365).default(0), limits: z.record(z.string().min(1).max(60), z.number().int().min(0).max(1_000_000)).default({}) })).mutation(async ({ ctx, input }) => {
+        const { db, access } = await requirePlatformAccess(ctx);
+        if (!canManagePlatformBilling(access.platformRole)) throw new TRPCError({ code: "FORBIDDEN" });
+        const values = { code: input.code, name: input.name, description: input.description ?? null, active: input.active, sortOrder: input.sortOrder, trialDays: input.trialDays, limitsJson: JSON.stringify(input.limits) };
+        if (input.id) {
+          const existing = (await db.select({ id: subscriptionPlans.id }).from(subscriptionPlans).where(eq(subscriptionPlans.id, input.id)).limit(1))[0];
+          if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Offre introuvable." });
+          await db.update(subscriptionPlans).set(values).where(eq(subscriptionPlans.id, input.id));
+          await auditPlatform(db, ctx.user.id, "subscription_plan_updated", null, undefined, { planId: input.id, code: input.code }, "subscription_plan", input.id);
+          return { id: input.id };
+        }
+        const result = await db.insert(subscriptionPlans).values(values);
+        const id = Number(result[0].insertId);
+        await auditPlatform(db, ctx.user.id, "subscription_plan_created", null, undefined, { planId: id, code: input.code }, "subscription_plan", id);
+        return { id };
+      }),
+    }),
+    list: authenticatedProcedure.query(async ({ ctx }) => {
+      const { db, access } = await requirePlatformAccess(ctx);
+      if (!canManagePlatformBilling(access.platformRole)) throw new TRPCError({ code: "FORBIDDEN" });
+      return db.select({ companyId: companies.id, companyName: companies.name, platformStatus: companies.platformStatus, subscriptionStatus: companySubscriptions.status, trialEndsAt: companySubscriptions.trialEndsAt, currentPeriodEndsAt: companySubscriptions.currentPeriodEndsAt, graceEndsAt: companySubscriptions.graceEndsAt, planId: subscriptionPlans.id, planName: subscriptionPlans.name, planCode: subscriptionPlans.code }).from(companies).leftJoin(companySubscriptions, eq(companies.id, companySubscriptions.companyId)).leftJoin(subscriptionPlans, eq(companySubscriptions.planId, subscriptionPlans.id)).orderBy(desc(companies.createdAt));
+    }),
+    set: authenticatedProcedure.input(z.object({ companyId: z.number().int().positive(), planId: z.number().int().positive().nullable().optional(), status: z.enum(["trial", "active", "past_due", "suspended", "cancelled", "manual"]), trialEndsAt: z.coerce.date().nullable().optional(), currentPeriodEndsAt: z.coerce.date().nullable().optional(), graceEndsAt: z.coerce.date().nullable().optional() })).mutation(async ({ ctx, input }) => {
+      const { db, access } = await requirePlatformAccess(ctx);
+      if (!canManagePlatformBilling(access.platformRole)) throw new TRPCError({ code: "FORBIDDEN" });
+      const company = (await db.select({ id: companies.id }).from(companies).where(eq(companies.id, input.companyId)).limit(1))[0];
+      if (!company) throw new TRPCError({ code: "NOT_FOUND", message: "Entreprise introuvable." });
+      if (input.planId) {
+        const plan = (await db.select({ id: subscriptionPlans.id }).from(subscriptionPlans).where(eq(subscriptionPlans.id, input.planId)).limit(1))[0];
+        if (!plan) throw new TRPCError({ code: "BAD_REQUEST", message: "Offre introuvable." });
+      }
+      const values = { companyId: input.companyId, planId: input.planId ?? null, status: input.status, trialEndsAt: input.trialEndsAt ?? null, currentPeriodEndsAt: input.currentPeriodEndsAt ?? null, graceEndsAt: input.graceEndsAt ?? null, cancelledAt: input.status === "cancelled" ? new Date() : null, updatedByPlatformUserId: ctx.user.id };
+      await db.insert(companySubscriptions).values(values).onDuplicateKeyUpdate({ set: { planId: values.planId, status: values.status, trialEndsAt: values.trialEndsAt, currentPeriodEndsAt: values.currentPeriodEndsAt, graceEndsAt: values.graceEndsAt, cancelledAt: values.cancelledAt, updatedByPlatformUserId: ctx.user.id } });
+      await auditPlatform(db, ctx.user.id, "company_subscription_updated", input.companyId, undefined, { planId: values.planId, status: values.status }, "company_subscription", input.companyId);
+      return { success: true } as const;
     }),
   }),
   audit: authenticatedProcedure.input(z.object({ limit: z.number().int().min(1).max(100).default(50) }).optional()).query(async ({ ctx, input }) => {
