@@ -5,9 +5,10 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { downloadCsv } from "@/lib/csv";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
-import { Activity, Building2, ChartNoAxesCombined, CircleAlert, ClipboardCheck, ClipboardList, Headphones, Loader2, ShieldCheck, UserCheck, UsersRound } from "lucide-react";
+import { Activity, Building2, ChartNoAxesCombined, CircleAlert, ClipboardCheck, ClipboardList, Download, Headphones, Loader2, ShieldCheck, UserCheck, UsersRound } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -20,6 +21,10 @@ export default function PlatformAdmin() {
   const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
   const [search, setSearch] = useState("");
+  const [companyStatusFilter, setCompanyStatusFilter] = useState<"all" | "active" | "suspended">("all");
+  const [companyHealthFilter, setCompanyHealthFilter] = useState<"all" | "attention" | "healthy">("all");
+  const [companyPage, setCompanyPage] = useState(1);
+  const [isExportingCompanies, setIsExportingCompanies] = useState(false);
   const [pendingCompany, setPendingCompany] = useState<{ id: number; name: string; status: "active" | "suspended" } | null>(null);
   const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(null);
   const [supportStatusFilter, setSupportStatusFilter] = useState<"all" | "open" | "in_progress" | "closed">("all");
@@ -73,6 +78,19 @@ export default function PlatformAdmin() {
   const healthByCompanyId = useMemo(() => new Map((companyHealth.data ?? []).map(item => [item.id, item])), [companyHealth.data]);
   const selectedCompany = useMemo(() => (companies.data ?? []).find(company => company.id === selectedCompanyId) ?? null, [companies.data, selectedCompanyId]);
   const selectedHealth = selectedCompany ? healthByCompanyId.get(selectedCompany.id) : null;
+  const filteredCompanies = useMemo(() => (companies.data ?? []).filter(company => {
+    const health = healthByCompanyId.get(company.id);
+    if (companyStatusFilter !== "all" && company.platformStatus !== companyStatusFilter) return false;
+    if (companyHealthFilter === "attention" && !health?.attentionRequired) return false;
+    if (companyHealthFilter === "healthy" && (!health || health.attentionRequired)) return false;
+    return true;
+  }), [companies.data, companyHealthFilter, companyStatusFilter, healthByCompanyId]);
+  const companyPageSize = 8;
+  const companyPageCount = Math.max(1, Math.ceil(filteredCompanies.length / companyPageSize));
+  const visibleCompanies = filteredCompanies.slice((companyPage - 1) * companyPageSize, companyPage * companyPageSize);
+
+  useEffect(() => { setCompanyPage(1); }, [companyHealthFilter, companyStatusFilter, search]);
+  useEffect(() => { if (companyPage > companyPageCount) setCompanyPage(companyPageCount); }, [companyPage, companyPageCount]);
   if (loading || (user && access.isLoading)) return <div className="grid min-h-screen place-items-center bg-background text-foreground"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div>;
   if (!user || access.isError || !access.data?.platformRole) return <div className="grid min-h-screen place-items-center bg-background px-6 text-center text-foreground"><Card className="max-w-md"><CardHeader><CardTitle>Accès plateforme non autorisé</CardTitle></CardHeader><CardContent><Button onClick={() => setLocation("/")}>Revenir à l’application</Button></CardContent></Card></div>;
 
@@ -80,6 +98,19 @@ export default function PlatformAdmin() {
     if (!pendingCompany) return;
     const nextStatus = pendingCompany.status === "active" ? "suspended" : "active";
     setStatus.mutate({ companyId: pendingCompany.id, status: nextStatus, reason: nextStatus === "suspended" ? reason : reason || undefined });
+  };
+
+  const exportCompanies = () => {
+    if (!filteredCompanies.length) return;
+    setIsExportingCompanies(true);
+    window.setTimeout(() => {
+      downloadCsv(`stockpilot-entreprises-${new Date().toISOString().slice(0, 10)}.csv`, ["Entreprise", "Statut", "Créée le", "Dernière activité", "Onboarding", "Sauvegarde", "Synchronisation", "Support ouvert"], filteredCompanies.map(company => {
+        const health = healthByCompanyId.get(company.id);
+        return [company.name, company.platformStatus === "active" ? "Active" : "Suspendue", formatDate(company.createdAt), formatDate(health?.lastActivityAt ?? company.lastSignedIn), company.onboardingCompletedAt ? "Terminé" : "À finaliser", health ? backupHealthLabel(health.backupHealth) : "Non disponible", health ? syncHealthLabel(health.syncHealth) : "Non disponible", health?.openSupportCount ?? 0];
+      }));
+      setIsExportingCompanies(false);
+      toast.success("Export administratif téléchargé.");
+    }, 0);
   };
 
   const stats = overview.data;
@@ -127,8 +158,9 @@ export default function PlatformAdmin() {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.55fr_0.85fr]">
-        <Card><CardHeader className="flex-row items-center justify-between gap-3"><div><CardTitle className="text-base">Entreprises et santé</CardTitle><p className="mt-1 text-sm text-muted-foreground">Statut administratif, sauvegarde, activité et support.</p></div><Input value={search} onChange={event => setSearch(event.target.value)} placeholder="Rechercher une entreprise" className="h-9 max-w-xs" /></CardHeader><CardContent className="space-y-3">
-          {companies.isLoading ? <div className="flex justify-center py-12"><Loader2 className="animate-spin text-primary" /></div> : companies.data?.map(company => { const health = healthByCompanyId.get(company.id); return <article key={company.id} className="flex flex-col gap-3 rounded-xl border border-border bg-muted/40 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><p className="truncate font-medium">{company.name}</p><p className="truncate text-sm text-muted-foreground">{company.ownerName || "Administrateur non défini"}{company.ownerEmail ? ` · ${company.ownerEmail}` : ""}</p><p className="mt-1 text-xs text-muted-foreground">Créée le {formatDate(company.createdAt)} · Dernière activité {formatDate(health?.lastActivityAt ?? company.lastSignedIn)}</p><div className="mt-2 flex flex-wrap gap-2">{health ? <><HealthBadge health={health.backupHealth} /><SyncHealthBadge health={health.syncHealth} /><Badge variant="outline" className={health.openSupportCount ? "border-amber-600/35 bg-amber-100 text-amber-900 dark:border-amber-400/30 dark:bg-amber-400/15 dark:text-amber-200" : "border-border bg-background text-muted-foreground"}>{health.openSupportCount ? `${health.openSupportCount} support à traiter` : "Aucun support ouvert"}</Badge>{health.attentionRequired && <Badge variant="outline" className="border-rose-600/35 bg-rose-100 text-rose-900 dark:border-rose-400/30 dark:bg-rose-400/15 dark:text-rose-200">À surveiller</Badge>}</> : <Badge variant="outline" className="border-border bg-background text-muted-foreground">Santé en chargement</Badge>}</div>{company.suspensionReason && <p className="mt-2 text-xs font-medium text-amber-800 dark:text-amber-200">Motif : {company.suspensionReason}</p>}</div><div className="flex flex-wrap items-center gap-2"><Button size="sm" variant="outline" onClick={() => setSelectedCompanyId(company.id)}>Voir le suivi</Button><Badge className={company.platformStatus === "active" ? "border-emerald-600/35 bg-emerald-100 text-emerald-800 dark:border-emerald-400/30 dark:bg-emerald-400/15 dark:text-emerald-200" : "border-amber-600/35 bg-amber-100 text-amber-900 dark:border-amber-400/30 dark:bg-amber-400/15 dark:text-amber-200"}>{company.platformStatus === "active" ? "Active" : "Suspendue"}</Badge><Button size="sm" variant={company.platformStatus === "active" ? "outline" : "default"} onClick={() => setPendingCompany({ id: company.id, name: company.name, status: company.platformStatus })} className={company.platformStatus === "active" ? "border-amber-600 text-amber-900 hover:bg-amber-100 hover:text-amber-950 dark:border-amber-400/50 dark:text-amber-200 dark:hover:bg-amber-400/15 dark:hover:text-amber-100" : undefined}>{company.platformStatus === "active" ? "Suspendre" : "Réactiver"}</Button></div></article>}) ?? <p className="py-8 text-center text-sm text-muted-foreground">Aucune entreprise ne correspond à la recherche.</p>}
+        <Card><CardHeader className="gap-3"><div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between"><div><CardTitle className="text-base">Entreprises et santé</CardTitle><p className="mt-1 text-sm text-muted-foreground">Statut administratif, sauvegarde, activité et support.</p></div><Button variant="outline" size="sm" disabled={isExportingCompanies || !filteredCompanies.length} onClick={exportCompanies}>{isExportingCompanies ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}Exporter</Button></div><div className="grid gap-2 sm:grid-cols-3"><Input value={search} onChange={event => setSearch(event.target.value)} placeholder="Rechercher une entreprise" className="h-9" /><Select value={companyStatusFilter} onValueChange={value => setCompanyStatusFilter(value as typeof companyStatusFilter)}><SelectTrigger className="h-9 bg-background"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Tous statuts</SelectItem><SelectItem value="active">Actives</SelectItem><SelectItem value="suspended">Suspendues</SelectItem></SelectContent></Select><Select value={companyHealthFilter} onValueChange={value => setCompanyHealthFilter(value as typeof companyHealthFilter)}><SelectTrigger className="h-9 bg-background"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Toute santé</SelectItem><SelectItem value="attention">À surveiller</SelectItem><SelectItem value="healthy">Sans alerte</SelectItem></SelectContent></Select></div></CardHeader><CardContent className="space-y-3">
+          {companies.isLoading ? <div className="flex justify-center py-12"><Loader2 className="animate-spin text-primary" /></div> : visibleCompanies.length ? visibleCompanies.map(company => { const health = healthByCompanyId.get(company.id); return <article key={company.id} className="flex flex-col gap-3 rounded-xl border border-border bg-muted/40 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><p className="truncate font-medium">{company.name}</p><p className="truncate text-sm text-muted-foreground">{company.ownerName || "Administrateur non défini"}{company.ownerEmail ? ` · ${company.ownerEmail}` : ""}</p><p className="mt-1 text-xs text-muted-foreground">Créée le {formatDate(company.createdAt)} · Dernière activité {formatDate(health?.lastActivityAt ?? company.lastSignedIn)}</p><div className="mt-2 flex flex-wrap gap-2">{health ? <><HealthBadge health={health.backupHealth} /><SyncHealthBadge health={health.syncHealth} /><Badge variant="outline" className={health.openSupportCount ? "border-amber-600/35 bg-amber-100 text-amber-900 dark:border-amber-400/30 dark:bg-amber-400/15 dark:text-amber-200" : "border-border bg-background text-muted-foreground"}>{health.openSupportCount ? `${health.openSupportCount} support à traiter` : "Aucun support ouvert"}</Badge>{health.attentionRequired && <Badge variant="outline" className="border-rose-600/35 bg-rose-100 text-rose-900 dark:border-rose-400/30 dark:bg-rose-400/15 dark:text-rose-200">À surveiller</Badge>}</> : <Badge variant="outline" className="border-border bg-background text-muted-foreground">Santé en chargement</Badge>}</div>{company.suspensionReason && <p className="mt-2 text-xs font-medium text-amber-800 dark:text-amber-200">Motif : {company.suspensionReason}</p>}</div><div className="flex flex-wrap items-center gap-2"><Button size="sm" variant="outline" onClick={() => setSelectedCompanyId(company.id)}>Voir le suivi</Button><Badge className={company.platformStatus === "active" ? "border-emerald-600/35 bg-emerald-100 text-emerald-800 dark:border-emerald-400/30 dark:bg-emerald-400/15 dark:text-emerald-200" : "border-amber-600/35 bg-amber-100 text-amber-900 dark:border-amber-400/30 dark:bg-amber-400/15 dark:text-amber-200"}>{company.platformStatus === "active" ? "Active" : "Suspendue"}</Badge><Button size="sm" variant={company.platformStatus === "active" ? "outline" : "default"} onClick={() => setPendingCompany({ id: company.id, name: company.name, status: company.platformStatus })} className={company.platformStatus === "active" ? "border-amber-600 text-amber-900 hover:bg-amber-100 hover:text-amber-950 dark:border-amber-400/50 dark:text-amber-200 dark:hover:bg-amber-400/15 dark:hover:text-amber-100" : undefined}>{company.platformStatus === "active" ? "Suspendre" : "Réactiver"}</Button></div></article>}) : <p className="py-8 text-center text-sm text-muted-foreground">Aucune entreprise ne correspond aux filtres.</p>}
+          {filteredCompanies.length > companyPageSize && <div className="flex items-center justify-between pt-2"><p className="text-xs text-muted-foreground">Page {companyPage} sur {companyPageCount} · {filteredCompanies.length} entreprises</p><div className="flex gap-2"><Button size="sm" variant="outline" disabled={companyPage <= 1} onClick={() => setCompanyPage(page => Math.max(1, page - 1))}>Précédent</Button><Button size="sm" variant="outline" disabled={companyPage >= companyPageCount} onClick={() => setCompanyPage(page => Math.min(companyPageCount, page + 1))}>Suivant</Button></div></div>}
         </CardContent></Card>
         <Card><CardHeader><CardTitle className="text-base">Journal plateforme</CardTitle></CardHeader><CardContent className="space-y-3">{filteredAudits.length ? filteredAudits.map(item => <div key={item.id} className="rounded-xl border border-border bg-muted/40 p-3"><p className="text-sm font-medium">{item.action}</p><p className="mt-1 text-xs text-muted-foreground">{item.actorName || "Opérateur plateforme"} · {formatDate(item.createdAt)}</p>{item.reason && <p className="mt-2 text-xs text-foreground">{item.reason}</p>}</div>) : <p className="py-10 text-center text-sm text-muted-foreground">Aucune action plateforme enregistrée.</p>}</CardContent></Card>
       </section>

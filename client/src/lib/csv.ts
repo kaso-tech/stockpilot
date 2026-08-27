@@ -16,9 +16,14 @@ export function parseCsv(text: string): CsvRow[] {
   return rows.slice(1).map(values => Object.fromEntries(headers.map((header, index) => [header, values[index]?.trim() ?? ""])));
 }
 
+export function escapeCsvCell(value: string | number | null | undefined) {
+  const raw = String(value ?? "");
+  const safe = /^[=+\-@]/.test(raw.trimStart()) ? `'${raw}` : raw;
+  return `"${safe.replace(/"/g, '""')}"`;
+}
+
 export function downloadCsv(filename: string, headers: string[], rows: Array<Array<string | number | null | undefined>>) {
-  const escape = (value: string | number | null | undefined) => `"${String(value ?? "").replace(/"/g, '""')}"`;
-  const content = [headers.map(escape).join(","), ...rows.map(row => row.map(escape).join(","))].join("\n");
+  const content = [headers.map(escapeCsvCell).join(","), ...rows.map(row => row.map(escapeCsvCell).join(","))].join("\n");
   const url = URL.createObjectURL(new Blob(["\uFEFF", content], { type: "text/csv;charset=utf-8" }));
   const link = document.createElement("a"); link.href = url; link.download = filename; link.click(); URL.revokeObjectURL(url);
 }

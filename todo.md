@@ -875,7 +875,7 @@
 - [x] Ajouter un registre support plateforme avec triage, affectation, statut, priorité et journal d’actions, limité aux métadonnées de demande.
 - [x] Ajouter une gestion sécurisée des opérateurs plateforme avec rôles granulaires, invitation contrôlée, révocation et audit immuable.
 - [ ] Ajouter une fiche entreprise plateforme avec plan, limites, statut administratif, contacts autorisés, événements de cycle de vie et actions auditées.
-- [ ] Ajouter des filtres, recherche avancée, pagination et exports administratifs ne contenant aucune donnée métier client.
+- [x] Ajouter des filtres, recherche avancée, pagination et exports administratifs ne contenant aucune donnée métier client.
 - [ ] Définir le socle abonnement et facturation SaaS côté serveur, sans activer de paiement avant la configuration d’un prestataire.
 - [ ] Tester les permissions plateforme, l’absence de fuite des données métier et les rendus clair/sombre avant publication par sous-lot.
 
