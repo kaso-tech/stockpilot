@@ -442,6 +442,13 @@
       "when": 1787789173822,
       "tag": "0062_brave_union_jack",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "5",
+      "when": 1787790605259,
+      "tag": "0063_lyrical_chronomancer",
+      "breakpoints": true
     }
   ]
 }

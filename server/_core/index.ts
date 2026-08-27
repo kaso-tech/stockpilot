@@ -7,6 +7,7 @@ import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { runScheduledBackup } from "../scheduledBackups";
+import { runScheduledPaymentDueReminders } from "../scheduledPaymentDueReminders";
 import { registerGoogleDriveRoutes } from "../googleDriveRoutes";
 import { serveStatic, setupVite } from "./vite";
 import { ensureAdminFallbackPasswordSeed } from "../adminFallbackSeed";
@@ -39,6 +40,7 @@ async function startServer() {
   registerStorageProxy(app);
   registerGoogleDriveRoutes(app);
   app.post("/api/scheduled/backup", runScheduledBackup);
+  app.post("/api/scheduled/payment-due-reminders", runScheduledPaymentDueReminders);
   // tRPC API
   app.use(
     "/api/trpc",

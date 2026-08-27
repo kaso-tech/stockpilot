@@ -600,6 +600,79 @@ export const expenseBudgets = mysqlTable("expenseBudgets", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, table => [uniqueIndex("expense_budgets_company_warehouse_month_unique").on(table.companyId, table.warehouseId, table.yearMonth)]);
 
+/** Modèle récurrent ou ponctuel d’une échéance de dépense ou de salaire, isolé par entreprise. */
+export const paymentDueSchedules = mysqlTable("paymentDueSchedules", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  warehouseId: int("warehouseId"),
+  scheduleType: mysqlEnum("scheduleType", ["expense", "salary"]).notNull(),
+  title: varchar("title", { length: 180 }).notNull(),
+  expenseCategory: mysqlEnum("expenseCategory", ["rent", "energy", "connection", "salary", "marketing", "supplies", "taxes", "other"]),
+  beneficiaryType: mysqlEnum("beneficiaryType", ["user", "agent"]),
+  beneficiaryId: int("beneficiaryId"),
+  amountCents: int("amountCents").notNull(),
+  recurrence: mysqlEnum("recurrence", ["once", "monthly"]).notNull().default("once"),
+  dueDay: int("dueDay"),
+  startsAt: timestamp("startsAt").notNull(),
+  endsAt: timestamp("endsAt"),
+  reminderDaysJson: varchar("reminderDaysJson", { length: 80 }).notNull().default("[7,3,1]"),
+  responsibleUserId: int("responsibleUserId"),
+  status: mysqlEnum("status", ["active", "paused", "archived"]).notNull().default("active"),
+  createdByUserId: int("createdByUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [index("payment_due_schedules_company_status_idx").on(table.companyId, table.status), index("payment_due_schedules_company_warehouse_idx").on(table.companyId, table.warehouseId)]);
+
+/** Échéance payable concrète ; les paiements réels restent dans dépenses ou paiements agents. */
+export const paymentDueOccurrences = mysqlTable("paymentDueOccurrences", {
+  id: int("id").autoincrement().primaryKey(),
+  scheduleId: int("scheduleId").notNull(),
+  companyId: int("companyId").notNull(),
+  warehouseId: int("warehouseId"),
+  dueAt: timestamp("dueAt").notNull(),
+  periodLabel: varchar("periodLabel", { length: 7 }).notNull(),
+  amountCents: int("amountCents").notNull(),
+  paidCents: int("paidCents").notNull().default(0),
+  status: mysqlEnum("status", ["upcoming", "due", "overdue", "partially_paid", "paid", "cancelled"]).notNull().default("upcoming"),
+  resolvedAt: timestamp("resolvedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [uniqueIndex("payment_due_occurrences_schedule_due_unique").on(table.scheduleId, table.dueAt), index("payment_due_occurrences_company_status_due_idx").on(table.companyId, table.status, table.dueAt)]);
+
+/** Lien traçable entre une échéance et une dépense ou un paiement agent réel, sans double comptage. */
+export const paymentDueSettlements = mysqlTable("paymentDueSettlements", {
+  id: int("id").autoincrement().primaryKey(),
+  occurrenceId: int("occurrenceId").notNull(),
+  companyId: int("companyId").notNull(),
+  amountCents: int("amountCents").notNull(),
+  expenseId: int("expenseId"),
+  agentPaymentId: int("agentPaymentId"),
+  settledByUserId: int("settledByUserId").notNull(),
+  settledAt: timestamp("settledAt").defaultNow().notNull(),
+}, table => [index("payment_due_settlements_occurrence_idx").on(table.occurrenceId), index("payment_due_settlements_company_idx").on(table.companyId)]);
+
+/** Journal idempotent des rappels internes affichés dans le centre de notifications. */
+export const paymentDueReminderEvents = mysqlTable("paymentDueReminderEvents", {
+  id: int("id").autoincrement().primaryKey(),
+  occurrenceId: int("occurrenceId").notNull(),
+  companyId: int("companyId").notNull(),
+  reminderKind: mysqlEnum("reminderKind", ["upcoming", "due", "overdue"]).notNull(),
+  triggeredForDate: varchar("triggeredForDate", { length: 10 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [uniqueIndex("payment_due_reminder_occurrence_kind_date_unique").on(table.occurrenceId, table.reminderKind, table.triggeredForDate), index("payment_due_reminder_company_created_idx").on(table.companyId, table.createdAt)]);
+
+/** Unique configuration projet du job quotidien de rappels, identifiée exclusivement par son task UID. */
+export const paymentDueReminderJobSettings = mysqlTable("paymentDueReminderJobSettings", {
+  id: int("id").autoincrement().primaryKey(),
+  scheduleCronTaskUid: varchar("scheduleCronTaskUid", { length: 65 }).unique(),
+  enabled: boolean("enabled").notNull().default(true),
+  lastRunAt: timestamp("lastRunAt"),
+  lastRunStatus: mysqlEnum("lastRunStatus", ["success", "failed"]).default("success"),
+  lastRunError: varchar("lastRunError", { length: 500 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 export const salePayments = mysqlTable("salePayments", {
   id: int("id").autoincrement().primaryKey(),
   saleId: int("saleId").notNull(),
