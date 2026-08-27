@@ -3,7 +3,7 @@ import { and, desc, eq, gte, isNotNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import { backupSettings, companies, companyLifecycleEvents, companySyncHealth, platformAdminUsers, platformAuditLogs, supportAssignments, supportPlatformEvents, supportRequests, users } from "../../drizzle/schema";
 import { authenticatedProcedure, router } from "../_core/trpc";
-import { canManagePlatformCompanies, requirePlatformAccess } from "../platformAccess";
+import { canManagePlatformCompanies, canManagePlatformOperators, canManagePlatformSupport, requirePlatformAccess } from "../platformAccess";
 import { resolveCompanyHealth } from "../platformHealth";
 
 async function auditPlatform(db: { insert: (...args: any[]) => any }, actorUserId: number, action: string, companyId: number | null, reason?: string, metadata?: Record<string, unknown>, entityType = "company", entityId: number | null = companyId) {
@@ -115,7 +115,8 @@ export const platformRouter = router({
   }),
   support: router({
     list: authenticatedProcedure.input(z.object({ status: z.enum(["open", "in_progress", "closed"]).optional(), priority: z.enum(["low", "normal", "high", "critical"]).optional(), limit: z.number().int().min(1).max(100).default(50) }).optional()).query(async ({ ctx, input }) => {
-      const { db } = await requirePlatformAccess(ctx);
+      const { db, access } = await requirePlatformAccess(ctx);
+      if (!canManagePlatformSupport(access.platformRole)) throw new TRPCError({ code: "FORBIDDEN" });
       const rows = await db.select({
         id: supportRequests.id,
         companyId: supportRequests.companyId,
@@ -131,7 +132,8 @@ export const platformRouter = router({
       return rows.filter(row => (!input?.status || row.status === input.status) && (!input?.priority || (row.priority ?? "normal") === input.priority)).slice(0, input?.limit ?? 50).map(row => ({ ...row, priority: row.priority ?? "normal" }));
     }),
     events: authenticatedProcedure.input(z.object({ supportRequestId: z.number().int().positive() })).query(async ({ ctx, input }) => {
-      const { db } = await requirePlatformAccess(ctx);
+      const { db, access } = await requirePlatformAccess(ctx);
+      if (!canManagePlatformSupport(access.platformRole)) throw new TRPCError({ code: "FORBIDDEN" });
       return db.select({ id: supportPlatformEvents.id, action: supportPlatformEvents.action, metadataJson: supportPlatformEvents.metadataJson, createdAt: supportPlatformEvents.createdAt, actorName: users.name }).from(supportPlatformEvents).leftJoin(users, eq(supportPlatformEvents.actorPlatformUserId, users.id)).where(eq(supportPlatformEvents.supportRequestId, input.supportRequestId)).orderBy(desc(supportPlatformEvents.createdAt));
     }),
     triage: authenticatedProcedure.input(z.object({
@@ -142,7 +144,8 @@ export const platformRouter = router({
       takeOwnership: z.boolean().optional(),
       dueAt: z.coerce.date().nullable().optional(),
     })).mutation(async ({ ctx, input }) => {
-      const { db } = await requirePlatformAccess(ctx);
+      const { db, access } = await requirePlatformAccess(ctx);
+      if (!canManagePlatformSupport(access.platformRole)) throw new TRPCError({ code: "FORBIDDEN" });
       const request = (await db.select({ id: supportRequests.id, companyId: supportRequests.companyId, status: supportRequests.status }).from(supportRequests).where(eq(supportRequests.id, input.supportRequestId)).limit(1))[0];
       if (!request) throw new TRPCError({ code: "NOT_FOUND", message: "Demande d’assistance introuvable." });
       const requestedAssignee = input.takeOwnership ? ctx.user.id : input.assignedPlatformUserId;
@@ -170,6 +173,43 @@ export const platformRouter = router({
         await auditPlatform(tx, ctx.user.id, "support_triaged", request.companyId, undefined, { requestId: request.id, actions: events.map(event => event.action) }, "support_request", request.id);
       });
       return { success: true, changed: true } as const;
+    }),
+  }),
+  operators: router({
+    list: authenticatedProcedure.query(async ({ ctx }) => {
+      const { db, access } = await requirePlatformAccess(ctx);
+      if (!canManagePlatformOperators(access.platformRole)) throw new TRPCError({ code: "FORBIDDEN" });
+      return db.select({ userId: platformAdminUsers.userId, platformRole: platformAdminUsers.platformRole, active: platformAdminUsers.active, createdAt: platformAdminUsers.createdAt, updatedAt: platformAdminUsers.updatedAt, name: users.name, email: users.email }).from(platformAdminUsers).leftJoin(users, eq(platformAdminUsers.userId, users.id)).orderBy(desc(platformAdminUsers.createdAt));
+    }),
+    grant: authenticatedProcedure.input(z.object({ email: z.string().trim().email().max(320), platformRole: z.enum(["super_admin", "operations", "support", "billing"]) })).mutation(async ({ ctx, input }) => {
+      const { db, access } = await requirePlatformAccess(ctx);
+      if (!canManagePlatformOperators(access.platformRole)) throw new TRPCError({ code: "FORBIDDEN" });
+      const normalizedEmail = input.email.toLowerCase();
+      const account = (await db.select({ id: users.id }).from(users).where(eq(users.email, normalizedEmail)).limit(1))[0];
+      if (!account) throw new TRPCError({ code: "NOT_FOUND", message: "Ce compte doit d’abord exister dans l’application avant de recevoir un rôle plateforme." });
+      await db.insert(platformAdminUsers).values({ userId: account.id, platformRole: input.platformRole, active: true, createdByUserId: ctx.user.id }).onDuplicateKeyUpdate({ set: { platformRole: input.platformRole, active: true, createdByUserId: ctx.user.id } });
+      await auditPlatform(db, ctx.user.id, "platform_operator_granted", null, undefined, { operatorUserId: account.id, platformRole: input.platformRole }, "platform_operator", account.id);
+      return { success: true } as const;
+    }),
+    updateRole: authenticatedProcedure.input(z.object({ userId: z.number().int().positive(), platformRole: z.enum(["super_admin", "operations", "support", "billing"]) })).mutation(async ({ ctx, input }) => {
+      const { db, access } = await requirePlatformAccess(ctx);
+      if (!canManagePlatformOperators(access.platformRole)) throw new TRPCError({ code: "FORBIDDEN" });
+      const operator = (await db.select({ userId: platformAdminUsers.userId, active: platformAdminUsers.active }).from(platformAdminUsers).where(eq(platformAdminUsers.userId, input.userId)).limit(1))[0];
+      if (!operator || !operator.active) throw new TRPCError({ code: "NOT_FOUND", message: "Opérateur plateforme introuvable." });
+      if (input.userId === ctx.user.id && input.platformRole !== "super_admin") throw new TRPCError({ code: "BAD_REQUEST", message: "Vous ne pouvez pas retirer votre propre rôle super administrateur." });
+      await db.update(platformAdminUsers).set({ platformRole: input.platformRole, createdByUserId: ctx.user.id }).where(eq(platformAdminUsers.userId, input.userId));
+      await auditPlatform(db, ctx.user.id, "platform_operator_role_changed", null, undefined, { operatorUserId: input.userId, platformRole: input.platformRole }, "platform_operator", input.userId);
+      return { success: true } as const;
+    }),
+    revoke: authenticatedProcedure.input(z.object({ userId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      const { db, access } = await requirePlatformAccess(ctx);
+      if (!canManagePlatformOperators(access.platformRole)) throw new TRPCError({ code: "FORBIDDEN" });
+      if (input.userId === ctx.user.id) throw new TRPCError({ code: "BAD_REQUEST", message: "Vous ne pouvez pas révoquer votre propre accès plateforme." });
+      const operator = (await db.select({ userId: platformAdminUsers.userId, active: platformAdminUsers.active }).from(platformAdminUsers).where(eq(platformAdminUsers.userId, input.userId)).limit(1))[0];
+      if (!operator || !operator.active) throw new TRPCError({ code: "NOT_FOUND", message: "Opérateur plateforme introuvable." });
+      await db.update(platformAdminUsers).set({ active: false, createdByUserId: ctx.user.id }).where(eq(platformAdminUsers.userId, input.userId));
+      await auditPlatform(db, ctx.user.id, "platform_operator_revoked", null, undefined, { operatorUserId: input.userId }, "platform_operator", input.userId);
+      return { success: true } as const;
     }),
   }),
 });

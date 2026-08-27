@@ -5,7 +5,8 @@ import type { TrpcContext } from "./_core/context";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "./db";
 
-export type PlatformAccess = { userId: number; platformRole: "super_admin" | "operator" };
+export type PlatformRole = "super_admin" | "operator" | "operations" | "support" | "billing";
+export type PlatformAccess = { userId: number; platformRole: PlatformRole };
 
 /**
  * Returns a distinct platform permission. The configured project owner may
@@ -27,5 +28,13 @@ export async function requirePlatformAccess(ctx: TrpcContext): Promise<{ db: Non
 }
 
 export function canManagePlatformCompanies(role: PlatformAccess["platformRole"]) {
-  return role === "super_admin" || role === "operator";
+  return role === "super_admin" || role === "operator" || role === "operations";
+}
+
+export function canManagePlatformSupport(role: PlatformAccess["platformRole"]) {
+  return role === "super_admin" || role === "operator" || role === "operations" || role === "support";
+}
+
+export function canManagePlatformOperators(role: PlatformAccess["platformRole"]) {
+  return role === "super_admin";
 }

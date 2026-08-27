@@ -32,7 +32,7 @@ export const users = mysqlTable("users", {
 export const platformAdminUsers = mysqlTable("platformAdminUsers", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull().unique(),
-  platformRole: mysqlEnum("platformRole", ["super_admin", "operator"]).notNull().default("operator"),
+  platformRole: mysqlEnum("platformRole", ["super_admin", "operator", "operations", "support", "billing"]).notNull().default("operator"),
   active: boolean("active").notNull().default(true),
   createdByUserId: int("createdByUserId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
