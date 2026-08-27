@@ -931,3 +931,6 @@
 - [x] Auditer le schéma, les migrations, l’intégrité métier, l’offline/PWA et les automatisations planifiées.
 - [x] Auditer les tests, le build, les performances, l’accessibilité, les interfaces et les régressions observables.
 - [x] Produire un rapport complet, priorisé et exploitable des failles, limites, incohérences et améliorations restantes.
+
+## Plan de remédiation de production
+- [x] Rédiger un plan complet de correction et d’amélioration issu de l’audit, avec lots, dépendances, critères go/no-go, tests et gouvernance de publication.
