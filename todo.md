@@ -922,3 +922,12 @@
 - [x] Créer des pages dédiées pour Entreprises, Support, Opérateurs, Abonnements et Journal d’audit.
 - [x] Conserver le tableau de bord comme vue de synthèse sans répéter les outils détaillés.
 - [x] Préserver les restrictions de rôle, les états de chargement, les contrastes et le responsive sur chaque page.
+
+## Compétence réutilisable
+- [x] Création d’une compétence réutilisable annulée à la demande avant son initialisation.
+
+## Audit global de StockPilot Pro
+- [x] Auditer la sécurité, l’authentification, les autorisations et l’isolation multi-entreprises.
+- [x] Auditer le schéma, les migrations, l’intégrité métier, l’offline/PWA et les automatisations planifiées.
+- [x] Auditer les tests, le build, les performances, l’accessibilité, les interfaces et les régressions observables.
+- [x] Produire un rapport complet, priorisé et exploitable des failles, limites, incohérences et améliorations restantes.
