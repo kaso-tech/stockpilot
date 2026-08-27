@@ -904,3 +904,9 @@
 - [x] Attacher un justificatif sécurisé à un règlement d’échéance et le rendre accessible dans la portée autorisée.
 - [x] Ajouter un rapport prévisionnel mensuel des sorties programmées, paiements attendus et solde engagé par entrepôt.
 - [x] Tester l’isolation, les pièces jointes, les calculs prévisionnels et publier le lot.
+
+## Navigation de la console plateforme
+- [x] Créer un header plateforme distinct avec identité, accès rapide, indicateurs et menu opérateur.
+- [x] Créer une barre latérale responsive organisant les fonctions par opérations, entreprises, support, abonnements et audit.
+- [x] Raccorder les sections de navigation aux permissions plateforme sans afficher d’outil non autorisé.
+- [x] Vérifier les contrastes, le responsive, les états de chargement et publier la console restructurée.

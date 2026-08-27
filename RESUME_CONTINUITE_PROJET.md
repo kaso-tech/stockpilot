@@ -265,3 +265,9 @@ Les modèles et groupes d’échéance peuvent désormais être modifiés puis a
 La migration `0065_zippy_siren.sql` ajoute les références de justificatif aux règlements d’échéance. Le dialogue de règlement accepte uniquement un PDF, PNG, JPEG ou WEBP de 5 Mo maximum. Le fichier est contrôlé côté serveur, enregistré sous le périmètre de l’entreprise et de l’occurrence, puis son URL de stockage est refusée lors du règlement si elle ne correspond pas à cette portée.
 
 L’espace `/echeances` propose aussi une prévision de trésorerie engagée à 3, 6 ou 12 mois, filtrée par l’entrepôt actif. Elle sépare les dépenses programmées et les salaires, affiche les montants déjà réglés, le solde restant et les retards. Il s’agit d’une prévision de sorties engagées : les encaissements futurs non programmés ne sont volontairement pas estimés.
+
+## 14. Shell de la console plateforme
+
+La console `/plateforme` utilise désormais le composant dédié `client/src/components/PlatformConsoleShell.tsx`, distinct du layout des entreprises clientes. Sur ordinateur, une barre latérale fixe organise les sections Vue d’ensemble, Entreprises, Support, Opérateurs, Abonnements et Journal d’audit. Sur mobile, les mêmes raccourcis deviennent une navigation horizontale défilante sous le header. Les sections interdites à un rôle ne sont pas rendues ; les contrôles serveur restent la source d’autorité.
+
+Le header plateforme affiche le périmètre d’administration restreint et une sortie explicite vers l’espace entreprise. La navigation fait défiler vers les sections internes de la console, sans créer de routes supplémentaires ni exposer de données métier. Les surfaces et textes utilisent les tokens de thème, avec une couverture de test de non-régression incluant le nouveau shell.
