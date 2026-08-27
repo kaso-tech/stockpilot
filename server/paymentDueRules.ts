@@ -15,14 +15,19 @@ export function resolvePaymentDueStatus(input: { dueAt: Date; amountCents: numbe
   return due < today ? "overdue" : due.getTime() === today.getTime() ? "due" : "upcoming";
 }
 
-export function nextMonthlyDueAt(previousDueAt: Date): Date {
-  const next = new Date(previousDueAt);
-  const expectedDay = previousDueAt.getUTCDate();
-  next.setUTCDate(1);
-  next.setUTCMonth(next.getUTCMonth() + 1);
-  const lastDay = new Date(Date.UTC(next.getUTCFullYear(), next.getUTCMonth() + 1, 0)).getUTCDate();
-  next.setUTCDate(Math.min(expectedDay, lastDay));
-  return next;
+export function monthlyDueDate(year: number, monthIndex: number, requestedDay: number): Date {
+  const safeDay = Math.min(31, Math.max(1, Math.trunc(requestedDay)));
+  const lastDay = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(year, monthIndex, Math.min(safeDay, lastDay), 12));
+}
+
+export function initialMonthlyDueAt(dueDay: number, now = new Date()): Date {
+  const current = monthlyDueDate(now.getUTCFullYear(), now.getUTCMonth(), dueDay);
+  return current.getTime() >= Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) ? current : monthlyDueDate(now.getUTCFullYear(), now.getUTCMonth() + 1, dueDay);
+}
+
+export function nextMonthlyDueAt(previousDueAt: Date, dueDay = previousDueAt.getUTCDate()): Date {
+  return monthlyDueDate(previousDueAt.getUTCFullYear(), previousDueAt.getUTCMonth() + 1, dueDay);
 }
 
 export function reminderKindFor(input: { dueAt: Date; status: PaymentDueStatus; reminderDays: number[] }, now = new Date()): "upcoming" | "due" | "overdue" | null {

@@ -610,6 +610,8 @@ export const paymentDueSchedules = mysqlTable("paymentDueSchedules", {
   expenseCategory: mysqlEnum("expenseCategory", ["rent", "energy", "connection", "salary", "marketing", "supplies", "taxes", "other"]),
   beneficiaryType: mysqlEnum("beneficiaryType", ["user", "agent"]),
   beneficiaryId: int("beneficiaryId"),
+  beneficiaryGroupId: int("beneficiaryGroupId"),
+  templateId: int("templateId"),
   amountCents: int("amountCents").notNull(),
   recurrence: mysqlEnum("recurrence", ["once", "monthly"]).notNull().default("once"),
   dueDay: int("dueDay"),
@@ -622,6 +624,47 @@ export const paymentDueSchedules = mysqlTable("paymentDueSchedules", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, table => [index("payment_due_schedules_company_status_idx").on(table.companyId, table.status), index("payment_due_schedules_company_warehouse_idx").on(table.companyId, table.warehouseId)]);
+
+/** Modèle réutilisable pour créer une échéance de dépense ou de salaire sans dupliquer ses règles. */
+export const paymentDueTemplates = mysqlTable("paymentDueTemplates", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  warehouseId: int("warehouseId"),
+  name: varchar("name", { length: 120 }).notNull(),
+  scheduleType: mysqlEnum("scheduleType", ["expense", "salary"]).notNull(),
+  expenseCategory: mysqlEnum("expenseCategory", ["rent", "energy", "connection", "salary", "marketing", "supplies", "taxes", "other"]),
+  amountCents: int("amountCents").notNull(),
+  recurrence: mysqlEnum("recurrence", ["once", "monthly"]).notNull().default("monthly"),
+  dueDay: int("dueDay"),
+  reminderDaysJson: varchar("reminderDaysJson", { length: 80 }).notNull().default("[7,3,1]"),
+  responsibleUserId: int("responsibleUserId"),
+  active: boolean("active").notNull().default(true),
+  createdByUserId: int("createdByUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [uniqueIndex("payment_due_templates_company_name_unique").on(table.companyId, table.name), index("payment_due_templates_company_type_idx").on(table.companyId, table.scheduleType)]);
+
+/** Groupe d’agents ou de vendeurs pouvant recevoir une même programmation de salaire. */
+export const paymentDueBeneficiaryGroups = mysqlTable("paymentDueBeneficiaryGroups", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  warehouseId: int("warehouseId"),
+  name: varchar("name", { length: 120 }).notNull(),
+  active: boolean("active").notNull().default(true),
+  createdByUserId: int("createdByUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [uniqueIndex("payment_due_groups_company_name_unique").on(table.companyId, table.name), index("payment_due_groups_company_warehouse_idx").on(table.companyId, table.warehouseId)]);
+
+/** Membres d’un groupe de bénéficiaires, isolés par entreprise et sans donnée de paie en double. */
+export const paymentDueBeneficiaryGroupMembers = mysqlTable("paymentDueBeneficiaryGroupMembers", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  groupId: int("groupId").notNull(),
+  beneficiaryType: mysqlEnum("beneficiaryType", ["user", "agent"]).notNull(),
+  beneficiaryId: int("beneficiaryId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [uniqueIndex("payment_due_group_members_unique").on(table.groupId, table.beneficiaryType, table.beneficiaryId), index("payment_due_group_members_company_idx").on(table.companyId, table.groupId)]);
 
 /** Échéance payable concrète ; les paiements réels restent dans dépenses ou paiements agents. */
 export const paymentDueOccurrences = mysqlTable("paymentDueOccurrences", {

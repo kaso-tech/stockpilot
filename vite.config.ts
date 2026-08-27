@@ -176,7 +176,7 @@ const plugins = [
       skipWaiting: true,
       navigateFallback: "/index.html",
       cleanupOutdatedCaches: true,
-      maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+      maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
     },
     devOptions: { enabled: true },
   }),

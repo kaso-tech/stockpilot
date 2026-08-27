@@ -891,3 +891,10 @@
 - [x] Mettre en œuvre le traitement périodique idempotent des rappels et son journal d’exécution.
 - [x] Créer les vues calendrier, liste d’alertes, filtres et actions de règlement sans double comptage de dépenses.
 - [x] Tester l’isolation multi-entreprise, les portées d’entrepôt, les rappels et publier le module.
+
+## Liaison échéances, dépenses et paie
+- [x] Ajouter des modèles d’échéances réutilisables pour les dépenses, un agent ou un groupe d’agents, avec associations cloisonnées.
+- [x] Permettre de créer ou lier une échéance depuis la création d’une dépense et d’un agent, sans créer de doublon financier.
+- [x] Adapter les échéances mensuelles à une saisie contrôlée du jour du mois et préserver les dates précises pour les échéances ponctuelles.
+- [x] Afficher les liaisons et les prochains règlements dans les pages Dépenses, Agents et Échéances.
+- [x] Tester l’isolation multi-entreprise, les groupes, les règlements et publier le lot.
