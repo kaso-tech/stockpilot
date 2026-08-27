@@ -277,3 +277,9 @@ Le header plateforme affiche le périmètre d’administration restreint et une 
 La migration `0066_typical_raider.sql` ajoute `platformNotificationReads`, qui mémorise individuellement la lecture d’une alerte par opérateur plateforme. Le centre de notifications du header est proposé aux rôles Facturation, Opérations historiques et Super administrateur. Il ne lit que les métadonnées de souscription : statut, dates de fin d’essai/période/délai de grâce et nom d’entreprise. Il ne retourne ni ventes, ni stock, ni données de clients.
 
 Les alertes comprennent les paiements à régulariser, fins de délai de grâce, fins d’essai et échéances de souscription proches. Un opérateur peut marquer une alerte ou toutes les alertes comme lues ; seule une clé d’alerte encore active est acceptée côté serveur. Le compteur est limité à `9+` à partir de dix alertes non lues. Cliquer sur une alerte rejoint la section Abonnements sans modifier l’abonnement.
+
+## 16. Pages dédiées de la console plateforme
+
+La console ne rassemble plus tous les outils dans une même vue. Le tableau de bord reste disponible à `/plateforme` et se limite aux indicateurs de synthèse. Les domaines opérationnels sont répartis sur les routes dédiées `/plateforme/entreprises`, `/plateforme/support`, `/plateforme/operateurs`, `/plateforme/abonnements` et `/plateforme/audit`.
+
+Le menu latéral gauche utilise ces routes au lieu d’un défilement interne. Sur mobile, la seconde ligne du header a été supprimée et le même menu est ouvert dans un panneau latéral via le bouton de navigation. Ce panneau comprend une déconnexion réelle et ne propose pas de retour direct vers l’application. La visibilité des entrées reste filtrée par rôle, et les validations serveur restent inchangées.

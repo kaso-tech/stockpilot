@@ -916,3 +916,9 @@
 - [x] Protéger les alertes par rôle plateforme et ne retourner que les métadonnées administratives autorisées.
 - [x] Permettre de marquer les alertes comme lues et de rejoindre la section concernée sans exposer de données client.
 - [x] Tester les permissions, les compteurs et le rendu responsive, puis publier.
+
+## Pages dédiées de la console plateforme
+- [x] Déplacer la navigation secondaire du header vers la barre latérale gauche de la console.
+- [x] Créer des pages dédiées pour Entreprises, Support, Opérateurs, Abonnements et Journal d’audit.
+- [x] Conserver le tableau de bord comme vue de synthèse sans répéter les outils détaillés.
+- [x] Préserver les restrictions de rôle, les états de chargement, les contrastes et le responsive sur chaque page.

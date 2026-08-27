@@ -117,8 +117,10 @@ function DashboardRouter() {
   );
 }
 
+const PlatformOverviewPage = () => <PlatformAdmin />;
+
 function Router() {
-  return <Switch><Route path="/plateforme" component={PlatformAdmin} /><Route path="/tarifs" component={Pricing} /><Route path="/aide" component={Help} /><Route path="/conditions-utilisation" component={TermsOfUse} /><Route path="/politique-confidentialite" component={PrivacyPolicy} /><Route path="/politique-securite" component={SecurityPolicy} /><Route path="/contactez-nous" component={ContactUs} /><Route path="/support" component={SupportRequests} /><Route component={DashboardRouter} /></Switch>;
+  return <Switch><Route path="/plateforme/entreprises" component={() => <PlatformAdmin page="companies" />} /><Route path="/plateforme/support" component={() => <PlatformAdmin page="support" />} /><Route path="/plateforme/operateurs" component={() => <PlatformAdmin page="operators" />} /><Route path="/plateforme/abonnements" component={() => <PlatformAdmin page="subscriptions" />} /><Route path="/plateforme/audit" component={() => <PlatformAdmin page="audit" />} /><Route path="/plateforme" component={PlatformOverviewPage} /><Route path="/tarifs" component={Pricing} /><Route path="/aide" component={Help} /><Route path="/conditions-utilisation" component={TermsOfUse} /><Route path="/politique-confidentialite" component={PrivacyPolicy} /><Route path="/politique-securite" component={SecurityPolicy} /><Route path="/contactez-nous" component={ContactUs} /><Route path="/support" component={SupportRequests} /><Route component={DashboardRouter} /></Switch>;
 }
 
 // NOTE: About Theme
