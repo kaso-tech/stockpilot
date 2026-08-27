@@ -1,13 +1,23 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, gte, isNotNull, ne, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
-import { backupSettings, companies, companyLifecycleEvents, companySubscriptions, companySyncHealth, platformAdminUsers, platformAuditLogs, subscriptionPlans, supportAssignments, supportPlatformEvents, supportRequests, users } from "../../drizzle/schema";
+import { backupSettings, companies, companyLifecycleEvents, companySubscriptions, companySyncHealth, platformAdminUsers, platformAuditLogs, platformNotificationReads, subscriptionPlans, supportAssignments, supportPlatformEvents, supportRequests, users } from "../../drizzle/schema";
 import { authenticatedProcedure, router } from "../_core/trpc";
 import { canManagePlatformBilling, canManagePlatformCompanies, canManagePlatformOperators, canManagePlatformSupport, requirePlatformAccess } from "../platformAccess";
 import { resolveCompanyHealth } from "../platformHealth";
+import { buildPlatformBillingAlerts } from "../platformBillingAlerts";
 
 async function auditPlatform(db: { insert: (...args: any[]) => any }, actorUserId: number, action: string, companyId: number | null, reason?: string, metadata?: Record<string, unknown>, entityType = "company", entityId: number | null = companyId) {
   await db.insert(platformAuditLogs).values({ actorUserId, action, entityType, entityId, companyId, reason: reason ?? null, metadataJson: metadata ? JSON.stringify(metadata) : null });
+}
+
+async function getPlatformBillingAlerts(db: any, platformUserId: number) {
+  const [subscriptions, readRows] = await Promise.all([
+    db.select({ companyId: companies.id, companyName: companies.name, platformStatus: companies.platformStatus, subscriptionStatus: companySubscriptions.status, trialEndsAt: companySubscriptions.trialEndsAt, currentPeriodEndsAt: companySubscriptions.currentPeriodEndsAt, graceEndsAt: companySubscriptions.graceEndsAt }).from(companies).leftJoin(companySubscriptions, eq(companies.id, companySubscriptions.companyId)),
+    db.select({ notificationKey: platformNotificationReads.notificationKey }).from(platformNotificationReads).where(eq(platformNotificationReads.platformUserId, platformUserId)),
+  ]);
+  const readKeys = new Set(readRows.map((row: { notificationKey: string }) => row.notificationKey));
+  return buildPlatformBillingAlerts(subscriptions).map(alert => ({ ...alert, read: readKeys.has(alert.key) }));
 }
 
 export const platformRouter = router({
@@ -164,6 +174,23 @@ export const platformRouter = router({
       await db.insert(companySubscriptions).values(values).onDuplicateKeyUpdate({ set: { planId: values.planId, status: values.status, trialEndsAt: values.trialEndsAt, currentPeriodEndsAt: values.currentPeriodEndsAt, graceEndsAt: values.graceEndsAt, cancelledAt: values.cancelledAt, updatedByPlatformUserId: ctx.user.id } });
       await auditPlatform(db, ctx.user.id, "company_subscription_updated", input.companyId, undefined, { planId: values.planId, status: values.status }, "company_subscription", input.companyId);
       return { success: true } as const;
+    }),
+  }),
+  alerts: router({
+    list: authenticatedProcedure.query(async ({ ctx }) => {
+      const { db, access } = await requirePlatformAccess(ctx);
+      if (!canManagePlatformBilling(access.platformRole)) throw new TRPCError({ code: "FORBIDDEN" });
+      const alerts = await getPlatformBillingAlerts(db, ctx.user.id);
+      return { alerts, unreadCount: alerts.filter(alert => !alert.read).length };
+    }),
+    markRead: authenticatedProcedure.input(z.object({ keys: z.array(z.string().regex(/^subscription:\d+:(past_due|grace_end|trial_end|period_end)$/)).min(1).max(50) })).mutation(async ({ ctx, input }) => {
+      const { db, access } = await requirePlatformAccess(ctx);
+      if (!canManagePlatformBilling(access.platformRole)) throw new TRPCError({ code: "FORBIDDEN" });
+      const activeKeys = new Set((await getPlatformBillingAlerts(db, ctx.user.id)).map(alert => alert.key));
+      const keys = input.keys.filter(key => activeKeys.has(key));
+      if (!keys.length) return { marked: 0 } as const;
+      await db.insert(platformNotificationReads).values(keys.map(notificationKey => ({ platformUserId: ctx.user.id, notificationKey }))).onDuplicateKeyUpdate({ set: { readAt: new Date() } });
+      return { marked: keys.length } as const;
     }),
   }),
   audit: authenticatedProcedure.input(z.object({ limit: z.number().int().min(1).max(100).default(50) }).optional()).query(async ({ ctx, input }) => {

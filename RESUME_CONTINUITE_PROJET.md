@@ -271,3 +271,9 @@ L’espace `/echeances` propose aussi une prévision de trésorerie engagée à 
 La console `/plateforme` utilise désormais le composant dédié `client/src/components/PlatformConsoleShell.tsx`, distinct du layout des entreprises clientes. Sur ordinateur, une barre latérale fixe organise les sections Vue d’ensemble, Entreprises, Support, Opérateurs, Abonnements et Journal d’audit. Sur mobile, les mêmes raccourcis deviennent une navigation horizontale défilante sous le header. Les sections interdites à un rôle ne sont pas rendues ; les contrôles serveur restent la source d’autorité.
 
 Le header plateforme affiche le périmètre d’administration restreint et une sortie explicite vers l’espace entreprise. La navigation fait défiler vers les sections internes de la console, sans créer de routes supplémentaires ni exposer de données métier. Les surfaces et textes utilisent les tokens de thème, avec une couverture de test de non-régression incluant le nouveau shell.
+
+## 15. Centre de notifications de paiement plateforme
+
+La migration `0066_typical_raider.sql` ajoute `platformNotificationReads`, qui mémorise individuellement la lecture d’une alerte par opérateur plateforme. Le centre de notifications du header est proposé aux rôles Facturation, Opérations historiques et Super administrateur. Il ne lit que les métadonnées de souscription : statut, dates de fin d’essai/période/délai de grâce et nom d’entreprise. Il ne retourne ni ventes, ni stock, ni données de clients.
+
+Les alertes comprennent les paiements à régulariser, fins de délai de grâce, fins d’essai et échéances de souscription proches. Un opérateur peut marquer une alerte ou toutes les alertes comme lues ; seule une clé d’alerte encore active est acceptée côté serveur. Le compteur est limité à `9+` à partir de dix alertes non lues. Cliquer sur une alerte rejoint la section Abonnements sans modifier l’abonnement.

@@ -719,6 +719,14 @@ export const paymentDueReminderJobSettings = mysqlTable("paymentDueReminderJobSe
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+/** État de lecture individuel des alertes de facturation SaaS affichées dans la console plateforme. */
+export const platformNotificationReads = mysqlTable("platformNotificationReads", {
+  id: int("id").autoincrement().primaryKey(),
+  platformUserId: int("platformUserId").notNull(),
+  notificationKey: varchar("notificationKey", { length: 180 }).notNull(),
+  readAt: timestamp("readAt").defaultNow().notNull(),
+}, table => [uniqueIndex("platform_notification_reads_user_key_unique").on(table.platformUserId, table.notificationKey), index("platform_notification_reads_user_read_idx").on(table.platformUserId, table.readAt)]);
+
 export const salePayments = mysqlTable("salePayments", {
   id: int("id").autoincrement().primaryKey(),
   saleId: int("saleId").notNull(),

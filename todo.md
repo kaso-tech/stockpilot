@@ -910,3 +910,9 @@
 - [x] Créer une barre latérale responsive organisant les fonctions par opérations, entreprises, support, abonnements et audit.
 - [x] Raccorder les sections de navigation aux permissions plateforme sans afficher d’outil non autorisé.
 - [x] Vérifier les contrastes, le responsive, les états de chargement et publier la console restructurée.
+
+## Notifications de la console plateforme
+- [x] Ajouter un centre de notifications dans le header pour les paiements à surveiller et les échéances à venir.
+- [x] Protéger les alertes par rôle plateforme et ne retourner que les métadonnées administratives autorisées.
+- [x] Permettre de marquer les alertes comme lues et de rejoindre la section concernée sans exposer de données client.
+- [x] Tester les permissions, les compteurs et le rendu responsive, puis publier.

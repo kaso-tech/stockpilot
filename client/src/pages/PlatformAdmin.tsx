@@ -42,6 +42,7 @@ export default function PlatformAdmin() {
   const supportQueue = trpc.platform.support.list.useQuery({ status: supportStatusFilter === "all" ? undefined : supportStatusFilter, priority: supportPriorityFilter === "all" ? undefined : supportPriorityFilter, limit: 50 }, { enabled: access.isSuccess });
   const supportEvents = trpc.platform.support.events.useQuery({ supportRequestId: selectedSupportId ?? 0 }, { enabled: access.isSuccess && selectedSupportId !== null });
   const operators = trpc.platform.operators.list.useQuery(undefined, { enabled: access.isSuccess && access.data?.platformRole === "super_admin" });
+  const platformAlerts = trpc.platform.alerts.list.useQuery(undefined, { enabled: access.isSuccess && ["super_admin", "operator", "billing"].includes(access.data?.platformRole ?? "") });
   const setStatus = trpc.platform.companies.setStatus.useMutation({
     onSuccess: async () => {
       await Promise.all([utils.platform.overview.invalidate(), utils.platform.companies.list.invalidate(), utils.platform.audit.invalidate()]);
@@ -68,6 +69,10 @@ export default function PlatformAdmin() {
   });
   const revokeOperator = trpc.platform.operators.revoke.useMutation({
     onSuccess: async () => { await Promise.all([utils.platform.operators.list.invalidate(), utils.platform.audit.invalidate()]); toast.success("Accès opérateur révoqué."); },
+    onError: error => toast.error(error.message),
+  });
+  const markPlatformAlertsRead = trpc.platform.alerts.markRead.useMutation({
+    onSuccess: async () => { await utils.platform.alerts.list.invalidate(); },
     onError: error => toast.error(error.message),
   });
 
@@ -120,7 +125,7 @@ export default function PlatformAdmin() {
   const onboardingShare = totalCompanies ? Math.round(((stats?.onboardedCompanies ?? 0) / totalCompanies) * 100) : 0;
   const canManageBilling = ["super_admin", "operator", "billing"].includes(access.data?.platformRole ?? "");
 
-  return <PlatformConsoleShell role={access.data.platformRole} openSupportCount={stats?.openSupportRequests ?? 0} onExit={() => setLocation("/")}>
+  return <PlatformConsoleShell role={access.data.platformRole} openSupportCount={stats?.openSupportRequests ?? 0} alertsEnabled={canManageBilling} billingAlerts={platformAlerts.data?.alerts ?? []} alertsLoading={platformAlerts.isLoading} markingAlertKeys={markPlatformAlertsRead.isPending} onMarkAlertsRead={keys => markPlatformAlertsRead.mutate({ keys })} onExit={() => setLocation("/")}>
     <div className="space-y-6">
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
