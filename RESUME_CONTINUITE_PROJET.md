@@ -257,3 +257,11 @@ Le traitement quotidien authentifié `/api/scheduled/payment-due-reminders` est 
 La migration `0064_colorful_amphibian.sql` ajoute les modèles réutilisables d’échéance et les groupes de bénéficiaires, tous deux isolés par entreprise et, le cas échéant, par entrepôt. Un modèle préremplit le montant, la nature, la catégorie, le jour mensuel et les rappels ; il ne crée jamais de dépense ni de paiement seul. Une échéance de groupe crée un échéancier distinct pour chaque membre autorisé afin de préserver le règlement individuel et l’audit.
 
 La page `/echeances` gère les modèles, groupes, échéanciers individuels ou collectifs et règlements. Une échéance mensuelle demande désormais un **jour du mois** entre 1 et 31 ; pour février et les mois courts, le dernier jour disponible est retenu. Une échéance ponctuelle conserve une date précise. La création d’un agent ou vendeur à salaire fixe peut relier un modèle salarial et un jour mensuel. Depuis Dépenses, l’utilisateur peut soit enregistrer une dépense déjà réglée et la lier à une occurrence existante, soit programmer une dépense mensuelle à partir d’un modèle, sans double comptage.
+
+## 13. Gestion avancée des échéances et prévision de trésorerie
+
+Les modèles et groupes d’échéance peuvent désormais être modifiés puis archivés ou réactivés sans suppression destructive. L’archivage retire un modèle des nouveaux choix sans rompre les échéanciers et règlements historiques ; chaque opération est journalisée dans l’audit de l’entreprise.
+
+La migration `0065_zippy_siren.sql` ajoute les références de justificatif aux règlements d’échéance. Le dialogue de règlement accepte uniquement un PDF, PNG, JPEG ou WEBP de 5 Mo maximum. Le fichier est contrôlé côté serveur, enregistré sous le périmètre de l’entreprise et de l’occurrence, puis son URL de stockage est refusée lors du règlement si elle ne correspond pas à cette portée.
+
+L’espace `/echeances` propose aussi une prévision de trésorerie engagée à 3, 6 ou 12 mois, filtrée par l’entrepôt actif. Elle sépare les dépenses programmées et les salaires, affiche les montants déjà réglés, le solde restant et les retards. Il s’agit d’une prévision de sorties engagées : les encaissements futurs non programmés ne sont volontairement pas estimés.

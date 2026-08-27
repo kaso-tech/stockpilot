@@ -898,3 +898,9 @@
 - [x] Adapter les échéances mensuelles à une saisie contrôlée du jour du mois et préserver les dates précises pour les échéances ponctuelles.
 - [x] Afficher les liaisons et les prochains règlements dans les pages Dépenses, Agents et Échéances.
 - [x] Tester l’isolation multi-entreprise, les groupes, les règlements et publier le lot.
+
+## Gestion avancée des échéances et trésorerie
+- [x] Ajouter l’édition et l’archivage sécurisés des modèles d’échéance et groupes de bénéficiaires.
+- [x] Attacher un justificatif sécurisé à un règlement d’échéance et le rendre accessible dans la portée autorisée.
+- [x] Ajouter un rapport prévisionnel mensuel des sorties programmées, paiements attendus et solde engagé par entrepôt.
+- [x] Tester l’isolation, les pièces jointes, les calculs prévisionnels et publier le lot.

@@ -690,6 +690,9 @@ export const paymentDueSettlements = mysqlTable("paymentDueSettlements", {
   amountCents: int("amountCents").notNull(),
   expenseId: int("expenseId"),
   agentPaymentId: int("agentPaymentId"),
+  receiptUrl: varchar("receiptUrl", { length: 1024 }),
+  receiptName: varchar("receiptName", { length: 180 }),
+  receiptMimeType: varchar("receiptMimeType", { length: 80 }),
   settledByUserId: int("settledByUserId").notNull(),
   settledAt: timestamp("settledAt").defaultNow().notNull(),
 }, table => [index("payment_due_settlements_occurrence_idx").on(table.occurrenceId), index("payment_due_settlements_company_idx").on(table.companyId)]);
