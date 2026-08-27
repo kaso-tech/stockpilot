@@ -283,3 +283,9 @@ Les alertes comprennent les paiements à régulariser, fins de délai de grâce,
 La console ne rassemble plus tous les outils dans une même vue. Le tableau de bord reste disponible à `/plateforme` et se limite aux indicateurs de synthèse. Les domaines opérationnels sont répartis sur les routes dédiées `/plateforme/entreprises`, `/plateforme/support`, `/plateforme/operateurs`, `/plateforme/abonnements` et `/plateforme/audit`.
 
 Le menu latéral gauche utilise ces routes au lieu d’un défilement interne. Sur mobile, la seconde ligne du header a été supprimée et le même menu est ouvert dans un panneau latéral via le bouton de navigation. Ce panneau comprend une déconnexion réelle et ne propose pas de retour direct vers l’application. La visibilité des entrées reste filtrée par rôle, et les validations serveur restent inchangées.
+
+## 17. Lot A — baseline de sécurité et release
+
+Les dépendances de production signalées par l’audit ont été mises à jour de façon ciblée, notamment tRPC, Drizzle ORM, AWS SDK, Express, Streamdown et Recharts. L’audit des dépendances de production ne remonte désormais plus de vulnérabilité connue. La mise à niveau vers Express 5 a nécessité l’adaptation des routes joker du proxy de stockage et des fallbacks Vite à la syntaxe `/{*splat}`.
+
+Le script `verify:release` exécute désormais `pnpm audit --prod` avant sa recette HTTP. Après une mise à jour de dépendances, utiliser l’ordre `pnpm check`, `pnpm test`, `pnpm build`, `pnpm verify:release`, puis redémarrer le serveur de développement. Les contrôles du lot ont confirmé le typage, 252 tests, le build PWA, la recette HTTP et le chargement visuel de l’application et de la console plateforme.

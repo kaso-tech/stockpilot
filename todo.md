@@ -934,3 +934,15 @@
 
 ## Plan de remédiation de production
 - [x] Rédiger un plan complet de correction et d’amélioration issu de l’audit, avec lots, dépendances, critères go/no-go, tests et gouvernance de publication.
+
+## Remédiation de production — exécution A à J
+- [x] Lot A : corriger les dépendances vulnérables et renforcer la baseline de release.
+- [ ] Lot B : renforcer l’isolation structurelle des données et les contraintes multi-entreprises.
+- [ ] Lot C : étendre la sauvegarde, la restauration et la continuité multi-entreprises.
+- [ ] Lot D : durcir l’authentification, les autorisations, les fichiers et l’audit.
+- [ ] Lot E : fiabiliser les automatisations et la supervision opérationnelle.
+- [ ] Lot F : compléter le mode offline-first durable par entreprise et entrepôt.
+- [ ] Lot G : consolider l’intégrité métier, stock et financière.
+- [ ] Lot H : renforcer qualité, accessibilité et recette de release.
+- [ ] Lot I : préparer paiement et abonnement SaaS sous validation externe.
+- [ ] Lot J : préparer conformité, gouvernance et lancement contrôlé.
