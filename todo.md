@@ -886,8 +886,8 @@
 - [x] Enchaîner automatiquement les sous-lots sûrs du panneau SaaS après leurs validations, tests, contrôles d’isolation et checkpoints, jusqu’aux seules décisions irréversibles ou intégrations nécessitant des secrets externes.
 
 ## Échéances de salaires et dépenses
-- [ ] Définir les échéances uniques et récurrentes de salaires et dépenses, avec entreprise, entrepôt facultatif, responsable et statut de règlement.
-- [ ] Ajouter des rappels internes configurables avant échéance et des alertes de retard visibles aux rôles autorisés, sans e-mail ni service externe.
-- [ ] Mettre en œuvre le traitement périodique idempotent des rappels et son journal d’exécution.
-- [ ] Créer les vues calendrier, liste d’alertes, filtres et actions de règlement sans double comptage de dépenses.
-- [ ] Tester l’isolation multi-entreprise, les portées d’entrepôt, les rappels et publier le module.
+- [x] Définir les échéances uniques et récurrentes de salaires et dépenses, avec entreprise, entrepôt facultatif, responsable et statut de règlement.
+- [x] Ajouter des rappels internes configurables avant échéance et des alertes de retard visibles aux rôles autorisés, sans e-mail ni service externe.
+- [x] Mettre en œuvre le traitement périodique idempotent des rappels et son journal d’exécution.
+- [x] Créer les vues calendrier, liste d’alertes, filtres et actions de règlement sans double comptage de dépenses.
+- [x] Tester l’isolation multi-entreprise, les portées d’entrepôt, les rappels et publier le module.

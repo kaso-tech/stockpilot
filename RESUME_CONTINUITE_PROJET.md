@@ -243,3 +243,11 @@ La prochaine conversation doit démarrer par le point critique offline suivant :
 ## 10. Instruction de reprise prête à copier
 
 > Reprendre StockPilot Pro dans `/home/ubuntu/stockpilot-pro`. Lire d’abord `RESUME_CONTINUITE_PROJET.md`, `tenant-isolation-audit.md`, `offline-architecture.md` et `todo.md`. Le projet est un SaaS React/tRPC/Drizzle multi-entreprise avec auth interne e-mail/mot de passe. La mise à jour GitHub `81833c5` a été intégrée fonctionnellement avec les réglages d’impression multi-entreprises et la migration `0043_loving_boom_boom.sql`. Priorité immédiate : terminer la migration du mode hors connexion de `localStorage` vers IndexedDB par entreprise/utilisateur dans `client/src/contexts/OfflineContext.tsx`, sans régression sur les ventes POS et encaissements idempotents. Exécuter `pnpm check`, `pnpm test` et `pnpm build` après les modifications ; relire `todo.md` avant tout checkpoint. Ne jamais exposer les secrets, hashes ou identifiants sensibles.
+
+## 11. Échéances de salaires et dépenses
+
+La migration `0063_lyrical_chronomancer.sql` ajoute des échéanciers d’entreprise (`paymentDueSchedules`), leurs occurrences, règlements rattachés, rappels idempotents et configuration de tâche planifiée. Les dépenses réglées créent exclusivement une écriture `expenses`; les salaires créent exclusivement un `agentPayments`. `paymentDueSettlements` relie ensuite la pièce réelle à l’échéance, ce qui évite tout double comptage dans les rapports.
+
+La page `/echeances`, accessible dans « Équipe & finance », permet de programmer une dépense ou un salaire ponctuel/mensuel, de choisir les rappels avant échéance, de filtrer les états et d’enregistrer un règlement partiel ou complet. Les alertes sont internes : administrateurs pour leur entreprise, responsables locaux uniquement pour les entrepôts dont ils ont la responsabilité. Les vendeurs et caissiers n’y accèdent pas.
+
+Le traitement quotidien authentifié `/api/scheduled/payment-due-reminders` est actif à 06:00 UTC. Il prépare les échéances à venir, recalcule les retards et écrit un journal de rappel dédupliqué par occurrence, type et jour. Il ne doit pas être remplacé par un minuteur de processus. L’e-mail reste volontairement désactivé tant qu’un fournisseur n’est pas configuré.

@@ -57,6 +57,7 @@ import StockTransfers from "./pages/StockTransfers";
 import WarehouseComparison from "./pages/WarehouseComparison";
 import Pricing from "./pages/Pricing";
 import PlatformAdmin from "./pages/PlatformAdmin";
+import PaymentDues from "./pages/PaymentDues";
 
 function DashboardRouter() {
   return (
@@ -93,6 +94,7 @@ function DashboardRouter() {
         <Route path={"/parametres/historique"} component={SettingsHistory} />
         <Route path={"/sauvegardes"} component={Backups} />
         <Route path={"/depenses"} component={Expenses} />
+        <Route path={"/echeances"} component={PaymentDues} />
         <Route path={"/produits/:id"} component={ProductDetail} />
         <Route path={"/produits"} component={Products} />
         <Route path={"/entrepots"} component={Warehouses} />
