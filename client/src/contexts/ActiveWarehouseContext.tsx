@@ -14,20 +14,42 @@ type ActiveWarehouseContextValue = {
 
 const ActiveWarehouseContext = createContext<ActiveWarehouseContextValue | undefined>(undefined);
 
+function storageKey(user: { id: number; companyId: number | null }) {
+  return Number.isInteger(user.companyId) && Number(user.companyId) > 0 ? `stockpilot-active-warehouse:company:${user.companyId}:user:${user.id}` : null;
+}
+
+function readStoredWarehouse(user: { id: number; companyId: number | null }) {
+  const key = storageKey(user);
+  if (!key) return null;
+  try {
+    const parsed = Number(localStorage.getItem(key));
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredWarehouse(user: { id: number; companyId: number | null }, warehouseId: number) {
+  const key = storageKey(user);
+  if (!key) return;
+  try { localStorage.setItem(key, String(warehouseId)); } catch { /* Le contexte serveur reste la source de vérité à la prochaine connexion. */ }
+}
+
 export function ActiveWarehouseProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
   const utils = trpc.useUtils();
   const [activeWarehouseId, setLocalActiveWarehouseId] = useState<number | null>(null);
-  const { data: active, isLoading } = trpc.warehouses.active.useQuery(undefined, { enabled: isAdmin });
-  const { data: rows = [] } = trpc.warehouses.list.useQuery(undefined, { enabled: isAdmin });
+  const { data: active, isLoading } = trpc.warehouses.active.useQuery(undefined, { enabled: Boolean(user) });
+  const { data: rows = [] } = trpc.warehouses.list.useQuery(undefined, { enabled: Boolean(user) });
   const warehouses = useMemo(() => rows.filter(warehouse => warehouse.active).map(warehouse => ({ id: warehouse.id, name: warehouse.name, code: warehouse.code, isDefault: warehouse.isDefault })), [rows]);
-  useEffect(() => { setLocalActiveWarehouseId(isAdmin ? active?.warehouseId ?? null : null); }, [active?.warehouseId, isAdmin]);
+  useEffect(() => {
+    setLocalActiveWarehouseId(user ? active?.warehouseId ?? readStoredWarehouse(user) : null);
+  }, [active?.warehouseId, user]);
   const setActive = trpc.warehouses.setActive.useMutation({
-    onSuccess: result => { setLocalActiveWarehouseId(result.warehouseId); void utils.warehouses.active.invalidate(); void utils.products.list.invalidate(); void utils.movements.list.invalidate(); void utils.inventory.list.invalidate(); void utils.dashboard.get.invalidate(); void utils.transactions.list.invalidate(); void utils.expenses.list.invalidate(); void utils.expenses.report.invalidate(); void utils.payroll.overview.invalidate(); void utils.commerce.agents.detail.invalidate(); },
+    onSuccess: result => { if (user) writeStoredWarehouse(user, result.warehouseId); setLocalActiveWarehouseId(result.warehouseId); void utils.warehouses.active.invalidate(); void utils.products.list.invalidate(); void utils.movements.list.invalidate(); void utils.inventory.list.invalidate(); void utils.dashboard.get.invalidate(); void utils.transactions.list.invalidate(); void utils.expenses.list.invalidate(); void utils.expenses.report.invalidate(); void utils.payroll.overview.invalidate(); void utils.commerce.agents.detail.invalidate(); },
     onError: error => toast.error(error.message),
   });
-  const value = useMemo(() => ({ activeWarehouseId, activeWarehouse: warehouses.find(warehouse => warehouse.id === activeWarehouseId) ?? null, warehouses, isReady: !isAdmin || !isLoading, setActiveWarehouseId: (warehouseId: number) => setActive.mutate({ warehouseId }) }), [activeWarehouseId, isAdmin, isLoading, setActive, warehouses]);
+  const value = useMemo(() => ({ activeWarehouseId, activeWarehouse: warehouses.find(warehouse => warehouse.id === activeWarehouseId) ?? null, warehouses, isReady: !user || !isLoading, setActiveWarehouseId: (warehouseId: number) => setActive.mutate({ warehouseId }) }), [activeWarehouseId, isLoading, setActive, user, warehouses]);
   return <ActiveWarehouseContext.Provider value={value}>{children}</ActiveWarehouseContext.Provider>;
 }
 

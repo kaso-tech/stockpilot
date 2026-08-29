@@ -1,7 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import { setActiveCurrency, setActivePriceFormat, type PriceGrouping, type PriceRounding } from "@/lib/format";
 import { applyPrimaryColor, DEFAULT_PRIMARY_COLOR, normalizePrimaryColor } from "@/lib/primaryColor";
-import { getOfflinePreferences, replaceOfflinePreferences, type OfflineScope } from "@/lib/offlineStore";
+import { getOfflinePreferences, replaceOfflinePreferences, type OfflineUserScope } from "@/lib/offlineStore";
 import { useAuth } from "@/_core/hooks/useAuth";
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 
@@ -11,7 +11,7 @@ type StoredPreferences = { currency: Currency; primaryColor: string; priceGroupi
 const DEFAULT_PREFERENCES: StoredPreferences = { currency: "XOF", primaryColor: DEFAULT_PRIMARY_COLOR, priceGrouping: "space", priceRounding: "none" };
 const PreferencesContext = createContext<PreferencesContextType | undefined>(undefined);
 
-function validScope(user: { id: number; companyId: number | null } | null | undefined): OfflineScope | null {
+function validScope(user: { id: number; companyId: number | null } | null | undefined): OfflineUserScope | null {
   return user && Number.isInteger(user.id) && user.id > 0 && Number.isInteger(user.companyId) && Number(user.companyId) > 0 ? { userId: user.id, companyId: Number(user.companyId) } : null;
 }
 
@@ -62,7 +62,7 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     void replaceOfflinePreferences(scope, next).catch(() => undefined);
   }, [data?.currency, data?.primaryColor, scope]);
 
-  const persist = (scopeAtWrite: OfflineScope | null, next: StoredPreferences) => {
+  const persist = (scopeAtWrite: OfflineUserScope | null, next: StoredPreferences) => {
     setPreferences(next);
     if (scopeAtWrite) void replaceOfflinePreferences(scopeAtWrite, next).catch(() => undefined);
   };

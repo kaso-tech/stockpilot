@@ -4,7 +4,7 @@ import { getOfflineQueryCache, replaceOfflineQueryCache, clearOfflineQueryCache 
 const CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 14;
 type StoredCache = { savedAt: number; dehydratedState: ReturnType<typeof dehydrate> };
 
-export async function restoreOfflineQueryCache(queryClient: QueryClient, scope: OfflineScope) {
+export async function restoreOfflineQueryCache(queryClient: QueryClient, scope: OfflineScope, canRestore: () => boolean = () => true) {
   try {
     const cached = await getOfflineQueryCache(scope);
     if (!cached || Date.now() - cached.savedAt > CACHE_TTL_MS) return;
@@ -12,7 +12,7 @@ export async function restoreOfflineQueryCache(queryClient: QueryClient, scope: 
       await clearScopedQueryCache(scope);
       return;
     }
-    hydrate(queryClient, cached.dehydratedState as ReturnType<typeof dehydrate>);
+    if (canRestore()) hydrate(queryClient, cached.dehydratedState as ReturnType<typeof dehydrate>);
   } catch {
     await clearScopedQueryCache(scope).catch(() => undefined);
   }

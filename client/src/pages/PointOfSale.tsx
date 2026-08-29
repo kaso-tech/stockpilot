@@ -77,7 +77,7 @@ export default function PointOfSale() {
   const { user } = useAuth();
   const { activeWarehouseId, setActiveWarehouseId } = useActiveWarehouse();
   const isAdmin = user?.role === "admin";
-  const { isOnline, pendingProductQuantitiesByWarehouse } = useOffline();
+  const { isOnline, pendingProductQuantitiesByWarehouse, lastLocalSnapshotAt } = useOffline();
   const { data: warehouses = [] } = trpc.warehouses.list.useQuery();
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | null>(null);
   useEffect(() => { if (selectedWarehouseId === null && warehouses.length) setSelectedWarehouseId(warehouses.find(warehouse => warehouse.isDefault)?.id ?? warehouses.find(warehouse => warehouse.active)?.id ?? null); }, [selectedWarehouseId, warehouses]);
@@ -486,6 +486,8 @@ export default function PointOfSale() {
         <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {available.map(product => {
             const productIsLowStock = isLowStock(product);
+            const pendingQuantity = pendingProductQuantities[product.id] ?? 0;
+            const estimatedQuantity = product.quantity - pendingQuantity;
             return (
               <button
                 key={product.id}
@@ -496,6 +498,7 @@ export default function PointOfSale() {
                 <p className="mt-1 text-xs text-muted-foreground">
                   {product.reference} · {product.quantity} {product.unit}
                 </p>
+                {!isOnline && <p className="mt-1 text-[11px] font-medium text-amber-700 dark:text-amber-300">Stock estimé : {estimatedQuantity} {product.unit}{pendingQuantity ? ` · ${pendingQuantity} en attente` : ""}</p>}
                 {product.priceTiers?.length ? (
                   <p className="mt-2 text-[11px] font-medium text-primary">
                     Paliers dès {product.priceTiers[0].minQuantity}{" "}
@@ -518,6 +521,7 @@ export default function PointOfSale() {
             );
           })}
         </div>
+        {!isOnline && <p className="mt-3 text-xs text-amber-700 dark:text-amber-300">Les quantités affichées sont une estimation locale{lastLocalSnapshotAt ? ` enregistrée le ${new Date(lastLocalSnapshotAt).toLocaleString("fr-FR")}` : ""}. La validation finale du stock est effectuée lors de la synchronisation.</p>}
         {!available.length && (
           <p className="py-14 text-center text-sm text-muted-foreground">
             {lowStockOnly

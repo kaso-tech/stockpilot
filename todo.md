@@ -960,7 +960,12 @@
 - [x] Lot E : isoler le traitement des rappels d’échéance par entreprise afin qu’un échec local ne bloque pas les autres périmètres.
 - [x] Lot E : exposer à la console plateforme un résumé agrégé de santé des automatisations sans ligne métier ni contenu client.
 - [x] Lot E : couvrir les doublons, les pannes isolées et les métriques de tâche, puis vérifier les parcours de release.
-- [ ] Lot F : compléter le mode offline-first durable par entreprise et entrepôt.
+- [x] Lot F : compléter le mode offline-first durable par entreprise et entrepôt.
+- [x] Lot F : étendre le périmètre IndexedDB des opérations métier à l’entreprise, l’utilisateur et l’entrepôt actif.
+- [x] Lot F : purger ou isoler les caches et files au changement d’entreprise, d’utilisateur ou d’entrepôt sans supprimer le périmètre précédent.
+- [x] Lot F : refuser la mise en file ou la synchronisation d’une opération dont l’entrepôt ne correspond plus au périmètre actif.
+- [x] Lot F : afficher la fraîcheur locale et distinguer les quantités de stock estimées hors connexion des données confirmées.
+- [x] Lot F : couvrir les changements de périmètre, les doublons et les conflits de stock par des tests de non-régression.
 - [ ] Lot G : consolider l’intégrité métier, stock et financière.
 - [ ] Lot H : renforcer qualité, accessibilité et recette de release.
 - [ ] Lot I : préparer paiement et abonnement SaaS sous validation externe.

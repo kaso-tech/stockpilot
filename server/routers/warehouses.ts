@@ -28,22 +28,28 @@ async function audit(tx: any, companyId: number | null, actorUserId: number, act
 }
 
 export const warehousesRouter = router({
-  active: adminProcedure.query(async ({ ctx }) => {
+  active: protectedProcedure.query(async ({ ctx }) => {
     const db = await dbOrThrow();
     if (ctx.user.companyId === null) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Aucune entreprise active n’est associée à ce compte." });
+    const assignedIds = await assignedWarehouseIds(db, ctx.user);
+    const warehouseScope = assignedIds === null
+      ? and(companyScope(warehouses.companyId, ctx.user.companyId), eq(warehouses.active, true))
+      : assignedIds.length
+        ? and(companyScope(warehouses.companyId, ctx.user.companyId), eq(warehouses.active, true), inArray(warehouses.id, assignedIds))
+        : and(companyScope(warehouses.companyId, ctx.user.companyId), sql`1 = 0`);
     const [preference, fallback] = await Promise.all([
       db.select().from(userWarehousePreferences).where(and(eq(userWarehousePreferences.userId, ctx.user.id), eq(userWarehousePreferences.companyId, ctx.user.companyId))).limit(1),
-      db.select().from(warehouses).where(and(companyScope(warehouses.companyId, ctx.user.companyId), eq(warehouses.active, true))).orderBy(asc(warehouses.isDefault), asc(warehouses.name)),
+      db.select().from(warehouses).where(warehouseScope).orderBy(asc(warehouses.isDefault), asc(warehouses.name)),
     ]);
     const preferredId = preference[0]?.warehouseId;
     const warehouse = resolveActiveWarehouse(preferredId, fallback);
     return { warehouseId: warehouse?.id ?? null, warehouse: warehouse ? { id: warehouse.id, name: warehouse.name, code: warehouse.code, isDefault: warehouse.isDefault } : null };
   }),
 
-  setActive: adminProcedure.input(z.object({ warehouseId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+  setActive: protectedProcedure.input(z.object({ warehouseId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
     const db = await dbOrThrow();
     if (ctx.user.companyId === null) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Aucune entreprise active n’est associée à ce compte." });
-    const warehouse = await getScopedWarehouse(db, ctx.user.companyId, input.warehouseId, { requireActive: true });
+    const warehouse = await assertSellerWarehouseAccess(db, ctx.user, input.warehouseId, { requireActive: true });
     const current = (await db.select().from(userWarehousePreferences).where(and(eq(userWarehousePreferences.userId, ctx.user.id), eq(userWarehousePreferences.companyId, ctx.user.companyId))).limit(1))[0];
     if (current) await db.update(userWarehousePreferences).set({ warehouseId: warehouse.id }).where(eq(userWarehousePreferences.id, current.id));
     else await db.insert(userWarehousePreferences).values({ userId: ctx.user.id, companyId: ctx.user.companyId, warehouseId: warehouse.id });
