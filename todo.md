@@ -978,4 +978,8 @@
 - [x] Lot H : aligner la CI sur l’audit de production, les migrations générées et les contrôles de qualité réellement exécutables.
 - [x] Lot H : vérifier les parcours essentiels sur desktop et mobile, les contrastes, la navigation clavier et les états de chargement.
 - [ ] Lot I : préparer paiement et abonnement SaaS sous validation externe.
-- [ ] Lot J : préparer conformité, gouvernance et lancement contrôlé.
+- [x] Lot J : préparer conformité, gouvernance et lancement contrôlé, sous réserve des validations externes documentées dans le registre.
+- [x] Lot J : produire un registre de préparation au lancement distinguant les contrôles techniques validés, les responsabilités et les prérequis externes.
+- [x] Lot J : consolider les procédures internes de sécurité, continuité, incident et support à partir des contrôles réellement disponibles dans l’application.
+- [x] Lot J : ajouter un parcours de vérification de préparation commerciale sans promettre de conformité juridique ni de risque nul.
+- [x] Lot J : exécuter les contrôles de release finaux et documenter les décisions requises avant d’activer les paiements ou une ouverture commerciale large.
