@@ -18,6 +18,7 @@ const settlementReceiptInput = z.object({ receiptKey: z.string().trim().max(720)
   const present = [input.receiptKey, input.receiptName, input.receiptMimeType].filter(Boolean).length;
   if (present > 0 && present < 3) validation.addIssue({ code: z.ZodIssueCode.custom, message: "Le justificatif de règlement est incomplet." });
 });
+export const paymentDueSettlementInput = z.object({ occurrenceId: z.number().int().positive(), operationId: z.string().trim().min(16).max(80), amountCents: z.number().int().positive(), settledAt: z.coerce.date(), note: z.string().trim().max(1000).nullable().optional() }).merge(settlementReceiptInput);
 
 const scheduleInput = z.object({
   id: z.number().int().positive().optional(),
@@ -217,11 +218,16 @@ export const paymentDuesRouter = router({
     const extension = mimeType === "application/pdf" ? "pdf" : mimeType === "image/jpeg" ? "jpg" : mimeType.split("/")[1]; const attachment = await storagePut(`company/${ctx.user.companyId}/payment-due-settlements/${input.occurrenceId}/${randomUUID()}.${extension}`, buffer, mimeType);
     return { key: attachment.key, filename: input.filename, mimeType };
   }),
-  settle: adminProcedure.input(z.object({ occurrenceId: z.number().int().positive(), amountCents: z.number().int().positive(), settledAt: z.coerce.date(), note: z.string().trim().max(1000).nullable().optional() }).merge(settlementReceiptInput)).mutation(async ({ ctx, input }) => {
+  settle: adminProcedure.input(paymentDueSettlementInput).mutation(async ({ ctx, input }) => {
     const db = await dbOrThrow();
     return db.transaction(async tx => {
       const row = (await tx.select({ occurrence: paymentDueOccurrences, schedule: paymentDueSchedules }).from(paymentDueOccurrences).innerJoin(paymentDueSchedules, eq(paymentDueOccurrences.scheduleId, paymentDueSchedules.id)).where(and(eq(paymentDueOccurrences.id, input.occurrenceId), companyScope(paymentDueOccurrences.companyId, ctx.user.companyId))).limit(1))[0];
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Échéance introuvable." });
+      const existing = (await tx.select().from(paymentDueSettlements).where(and(companyScope(paymentDueSettlements.companyId, ctx.user.companyId), eq(paymentDueSettlements.operationId, input.operationId))).limit(1))[0];
+      if (existing) {
+        if (existing.occurrenceId !== row.occurrence.id) throw new TRPCError({ code: "CONFLICT", message: "Cette demande est déjà associée à une autre échéance." });
+        return { success: true, expenseId: existing.expenseId, agentPaymentId: existing.agentPaymentId, status: row.occurrence.status, paidCents: row.occurrence.paidCents, alreadySettled: true };
+      }
       if (["paid", "cancelled"].includes(row.occurrence.status)) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Cette échéance ne peut plus être réglée." });
       const remainingCents = row.occurrence.amountCents - row.occurrence.paidCents;
       if (input.amountCents > remainingCents) throw new TRPCError({ code: "BAD_REQUEST", message: "Le règlement dépasse le solde de l’échéance." });
@@ -240,8 +246,9 @@ export const paymentDuesRouter = router({
       }
       const paidCents = row.occurrence.paidCents + input.amountCents;
       const status = resolvePaymentDueStatus({ dueAt: row.occurrence.dueAt, amountCents: row.occurrence.amountCents, paidCents });
-      await tx.insert(paymentDueSettlements).values({ occurrenceId: row.occurrence.id, companyId: ctx.user.companyId!, amountCents: input.amountCents, expenseId, agentPaymentId, receiptUrl, receiptName: input.receiptName ?? null, receiptMimeType: input.receiptMimeType ?? null, settledByUserId: ctx.user.id, settledAt: input.settledAt });
-      await tx.update(paymentDueOccurrences).set({ paidCents, status, resolvedAt: status === "paid" ? input.settledAt : null }).where(eq(paymentDueOccurrences.id, row.occurrence.id));
+      const occurrenceUpdate = await tx.update(paymentDueOccurrences).set({ paidCents, status, resolvedAt: status === "paid" ? input.settledAt : null }).where(and(eq(paymentDueOccurrences.id, row.occurrence.id), eq(paymentDueOccurrences.paidCents, row.occurrence.paidCents), eq(paymentDueOccurrences.status, row.occurrence.status)));
+      if (Number((occurrenceUpdate as Array<{ affectedRows?: number }>)[0]?.affectedRows ?? 0) !== 1) throw new TRPCError({ code: "CONFLICT", message: "Cette échéance a été modifiée. Actualisez avant de recommencer." });
+      await tx.insert(paymentDueSettlements).values({ occurrenceId: row.occurrence.id, companyId: ctx.user.companyId!, operationId: input.operationId, amountCents: input.amountCents, expenseId, agentPaymentId, receiptUrl, receiptName: input.receiptName ?? null, receiptMimeType: input.receiptMimeType ?? null, settledByUserId: ctx.user.id, settledAt: input.settledAt });
       await tx.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Échéance réglée", entityType: "Échéance", entityId: String(row.occurrence.id), detail: `Règlement de ${input.amountCents} centimes enregistré sans double comptage.` });
       return { success: true, expenseId, agentPaymentId, status, paidCents };
     });

@@ -6,7 +6,7 @@ import { commissionCents, priceForCustomer, priceForQuantityTier } from "../comm
 import { getDb } from "../db";
 import { protectedProcedure, router } from "../_core/trpc";
 import { resultingStock, signedMovementQuantity } from "../stockRules";
-import { assertPaymentMethodsEnabled, settlementResult } from "../transactionRules";
+import { assertPaymentMethodsEnabled, didApplyExactlyOneStateTransition, settlementResult } from "../transactionRules";
 import { discountCents, type DiscountType } from "../discountRules";
 import { assertExplicitInvoiceAgentChoice } from "../agentSelectionRules";
 import { assertSellerSensitiveAction } from "../sellerActionRules";
@@ -85,6 +85,8 @@ export const transactionsRouter = router({
       const sale = (await tx.select().from(sales).where(and(eq(sales.id, input.saleId), companyScope(sales.companyId, ctx.user.companyId))).limit(1))[0];
       if (!sale) throw new TRPCError({ code: "NOT_FOUND", message: "Facture introuvable." });
       if ((sale.status !== "paid" && sale.status !== "partial") || sale.amountPaidCents <= 0) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Seule une facture encaissée ou partiellement encaissée peut être remboursée." });
+      const refundLock = await tx.update(sales).set({ status: "void", amountPaidCents: 0, voidedAt: new Date() }).where(and(eq(sales.id, sale.id), companyScope(sales.companyId, ctx.user.companyId), eq(sales.status, sale.status), eq(sales.amountPaidCents, sale.amountPaidCents)));
+      if (!didApplyExactlyOneStateTransition(refundLock)) throw new TRPCError({ code: "CONFLICT", message: "Cette facture a été modifiée. Actualisez avant de recommencer." });
       if (ctx.user.role === "seller") {
         const settings = (await tx.select().from(saleSettings).where(companyScope(saleSettings.companyId, ctx.user.companyId)).limit(1))[0];
         try { assertSellerSensitiveAction(settings, "refund"); } catch (error) { throw new TRPCError({ code: "FORBIDDEN", message: error instanceof Error ? error.message : "Remboursement non autorisé." }); }
@@ -103,7 +105,6 @@ export const transactionsRouter = router({
         else await tx.update(stockAlerts).set({ observedQuantity: quantity, status: "resolved", resolvedAt: new Date() }).where(and(eq(stockAlerts.productId, product.id), companyScope(stockAlerts.companyId, ctx.user.companyId)));
       }
       await tx.delete(saleCommissions).where(eq(saleCommissions.saleId, sale.id));
-      await tx.update(sales).set({ status: "void", amountPaidCents: 0 }).where(and(eq(sales.id, sale.id), companyScope(sales.companyId, ctx.user.companyId)));
       await tx.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Remboursement", entityType: "Facture", entityId: String(sale.id), detail: `Facture ${sale.invoiceNumber} remboursée pour ${sale.amountPaidCents} centimes ; stock réintégré et commissions annulées.` });
     });
     return { success: true };
@@ -176,6 +177,8 @@ export const transactionsRouter = router({
       const saleWarehouse = sale.warehouseId ? await assertSellerWarehouseAccess(tx, ctx.user, sale.warehouseId, { permission: "checkout" }) : ctx.user.role === "seller" ? await assertSellerWarehouseAccess(tx, ctx.user, (await getDefaultWarehouse(tx, ctx.user.companyId)).id, { permission: "checkout" }) : await getDefaultWarehouse(tx, ctx.user.companyId);
       const assigned = await validateAgents(tx, ctx.user.companyId, saleWarehouse.id, input);
       const isFirstCollection = sale.status === "draft";
+      const checkoutLock = await tx.update(sales).set({ ...assigned, status: settlement.status, amountPaidCents: sale.amountPaidCents + settlement.paidCents, paymentMethod: input.payments[0].method, note: input.note ?? sale.note }).where(and(eq(sales.id, sale.id), companyScope(sales.companyId, ctx.user.companyId), eq(sales.status, sale.status), eq(sales.amountPaidCents, sale.amountPaidCents)));
+      if (!didApplyExactlyOneStateTransition(checkoutLock)) throw new TRPCError({ code: "CONFLICT", message: "Cette vente a été modifiée. Actualisez avant de recommencer." });
       if (isFirstCollection) {
         const items = await tx.select().from(saleItems).where(eq(saleItems.saleId, sale.id));
         const productRows = await tx.select().from(products).where(and(inArray(products.id, items.map((item: any) => item.productId)), companyScope(products.companyId, ctx.user.companyId)));
@@ -188,7 +191,6 @@ export const transactionsRouter = router({
       for (let index = 0; index < input.payments.length; index += 1) { const payment = input.payments[index]!; await tx.insert(salePayments).values({ saleId: sale.id, offlineOperationId: index === 0 ? input.offlineOperationId : undefined, method: payment.method, amountCents: payment.amountCents, createdByUserId: ctx.user.id }); }
       const amountPaidCents = sale.amountPaidCents + settlement.paidCents;
       const status = settlement.status;
-      await tx.update(sales).set({ ...assigned, status, amountPaidCents, paymentMethod: input.payments[0].method, note: input.note ?? sale.note }).where(and(eq(sales.id, sale.id), companyScope(sales.companyId, ctx.user.companyId)));
       await tx.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Encaissement", entityType: "Vente", entityId: String(sale.id), detail: `${settlement.paidCents} encaissé sur ${sale.invoiceNumber} (${status === "paid" ? "soldée" : "partielle"})` });
       result = { status, amountPaidCents, balanceCents: sale.totalCents - amountPaidCents };
     });

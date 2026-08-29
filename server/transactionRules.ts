@@ -21,3 +21,8 @@ export function settlementResult(remainingCents: number, mode: SettlementMode, p
   if (mode === "partial" && paidCents >= remainingCents) throw new Error("Pour un règlement partiel, saisissez un montant inférieur au solde.");
   return { paidCents, balanceCents: remainingCents - paidCents, status: paidCents === remainingCents ? "paid" as const : "partial" as const };
 }
+
+export function didApplyExactlyOneStateTransition(result: unknown) {
+  const affectedRows = Number((result as Array<{ affectedRows?: number }> | undefined)?.[0]?.affectedRows ?? 0);
+  return affectedRows === 1;
+}

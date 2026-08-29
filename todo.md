@@ -966,7 +966,12 @@
 - [x] Lot F : refuser la mise en file ou la synchronisation d’une opération dont l’entrepôt ne correspond plus au périmètre actif.
 - [x] Lot F : afficher la fraîcheur locale et distinguer les quantités de stock estimées hors connexion des données confirmées.
 - [x] Lot F : couvrir les changements de périmètre, les doublons et les conflits de stock par des tests de non-régression.
-- [ ] Lot G : consolider l’intégrité métier, stock et financière.
+- [x] Lot G : consolider l’intégrité métier, stock et financière.
+- [x] Lot G : rendre les règlements d’échéance et paiements agents idempotents à partir d’une clé de demande persistée et unique par entreprise.
+- [x] Lot G : vérifier côté serveur les bénéficiaires de paie, leur entreprise et leur état actif avant toute écriture financière.
+- [x] Lot G : interdire qu’une dépense ou un paiement agent réel soit rattaché à plusieurs règlements d’échéance.
+- [x] Lot G : ajouter des tests de conservation des totaux, de doublon de demande et de refus de bénéficiaire hors périmètre.
+- [x] Lot G : verrouiller atomiquement l’état des encaissements et remboursements avant tout mouvement de stock ou écriture de commission.
 - [ ] Lot H : renforcer qualité, accessibilité et recette de release.
 - [ ] Lot I : préparer paiement et abonnement SaaS sous validation externe.
 - [ ] Lot J : préparer conformité, gouvernance et lancement contrôlé.

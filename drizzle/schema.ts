@@ -706,6 +706,7 @@ export const paymentDueSettlements = mysqlTable("paymentDueSettlements", {
   id: int("id").autoincrement().primaryKey(),
   occurrenceId: int("occurrenceId").notNull(),
   companyId: int("companyId").notNull(),
+  operationId: varchar("operationId", { length: 80 }),
   amountCents: int("amountCents").notNull(),
   expenseId: int("expenseId"),
   agentPaymentId: int("agentPaymentId"),
@@ -714,7 +715,13 @@ export const paymentDueSettlements = mysqlTable("paymentDueSettlements", {
   receiptMimeType: varchar("receiptMimeType", { length: 80 }),
   settledByUserId: int("settledByUserId").notNull(),
   settledAt: timestamp("settledAt").defaultNow().notNull(),
-}, table => [index("payment_due_settlements_occurrence_idx").on(table.occurrenceId), index("payment_due_settlements_company_idx").on(table.companyId)]);
+}, table => [
+  uniqueIndex("payment_due_settlements_company_operation_unique").on(table.companyId, table.operationId),
+  uniqueIndex("payment_due_settlements_expense_unique").on(table.expenseId),
+  uniqueIndex("payment_due_settlements_agent_payment_unique").on(table.agentPaymentId),
+  index("payment_due_settlements_occurrence_idx").on(table.occurrenceId),
+  index("payment_due_settlements_company_idx").on(table.companyId),
+]);
 
 /** Journal idempotent des rappels internes affichés dans le centre de notifications. */
 export const paymentDueReminderEvents = mysqlTable("paymentDueReminderEvents", {
@@ -787,6 +794,7 @@ export const saleCommissions = mysqlTable("saleCommissions", {
 export const agentPayments = mysqlTable("agentPayments", {
   id: int("id").autoincrement().primaryKey(),
   companyId: int("companyId").notNull(),
+  operationId: varchar("operationId", { length: 80 }),
   warehouseId: int("warehouseId"),
   beneficiaryType: mysqlEnum("beneficiaryType", ["user", "agent"]).notNull(),
   beneficiaryId: int("beneficiaryId").notNull(),
@@ -800,7 +808,10 @@ export const agentPayments = mysqlTable("agentPayments", {
   receiptMimeType: varchar("receiptMimeType", { length: 80 }),
   createdByUserId: int("createdByUserId").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-}, table => [index("agent_payments_company_warehouse_paid_idx").on(table.companyId, table.warehouseId, table.paidAt)]);
+}, table => [
+  uniqueIndex("agent_payments_company_operation_unique").on(table.companyId, table.operationId),
+  index("agent_payments_company_warehouse_paid_idx").on(table.companyId, table.warehouseId, table.paidAt),
+]);
 
 export const inventorySessions = mysqlTable("inventorySessions", {
   id: int("id").autoincrement().primaryKey(),
