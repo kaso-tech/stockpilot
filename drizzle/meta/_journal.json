@@ -470,6 +470,13 @@
       "when": 1787823731321,
       "tag": "0066_typical_raider",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "5",
+      "when": 1787867235974,
+      "tag": "0067_glossy_leader",
+      "breakpoints": true
     }
   ]
 }

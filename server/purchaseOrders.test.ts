@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { products, purchaseOrderItems, purchaseOrders, stockMovements, suppliers, warehouses, warehouseStocks } from "../drizzle/schema";
+import { products, purchaseOrderItems, purchaseOrders, stockMovements, suppliers, users, warehouses, warehouseStocks } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
 
 vi.mock("./db", () => ({ getDb: vi.fn() }));
@@ -52,7 +52,7 @@ describe("purchaseOrders transitions", () => {
     productUpdates = [];
     stockRows = [];
     const warehouseStockRow = { id: 1, companyId: 1, warehouseId: 5, productId: 12, quantity: 3 };
-    const tableRows = new Map<unknown, unknown[]>([[purchaseOrders, [order]], [purchaseOrderItems, [item]], [products, [{ id: 12, companyId: 1, name: "Produit A", quantity: 3 }]], [warehouses, [{ id: 5, companyId: 1, code: "PRINCIPAL", name: "Entrepôt principal", active: true, isDefault: true }]], [warehouseStocks, [warehouseStockRow]]]);
+    const tableRows = new Map<unknown, unknown[]>([[purchaseOrders, [order]], [purchaseOrderItems, [item]], [products, [{ id: 12, companyId: 1, name: "Produit A", quantity: 3 }]], [users, [{ id: 1, companyId: 1 }]], [warehouses, [{ id: 5, companyId: 1, code: "PRINCIPAL", name: "Entrepôt principal", active: true, isDefault: true }]], [warehouseStocks, [warehouseStockRow]]]);
     const update = (table: unknown) => ({ set: (values: unknown) => ({ where: async () => { if (table === products) productUpdates.push(values); return [{ affectedRows: 1 }]; } }) });
     const insert = (table: unknown) => ({ values: (values: unknown) => { if (table === stockMovements) stockRows.push(values); return table === warehouseStocks ? { onDuplicateKeyUpdate: async () => { warehouseStockRow.quantity += 2; return []; } } : []; } });
     const select = () => ({ from: (table: unknown) => ({ where: () => chain(tableRows.get(table) ?? []), then: (resolve: (value: unknown[]) => unknown) => resolve([...(tableRows.get(table) ?? [])]), limit: async () => tableRows.get(table) ?? [] }) });

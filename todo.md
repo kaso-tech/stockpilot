@@ -937,7 +937,10 @@
 
 ## Remédiation de production — exécution A à J
 - [x] Lot A : corriger les dépendances vulnérables et renforcer la baseline de release.
-- [ ] Lot B : renforcer l’isolation structurelle des données et les contraintes multi-entreprises.
+- [x] Lot B : renforcer l’isolation structurelle des données et les contraintes multi-entreprises.
+- [x] Lot B : rattacher les quatre enregistrements historiques identifiés à l’unique entreprise, conformément à la confirmation explicite reçue, puis imposer les clés entreprise obligatoires.
+- [x] Lot B : résoudre la collision historique d’un code d’entrepôt par suffixe technique confirmé avant le rattachement, sans modifier les liaisons par identifiant.
+- [x] Lot B : mettre à jour les doubles de test pour refléter le contexte entreprise obligatoire sans affaiblir les contrôles de production.
 - [ ] Lot C : étendre la sauvegarde, la restauration et la continuité multi-entreprises.
 - [ ] Lot D : durcir l’authentification, les autorisations, les fichiers et l’audit.
 - [ ] Lot E : fiabiliser les automatisations et la supervision opérationnelle.

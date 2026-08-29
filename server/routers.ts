@@ -151,7 +151,10 @@ async function createAudit(
   detail: string,
 ) {
   const db = await requireDb();
+  const actor = (await db.select({ companyId: users.companyId }).from(users).where(eq(users.id, actorUserId)).limit(1))[0];
+  if (!actor || actor.companyId == null) throw new TRPCError({ code: "FORBIDDEN", message: "Aucune entreprise active n’est associée à cet acteur." });
   await db.insert(auditLogs).values({
+    companyId: actor.companyId,
     actorUserId,
     action,
     entityType,
@@ -199,7 +202,7 @@ async function inspectBulkDeleteSelection(db: any, companyId: number | null, res
   return { resource, requestedCount: ids.length, eligible: candidates.filter(candidate => !protectedIds.has(candidate.id)), blocked: candidates.filter(candidate => protectedIds.has(candidate.id)).map(candidate => ({ ...candidate, reason: "Ce client est lié à un historique de documents commerciaux." })), missingIds: ids.filter(id => !found.has(id)) };
 }
 
-async function syncStockAlert(productId: number, companyId: number | null) {
+async function syncStockAlert(productId: number, companyId: number) {
   const db = await requireDb();
   const row = await db.select().from(products).where(and(eq(products.id, productId), companyScope(products.companyId, companyId))).limit(1);
   const product = row[0];

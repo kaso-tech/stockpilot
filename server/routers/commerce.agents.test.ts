@@ -18,7 +18,7 @@ describe("commerce agents et vendeurs", () => {
     inserts.length = 0; updates.length = 0;
     const credential = { id: 71, userId: 30, username: "vendeur.test", passwordHash: "salt:hash" };
     const sourceAgent = { id: 20, name: "Awa Agent", type: "sales_agent", email: "awa@example.test", phone: null, active: true };
-    const sourceSeller = { id: 30, name: "Vendeur Test", email: "vendeur@example.test", role: "seller", active: true };
+    const sourceSeller = { id: 30, companyId: 1, name: "Vendeur Test", email: "vendeur@example.test", role: "seller", active: true };
     const profiles = [{ id: 51, beneficiaryType: "agent" as const, beneficiaryId: 20, ...remuneration }, { id: 52, beneficiaryType: "user" as const, beneficiaryId: 30, ...remuneration }];
     const rowsFor = (table: unknown) => table === sellerCredentials ? [credential] : table === remunerationProfiles ? profiles : table === agents ? [sourceAgent] : table === users ? [sourceSeller] : [];
     const db: any = {

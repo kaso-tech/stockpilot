@@ -289,3 +289,11 @@ Le menu latéral gauche utilise ces routes au lieu d’un défilement interne. S
 Les dépendances de production signalées par l’audit ont été mises à jour de façon ciblée, notamment tRPC, Drizzle ORM, AWS SDK, Express, Streamdown et Recharts. L’audit des dépendances de production ne remonte désormais plus de vulnérabilité connue. La mise à niveau vers Express 5 a nécessité l’adaptation des routes joker du proxy de stockage et des fallbacks Vite à la syntaxe `/{*splat}`.
 
 Le script `verify:release` exécute désormais `pnpm audit --prod` avant sa recette HTTP. Après une mise à jour de dépendances, utiliser l’ordre `pnpm check`, `pnpm test`, `pnpm build`, `pnpm verify:release`, puis redémarrer le serveur de développement. Les contrôles du lot ont confirmé le typage, 252 tests, le build PWA, la recette HTTP et le chargement visuel de l’application et de la console plateforme.
+
+## 18. Lot B — isolation structurelle multi-entreprises
+
+La migration `0067_glossy_leader.sql` renforce les tables métier prioritaires : les clés `companyId` des journaux, réglages, produits, ventes, stocks, commandes, partenaires, support, inventaires et entrepôts sont désormais obligatoires. Les unicités qui devaient être locales à une entreprise sont définies à partir de la clé entreprise. Les procédures métier reçoivent également un contexte entreprise explicitement typé ; les procédures plateforme restent séparées.
+
+Le rattachement historique a été exécuté après confirmation explicite : deux entrepôts, un réglage commercial et un réglage de sauvegarde ont été affectés à l’unique entreprise alors présente. Une collision de code d’entrepôt a été résolue en conservant le code déjà local à l’entreprise et en ajoutant un suffixe technique stable à l’enregistrement historique concerné ; les relations métier par identifiant n’ont pas changé. La base confirme qu’aucune clé `companyId` du périmètre visé n’est désormais nullable.
+
+Les doubles de tests ont été rendus cohérents avec cette garantie de périmètre, sans replier la protection en production. Le lot doit être validé avec `pnpm check`, `pnpm test` et `pnpm build` avant son checkpoint ; la suite doit être entièrement verte avant de continuer vers le lot C.

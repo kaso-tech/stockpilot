@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { auditLogs, saleSettings } from "../../drizzle/schema";
+import { auditLogs, saleSettings, users } from "../../drizzle/schema";
 import type { TrpcContext } from "../_core/context";
 
 vi.mock("../db", () => ({ getDb: vi.fn() }));
@@ -19,7 +19,15 @@ describe("commerce.settings.save", () => {
   const inserts: Array<{ table: unknown; values: unknown }> = [];
   beforeEach(() => {
     inserts.length = 0;
-    const db: any = { select: () => ({ from: () => ({ where: () => ({ limit: async () => [] }), limit: async () => [] }) }), insert: (table: unknown) => ({ values: async (values: unknown) => { inserts.push({ table, values }); return [{ insertId: 1 }]; } }) };
+    const db: any = {
+      select: () => ({
+        from: (table: unknown) => ({
+          where: () => ({ limit: async () => table === users ? [{ companyId: 1 }] : [] }),
+          limit: async () => table === users ? [{ companyId: 1 }] : [],
+        }),
+      }),
+      insert: (table: unknown) => ({ values: async (values: unknown) => { inserts.push({ table, values }); return [{ insertId: 1 }]; } }),
+    };
     mockedGetDb.mockResolvedValue(db);
   });
   it.each(["USD", "EUR", "XOF"] as const)("enregistre %s comme devise de référence", async currency => {

@@ -34,20 +34,24 @@ const requireActiveCompany = t.middleware(async opts => {
   const { ctx, next } = opts;
   const user = ctx.user;
   if (!user) throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
-  if (user.companyId) {
-    const db = await getDb();
-    // Certaines doubles de tests injectent un accès DB minimal pour tester les
-    // règles métier isolées. En production, le client Drizzle expose toujours
-    // select et le contrôle de suspension est donc systématiquement appliqué.
-    const company = db && typeof (db as any).select === "function" ? (await db.select({ status: companies.platformStatus }).from(companies).where(and(eq(companies.id, user.companyId))).limit(1))[0] : null;
-    if (company?.status === "suspended") throw new TRPCError({ code: "FORBIDDEN", message: "Cette entreprise est temporairement suspendue. Contactez le support StockPilot." });
+  if (user.companyId == null) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Aucune entreprise active n’est associée à ce compte." });
   }
-  return next({ ctx: { ...ctx, user } });
+
+  const companyId = user.companyId;
+  const db = await getDb();
+  // Certaines doubles de tests injectent un accès DB minimal pour tester les
+  // règles métier isolées. En production, le client Drizzle expose toujours
+  // select et le contrôle de suspension est donc systématiquement appliqué.
+  const company = db && typeof (db as any).select === "function" ? (await db.select({ status: companies.platformStatus }).from(companies).where(and(eq(companies.id, companyId))).limit(1))[0] : null;
+  if (company?.status === "suspended") throw new TRPCError({ code: "FORBIDDEN", message: "Cette entreprise est temporairement suspendue. Contactez le support StockPilot." });
+
+  return next({ ctx: { ...ctx, user: { ...user, companyId } } });
 });
 
 export const protectedProcedure = authenticatedProcedure.use(requireActiveCompany);
 
-export const adminProcedure = t.procedure.use(
+export const adminProcedure = protectedProcedure.use(
   t.middleware(async opts => {
     const { ctx, next } = opts;
 

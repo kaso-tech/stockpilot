@@ -319,6 +319,11 @@ class SDKServer {
       throw ForbiddenError("User account is inactive");
     }
 
+    const companyId = user.companyId;
+    if (companyId == null) {
+      throw ForbiddenError("User account is not linked to an active company");
+    }
+
     if (session.sessionId) {
       const trackedSession = await db.getUserSessionById(session.sessionId);
       if (!trackedSession || trackedSession.userId !== user.id || trackedSession.revokedAt || trackedSession.expiresAt <= new Date()) {
@@ -332,14 +337,15 @@ class SDKServer {
       lastSignedIn: signedInAt,
     });
 
-    return { ...user, ...(session.sessionId ? { sessionId: session.sessionId } : {}) };
+    return { ...user, companyId, ...(session.sessionId ? { sessionId: session.sessionId } : {}) };
   }
 }
 
 const CRON_OPEN_ID_PREFIX = "cron_";
 
 /** Result of `sdk.authenticateRequest`. Cron callbacks set `isCron=true` and `taskUid`; see `/home/ubuntu/skills/webdev-periodic-updates/SKILL.md`. */
-export type AuthenticatedUser = User & {
+export type AuthenticatedUser = Omit<User, "companyId"> & {
+  companyId: number;
   sessionId?: string;
   taskUid?: string;
   isCron?: boolean;
@@ -352,6 +358,7 @@ function buildCronUser(
   return {
     id: -1,
     openId: userInfo.openId,
+    companyId: -1,
     name: userInfo.name || "Manus Scheduled Task",
     email: null,
     loginMethod: null,

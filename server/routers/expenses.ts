@@ -41,7 +41,7 @@ export const expensesRouter = router({
       const current = (await db.select().from(expenseBudgets).where(and(eq(expenseBudgets.yearMonth, input.yearMonth), eq(expenseBudgets.warehouseId, warehouse.id), companyScope(expenseBudgets.companyId, ctx.user.companyId))).limit(1))[0];
       if (current) await db.update(expenseBudgets).set({ amountCents: input.amountCents, warningPercent: input.warningPercent, updatedByUserId: ctx.user.id }).where(eq(expenseBudgets.id, current.id));
       else await db.insert(expenseBudgets).values({ yearMonth: input.yearMonth, amountCents: input.amountCents, warningPercent: input.warningPercent, warehouseId: warehouse.id, companyId: ctx.user.companyId, updatedByUserId: ctx.user.id });
-      await db.insert(auditLogs).values({ actorUserId: ctx.user.id, action: "Budget dépenses", entityType: "Budget", entityId: input.yearMonth, detail: `Budget mensuel fixé à ${input.amountCents} centimes` });
+      await db.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Budget dépenses", entityType: "Budget", entityId: input.yearMonth, detail: `Budget mensuel fixé à ${input.amountCents} centimes` });
       return { success: true };
     }),
   }),
@@ -65,20 +65,20 @@ export const expensesRouter = router({
     const { warehouseId, ...expense } = input; const warehouse = warehouseId ? await getScopedWarehouse(db, ctx.user.companyId, warehouseId, { requireActive: true }) : await getDefaultWarehouse(db, ctx.user.companyId);
     const result = await db.insert(expenses).values({ ...expense, warehouseId: warehouse.id, companyId: ctx.user.companyId, createdByUserId: ctx.user.id });
     const id = Number(result[0].insertId);
-    await db.insert(auditLogs).values({ actorUserId: ctx.user.id, action: "Création", entityType: "Dépense", entityId: String(id), detail: `Dépense ${input.category} de ${input.amountCents} centimes créée` });
+    await db.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Création", entityType: "Dépense", entityId: String(id), detail: `Dépense ${input.category} de ${input.amountCents} centimes créée` });
     return { id };
   }),
   update: adminProcedure.input(expenseInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
     const db = await dbOrThrow();
     const { id, warehouseId, ...data } = input; if (warehouseId) await getScopedWarehouse(db, ctx.user.companyId, warehouseId, { requireActive: true });
     await db.update(expenses).set({ ...data, ...(warehouseId ? { warehouseId } : {}) }).where(and(eq(expenses.id, id), companyScope(expenses.companyId, ctx.user.companyId)));
-    await db.insert(auditLogs).values({ actorUserId: ctx.user.id, action: "Modification", entityType: "Dépense", entityId: String(id), detail: `Dépense ${data.category} de ${data.amountCents} centimes modifiée` });
+    await db.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Modification", entityType: "Dépense", entityId: String(id), detail: `Dépense ${data.category} de ${data.amountCents} centimes modifiée` });
     return { success: true };
   }),
   remove: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
     const db = await dbOrThrow();
     await db.delete(expenses).where(and(eq(expenses.id, input.id), companyScope(expenses.companyId, ctx.user.companyId)));
-    await db.insert(auditLogs).values({ actorUserId: ctx.user.id, action: "Suppression", entityType: "Dépense", entityId: String(input.id), detail: "Dépense supprimée" });
+    await db.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Suppression", entityType: "Dépense", entityId: String(input.id), detail: "Dépense supprimée" });
     return { success: true };
   }),
 });

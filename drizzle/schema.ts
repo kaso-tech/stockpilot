@@ -109,7 +109,7 @@ export const companySubscriptions = mysqlTable("companySubscriptions", {
 /** Demande d’assistance interne créée par un utilisateur de l’entreprise. */
 export const supportRequests = mysqlTable("supportRequests", {
   id: int("id").autoincrement().primaryKey(),
-  companyId: int("companyId"),
+  companyId: int("companyId").notNull(),
   requesterUserId: int("requesterUserId").notNull(),
   warehouseId: int("warehouseId"),
   subject: varchar("subject", { length: 180 }).notNull(),
@@ -214,7 +214,7 @@ export const adminFallbackPasswords = mysqlTable("adminFallbackPasswords", {
 
 export const suppliers = mysqlTable("suppliers", {
   id: int("id").autoincrement().primaryKey(),
-  companyId: int("companyId"),
+  companyId: int("companyId").notNull(),
   name: varchar("name", { length: 160 }).notNull().unique(),
   otherReference: varchar("otherReference", { length: 80 }),
   contactName: varchar("contactName", { length: 160 }),
@@ -229,7 +229,7 @@ export const suppliers = mysqlTable("suppliers", {
 
 export const purchaseOrders = mysqlTable("purchaseOrders", {
   id: int("id").autoincrement().primaryKey(),
-  companyId: int("companyId"),
+  companyId: int("companyId").notNull(),
   orderNumber: varchar("orderNumber", { length: 60 }).notNull().unique(),
   supplierId: int("supplierId").notNull(),
   warehouseId: int("warehouseId"),
@@ -265,7 +265,7 @@ export const purchaseOrderItems = mysqlTable("purchaseOrderItems", {
 
 export const products = mysqlTable("products", {
   id: int("id").autoincrement().primaryKey(),
-  companyId: int("companyId"),
+  companyId: int("companyId").notNull(),
   reference: varchar("reference", { length: 80 }).notNull().unique(),
   name: varchar("name", { length: 200 }).notNull(),
   description: text("description"),
@@ -284,7 +284,7 @@ export const products = mysqlTable("products", {
 /** Entrepôt physique ou point de stockage d'une entreprise. */
 export const warehouses = mysqlTable("warehouses", {
   id: int("id").autoincrement().primaryKey(),
-  companyId: int("companyId"),
+  companyId: int("companyId").notNull(),
   name: varchar("name", { length: 160 }).notNull(),
   code: varchar("code", { length: 40 }).notNull(),
   address: text("address"),
@@ -301,7 +301,7 @@ export const warehouses = mysqlTable("warehouses", {
 /** Stock porté par un produit dans un entrepôt précis. */
 export const warehouseStocks = mysqlTable("warehouseStocks", {
   id: int("id").autoincrement().primaryKey(),
-  companyId: int("companyId"),
+  companyId: int("companyId").notNull(),
   warehouseId: int("warehouseId").notNull(),
   productId: int("productId").notNull(),
   quantity: int("quantity").notNull().default(0),
@@ -352,7 +352,7 @@ export const warehouseStockAlerts = mysqlTable("warehouseStockAlerts", {
 /** Les transferts internes sont expédiés puis reçus dans une transaction distincte. */
 export const stockTransfers = mysqlTable("stockTransfers", {
   id: int("id").autoincrement().primaryKey(),
-  companyId: int("companyId"),
+  companyId: int("companyId").notNull(),
   transferNumber: varchar("transferNumber", { length: 60 }).notNull().unique(),
   sourceWarehouseId: int("sourceWarehouseId").notNull(),
   destinationWarehouseId: int("destinationWarehouseId").notNull(),
@@ -401,7 +401,7 @@ export const productPriceTiers = mysqlTable("productPriceTiers", {
 
 export const productCategories = mysqlTable("productCategories", {
   id: int("id").autoincrement().primaryKey(),
-  companyId: int("companyId"),
+  companyId: int("companyId").notNull(),
   name: varchar("name", { length: 100 }).notNull().unique(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -409,7 +409,7 @@ export const productCategories = mysqlTable("productCategories", {
 
 export const productUnits = mysqlTable("productUnits", {
   id: int("id").autoincrement().primaryKey(),
-  companyId: int("companyId"),
+  companyId: int("companyId").notNull(),
   name: varchar("name", { length: 30 }).notNull().unique(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -417,7 +417,7 @@ export const productUnits = mysqlTable("productUnits", {
 
 export const customers = mysqlTable("customers", {
   id: int("id").autoincrement().primaryKey(),
-  companyId: int("companyId"),
+  companyId: int("companyId").notNull(),
   name: varchar("name", { length: 180 }).notNull(),
   otherReference: varchar("otherReference", { length: 80 }),
   type: mysqlEnum("type", ["ordinary", "wholesale"]).notNull().default("ordinary"),
@@ -433,7 +433,7 @@ export const customers = mysqlTable("customers", {
 
 export const agents = mysqlTable("agents", {
   id: int("id").autoincrement().primaryKey(),
-  companyId: int("companyId"),
+  companyId: int("companyId").notNull(),
   name: varchar("name", { length: 160 }).notNull(),
   type: mysqlEnum("type", ["sales_agent", "cashier"]).notNull(),
   warehouseScope: mysqlEnum("warehouseScope", ["all", "selected", "attribution_only"]).notNull().default("all"),
@@ -459,7 +459,7 @@ export const salesAgentWarehouseAssignments = mysqlTable("salesAgentWarehouseAss
 
 export const remunerationProfiles = mysqlTable("remunerationProfiles", {
   id: int("id").autoincrement().primaryKey(),
-  companyId: int("companyId"),
+  companyId: int("companyId").notNull(),
   beneficiaryType: mysqlEnum("beneficiaryType", ["user", "agent"]).notNull(),
   beneficiaryId: int("beneficiaryId").notNull(),
   remunerationMode: mysqlEnum("remunerationMode", ["fixed", "commission", "fixed_plus_commission"]).notNull().default("commission"),
@@ -473,7 +473,7 @@ export const remunerationProfiles = mysqlTable("remunerationProfiles", {
 
 export const saleSettings = mysqlTable("saleSettings", {
   id: int("id").autoincrement().primaryKey(),
-  companyId: int("companyId"),
+  companyId: int("companyId").notNull(),
   defaultSalesAgentId: int("defaultSalesAgentId"),
   defaultCashierId: int("defaultCashierId"),
   requireSalesAgent: boolean("requireSalesAgent").notNull().default(false),
@@ -544,7 +544,7 @@ export const vatRatePresets = mysqlTable("vatRatePresets", {
 
 export const sales = mysqlTable("sales", {
   id: int("id").autoincrement().primaryKey(),
-  companyId: int("companyId"),
+  companyId: int("companyId").notNull(),
   invoiceNumber: varchar("invoiceNumber", { length: 60 }).notNull().unique(),
   offlineOperationId: varchar("offlineOperationId", { length: 80 }).unique(),
   channel: mysqlEnum("channel", ["pos", "invoice", "quote"]).notNull().default("invoice"),
@@ -574,7 +574,7 @@ export const sales = mysqlTable("sales", {
 
 export const expenses = mysqlTable("expenses", {
   id: int("id").autoincrement().primaryKey(),
-  companyId: int("companyId"),
+  companyId: int("companyId").notNull(),
   warehouseId: int("warehouseId"),
   category: mysqlEnum("category", ["rent", "energy", "connection", "salary", "marketing", "supplies", "taxes", "other"]).notNull(),
   description: varchar("description", { length: 300 }).notNull(),
@@ -590,7 +590,7 @@ export const expenses = mysqlTable("expenses", {
 
 export const expenseBudgets = mysqlTable("expenseBudgets", {
   id: int("id").autoincrement().primaryKey(),
-  companyId: int("companyId"),
+  companyId: int("companyId").notNull(),
   warehouseId: int("warehouseId"),
   yearMonth: varchar("yearMonth", { length: 7 }).notNull(),
   amountCents: int("amountCents").notNull(),
@@ -767,7 +767,7 @@ export const saleCommissions = mysqlTable("saleCommissions", {
 
 export const agentPayments = mysqlTable("agentPayments", {
   id: int("id").autoincrement().primaryKey(),
-  companyId: int("companyId"),
+  companyId: int("companyId").notNull(),
   warehouseId: int("warehouseId"),
   beneficiaryType: mysqlEnum("beneficiaryType", ["user", "agent"]).notNull(),
   beneficiaryId: int("beneficiaryId").notNull(),
@@ -785,7 +785,7 @@ export const agentPayments = mysqlTable("agentPayments", {
 
 export const inventorySessions = mysqlTable("inventorySessions", {
   id: int("id").autoincrement().primaryKey(),
-  companyId: int("companyId"),
+  companyId: int("companyId").notNull(),
   name: varchar("name", { length: 160 }).notNull(),
   warehouseId: int("warehouseId"),
   status: mysqlEnum("status", ["draft", "validated"]).notNull().default("draft"),
@@ -807,7 +807,7 @@ export const inventoryItems = mysqlTable("inventoryItems", {
 
 export const stockMovements = mysqlTable("stockMovements", {
   id: int("id").autoincrement().primaryKey(),
-  companyId: int("companyId"),
+  companyId: int("companyId").notNull(),
   productId: int("productId").notNull(),
   warehouseId: int("warehouseId"),
   supplierId: int("supplierId"),
@@ -823,7 +823,7 @@ export const stockMovements = mysqlTable("stockMovements", {
 
 export const stockAlerts = mysqlTable("stockAlerts", {
   id: int("id").autoincrement().primaryKey(),
-  companyId: int("companyId"),
+  companyId: int("companyId").notNull(),
   productId: int("productId").notNull().unique(),
   threshold: int("threshold").notNull(),
   observedQuantity: int("observedQuantity").notNull(),
@@ -835,7 +835,7 @@ export const stockAlerts = mysqlTable("stockAlerts", {
 
 export const auditLogs = mysqlTable("auditLogs", {
   id: int("id").autoincrement().primaryKey(),
-  companyId: int("companyId"),
+  companyId: int("companyId").notNull(),
   actorUserId: int("actorUserId").notNull(),
   action: varchar("action", { length: 120 }).notNull(),
   entityType: varchar("entityType", { length: 80 }).notNull(),
@@ -846,7 +846,7 @@ export const auditLogs = mysqlTable("auditLogs", {
 
 export const backupSettings = mysqlTable("backupSettings", {
   id: int("id").autoincrement().primaryKey(),
-  companyId: int("companyId"),
+  companyId: int("companyId").notNull(),
   automaticEnabled: boolean("automaticEnabled").notNull().default(true),
   frequencyHours: int("frequencyHours").notNull().default(24),
   retentionCount: int("retentionCount").notNull().default(14),
@@ -866,7 +866,7 @@ export const backupSettings = mysqlTable("backupSettings", {
 
 export const backupArchives = mysqlTable("backupArchives", {
   id: int("id").autoincrement().primaryKey(),
-  companyId: int("companyId"),
+  companyId: int("companyId").notNull(),
   filename: varchar("filename", { length: 220 }).notNull(),
   trigger: mysqlEnum("trigger", ["manual", "scheduled"]).notNull(),
   status: mysqlEnum("status", ["completed", "failed"]).notNull().default("completed"),

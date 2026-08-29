@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { userSessions } from "../drizzle/schema";
+import { userSessions, users } from "../drizzle/schema";
 
 vi.mock("./db", () => ({ getDb: vi.fn() }));
 import { getDb } from "./db";
@@ -11,7 +11,7 @@ const otherSessionId = "22222222-2222-4222-8222-222222222222";
 
 function authenticatedContext() {
   return {
-    user: { id: 7, openId: "session-user", name: "Utilisateur", email: "user@example.test", phone: null, loginMethod: "password", role: "seller", active: true, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date(), sessionId: currentSessionId },
+    user: { id: 7, openId: "session-user", name: "Utilisateur", email: "user@example.test", phone: null, loginMethod: "password", role: "seller", active: true, companyId: 1, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date(), sessionId: currentSessionId },
     req: { protocol: "https", headers: {} },
     res: { clearCookie: vi.fn() },
   } as never;
@@ -29,7 +29,7 @@ describe("auth.sessions", () => {
     updates.length = 0;
     const db: any = {
       select: () => ({ from: (table: unknown) => {
-        const rows = table === userSessions ? sessions : [];
+        const rows = table === userSessions ? sessions : table === users ? [{ id: 7, companyId: 1 }] : [];
         return { where: () => Object.assign(Promise.resolve(rows), { orderBy: async () => rows, limit: async () => rows }) };
       } }),
       update: () => ({ set: (values: Record<string, unknown>) => ({ where: async () => { updates.push({ values, id: otherSessionId }); } }) }),

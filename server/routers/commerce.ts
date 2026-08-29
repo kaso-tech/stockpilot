@@ -37,15 +37,17 @@ async function dbOrThrow() {
   return db;
 }
 
-async function companySettings(db: any, companyId: number | null | undefined) {
+async function companySettings(db: any, companyId: number) {
   const query = db.select().from(saleSettings);
   if (typeof query.where !== "function") return query[0] ?? null;
-  return (await query.where(companyScope(saleSettings.companyId, companyId ?? null)).limit(1))[0] ?? null;
+  return (await query.where(companyScope(saleSettings.companyId, companyId)).limit(1))[0] ?? null;
 }
 
 async function audit(actorUserId: number, action: string, entityType: string, entityId: string | number | null, detail: string) {
   const db = await dbOrThrow();
-  await db.insert(auditLogs).values({ actorUserId, action, entityType, entityId: entityId === null ? null : String(entityId), detail });
+  const actor = (await db.select({ companyId: users.companyId }).from(users).where(eq(users.id, actorUserId)).limit(1))[0];
+  if (!actor || actor.companyId == null) throw new TRPCError({ code: "FORBIDDEN", message: "Aucune entreprise active n’est associée à cet acteur." });
+  await db.insert(auditLogs).values({ companyId: actor.companyId, actorUserId, action, entityType, entityId: entityId === null ? null : String(entityId), detail });
 }
 
 async function ensureLoginEmailAvailable(db: Awaited<ReturnType<typeof dbOrThrow>>, email: string, exceptUserId?: number) {
@@ -55,7 +57,7 @@ async function ensureLoginEmailAvailable(db: Awaited<ReturnType<typeof dbOrThrow
   if (conflict) throw new TRPCError({ code: "CONFLICT", message: "Cette adresse e-mail est déjà utilisée par un compte de connexion." });
 }
 
-async function attachSalaryScheduleFromTemplate(db: any, input: { templateId?: number | null; dueDay?: number | null } | null | undefined, companyId: number | null, actorUserId: number, beneficiary: { type: "agent" | "user"; id: number; name: string }) {
+async function attachSalaryScheduleFromTemplate(db: any, input: { templateId?: number | null; dueDay?: number | null } | null | undefined, companyId: number, actorUserId: number, beneficiary: { type: "agent" | "user"; id: number; name: string }) {
   if (!input?.templateId) return null;
   const template = (await db.select().from(paymentDueTemplates).where(and(eq(paymentDueTemplates.id, input.templateId), companyScope(paymentDueTemplates.companyId, companyId), eq(paymentDueTemplates.active, true), eq(paymentDueTemplates.scheduleType, "salary"))).limit(1))[0];
   if (!template) throw new TRPCError({ code: "BAD_REQUEST", message: "Le modèle salarial sélectionné est introuvable ou indisponible." });
@@ -63,7 +65,7 @@ async function attachSalaryScheduleFromTemplate(db: any, input: { templateId?: n
   const dueDay = input.dueDay ?? template.dueDay;
   if (!dueDay || dueDay < 1 || dueDay > 31) throw new TRPCError({ code: "BAD_REQUEST", message: "Le jour mensuel du salaire est invalide." });
   const warehouse = template.warehouseId ? await getScopedWarehouse(db, companyId, template.warehouseId, { requireActive: true }) : await getDefaultWarehouse(db, companyId);
-  const result = await db.insert(paymentDueSchedules).values({ companyId: companyId!, warehouseId: warehouse.id, scheduleType: "salary", title: `${template.name} — ${beneficiary.name}`, beneficiaryType: beneficiary.type, beneficiaryId: beneficiary.id, templateId: template.id, amountCents: template.amountCents, recurrence: "monthly", dueDay, startsAt: initialMonthlyDueAt(dueDay), reminderDaysJson: template.reminderDaysJson, responsibleUserId: template.responsibleUserId, createdByUserId: actorUserId });
+  const result = await db.insert(paymentDueSchedules).values({ companyId, warehouseId: warehouse.id, scheduleType: "salary", title: `${template.name} — ${beneficiary.name}`, beneficiaryType: beneficiary.type, beneficiaryId: beneficiary.id, templateId: template.id, amountCents: template.amountCents, recurrence: "monthly", dueDay, startsAt: initialMonthlyDueAt(dueDay), reminderDaysJson: template.reminderDaysJson, responsibleUserId: template.responsibleUserId, createdByUserId: actorUserId });
   const scheduleId = Number(result[0].insertId);
   const schedule = (await db.select().from(paymentDueSchedules).where(eq(paymentDueSchedules.id, scheduleId)).limit(1))[0]!;
   await materializePaymentDueOccurrences(db, schedule);
@@ -74,7 +76,7 @@ async function runAtomically<T>(db: any, operation: (transaction: any) => Promis
   return typeof db.transaction === "function" ? db.transaction(operation) : operation(db);
 }
 
-async function listSales(companyId: number | null, limit = 100) {
+async function listSales(companyId: number, limit = 100) {
   const db = await dbOrThrow();
   return db.select({ id: sales.id, invoiceNumber: sales.invoiceNumber, status: sales.status, paymentMethod: sales.paymentMethod, totalCents: sales.totalCents, netProfitCents: sales.netProfitCents, createdAt: sales.createdAt, customerName: customers.name, customerType: customers.type, sellerName: users.name, salesAgentName: agents.name })
     .from(sales).innerJoin(customers, eq(sales.customerId, customers.id)).leftJoin(users, eq(sales.sellerUserId, users.id)).leftJoin(agents, eq(sales.salesAgentId, agents.id)).where(companyScope(sales.companyId, companyId)).orderBy(desc(sales.createdAt)).limit(limit);
@@ -240,7 +242,7 @@ export const commerceRouter = router({
         const profiles = await tx.select().from(remunerationProfiles).where(and(eq(remunerationProfiles.active, true), companyScope(remunerationProfiles.companyId, ctx.user.companyId)));
         const beneficiaries = [{ type: "user" as const, id: ctx.user.id }, ...(salesAgentId ? [{ type: "agent" as const, id: salesAgentId }] : []), ...(cashierId ? [{ type: "agent" as const, id: cashierId }] : [])];
         for (const beneficiary of beneficiaries) { const profile = profiles.find(item => item.beneficiaryType === beneficiary.type && item.beneficiaryId === beneficiary.id); if (profile) { const amount = commissionCents({ remunerationMode: profile.remunerationMode, commissionBasis: profile.commissionBasis, rateBasisPoints: profile.rateBasisPoints, invoiceRevenueCents: totalCents, invoiceNetProfitCents: netProfitCents }); if (amount > 0) await tx.insert(saleCommissions).values({ saleId, beneficiaryType: beneficiary.type, beneficiaryId: beneficiary.id, commissionBasis: profile.commissionBasis, rateBasisPoints: profile.rateBasisPoints, commissionCents: amount }); } }
-        await tx.insert(auditLogs).values({ actorUserId: ctx.user.id, action: "Vente créée", entityType: "Facture", entityId: String(saleId), detail: `Facture ${invoiceNumber} créée pour ${customer.name}` });
+        await tx.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Vente créée", entityType: "Facture", entityId: String(saleId), detail: `Facture ${invoiceNumber} créée pour ${customer.name}` });
       });
       return { success: true, invoiceNumber };
     }),
