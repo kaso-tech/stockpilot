@@ -498,6 +498,13 @@
       "when": 1787992949355,
       "tag": "0070_slippery_whiplash",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "5",
+      "when": 1787993460815,
+      "tag": "0071_whole_kate_bishop",
+      "breakpoints": true
     }
   ]
 }

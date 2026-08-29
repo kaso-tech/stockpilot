@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { backupSettings } from "../drizzle/schema";
 import { getDb } from "./db";
 import { runBackupWithStatus } from "./backups";
+import { hourlyPeriodKey, runObservedAutomation } from "./automationMonitoring";
 import { sdk } from "./_core/sdk";
 
 function isValidCompanyId(companyId: number | null): companyId is number { const normalized = typeof companyId === "number" ? companyId : Number.NaN; return Number.isInteger(normalized) && normalized > 0; }
@@ -26,8 +27,16 @@ export async function runScheduledBackup(req: Request, res: Response) {
     if (!settings || !settings.automaticEnabled) return res.json({ ok: true, skipped: "inactive-or-orphan" });
     const companyId = settings.companyId;
     if (!isValidCompanyId(companyId)) return res.status(409).json({ error: "invalid-schedule-scope", correlationId });
-    const archive = await runBackupWithStatus(settings.updatedByUserId ?? null, "scheduled", settings.retentionCount, companyId);
-    return res.json({ ok: true, archiveId: archive.id, filename: archive.filename });
+    const observed = await runObservedAutomation({
+      db,
+      companyId,
+      jobType: "backup",
+      periodKey: hourlyPeriodKey(new Date(), settings.frequencyHours),
+      correlationId,
+      execute: () => runBackupWithStatus(settings.updatedByUserId ?? null, "scheduled", settings.retentionCount, companyId),
+    });
+    if (observed.status === "skipped") return res.json({ ok: true, skipped: "duplicate-period", correlationId });
+    return res.json({ ok: true, archiveId: observed.value!.id, filename: observed.value!.filename, correlationId });
   } catch (error) {
     console.error("[ScheduledBackup] execution failed", { correlationId, error });
     return res.status(500).json({ error: "scheduled-backup-failed", correlationId, timestamp: new Date().toISOString() });

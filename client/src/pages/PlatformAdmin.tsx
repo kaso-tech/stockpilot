@@ -145,7 +145,7 @@ export default function PlatformAdmin({ page = "overview" }: { page?: PlatformPa
           <Metric icon={ClipboardCheck} label="Onboarding terminé" value={stats?.onboardedCompanies ?? 0} tone="text-emerald-700 dark:text-emerald-300" />
           <Metric icon={UsersRound} label="Nouvelles entreprises · 30 jours" value={stats?.newCompaniesLast30Days ?? 0} tone="text-indigo-700 dark:text-indigo-300" />
         </div>
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid gap-4 lg:grid-cols-4">
           <StatusPanel title="Portefeuille entreprises" description="Répartition administrative actuelle" value={`${activeShare} %`} valueLabel="actives" icon={Building2}>
             <DistributionRow label="Actives" value={stats?.activeCompanies ?? 0} total={totalCompanies} className="bg-emerald-600 dark:bg-emerald-400" />
             <DistributionRow label="Suspendues" value={stats?.suspendedCompanies ?? 0} total={totalCompanies} className="bg-amber-600 dark:bg-amber-400" />
@@ -158,6 +158,11 @@ export default function PlatformAdmin({ page = "overview" }: { page?: PlatformPa
             <DistributionRow label="Ouvertes" value={stats?.supportByStatus.open ?? 0} total={Math.max((stats?.supportByStatus.open ?? 0) + (stats?.supportByStatus.inProgress ?? 0) + (stats?.supportByStatus.closed ?? 0), 1)} className="bg-rose-600 dark:bg-rose-400" />
             <DistributionRow label="En cours" value={stats?.supportByStatus.inProgress ?? 0} total={Math.max((stats?.supportByStatus.open ?? 0) + (stats?.supportByStatus.inProgress ?? 0) + (stats?.supportByStatus.closed ?? 0), 1)} className="bg-amber-600 dark:bg-amber-400" />
             <DistributionRow label="Clôturées" value={stats?.supportByStatus.closed ?? 0} total={Math.max((stats?.supportByStatus.open ?? 0) + (stats?.supportByStatus.inProgress ?? 0) + (stats?.supportByStatus.closed ?? 0), 1)} className="bg-emerald-600 dark:bg-emerald-400" />
+          </StatusPanel>
+          <StatusPanel title="Automatisations" description="Exécutions des dernières 24 h" value={String(stats?.automationLast24Hours.success ?? 0)} valueLabel="terminées" icon={Activity}>
+            <DistributionRow label="Réussies" value={stats?.automationLast24Hours.success ?? 0} total={Math.max((stats?.automationLast24Hours.success ?? 0) + (stats?.automationLast24Hours.failed ?? 0) + (stats?.automationLast24Hours.running ?? 0) + (stats?.automationLast24Hours.skipped ?? 0), 1)} className="bg-emerald-600 dark:bg-emerald-400" />
+            <DistributionRow label="En erreur" value={stats?.automationLast24Hours.failed ?? 0} total={Math.max((stats?.automationLast24Hours.success ?? 0) + (stats?.automationLast24Hours.failed ?? 0) + (stats?.automationLast24Hours.running ?? 0) + (stats?.automationLast24Hours.skipped ?? 0), 1)} className="bg-rose-600 dark:bg-rose-400" />
+            <DistributionRow label="En cours / ignorées" value={(stats?.automationLast24Hours.running ?? 0) + (stats?.automationLast24Hours.skipped ?? 0)} total={Math.max((stats?.automationLast24Hours.success ?? 0) + (stats?.automationLast24Hours.failed ?? 0) + (stats?.automationLast24Hours.running ?? 0) + (stats?.automationLast24Hours.skipped ?? 0), 1)} className="bg-amber-600 dark:bg-amber-400" />
           </StatusPanel>
         </div>
       </section>}

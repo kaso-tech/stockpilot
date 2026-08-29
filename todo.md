@@ -955,7 +955,11 @@
 - [x] Lot D : acheminer les liens de pièces jointes par un téléchargement autorisé et tenant-scopé, avec redirection signée côté serveur.
 - [x] Lot D : contrôler côté serveur l’appartenance des justificatifs de règlement avant leur rattachement à une occurrence.
 - [x] Lot D : couvrir par tests la recherche e-mail, la révocation de session et les refus d’accès aux fichiers hors périmètre.
-- [ ] Lot E : fiabiliser les automatisations et la supervision opérationnelle.
+- [x] Lot E : fiabiliser les automatisations et la supervision opérationnelle.
+- [x] Lot E : enregistrer des exécutions de tâches tenant-scopées avec statut, durée, corrélation et idempotence temporelle.
+- [x] Lot E : isoler le traitement des rappels d’échéance par entreprise afin qu’un échec local ne bloque pas les autres périmètres.
+- [x] Lot E : exposer à la console plateforme un résumé agrégé de santé des automatisations sans ligne métier ni contenu client.
+- [x] Lot E : couvrir les doublons, les pannes isolées et les métriques de tâche, puis vérifier les parcours de release.
 - [ ] Lot F : compléter le mode offline-first durable par entreprise et entrepôt.
 - [ ] Lot G : consolider l’intégrité métier, stock et financière.
 - [ ] Lot H : renforcer qualité, accessibilité et recette de release.

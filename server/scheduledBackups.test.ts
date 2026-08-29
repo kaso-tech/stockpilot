@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ authenticate: vi.fn(), getDb: vi.fn(), runBackup: vi.fn() }));
+const mocks = vi.hoisted(() => ({ authenticate: vi.fn(), getDb: vi.fn(), runBackup: vi.fn(), runObserved: vi.fn() }));
 vi.mock("./_core/sdk", () => ({ sdk: { authenticateRequest: mocks.authenticate } }));
 vi.mock("./db", () => ({ getDb: mocks.getDb }));
 vi.mock("./backups", () => ({ runBackupWithStatus: mocks.runBackup }));
+vi.mock("./automationMonitoring", () => ({ hourlyPeriodKey: vi.fn(() => "2026-08-29T06:00Z/6h"), runObservedAutomation: mocks.runObserved }));
 import { runScheduledBackup } from "./scheduledBackups";
 
 function response() { const status = vi.fn().mockReturnThis(); const json = vi.fn().mockReturnThis(); return { status, json }; }
@@ -19,19 +20,19 @@ describe("callback planifié de sauvegarde", () => {
 
   it("exécute une sauvegarde pour la tâche planifiée active", async () => {
     mocks.authenticate.mockResolvedValue({ isCron: true, taskUid: "task-1" });
-    const settings = { scheduleCronTaskUid: "task-1", automaticEnabled: true, updatedByUserId: 7, retentionCount: 14, companyId: 3 };
+    const settings = { scheduleCronTaskUid: "task-1", automaticEnabled: true, updatedByUserId: 7, retentionCount: 14, frequencyHours: 6, companyId: 3 };
     mocks.getDb.mockResolvedValue({ select: vi.fn(() => ({ from: vi.fn(() => ({ where: vi.fn(() => ({ limit: vi.fn().mockResolvedValue([settings]) })) })) })) });
-    mocks.runBackup.mockResolvedValue({ id: 4, filename: "archive.json" }); const res = response();
+    mocks.runObserved.mockResolvedValue({ status: "success", value: { id: 4, filename: "archive.json" } }); const res = response();
     await runScheduledBackup({} as any, res as any);
-    expect(mocks.runBackup).toHaveBeenCalledWith(7, "scheduled", 14, 3);
-    expect(res.json).toHaveBeenCalledWith({ ok: true, archiveId: 4, filename: "archive.json" });
+    expect(mocks.runObserved).toHaveBeenCalledWith(expect.objectContaining({ companyId: 3, jobType: "backup", correlationId: expect.any(String) }));
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ ok: true, archiveId: 4, filename: "archive.json" }));
   });
 
   it("ne divulgue pas le message interne lorsque l’exécution échoue", async () => {
     mocks.authenticate.mockResolvedValue({ isCron: true, taskUid: "task-1" });
-    const settings = { scheduleCronTaskUid: "task-1", automaticEnabled: true, updatedByUserId: 7, retentionCount: 14, companyId: 3 };
+    const settings = { scheduleCronTaskUid: "task-1", automaticEnabled: true, updatedByUserId: 7, retentionCount: 14, frequencyHours: 6, companyId: 3 };
     mocks.getDb.mockResolvedValue({ select: vi.fn(() => ({ from: vi.fn(() => ({ where: vi.fn(() => ({ limit: vi.fn().mockResolvedValue([settings]) })) })) })) });
-    mocks.runBackup.mockRejectedValue(new Error("message interne sensible")); const res = response();
+    mocks.runObserved.mockRejectedValue(new Error("message interne sensible")); const res = response();
     await runScheduledBackup({} as any, res as any);
     expect(res.status).toHaveBeenCalledWith(500);
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: "scheduled-backup-failed" }));
@@ -40,7 +41,7 @@ describe("callback planifié de sauvegarde", () => {
 
   it("refuse une configuration planifiée sans entreprise", async () => {
     mocks.authenticate.mockResolvedValue({ isCron: true, taskUid: "task-1" });
-    const settings = { scheduleCronTaskUid: "task-1", automaticEnabled: true, updatedByUserId: 7, retentionCount: 14, companyId: null };
+    const settings = { scheduleCronTaskUid: "task-1", automaticEnabled: true, updatedByUserId: 7, retentionCount: 14, frequencyHours: 6, companyId: null };
     mocks.getDb.mockResolvedValue({ select: vi.fn(() => ({ from: vi.fn(() => ({ where: vi.fn(() => ({ limit: vi.fn().mockResolvedValue([settings]) })) })) })) }); const res = response();
     await runScheduledBackup({} as any, res as any);
     expect(res.status).toHaveBeenCalledWith(409);

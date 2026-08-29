@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { and, desc, eq, gte, inArray, isNotNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
-import { backupSettings, companies, companyLifecycleEvents, companySubscriptions, companySyncHealth, platformAdminUsers, platformAuditLogs, platformNotificationReads, subscriptionPlans, supportAssignments, supportPlatformEvents, supportRequests, users } from "../../drizzle/schema";
+import { automationJobRuns, backupSettings, companies, companyLifecycleEvents, companySubscriptions, companySyncHealth, platformAdminUsers, platformAuditLogs, platformNotificationReads, subscriptionPlans, supportAssignments, supportPlatformEvents, supportRequests, users } from "../../drizzle/schema";
 import { authenticatedProcedure, router } from "../_core/trpc";
 import { canManagePlatformBilling, canManagePlatformCompanies, canManagePlatformOperators, canManagePlatformSupport, requirePlatformAccess } from "../platformAccess";
 import { resolveCompanyHealth } from "../platformHealth";
@@ -37,13 +37,14 @@ export const platformRouter = router({
     sevenDaysAgo.setDate(now.getDate() - 7);
     const thirtyDaysAgo = new Date(now);
     thirtyDaysAgo.setDate(now.getDate() - 30);
-    const [companyRows, supportRows, onboardingRows, newCompanyRows, activeCompanyRows, lifecycleRows] = await Promise.all([
+    const [companyRows, supportRows, onboardingRows, newCompanyRows, activeCompanyRows, lifecycleRows, automationRows] = await Promise.all([
       db.select({ status: companies.platformStatus, total: sql<number>`count(*)` }).from(companies).groupBy(companies.platformStatus),
       db.select({ status: supportRequests.status, total: sql<number>`count(*)` }).from(supportRequests).groupBy(supportRequests.status),
       db.select({ total: sql<number>`sum(case when ${companies.onboardingCompletedAt} is not null then 1 else 0 end)` }).from(companies),
       db.select({ totalLast7Days: sql<number>`sum(case when ${companies.createdAt} >= ${sevenDaysAgo} then 1 else 0 end)`, totalLast30Days: sql<number>`sum(case when ${companies.createdAt} >= ${thirtyDaysAgo} then 1 else 0 end)` }).from(companies),
       db.select({ total: sql<number>`count(distinct ${users.companyId})` }).from(users).where(and(eq(users.active, true), gte(users.lastSignedIn, sevenDaysAgo))),
       db.select({ action: companyLifecycleEvents.action, total: sql<number>`count(*)` }).from(companyLifecycleEvents).where(gte(companyLifecycleEvents.createdAt, thirtyDaysAgo)).groupBy(companyLifecycleEvents.action),
+      db.select({ status: automationJobRuns.status, total: sql<number>`count(*)` }).from(automationJobRuns).where(gte(automationJobRuns.startedAt, new Date(now.getTime() - 24 * 60 * 60 * 1000))).groupBy(automationJobRuns.status),
     ]);
     const totalCompanies = companyRows.reduce((sum, row) => sum + Number(row.total), 0);
     const supportOpen = Number(supportRows.find(row => row.status === "open")?.total ?? 0);
@@ -65,6 +66,12 @@ export const platformRouter = router({
       lifecycleLast30Days: {
         activated: Number(lifecycleRows.find(row => row.action === "activated")?.total ?? 0),
         suspended: Number(lifecycleRows.find(row => row.action === "suspended")?.total ?? 0),
+      },
+      automationLast24Hours: {
+        success: Number(automationRows.find(row => row.status === "success")?.total ?? 0),
+        failed: Number(automationRows.find(row => row.status === "failed")?.total ?? 0),
+        running: Number(automationRows.find(row => row.status === "running")?.total ?? 0),
+        skipped: Number(automationRows.find(row => row.status === "skipped")?.total ?? 0),
       },
     };
   }),

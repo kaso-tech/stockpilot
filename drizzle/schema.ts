@@ -78,6 +78,24 @@ export const companySyncHealth = mysqlTable("companySyncHealth", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, table => [index("company_sync_health_status_updated_idx").on(table.status, table.updatedAt)]);
 
+/** Métadonnées de supervision des traitements planifiés, sans contenu de données métier. */
+export const automationJobRuns = mysqlTable("automationJobRuns", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  jobType: mysqlEnum("jobType", ["backup", "payment_due_reminders"]).notNull(),
+  periodKey: varchar("periodKey", { length: 48 }).notNull(),
+  correlationId: varchar("correlationId", { length: 64 }).notNull(),
+  status: mysqlEnum("status", ["running", "success", "failed", "skipped"]).notNull().default("running"),
+  startedAt: timestamp("startedAt").defaultNow().notNull(),
+  completedAt: timestamp("completedAt"),
+  durationMs: int("durationMs"),
+  errorCode: varchar("errorCode", { length: 80 }),
+}, table => [
+  uniqueIndex("automation_job_runs_idempotency_unique").on(table.jobType, table.companyId, table.periodKey),
+  index("automation_job_runs_status_started_idx").on(table.status, table.startedAt),
+  index("automation_job_runs_company_started_idx").on(table.companyId, table.startedAt),
+]);
+
 /** Offre SaaS configurée par la plateforme ; aucun tarif ou paiement n’est activé sans prestataire validé. */
 export const subscriptionPlans = mysqlTable("subscriptionPlans", {
   id: int("id").autoincrement().primaryKey(),
