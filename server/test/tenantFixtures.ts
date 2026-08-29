@@ -15,6 +15,7 @@ function userFor(companyId: number, id: number, role: "admin" | "seller", slug: 
     openId: `test-${slug}-${role}`,
     name: `${role === "admin" ? "Administrateur" : "Vendeur"} ${slug}`,
     email: `${role}@${slug}.example.test`,
+    emailNormalized: `${role}@${slug}.example.test`,
     phone: null,
     loginMethod: "password",
     role,

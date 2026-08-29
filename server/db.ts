@@ -13,6 +13,7 @@ import {
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { companyScope } from "./companyScope";
+import { normalizeAuthEmail } from "./authEmail";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -39,6 +40,10 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     if (user[field] !== undefined) {
       values[field] = user[field] ?? null;
       updateSet[field] = user[field] ?? null;
+      if (field === "email") {
+        values.emailNormalized = normalizeAuthEmail(user.email);
+        updateSet.emailNormalized = normalizeAuthEmail(user.email);
+      }
     }
   });
   if (user.role !== undefined) {
@@ -57,6 +62,14 @@ export async function getUserByOpenId(openId: string) {
   if (!db) return undefined;
   const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
   return result[0];
+}
+
+export async function getUserByNormalizedEmail(email: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const normalizedEmail = normalizeAuthEmail(email);
+  if (!normalizedEmail) return undefined;
+  return (await db.select().from(users).where(eq(users.emailNormalized, normalizedEmail)).limit(1))[0];
 }
 
 export async function getUserSessionById(sessionId: string) {

@@ -6,6 +6,7 @@ import { companyScope } from "../companyScope";
 import { getDb } from "../db";
 import { initialMonthlyDueAt, nextMonthlyDueAt, normalizeReminderDays, resolvePaymentDueStatus } from "../paymentDueRules";
 import { buildPaymentDueForecast, paymentDueForecastMonths } from "../paymentDueForecast";
+import { isPaymentDueReceiptKeyInScope } from "../paymentReceiptRules";
 import { getDefaultWarehouse, getScopedWarehouse } from "../warehouseStock";
 import { storagePut } from "../storage";
 import { adminProcedure, protectedProcedure, router } from "../_core/trpc";
@@ -13,8 +14,8 @@ import { TRPCError } from "@trpc/server";
 
 const expenseCategories = ["rent", "energy", "connection", "salary", "marketing", "supplies", "taxes", "other"] as const;
 const occurrenceStatuses = ["upcoming", "due", "overdue", "partially_paid", "paid", "cancelled"] as const;
-const settlementReceiptInput = z.object({ receiptUrl: z.string().max(1024).nullable().optional(), receiptName: z.string().trim().max(180).nullable().optional(), receiptMimeType: z.string().trim().max(80).nullable().optional() }).superRefine((input, validation) => {
-  const present = [input.receiptUrl, input.receiptName, input.receiptMimeType].filter(Boolean).length;
+const settlementReceiptInput = z.object({ receiptKey: z.string().trim().max(720).nullable().optional(), receiptName: z.string().trim().max(180).nullable().optional(), receiptMimeType: z.string().trim().max(80).nullable().optional() }).superRefine((input, validation) => {
+  const present = [input.receiptKey, input.receiptName, input.receiptMimeType].filter(Boolean).length;
   if (present > 0 && present < 3) validation.addIssue({ code: z.ZodIssueCode.custom, message: "Le justificatif de règlement est incomplet." });
 });
 
@@ -213,8 +214,8 @@ export const paymentDuesRouter = router({
     const db = await dbOrThrow(); const occurrence = (await db.select({ id: paymentDueOccurrences.id }).from(paymentDueOccurrences).where(and(eq(paymentDueOccurrences.id, input.occurrenceId), companyScope(paymentDueOccurrences.companyId, ctx.user.companyId))).limit(1))[0]; if (!occurrence) throw new TRPCError({ code: "NOT_FOUND", message: "Échéance introuvable." });
     const match = input.dataUrl.match(/^data:(application\/pdf|image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/); if (!match) throw new TRPCError({ code: "BAD_REQUEST", message: "Le justificatif doit être un PDF, PNG, JPEG ou WEBP." });
     const mimeType = match[1]; const buffer = Buffer.from(match[2], "base64"); if (buffer.byteLength > 5 * 1024 * 1024) throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "Le justificatif ne doit pas dépasser 5 Mo." });
-    const extension = mimeType === "application/pdf" ? "pdf" : mimeType === "image/jpeg" ? "jpg" : mimeType.split("/")[1]; const { url } = await storagePut(`company/${ctx.user.companyId}/payment-due-settlements/${input.occurrenceId}/${randomUUID()}.${extension}`, buffer, mimeType);
-    return { url, filename: input.filename, mimeType };
+    const extension = mimeType === "application/pdf" ? "pdf" : mimeType === "image/jpeg" ? "jpg" : mimeType.split("/")[1]; const attachment = await storagePut(`company/${ctx.user.companyId}/payment-due-settlements/${input.occurrenceId}/${randomUUID()}.${extension}`, buffer, mimeType);
+    return { key: attachment.key, filename: input.filename, mimeType };
   }),
   settle: adminProcedure.input(z.object({ occurrenceId: z.number().int().positive(), amountCents: z.number().int().positive(), settledAt: z.coerce.date(), note: z.string().trim().max(1000).nullable().optional() }).merge(settlementReceiptInput)).mutation(async ({ ctx, input }) => {
     const db = await dbOrThrow();
@@ -224,7 +225,8 @@ export const paymentDuesRouter = router({
       if (["paid", "cancelled"].includes(row.occurrence.status)) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Cette échéance ne peut plus être réglée." });
       const remainingCents = row.occurrence.amountCents - row.occurrence.paidCents;
       if (input.amountCents > remainingCents) throw new TRPCError({ code: "BAD_REQUEST", message: "Le règlement dépasse le solde de l’échéance." });
-      if (input.receiptUrl && !input.receiptUrl.startsWith(`/manus-storage/company/${ctx.user.companyId}/payment-due-settlements/${row.occurrence.id}/`)) throw new TRPCError({ code: "BAD_REQUEST", message: "Le justificatif de règlement n’est pas autorisé." });
+      const receiptUrl = input.receiptKey ? `/manus-storage/${input.receiptKey}` : null;
+      if (input.receiptKey && !isPaymentDueReceiptKeyInScope(input.receiptKey, ctx.user.companyId!, row.occurrence.id)) throw new TRPCError({ code: "BAD_REQUEST", message: "Le justificatif de règlement n’est pas autorisé." });
       const warehouse = row.occurrence.warehouseId ? await getScopedWarehouse(tx, ctx.user.companyId, row.occurrence.warehouseId, { requireActive: false }) : await getDefaultWarehouse(tx, ctx.user.companyId);
       let expenseId: number | null = null;
       let agentPaymentId: number | null = null;
@@ -238,7 +240,7 @@ export const paymentDuesRouter = router({
       }
       const paidCents = row.occurrence.paidCents + input.amountCents;
       const status = resolvePaymentDueStatus({ dueAt: row.occurrence.dueAt, amountCents: row.occurrence.amountCents, paidCents });
-      await tx.insert(paymentDueSettlements).values({ occurrenceId: row.occurrence.id, companyId: ctx.user.companyId!, amountCents: input.amountCents, expenseId, agentPaymentId, receiptUrl: input.receiptUrl ?? null, receiptName: input.receiptName ?? null, receiptMimeType: input.receiptMimeType ?? null, settledByUserId: ctx.user.id, settledAt: input.settledAt });
+      await tx.insert(paymentDueSettlements).values({ occurrenceId: row.occurrence.id, companyId: ctx.user.companyId!, amountCents: input.amountCents, expenseId, agentPaymentId, receiptUrl, receiptName: input.receiptName ?? null, receiptMimeType: input.receiptMimeType ?? null, settledByUserId: ctx.user.id, settledAt: input.settledAt });
       await tx.update(paymentDueOccurrences).set({ paidCents, status, resolvedAt: status === "paid" ? input.settledAt : null }).where(eq(paymentDueOccurrences.id, row.occurrence.id));
       await tx.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Échéance réglée", entityType: "Échéance", entityId: String(row.occurrence.id), detail: `Règlement de ${input.amountCents} centimes enregistré sans double comptage.` });
       return { success: true, expenseId, agentPaymentId, status, paidCents };

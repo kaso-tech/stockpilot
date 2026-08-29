@@ -21,15 +21,17 @@ describe("auth.passwordLogin", () => {
   const admin = { id: 1, openId: "admin-password-test", name: "Administrateur", email: "admin@example.test", role: "admin" as const, active: true };
   const seller = { id: 2, openId: "seller-password-test", name: "Vendeur", email: "vendeur@example.test", role: "seller" as const, active: true };
   const insertedSessions: Array<Record<string, unknown>> = [];
+  let selectedAccount = admin;
 
   beforeEach(async () => {
     insertedSessions.length = 0;
+    selectedAccount = admin;
     const adminPasswordHash = await hashPassword("Admin!2026");
     const sellerPasswordHash = await hashPassword("Vendeur!2026");
     const db: any = {
       select: () => ({
         from: (table: unknown) => {
-          if (table === users) return [admin, seller];
+          if (table === users) return { where: () => ({ limit: async () => [selectedAccount] }) };
           const rows = table === adminFallbackPasswords
             ? [{ id: 1, ownerOpenId: admin.openId, passwordHash: adminPasswordHash }]
             : table === sellerCredentials
@@ -53,6 +55,7 @@ describe("auth.passwordLogin", () => {
 
   it("ouvre une session vendeur avec son e-mail et son mot de passe", async () => {
     const cookies: Array<{ name: string; value: string; options: Record<string, unknown> }> = [];
+    selectedAccount = seller;
     await expect(appRouter.createCaller(publicContext(cookies)).auth.passwordLogin({ email: "vendeur@example.test", password: "Vendeur!2026", rememberMe: true })).resolves.toEqual({ success: true, role: "seller" });
     expect(cookies).toHaveLength(1);
     expect(cookies[0]?.options).toMatchObject({ maxAge: 2_592_000_000 });

@@ -15,16 +15,18 @@ function context() {
 }
 
 describe("auth.localLogin", () => {
+  const insertedSessions: Array<Record<string, unknown>> = [];
   async function setSeller(active: boolean, password = "Vendeur!2026") {
     const passwordHash = await hashPassword(password);
-    const row = { openId: "local_seller_1", name: "Vendeur", active, passwordHash };
-    mockedGetDb.mockResolvedValue({ select: () => ({ from: () => ({ innerJoin: () => ({ where: () => ({ limit: async () => [row] }) }) }) }) } as any);
+    const row = { id: 7, openId: "local_seller_1", name: "Vendeur", active, passwordHash };
+    mockedGetDb.mockResolvedValue({ select: () => ({ from: () => ({ innerJoin: () => ({ where: () => ({ limit: async () => [row] }) }) }) }), insert: () => ({ values: async (values: Record<string, unknown>) => { insertedSessions.push(values); return []; } }) } as any);
   }
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => { vi.clearAllMocks(); insertedSessions.length = 0; });
   it("ouvre une session pour un vendeur actif avec le bon mot de passe", async () => {
     await setSeller(true); const { ctx, cookies } = context();
     await expect(appRouter.createCaller(ctx).auth.localLogin({ username: "vendeur", password: "Vendeur!2026" })).resolves.toEqual({ success: true });
     expect(cookies).toHaveLength(1);
+    expect(insertedSessions[0]).toMatchObject({ userId: 7 });
   });
   it("refuse un mot de passe erroné", async () => {
     await setSeller(true); const { ctx } = context();

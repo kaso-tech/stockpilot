@@ -75,9 +75,9 @@ function sessionDeviceLabel(userAgent: string | undefined) {
 }
 
 function requestIdentity(req: { ip?: string; headers: Record<string, unknown> }) {
-  const forwarded = req.headers["x-forwarded-for"];
-  const forwardedIp = Array.isArray(forwarded) ? forwarded[0] : typeof forwarded === "string" ? forwarded.split(",")[0]?.trim() : undefined;
-  return forwardedIp || req.ip || "unknown";
+  // Ne jamais accepter directement X-Forwarded-For fourni par le navigateur :
+  // Express renseigne req.ip selon la configuration du proxy de confiance.
+  return req.ip || "unknown";
 }
 
 function assertLoginRateLimit(req: { ip?: string; headers: Record<string, unknown> }, email: string) {
@@ -106,6 +106,7 @@ import { companyScope } from "./companyScope";
 import { consumeRateLimit } from "./rateLimit";
 import { creditWarehouseStock, debitWarehouseStock, getDefaultWarehouse, getScopedWarehouse } from "./warehouseStock";
 import { assertSellerWarehouseAccess } from "./sellerWarehouseAccess";
+import { normalizeAuthEmail } from "./authEmail";
 
 const productInput = z.object({
   reference: z.string().trim().min(2).max(80),
@@ -265,18 +266,21 @@ export const appRouter = router({
     localLogin: publicProcedure.input(z.object({ username: z.string().trim().min(3).max(320), password: z.string().min(1).max(256) })).mutation(async ({ ctx, input }) => {
       assertLoginRateLimit(ctx.req, input.username);
       const db = await requireDb();
-      const row = (await db.select({ openId: users.openId, name: users.name, active: users.active, passwordHash: sellerCredentials.passwordHash }).from(sellerCredentials).innerJoin(users, eq(sellerCredentials.userId, users.id)).where(eq(sellerCredentials.username, input.username)).limit(1))[0];
+      const row = (await db.select({ id: users.id, openId: users.openId, name: users.name, active: users.active, passwordHash: sellerCredentials.passwordHash }).from(sellerCredentials).innerJoin(users, eq(sellerCredentials.userId, users.id)).where(eq(sellerCredentials.username, input.username)).limit(1))[0];
       if (!row || !row.active || !(await verifyPassword(input.password, row.passwordHash))) throw new TRPCError({ code: "UNAUTHORIZED", message: "E-mail ou mot de passe incorrect." });
-      const token = await sdk.createSessionToken(row.openId, { name: row.name || input.username, expiresInMs: ONE_YEAR_MS });
+      const sessionId = randomUUID();
+      const userAgent = typeof ctx.req.headers["user-agent"] === "string" ? ctx.req.headers["user-agent"].slice(0, 512) : undefined;
+      await db.insert(userSessions).values({ id: sessionId, userId: row.id, deviceLabel: sessionDeviceLabel(userAgent), userAgent: userAgent ?? null, expiresAt: new Date(Date.now() + ONE_YEAR_MS) });
+      const token = await sdk.createSessionToken(row.openId, { name: row.name || input.username, expiresInMs: ONE_YEAR_MS, sessionId });
       ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: ONE_YEAR_MS });
       return { success: true } as const;
     }),
     passwordLogin: publicProcedure.input(z.object({ email: z.string().trim().email().max(320), password: z.string().min(1).max(256), rememberMe: z.boolean().optional().default(false) })).mutation(async ({ ctx, input }) => {
       assertLoginRateLimit(ctx.req, input.email);
       const db = await requireDb();
-      const email = input.email.trim().toLowerCase();
-      const accounts = await db.select().from(users);
-      const account = accounts.find(user => user.active && user.email?.trim().toLowerCase() === email && (user.role === "admin" || user.role === "seller"));
+      const email = normalizeAuthEmail(input.email);
+      if (!email) throw new TRPCError({ code: "UNAUTHORIZED", message: "E-mail ou mot de passe incorrect." });
+      const account = (await db.select().from(users).where(and(eq(users.emailNormalized, email), eq(users.active, true), inArray(users.role, ["admin", "seller"]))).limit(1))[0];
       if (!account) throw new TRPCError({ code: "UNAUTHORIZED", message: "E-mail ou mot de passe incorrect." });
 
       let passwordValid = false;
@@ -298,16 +302,19 @@ export const appRouter = router({
       console.info("[Auth password] Session issued", { role: account.role, remembered: input.rememberMe });
       return { success: true, role: account.role } as const;
     }),
-    emailAvailability: publicProcedure.input(z.object({ email: z.string().trim().email().max(320) })).query(async ({ input }) => {
+    emailAvailability: publicProcedure.input(z.object({ email: z.string().trim().email().max(320) })).query(async ({ ctx, input }) => {
+      assertLoginRateLimit(ctx.req, input.email);
       const db = await requireDb();
-      const normalizedEmail = input.email.trim().toLowerCase();
-      const accounts = await db.select({ email: users.email }).from(users);
-      return { available: !accounts.some(account => account.email?.trim().toLowerCase() === normalizedEmail) } as const;
+      const normalizedEmail = normalizeAuthEmail(input.email);
+      const account = normalizedEmail ? (await db.select({ id: users.id }).from(users).where(eq(users.emailNormalized, normalizedEmail)).limit(1))[0] : undefined;
+      return { available: !account } as const;
     }),
     registerCompany: publicProcedure.input(z.object({ companyName: z.string().trim().min(2).max(200), administratorName: z.string().trim().min(2).max(160), email: z.string().trim().email().max(320), password: z.string().min(10).max(256), rememberMe: z.boolean().optional().default(true) })).mutation(async ({ ctx, input }) => {
+      assertLoginRateLimit(ctx.req, input.email);
       const db = await requireDb();
-      const email = input.email.trim().toLowerCase();
-      const existingAccount = (await db.select().from(users)).find(user => user.email?.trim().toLowerCase() === email);
+      const email = normalizeAuthEmail(input.email);
+      if (!email) throw new TRPCError({ code: "BAD_REQUEST", message: "Adresse e-mail invalide." });
+      const existingAccount = (await db.select({ id: users.id }).from(users).where(eq(users.emailNormalized, email)).limit(1))[0];
       if (existingAccount) throw new TRPCError({ code: "CONFLICT", message: "Cette adresse e-mail est déjà utilisée." });
       const sessionDurationMs = input.rememberMe ? REMEMBERED_AUTH_SESSION_MS : STANDARD_AUTH_SESSION_MS;
       const openId = `local_admin_${randomUUID()}`;
@@ -315,7 +322,7 @@ export const appRouter = router({
       const { companyId, administratorId } = await db.transaction(async tx => {
         const companyResult = await tx.insert(companies).values({ name: input.companyName }).$returningId();
         const companyId = Number(companyResult[0]?.id);
-        const userResult = await tx.insert(users).values({ openId, name: input.administratorName, email, loginMethod: "password", role: "admin", active: true, companyId }).$returningId();
+        const userResult = await tx.insert(users).values({ openId, name: input.administratorName, email, emailNormalized: email, loginMethod: "password", role: "admin", active: true, companyId }).$returningId();
         const administratorId = Number(userResult[0]?.id);
         await tx.update(companies).set({ ownerUserId: administratorId }).where(eq(companies.id, companyId));
         await tx.insert(adminFallbackPasswords).values({ ownerOpenId: openId, passwordHash, updatedByUserId: administratorId });
@@ -366,10 +373,13 @@ export const appRouter = router({
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Identifiants administrateur incorrects." });
       }
       const db = await requireDb();
-      const adminAccounts = await db.select().from(users).where(eq(users.role, "admin"));
-      const configuredAdmin = adminAccounts.find(account => account.email?.trim().toLowerCase() === input.email.trim().toLowerCase()) ?? (adminAccounts.length === 1 ? adminAccounts[0] : undefined);
       const adminOpenId = ENV.ownerOpenId;
       if (!adminOpenId) {
+        console.info("[Auth fallback] Rejected credentials", { reason: "admin-account" });
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Identifiants administrateur incorrects." });
+      }
+      const configuredAdmin = (await db.select({ id: users.id, openId: users.openId, name: users.name, active: users.active, role: users.role }).from(users).where(eq(users.openId, adminOpenId)).limit(1))[0];
+      if (!configuredAdmin || !configuredAdmin.active || configuredAdmin.role !== "admin") {
         console.info("[Auth fallback] Rejected credentials", { reason: "admin-account" });
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Identifiants administrateur incorrects." });
       }
@@ -379,7 +389,10 @@ export const appRouter = router({
         console.info("[Auth fallback] Rejected credentials", { reason: "password" });
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Identifiants administrateur incorrects." });
       }
-      const token = await sdk.createSessionToken(adminOpenId, { name: configuredAdmin?.name || "Administrateur", expiresInMs: ONE_YEAR_MS });
+      const sessionId = randomUUID();
+      const userAgent = typeof ctx.req.headers["user-agent"] === "string" ? ctx.req.headers["user-agent"].slice(0, 512) : undefined;
+      await db.insert(userSessions).values({ id: sessionId, userId: configuredAdmin.id, deviceLabel: sessionDeviceLabel(userAgent), userAgent: userAgent ?? null, expiresAt: new Date(Date.now() + ONE_YEAR_MS) });
+      const token = await sdk.createSessionToken(adminOpenId, { name: configuredAdmin.name || "Administrateur", expiresInMs: ONE_YEAR_MS, sessionId });
       ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: ONE_YEAR_MS });
       console.info("[Auth fallback] Session issued", { overridePresent: Boolean(override) });
       return { success: true } as const;

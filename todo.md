@@ -949,7 +949,12 @@
 - [x] Lot C : aligner les doubles et attentes de test des sauvegardes avec la rétention minimale de production de 30 archives.
 - [x] Lot C : aligner les libellés et limites d’interface de sauvegarde sur la politique validée de 6 h et 30 archives.
 - [x] Lot C : consolider les réglages de sauvegarde dupliqués afin de garantir une seule planification active par entreprise.
-- [ ] Lot D : durcir l’authentification, les autorisations, les fichiers et l’audit.
+- [x] Lot D : durcir l’authentification, les autorisations, les fichiers et l’audit.
+- [x] Lot D : indexer et normaliser l’adresse e-mail afin d’éviter les recherches d’utilisateurs en mémoire dans les flux d’authentification et d’inscription.
+- [x] Lot D : empêcher l’accès direct non authentifié aux objets de stockage et vérifier la portée entreprise avant toute lecture de pièce jointe.
+- [x] Lot D : acheminer les liens de pièces jointes par un téléchargement autorisé et tenant-scopé, avec redirection signée côté serveur.
+- [x] Lot D : contrôler côté serveur l’appartenance des justificatifs de règlement avant leur rattachement à une occurrence.
+- [x] Lot D : couvrir par tests la recherche e-mail, la révocation de session et les refus d’accès aux fichiers hors périmètre.
 - [ ] Lot E : fiabiliser les automatisations et la supervision opérationnelle.
 - [ ] Lot F : compléter le mode offline-first durable par entreprise et entrepôt.
 - [ ] Lot G : consolider l’intégrité métier, stock et financière.
