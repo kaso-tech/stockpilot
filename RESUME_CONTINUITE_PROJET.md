@@ -335,3 +335,11 @@ La migration `0072_blushing_mephistopheles.sql` ajoute des clés d’opération 
 Les encaissements et remboursements verrouillent désormais l’état et le montant de la vente avant de créer les mouvements de stock, paiements ou commissions. Une requête concurrente ou devenue obsolète est refusée avec un conflit plutôt que de réappliquer les effets de bord. Les transferts inter-entrepôts conservent leur verrouillage de statut, leur débit atomique de stock source et leur réintégration à l’annulation.
 
 Les tests de règles couvrent les montants complets et partiels, les clés d’opération obligatoires et le refus des transitions concurrentes. La validation complète a confirmé TypeScript, 114 fichiers de test / 272 tests, le build PWA et la recette de release. Les outils de production doivent toujours conserver une revue comptable et des rapprochements périodiques : l’idempotence applicative réduit les doubles écritures techniques, sans remplacer les contrôles métier de clôture.
+
+## 24. Lot H — qualité, accessibilité et recette de release
+
+Les sélecteurs d’agent, de caissier et d’entrepôt restent désormais contrôlés pendant leur chargement, ce qui élimine la transition contrôlé/non contrôlé observée dans les parcours de vente et de mouvements. Le script `check-controlled-selects.mjs` empêche le retour de ce motif dans le code client. Les déclencheurs possèdent également un libellé accessible lorsque le contexte ne suffit pas.
+
+La recette de release contrôle maintenant, en plus de l’audit des dépendances, que tous les artefacts de migrations du journal sont présents et non vides. Elle teste sans session les routes protégées du tableau de bord, des sauvegardes, transactions, échéances, console plateforme et proxy de fichiers. Le workflow CI exécute les mêmes contrôles statiques de migration et de sélecteur, l’audit de portée tenant, l’audit production, le typage, les tests et le build.
+
+La vérification visuelle desktop a couvert le tableau de bord, les mouvements de stock, la création de facture, le journal de synchronisation et la console plateforme. Les états de chargement, les contrastes et la navigation restent à rejuger lors de chaque nouvelle interface ; les essais clavier et lecteur d’écran avec des utilisateurs réels sont une étape de recette manuelle complémentaire, non simulée par ces contrôles automatisés.

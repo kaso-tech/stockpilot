@@ -972,6 +972,10 @@
 - [x] Lot G : interdire qu’une dépense ou un paiement agent réel soit rattaché à plusieurs règlements d’échéance.
 - [x] Lot G : ajouter des tests de conservation des totaux, de doublon de demande et de refus de bénéficiaire hors périmètre.
 - [x] Lot G : verrouiller atomiquement l’état des encaissements et remboursements avant tout mouvement de stock ou écriture de commission.
-- [ ] Lot H : renforcer qualité, accessibilité et recette de release.
+- [x] Lot H : renforcer qualité, accessibilité et recette de release.
+- [x] Lot H : supprimer les transitions contrôlé/non contrôlé des sélecteurs critiques et les couvrir par une règle de rendu stable.
+- [x] Lot H : étendre la vérification de release aux routes sensibles supplémentaires et à l’audit statique de périmètre tenant.
+- [x] Lot H : aligner la CI sur l’audit de production, les migrations générées et les contrôles de qualité réellement exécutables.
+- [x] Lot H : vérifier les parcours essentiels sur desktop et mobile, les contrastes, la navigation clavier et les états de chargement.
 - [ ] Lot I : préparer paiement et abonnement SaaS sous validation externe.
 - [ ] Lot J : préparer conformité, gouvernance et lancement contrôlé.

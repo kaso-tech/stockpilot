@@ -34,6 +34,10 @@ jobs:
       - name: Tenant scope audit
         run: node scripts/audit-tenant-scope.mjs
       - name: Migration artifact check
-        run: test -s drizzle/0041_nosy_goblin_queen.sql
+        run: node scripts/check-migrations.mjs
+      - name: Controlled Select regression check
+        run: node scripts/check-controlled-selects.mjs
+      - name: Production dependency audit
+        run: pnpm audit:production
       - name: Production build
         run: pnpm build

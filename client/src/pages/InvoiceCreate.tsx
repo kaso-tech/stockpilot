@@ -603,10 +603,10 @@ export default function InvoiceCreate({
                     Agent commercial <span className="text-rose-500">*</span>
                   </Label>
                   <Select
-                    value={salesAgentId || undefined}
+                    value={salesAgentId}
                     onValueChange={setSalesAgentId}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger aria-label="Agent commercial">
                       <SelectValue placeholder="Sélectionner un agent" />
                     </SelectTrigger>
                     <SelectContent>
@@ -626,10 +626,10 @@ export default function InvoiceCreate({
                     Caissier <span className="text-rose-500">*</span>
                   </Label>
                   <Select
-                    value={cashierId || undefined}
+                    value={cashierId}
                     onValueChange={setCashierId}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger aria-label="Caissier">
                       <SelectValue placeholder="Sélectionner un caissier" />
                     </SelectTrigger>
                     <SelectContent>

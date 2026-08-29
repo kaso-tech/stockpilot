@@ -12,7 +12,7 @@
     "test": "vitest run",
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
     "audit:production": "pnpm audit --prod",
-    "verify:release": "pnpm audit:production && node scripts/verify-release.mjs"
+    "verify:release": "pnpm audit:production && node scripts/check-migrations.mjs && node scripts/check-controlled-selects.mjs && node scripts/verify-release.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1120.0",
