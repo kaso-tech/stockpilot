@@ -25,7 +25,7 @@ describe("configuration Heartbeat des sauvegardes", () => {
   it("crée une tâche Heartbeat pour activer les sauvegardes quotidiennes", async () => {
     const db = dbFor({ id: 1, scheduleCronTaskUid: null, scheduleNextAt: null });
     mocks.getDb.mockResolvedValue(db); mocks.createHeartbeatJob.mockResolvedValue({ taskUid: "backup-job", nextExecutionAt: "2026-08-22T02:00:00.000Z" });
-    const result = await backupRouter.createCaller(ctx).saveConfiguration({ automaticEnabled: true, frequencyHours: 24, retentionCount: 14, googleDriveFolderId: null });
+    const result = await backupRouter.createCaller(ctx).saveConfiguration({ automaticEnabled: true, frequencyHours: 24, retentionCount: 30, googleDriveFolderId: null });
     expect(result.nextExecutionAt).toBe("2026-08-22T02:00:00.000Z");
     expect(mocks.createHeartbeatJob).toHaveBeenCalledWith(expect.objectContaining({ cron: "0 0 2 * * *", path: "/api/scheduled/backup" }), "session-1");
   });
@@ -33,14 +33,14 @@ describe("configuration Heartbeat des sauvegardes", () => {
   it("suspend une tâche existante lorsque l’automatisation est désactivée", async () => {
     const db = dbFor({ id: 1, scheduleCronTaskUid: "backup-job", scheduleNextAt: null });
     mocks.getDb.mockResolvedValue(db); mocks.updateHeartbeatJob.mockResolvedValue({ nextExecutionAt: null });
-    await backupRouter.createCaller(ctx).saveConfiguration({ automaticEnabled: false, frequencyHours: 24, retentionCount: 14, googleDriveFolderId: null });
+    await backupRouter.createCaller(ctx).saveConfiguration({ automaticEnabled: false, frequencyHours: 24, retentionCount: 30, googleDriveFolderId: null });
     expect(mocks.updateHeartbeatJob).toHaveBeenCalledWith("backup-job", { enable: false }, "session-1");
   });
 
   it("met à jour la fréquence d’une tâche Heartbeat déjà active", async () => {
     const db = dbFor({ id: 1, scheduleCronTaskUid: "backup-job", scheduleNextAt: null });
     mocks.getDb.mockResolvedValue(db); mocks.updateHeartbeatJob.mockResolvedValue({ nextExecutionAt: "2026-08-21T12:00:00.000Z" });
-    await backupRouter.createCaller(ctx).saveConfiguration({ automaticEnabled: true, frequencyHours: 12, retentionCount: 21, googleDriveFolderId: null });
+    await backupRouter.createCaller(ctx).saveConfiguration({ automaticEnabled: true, frequencyHours: 12, retentionCount: 30, googleDriveFolderId: null });
     expect(mocks.updateHeartbeatJob).toHaveBeenCalledWith("backup-job", expect.objectContaining({ cron: "0 0 */12 * * *", enable: true }), "session-1");
     expect(mocks.createHeartbeatJob).not.toHaveBeenCalled();
   });

@@ -848,8 +848,8 @@ export const backupSettings = mysqlTable("backupSettings", {
   id: int("id").autoincrement().primaryKey(),
   companyId: int("companyId").notNull(),
   automaticEnabled: boolean("automaticEnabled").notNull().default(true),
-  frequencyHours: int("frequencyHours").notNull().default(24),
-  retentionCount: int("retentionCount").notNull().default(14),
+  frequencyHours: int("frequencyHours").notNull().default(6),
+  retentionCount: int("retentionCount").notNull().default(30),
   scheduleCronTaskUid: varchar("scheduleCronTaskUid", { length: 65 }).unique(),
   scheduleNextAt: timestamp("scheduleNextAt"),
   googleDriveFolderId: varchar("googleDriveFolderId", { length: 180 }),
@@ -862,7 +862,7 @@ export const backupSettings = mysqlTable("backupSettings", {
   lastBackupError: text("lastBackupError"),
   updatedByUserId: int("updatedByUserId"),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, table => [uniqueIndex("backup_settings_company_unique").on(table.companyId)]);
 
 export const backupArchives = mysqlTable("backupArchives", {
   id: int("id").autoincrement().primaryKey(),
@@ -874,6 +874,8 @@ export const backupArchives = mysqlTable("backupArchives", {
   storageUrl: text("storageUrl"),
   sizeBytes: int("sizeBytes").notNull().default(0),
   recordCount: int("recordCount").notNull().default(0),
+  contentSha256: varchar("contentSha256", { length: 64 }),
+  encryptionVersion: int("encryptionVersion").notNull().default(1),
   googleDriveFileId: varchar("googleDriveFileId", { length: 180 }),
   googleDriveUrl: text("googleDriveUrl"),
   createdByUserId: int("createdByUserId"),

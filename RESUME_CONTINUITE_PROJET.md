@@ -297,3 +297,9 @@ La migration `0067_glossy_leader.sql` renforce les tables métier prioritaires :
 Le rattachement historique a été exécuté après confirmation explicite : deux entrepôts, un réglage commercial et un réglage de sauvegarde ont été affectés à l’unique entreprise alors présente. Une collision de code d’entrepôt a été résolue en conservant le code déjà local à l’entreprise et en ajoutant un suffixe technique stable à l’enregistrement historique concerné ; les relations métier par identifiant n’ont pas changé. La base confirme qu’aucune clé `companyId` du périmètre visé n’est désormais nullable.
 
 Les doubles de tests ont été rendus cohérents avec cette garantie de périmètre, sans replier la protection en production. Le lot doit être validé avec `pnpm check`, `pnpm test` et `pnpm build` avant son checkpoint ; la suite doit être entièrement verte avant de continuer vers le lot C.
+
+## 19. Lot C — sauvegarde, restauration et continuité
+
+La politique validée est une sauvegarde automatique toutes les 6 heures, une conservation minimale de 30 archives, un RPO de 6 heures et un RTO cible de 8 heures. Les réglages existants ont été alignés puis consolidés : une contrainte unique ajoutée par la migration `0069_complete_warstar.sql` garantit désormais une seule configuration de sauvegarde par entreprise.
+
+Les snapshots couvrent les données métier, multi-entrepôts et financières nécessaires à la reprise. Avant une restauration, la simulation valide strictement le format, la version, le périmètre d’entreprise et les références du fichier sans effectuer d’écriture. Les archives produites portent une empreinte SHA-256. La restauration supprime d’abord les relations enfants du seul périmètre concerné, puis réinsère le snapshot dans une transaction. L’essai de restauration réel reste à effectuer sur une archive de recette, jamais comme premier test sur les données de production.

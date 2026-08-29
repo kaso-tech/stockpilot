@@ -941,7 +941,14 @@
 - [x] Lot B : rattacher les quatre enregistrements historiques identifiés à l’unique entreprise, conformément à la confirmation explicite reçue, puis imposer les clés entreprise obligatoires.
 - [x] Lot B : résoudre la collision historique d’un code d’entrepôt par suffixe technique confirmé avant le rattachement, sans modifier les liaisons par identifiant.
 - [x] Lot B : mettre à jour les doubles de test pour refléter le contexte entreprise obligatoire sans affaiblir les contrôles de production.
-- [ ] Lot C : étendre la sauvegarde, la restauration et la continuité multi-entreprises.
+- [x] Lot C : étendre la sauvegarde, la restauration et la continuité multi-entreprises.
+- [x] Lot C : définir les objectifs RPO/RTO, la fréquence, la rétention et le mode de restauration applicables à la production — RPO 6 h, RTO 8 h, fréquence 6 h et conservation de 30 archives.
+- [x] Lot C : étendre les snapshots aux données métier multi-entrepôts et financières absentes, avec validation de périmètre et de références.
+- [x] Lot C : appliquer la politique validée de sauvegarde toutes les 6 h et de conservation de 30 archives aux réglages nouveaux et existants.
+- [x] Lot C : ajouter un contrôle d’intégrité et une simulation de restauration sans écriture avant toute restauration destructive.
+- [x] Lot C : aligner les doubles et attentes de test des sauvegardes avec la rétention minimale de production de 30 archives.
+- [x] Lot C : aligner les libellés et limites d’interface de sauvegarde sur la politique validée de 6 h et 30 archives.
+- [x] Lot C : consolider les réglages de sauvegarde dupliqués afin de garantir une seule planification active par entreprise.
 - [ ] Lot D : durcir l’authentification, les autorisations, les fichiers et l’audit.
 - [ ] Lot E : fiabiliser les automatisations et la supervision opérationnelle.
 - [ ] Lot F : compléter le mode offline-first durable par entreprise et entrepôt.

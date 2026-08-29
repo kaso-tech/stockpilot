@@ -477,6 +477,20 @@
       "when": 1787867235974,
       "tag": "0067_glossy_leader",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "5",
+      "when": 1787991782289,
+      "tag": "0068_ambiguous_blazing_skull",
+      "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "5",
+      "when": 1787992492788,
+      "tag": "0069_complete_warstar",
+      "breakpoints": true
     }
   ]
 }
