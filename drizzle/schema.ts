@@ -105,6 +105,10 @@ export const subscriptionPlans = mysqlTable("subscriptionPlans", {
   active: boolean("active").notNull().default(true),
   sortOrder: int("sortOrder").notNull().default(0),
   trialDays: int("trialDays").notNull().default(0),
+  monthlyPriceCents: int("monthlyPriceCents").notNull().default(0),
+  priceCents: int("priceCents").notNull().default(0),
+  currency: varchar("currency", { length: 3 }).notNull().default("XOF"),
+  billingInterval: mysqlEnum("billingInterval", ["monthly", "annual", "lifetime"]).notNull().default("monthly"),
   limitsJson: varchar("limitsJson", { length: 4000 }).notNull().default("{}"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -141,6 +145,33 @@ export const saasPaymentEvents = mysqlTable("saasPaymentEvents", {
   uniqueIndex("saas_payment_events_provider_payload_unique").on(table.provider, table.payloadSha256),
   index("saas_payment_events_status_received_idx").on(table.status, table.receivedAt),
   index("saas_payment_events_company_received_idx").on(table.companyId, table.receivedAt),
+]);
+
+/** Intention PayIn SaaS, créée côté serveur et réconciliée avant toute activation d’abonnement. */
+export const saasPaymentIntents = mysqlTable("saasPaymentIntents", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  planId: int("planId").notNull(),
+  createdByUserId: int("createdByUserId").notNull(),
+  requestKey: varchar("requestKey", { length: 64 }).notNull(),
+  reference: varchar("reference", { length: 180 }).notNull().unique(),
+  amountCents: int("amountCents").notNull(),
+  currency: varchar("currency", { length: 3 }).notNull(),
+  billingInterval: mysqlEnum("billingInterval", ["monthly", "annual", "lifetime"]).notNull().default("monthly"),
+  provider: mysqlEnum("provider", ["yengapay"]).notNull().default("yengapay"),
+  providerIntentId: varchar("providerIntentId", { length: 180 }),
+  providerPaymentId: varchar("providerPaymentId", { length: 180 }),
+  providerStatus: varchar("providerStatus", { length: 80 }),
+  checkoutUrl: varchar("checkoutUrl", { length: 1600 }),
+  status: mysqlEnum("status", ["created", "pending", "confirmed", "failed", "expired", "cancelled", "reconciliation_required"]).notNull().default("created"),
+  paymentEventId: int("paymentEventId"),
+  confirmedAt: timestamp("confirmedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  uniqueIndex("saas_payment_intents_company_request_unique").on(table.companyId, table.requestKey),
+  index("saas_payment_intents_company_status_created_idx").on(table.companyId, table.status, table.createdAt),
+  index("saas_payment_intents_provider_intent_idx").on(table.provider, table.providerIntentId),
 ]);
 
 /** Demande d’assistance interne créée par un utilisateur de l’entreprise. */

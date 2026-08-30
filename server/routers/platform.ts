@@ -6,6 +6,7 @@ import { authenticatedProcedure, router } from "../_core/trpc";
 import { canManagePlatformBilling, canManagePlatformCompanies, canManagePlatformOperators, canManagePlatformSupport, requirePlatformAccess } from "../platformAccess";
 import { resolveCompanyHealth } from "../platformHealth";
 import { buildPlatformBillingAlerts } from "../platformBillingAlerts";
+import { subscriptionPlanPricingInput } from "../subscriptionPlanRules";
 
 async function auditPlatform(db: { insert: (...args: any[]) => any }, actorUserId: number, action: string, companyId: number | null, reason?: string, metadata?: Record<string, unknown>, entityType = "company", entityId: number | null = companyId) {
   await db.insert(platformAuditLogs).values({ actorUserId, action, entityType, entityId, companyId, reason: reason ?? null, metadataJson: metadata ? JSON.stringify(metadata) : null });
@@ -146,10 +147,10 @@ export const platformRouter = router({
         const rows = await db.select().from(subscriptionPlans).orderBy(subscriptionPlans.sortOrder, subscriptionPlans.name);
         return rows.map(row => { let limits: Record<string, number> = {}; try { const parsed = JSON.parse(row.limitsJson); if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) limits = parsed as Record<string, number>; } catch { limits = {}; } return { ...row, limits }; });
       }),
-      save: authenticatedProcedure.input(z.object({ id: z.number().int().positive().optional(), code: z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9_-]{1,46}$/), name: z.string().trim().min(2).max(120), description: z.string().trim().max(500).nullable().optional(), active: z.boolean().default(true), sortOrder: z.number().int().min(0).max(1000).default(0), trialDays: z.number().int().min(0).max(365).default(0), limits: z.record(z.string().min(1).max(60), z.number().int().min(0).max(1_000_000)).default({}) })).mutation(async ({ ctx, input }) => {
+      save: authenticatedProcedure.input(z.object({ id: z.number().int().positive().optional(), code: z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9_-]{1,46}$/), name: z.string().trim().min(2).max(120), description: z.string().trim().max(500).nullable().optional(), active: z.boolean().default(true), sortOrder: z.number().int().min(0).max(1000).default(0), trialDays: z.number().int().min(0).max(365).default(0), limits: z.record(z.string().min(1).max(60), z.number().int().min(0).max(1_000_000)).default({}) }).merge(subscriptionPlanPricingInput)).mutation(async ({ ctx, input }) => {
         const { db, access } = await requirePlatformAccess(ctx);
         if (!canManagePlatformBilling(access.platformRole)) throw new TRPCError({ code: "FORBIDDEN" });
-        const values = { code: input.code, name: input.name, description: input.description ?? null, active: input.active, sortOrder: input.sortOrder, trialDays: input.trialDays, limitsJson: JSON.stringify(input.limits) };
+        const values = { code: input.code, name: input.name, description: input.description ?? null, active: input.active, sortOrder: input.sortOrder, trialDays: input.trialDays, priceCents: input.priceCents, monthlyPriceCents: input.billingInterval === "monthly" ? input.priceCents : 0, currency: input.currency, billingInterval: input.billingInterval, limitsJson: JSON.stringify(input.limits) };
         if (input.id) {
           const existing = (await db.select({ id: subscriptionPlans.id }).from(subscriptionPlans).where(eq(subscriptionPlans.id, input.id)).limit(1))[0];
           if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Offre introuvable." });

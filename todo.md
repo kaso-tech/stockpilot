@@ -984,6 +984,17 @@
 - [ ] Lot I : couvrir les scénarios test réussis, annulés, expirés, doublons, retardés et reçus dans un ordre inversé.
 - [x] Lot I : préparer la réception webhook YengaPay SANDBOX avec vérification HMAC-SHA256, journal idempotent et refus des événements non autorisés.
 - [x] Lot I : différer explicitement la création PayIn, la vérification de statut et l’activation d’abonnement jusqu’à obtention de la clé API SANDBOX.
+- [ ] Lot I : configurer l’organisation et le projet YengaPay SANDBOX côté serveur, sans les exposer au navigateur.
+- [ ] Lot I : créer une demande PayIn SaaS idempotente avec référence interne et checkout hébergé YengaPay.
+- [ ] Lot I : réconcilier l’intention et le paiement côté serveur avant tout changement de souscription.
+- [ ] Lot I : tester les flux SANDBOX et les notifications rejouées sans activer le projet YengaPay de production.
+- [ ] Lot I : modéliser l’offre Test à 1 000 XOF par mois et des intentions de paiement SaaS tenant-scopées.
+- [ ] Lot I : autoriser uniquement le propriétaire d’une entreprise à créer un checkout YengaPay SANDBOX pour son offre.
+- [ ] Lot I : créer le PayIn YengaPay côté serveur avec référence idempotente, retour utilisateur sans confiance et journal de réconciliation.
+- [ ] Lot I : activer un abonnement mensuel seulement après rapprochement du paiement confirmé par le fournisseur.
+- [x] Lot I : transformer l’offre existante Premium en offre Test à 1 000 XOF par mois, avec un essai d’un jour, après migration non destructive.
+- [x] Offres SaaS : ajouter prix et modalité mensuelle, annuelle ou à vie au modèle de plan et au formulaire d’administration.
+- [x] Offres SaaS : valider côté serveur les montants, devises et modalités, puis afficher une tarification lisible dans la console.
 - [x] Lot J : préparer conformité, gouvernance et lancement contrôlé, sous réserve des validations externes documentées dans le registre.
 - [x] Lot J : produire un registre de préparation au lancement distinguant les contrôles techniques validés, les responsabilités et les prérequis externes.
 - [x] Lot J : consolider les procédures internes de sécurité, continuité, incident et support à partir des contrôles réellement disponibles dans l’application.

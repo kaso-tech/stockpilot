@@ -59,6 +59,7 @@ import { supportRouter } from "./routers/support";
 import { platformRouter } from "./routers/platform";
 import { syncHealthRouter } from "./routers/syncHealth";
 import { paymentDuesRouter } from "./routers/paymentDues";
+import { subscriptionBillingRouter } from "./routers/subscriptionBilling";
 import { BULK_DELETE_CONFIRMATION, hasBulkDeleteConfirmation, normalizeBulkDeleteIds, type BulkDeleteResource } from "./bulkDeleteRules";
 
 const STANDARD_AUTH_SESSION_MS = 24 * 60 * 60 * 1000;
@@ -937,6 +938,7 @@ export const appRouter = router({
   }),
   support: supportRouter,
   paymentDues: paymentDuesRouter,
+  subscriptionBilling: subscriptionBillingRouter,
 });
 
 export type AppRouter = typeof appRouter;

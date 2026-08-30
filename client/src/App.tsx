@@ -59,6 +59,7 @@ import WarehouseComparison from "./pages/WarehouseComparison";
 import Pricing from "./pages/Pricing";
 import PlatformAdmin from "./pages/PlatformAdmin";
 import PaymentDues from "./pages/PaymentDues";
+import SubscriptionBilling from "./pages/SubscriptionBilling";
 
 function DashboardRouter() {
   return (
@@ -110,6 +111,7 @@ function DashboardRouter() {
         <Route path={"/alertes"} component={Alerts} />
         <Route path={"/journal"} component={AuditLog} />
         <Route path={"/synchronisation"} component={SyncJournal} />
+        <Route path={"/abonnement"} component={SubscriptionBilling} />
         <Route path={"/donnees"} component={DataExchange} />
         <Route path={"/404"} component={NotFound} />
         <Route component={NotFound} />

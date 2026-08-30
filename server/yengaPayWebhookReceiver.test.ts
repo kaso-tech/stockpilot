@@ -1,8 +1,11 @@
 import { createHmac } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { insert, getDb } = vi.hoisted(() => ({
+const { insert, select, update, transaction, getDb } = vi.hoisted(() => ({
   insert: vi.fn(),
+  select: vi.fn(),
+  update: vi.fn(),
+  transaction: vi.fn(),
   getDb: vi.fn(),
 }));
 
@@ -31,10 +34,17 @@ function response() {
 describe("réception webhook YengaPay", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    const onDuplicateKeyUpdate = vi.fn().mockResolvedValue(undefined);
-    const values = vi.fn().mockReturnValue({ onDuplicateKeyUpdate });
+    const values = vi.fn().mockResolvedValue([{ insertId: 41 }]);
     insert.mockReturnValue({ values });
-    getDb.mockResolvedValue({ insert });
+    const limit = vi.fn().mockResolvedValue([]);
+    const where = vi.fn().mockReturnValue({ limit });
+    const from = vi.fn().mockReturnValue({ where });
+    select.mockReturnValue({ from });
+    const updateWhere = vi.fn().mockResolvedValue([{ affectedRows: 1 }]);
+    const set = vi.fn().mockReturnValue({ where: updateWhere });
+    update.mockReturnValue({ set });
+    transaction.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => callback({ select, update }));
+    getDb.mockResolvedValue({ insert, select, update, transaction });
   });
 
   it("conserve seulement les métadonnées minimales d’un événement PayIn signé", async () => {
@@ -52,6 +62,7 @@ describe("réception webhook YengaPay", () => {
       status: "received",
     }));
     expect(JSON.stringify(insert.mock.results[0].value.values.mock.calls)).not.toContain("ne-pas-conserver");
+    expect(transaction).toHaveBeenCalledOnce();
   });
 
   it("refuse les signatures invalides avant toute écriture", async () => {

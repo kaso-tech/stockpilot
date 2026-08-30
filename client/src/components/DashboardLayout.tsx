@@ -50,6 +50,7 @@ import {
   CloudUpload,
   ClipboardList,
   ClipboardCheck,
+  CreditCard,
   FileText,
   DatabaseBackup,
   Eye,
@@ -267,6 +268,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
               <DropdownMenuSeparator className="bg-white/10" />
               <DropdownMenuItem onClick={() => setLocation("/aide")} className="cursor-pointer focus:bg-white/[0.06]"><CircleHelp className="mr-2 h-4 w-4" />Aide</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setLocation("/tarifs")} className="cursor-pointer focus:bg-white/[0.06]"><WalletCards className="mr-2 h-4 w-4" />Tarification</DropdownMenuItem>
+              {isAdmin && <DropdownMenuItem onClick={() => setLocation("/abonnement")} className="cursor-pointer focus:bg-white/[0.06]"><CreditCard className="mr-2 h-4 w-4" />Mon abonnement</DropdownMenuItem>}
               <DropdownMenuItem onClick={() => setLocation("/politique-securite")} className="cursor-pointer focus:bg-white/[0.06]"><ShieldCheck className="mr-2 h-4 w-4" />Politique de sécurité</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setLocation("/contactez-nous")} className="cursor-pointer focus:bg-white/[0.06]"><Mail className="mr-2 h-4 w-4" />Contactez-nous</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setLocation("/conditions-utilisation")} className="cursor-pointer focus:bg-white/[0.06]"><FileText className="mr-2 h-4 w-4" />Conditions d’utilisation</DropdownMenuItem>
