@@ -125,6 +125,24 @@ export const companySubscriptions = mysqlTable("companySubscriptions", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, table => [index("company_subscriptions_status_ends_idx").on(table.status, table.currentPeriodEndsAt)]);
 
+/** Événements de paiement SaaS reçus, minimisés et dédupliqués avant réconciliation explicite. */
+export const saasPaymentEvents = mysqlTable("saasPaymentEvents", {
+  id: int("id").autoincrement().primaryKey(),
+  provider: mysqlEnum("provider", ["yengapay"]).notNull().default("yengapay"),
+  companyId: int("companyId"),
+  eventType: varchar("eventType", { length: 96 }).notNull(),
+  providerReference: varchar("providerReference", { length: 180 }),
+  payloadSha256: varchar("payloadSha256", { length: 64 }).notNull(),
+  signatureVerified: boolean("signatureVerified").notNull().default(false),
+  status: mysqlEnum("status", ["received", "ignored", "processed", "rejected"]).notNull().default("received"),
+  receivedAt: timestamp("receivedAt").defaultNow().notNull(),
+  processedAt: timestamp("processedAt"),
+}, table => [
+  uniqueIndex("saas_payment_events_provider_payload_unique").on(table.provider, table.payloadSha256),
+  index("saas_payment_events_status_received_idx").on(table.status, table.receivedAt),
+  index("saas_payment_events_company_received_idx").on(table.companyId, table.receivedAt),
+]);
+
 /** Demande d’assistance interne créée par un utilisateur de l’entreprise. */
 export const supportRequests = mysqlTable("supportRequests", {
   id: int("id").autoincrement().primaryKey(),

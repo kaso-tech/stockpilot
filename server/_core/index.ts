@@ -11,6 +11,7 @@ import { runScheduledPaymentDueReminders } from "../scheduledPaymentDueReminders
 import { registerGoogleDriveRoutes } from "../googleDriveRoutes";
 import { serveStatic, setupVite } from "./vite";
 import { ensureAdminFallbackPasswordSeed } from "../adminFallbackSeed";
+import { receiveYengaPayWebhook } from "../yengaPayWebhookReceiver";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -44,6 +45,8 @@ async function startServer() {
     }
     next();
   });
+  // Webhook vérifié sur le corps brut : doit précéder les parseurs JSON globaux.
+  app.post("/api/webhooks/yengapay", express.raw({ type: "application/json", limit: "128kb" }), receiveYengaPayWebhook);
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));

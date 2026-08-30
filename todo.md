@@ -977,7 +977,13 @@
 - [x] Lot H : étendre la vérification de release aux routes sensibles supplémentaires et à l’audit statique de périmètre tenant.
 - [x] Lot H : aligner la CI sur l’audit de production, les migrations générées et les contrôles de qualité réellement exécutables.
 - [x] Lot H : vérifier les parcours essentiels sur desktop et mobile, les contrastes, la navigation clavier et les états de chargement.
-- [ ] Lot I : préparer paiement et abonnement SaaS sous validation externe.
+- [ ] Lot I : préparer paiement et abonnement SaaS avec YengaPay sous validation externe.
+- [x] Lot I : vérifier la documentation YengaPay, les pays, devises, flux de test et exigences de webhook avant toute activation.
+- [ ] Lot I : concevoir des références de paiement uniques, des webhooks vérifiés et une réconciliation sans activation côté client.
+- [ ] Lot I : demander les identifiants de test et les paramètres commerciaux/fiscaux uniquement après validation du flux retenu.
+- [ ] Lot I : couvrir les scénarios test réussis, annulés, expirés, doublons, retardés et reçus dans un ordre inversé.
+- [x] Lot I : préparer la réception webhook YengaPay SANDBOX avec vérification HMAC-SHA256, journal idempotent et refus des événements non autorisés.
+- [x] Lot I : différer explicitement la création PayIn, la vérification de statut et l’activation d’abonnement jusqu’à obtention de la clé API SANDBOX.
 - [x] Lot J : préparer conformité, gouvernance et lancement contrôlé, sous réserve des validations externes documentées dans le registre.
 - [x] Lot J : produire un registre de préparation au lancement distinguant les contrôles techniques validés, les responsabilités et les prérequis externes.
 - [x] Lot J : consolider les procédures internes de sécurité, continuité, incident et support à partir des contrôles réellement disponibles dans l’application.

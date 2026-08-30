@@ -1,7 +1,7 @@
 const baseUrl = (process.env.BASE_URL || "http://127.0.0.1:3000").replace(/\/$/, "");
 const checks = [];
-async function check(path, predicate, label) {
-  const response = await fetch(`${baseUrl}${path}`, { redirect: "manual" });
+async function check(path, predicate, label, init = {}) {
+  const response = await fetch(`${baseUrl}${path}`, { redirect: "manual", ...init });
   const body = await response.text();
   const result = predicate(response, body);
   checks.push({ label, status: response.status, passed: result });
@@ -14,4 +14,9 @@ await check("/api/trpc/transactions.list", response => response.status === 401 |
 await check("/api/trpc/paymentDues.list", response => response.status === 401 || response.status === 403, "protected payment due route");
 await check("/api/trpc/platform.overview", response => response.status === 401 || response.status === 403, "protected platform route");
 await check("/manus-storage/company/999/protected.pdf", response => response.status === 401 || response.status === 403, "protected tenant storage route");
+await check("/api/webhooks/yengapay", response => response.status === 401, "unsigned YengaPay webhook rejected", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: "{}",
+});
 console.log(JSON.stringify({ baseUrl, checks }, null, 2));
