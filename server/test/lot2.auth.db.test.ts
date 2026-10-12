@@ -106,12 +106,4 @@ describe.skipIf(!realDbUrl)("Lot 2 — authentification et sessions (MySQL réel
     expect(results.slice(0, 5)).toEqual(["OK", "OK", "OK", "OK", "OK"]);
     expect(results[5]).toBe("TOO_MANY_REQUESTS");
   });
-
-  it("users.updateRole révoque les sessions de l'utilisateur ciblé", async () => {
-    const db = await realDb();
-    await db.insert(userSessions).values({ id: "44444444-4444-4444-8444-444444444444", userId: a.seller.id, deviceLabel: "S", expiresAt: new Date(Date.now() + 86_400_000) });
-    await appRouter.createCaller(ctx(a.admin)).users.updateRole({ id: a.seller.id, role: "admin" });
-    const row = (await db.select().from(userSessions).where(and(eq(userSessions.userId, a.seller.id))))[0];
-    expect(row?.revokedAt).not.toBeNull();
-  });
 });

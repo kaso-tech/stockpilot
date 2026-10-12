@@ -136,20 +136,3 @@ export async function listAuditLogs(companyId: number | null, limit = 100) {
     .orderBy(desc(auditLogs.createdAt))
     .limit(limit);
 }
-
-export async function listUsers(companyId: number | null) {
-  const db = await getDb();
-  if (!db) return [];
-  return db
-    .select({
-      id: users.id,
-      name: users.name,
-      email: users.email,
-      role: users.role,
-      lastSignedIn: users.lastSignedIn,
-      createdAt: users.createdAt,
-    })
-    .from(users)
-    .where(companyScope(users.companyId, companyId))
-    .orderBy(users.name);
-}

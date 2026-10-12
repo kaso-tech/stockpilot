@@ -63,7 +63,6 @@ export default function PointOfSale() {
     const { remainingAfterSale, isLowStock: lineIsLowStock } = stockAfterCartSelection(product.quantity, item.quantity, product.minimumQuantity);
     return { ...item, product, unitPriceCents: pricing.unitPriceCents, tierMinQuantity: pricing.tierMinQuantity, subtotalCents, discountCents, totalCents: subtotalCents - discountCents, remainingAfterSale, isLowStock: lineIsLowStock };
   }).filter(Boolean) as Array<CartItem & { product: typeof products[number]; unitPriceCents: number; tierMinQuantity: number | null; subtotalCents: number; discountCents: number; totalCents: number; remainingAfterSale: number; isLowStock: boolean }>;
-  const subtotalCents = lines.reduce((sum, line) => sum + line.subtotalCents, 0);
   const lineNetCents = lines.reduce((sum, line) => sum + line.totalCents, 0);
   const invoiceDiscountCents = calculateDiscount(lineNetCents, invoiceDiscount);
   const taxableSubtotalCents = lineNetCents - invoiceDiscountCents;

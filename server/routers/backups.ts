@@ -1,7 +1,7 @@
-import { and, desc, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { parse as parseCookie } from "cookie";
 import { z } from "zod";
-import { backupArchives, backupSettings, auditLogs } from "../../drizzle/schema";
+import { backupSettings, auditLogs } from "../../drizzle/schema";
 import { getDb } from "../db";
 import { assertBackupCompany, assertRestoreConfirmation, getBackupDownloadUrl, listBackups, parseBackupPayload, restoreBackupPayload, runBackupWithStatus } from "../backups";
 import { createHeartbeatJob, updateHeartbeatJob } from "../_core/heartbeat";
@@ -38,6 +38,4 @@ export const backupRouter = router({
   runNow: adminProcedure.mutation(async ({ ctx }) => { const settings = await getOrCreateSettings(ctx.user.companyId); const archive = await runBackupWithStatus(ctx.user.id, "manual", settings.retentionCount, ctx.user.companyId); const db = await dbOrThrow(); await db.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Sauvegarde créée", entityType: "Sauvegarde", entityId: String(archive.id), detail: `Archive locale ${archive.filename} créée` }); return archive; }),
   download: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => ({ url: await getBackupDownloadUrl(input.id, ctx.user.companyId) })),
   previewRestore: adminProcedure.input(z.object({ dataUrl: z.string().min(40).max(30_000_000) })).mutation(async ({ ctx, input }) => { const payload = parseBackupPayload(input.dataUrl); assertBackupCompany(payload, ctx.user.companyId); const counts = Object.fromEntries(Object.entries(payload.tables).map(([name, rows]) => [name, Array.isArray(rows) ? rows.length : 0])); return { exportedAt: payload.exportedAt, counts, total: Object.values(counts).reduce((sum, count) => sum + count, 0) }; }),
-  restore: adminProcedure.input(z.object({ dataUrl: z.string().min(40).max(30_000_000), confirmation: z.string().max(30) })).mutation(async ({ ctx, input }) => { assertRestoreConfirmation(input.confirmation); const payload = parseBackupPayload(input.dataUrl); assertBackupCompany(payload, ctx.user.companyId); return restoreBackupPayload(payload, ctx.user.id, ctx.user.companyId); }),
-  removeArchive: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await dbOrThrow(); await db.delete(backupArchives).where(and(eq(backupArchives.id, input.id), companyScope(backupArchives.companyId, ctx.user.companyId))); await db.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Archive supprimée", entityType: "Sauvegarde", entityId: String(input.id), detail: "Archive retirée de l’historique" }); return { success: true }; }),
-});
+  restore: adminProcedure.input(z.object({ dataUrl: z.string().min(40).max(30_000_000), confirmation: z.string().max(30) })).mutation(async ({ ctx, input }) => { assertRestoreConfirmation(input.confirmation); const payload = parseBackupPayload(input.dataUrl); assertBackupCompany(payload, ctx.user.companyId); return restoreBackupPayload(payload, ctx.user.id, ctx.user.companyId); }) });

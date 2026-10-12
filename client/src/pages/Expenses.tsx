@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
-import { CalendarDays, ExternalLink, FileText, Paperclip, Pencil, Plus, ReceiptText, Target, Trash2, WalletCards } from "lucide-react";
+import { CalendarDays, ExternalLink, Paperclip, Pencil, Plus, ReceiptText, Target, Trash2, WalletCards } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Restricted } from "./AuditLog";

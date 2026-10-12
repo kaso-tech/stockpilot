@@ -41,10 +41,4 @@ describe("contrôle des rôles StockPilot", () => {
 
     await expect(caller.audit.list()).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
-
-  it("interdit à un opérateur de modifier les rôles utilisateurs", async () => {
-    const caller = appRouter.createCaller(createOperatorContext());
-
-    await expect(caller.users.updateRole({ id: 1, role: "admin" })).rejects.toMatchObject({ code: "FORBIDDEN" });
-  });
 });

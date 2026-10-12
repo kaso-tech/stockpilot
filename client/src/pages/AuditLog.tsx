@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
 import { displayCurrencyLabel, formatDate } from "@/lib/format";
-import { ClipboardList, LockKeyhole } from "lucide-react";
+import { LockKeyhole } from "lucide-react";
 
 export default function AuditLog() {
   const { user } = useAuth(); const isAdmin = user?.role === "admin"; const { data: logs = [], isLoading } = trpc.audit.list.useQuery(undefined, { enabled: isAdmin });

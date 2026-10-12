@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, inArray, ne } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import {
@@ -28,17 +28,13 @@ import {
   suppliers,
   userDashboardPreferences,
   userSessions,
-  users,
-} from "../drizzle/schema";
+  users } from "../drizzle/schema";
 import {
   getDb,
   listAuditLogs,
   listMovements,
   listProducts,
-  listSuppliers,
-  listUsers,
-} from "./db";
-import { resultingStock, signedMovementQuantity } from "./stockRules";
+  listSuppliers } from "./db";
 import { calculateCommercialTotals } from "./commercialTotals";
 import { MAX_CENTS, MAX_QUANTITY } from "./numericLimits";
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -67,7 +63,6 @@ import { transactionsRouter } from "./routers/transactions";
 import { expensesRouter } from "./routers/expenses";
 import { agentPaymentExpenseRows, budgetComparison, expenseBreakdownByCategory, monthlyExpenseTotalCents, operatingNetProfitCents } from "./expenseRules";
 import { sdk } from "./_core/sdk";
-import { ENV } from "./_core/env";
 import { hashPassword, verifyPassword } from "./passwords";
 import { categoryCanBeRemoved } from "./categoryRules";
 import { assertSellerSensitiveAction } from "./sellerActionRules";
@@ -90,8 +85,7 @@ const productInput = z.object({
   supplierId: z.number().int().positive().nullable(),
   priceTiers: z.array(z.object({ minQuantity: z.number().int().min(2).max(MAX_QUANTITY), unitPriceCents: z.number().int().min(0).max(MAX_CENTS) })).max(12).default([]),
   retailPriceTiers: z.array(z.object({ minQuantity: z.number().int().min(2).max(MAX_QUANTITY), unitPriceCents: z.number().int().min(0).max(MAX_CENTS) })).max(12).default([]),
-  wholesalePriceTiers: z.array(z.object({ minQuantity: z.number().int().min(2).max(MAX_QUANTITY), unitPriceCents: z.number().int().min(0).max(MAX_CENTS) })).max(12).default([]),
-}).superRefine((input, ctx) => { for (const [label, tiers] of [["détail", input.retailPriceTiers.length ? input.retailPriceTiers : input.priceTiers], ["grossiste", input.wholesalePriceTiers]] as const) { const seen = new Set<number>(); for (const tier of tiers) { if (seen.has(tier.minQuantity)) ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Chaque seuil ${label} doit être unique.` }); seen.add(tier.minQuantity); } } });
+  wholesalePriceTiers: z.array(z.object({ minQuantity: z.number().int().min(2).max(MAX_QUANTITY), unitPriceCents: z.number().int().min(0).max(MAX_CENTS) })).max(12).default([]) }).superRefine((input, ctx) => { for (const [label, tiers] of [["détail", input.retailPriceTiers.length ? input.retailPriceTiers : input.priceTiers], ["grossiste", input.wholesalePriceTiers]] as const) { const seen = new Set<number>(); for (const tier of tiers) { if (seen.has(tier.minQuantity)) ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Chaque seuil ${label} doit être unique.` }); seen.add(tier.minQuantity); } } });
 
 const supplierInput = z.object({
   name: z.string().trim().min(2).max(160),
@@ -100,8 +94,7 @@ const supplierInput = z.object({
   email: z.string().trim().email().max(320).nullable(),
   phone: z.string().trim().max(50).nullable(),
   taxNumber: z.string().trim().max(100).nullable(),
-  notes: z.string().trim().max(2000).nullable(),
-});
+  notes: z.string().trim().max(2000).nullable() });
 const categoryInput = z.object({ name: z.string().trim().min(2).max(100) });
 const unitInput = z.object({ name: z.string().trim().min(1).max(30).regex(/^[A-Za-zÀ-ÖØ-öø-ÿ0-9\s'-]+$/, "Caractères non autorisés") });
 
@@ -125,8 +118,7 @@ async function createAudit(
     action,
     entityType,
     entityId: entityId === null ? null : String(entityId),
-    detail,
-  });
+    detail });
 }
 
 async function assertSupplierInCompany(supplierId: number | null, companyId: number | null) {
@@ -150,23 +142,20 @@ async function syncStockAlert(productId: number, companyId: number | null) {
         threshold: product.minimumQuantity,
         observedQuantity: product.quantity,
         status: "active",
-        resolvedAt: null,
-      }).where(and(eq(stockAlerts.id, existing[0].id), companyScope(stockAlerts.companyId, companyId)));
+        resolvedAt: null }).where(and(eq(stockAlerts.id, existing[0].id), companyScope(stockAlerts.companyId, companyId)));
     } else {
       await db.insert(stockAlerts).values({
         companyId,
         productId,
         threshold: product.minimumQuantity,
         observedQuantity: product.quantity,
-        status: "active",
-      });
+        status: "active" });
     }
   } else if (existing[0]?.status === "active") {
     await db.update(stockAlerts).set({
       observedQuantity: product.quantity,
       status: "resolved",
-      resolvedAt: new Date(),
-    }).where(and(eq(stockAlerts.id, existing[0].id), companyScope(stockAlerts.companyId, companyId)));
+      resolvedAt: new Date() }).where(and(eq(stockAlerts.id, existing[0].id), companyScope(stockAlerts.companyId, companyId)));
   }
 }
 
@@ -266,8 +255,7 @@ export const appRouter = router({
         const db = await requireDb();
         const revokedCount = await revokeUserSessions(db, ctx.user.id, ctx.user.sessionId);
         return { success: true, revokedCount } as const;
-      }),
-    }),
+      }) }),
     adminFallbackPasswordChange: adminProcedure.input(z.object({ currentPassword: z.string().min(1), newPassword: z.string().min(10).max(256) })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
       const override = (await db.select().from(adminFallbackPasswords).where(eq(adminFallbackPasswords.ownerOpenId, ctx.user.openId)).limit(1))[0];
@@ -278,8 +266,7 @@ export const appRouter = router({
       else await db.insert(adminFallbackPasswords).values({ ownerOpenId: ctx.user.openId, passwordHash, updatedByUserId: ctx.user.id });
       await revokeUserSessions(db, ctx.user.id, ctx.user.sessionId);
       return { success: true } as const;
-    }),
-  }),
+    }) }),
 
   dashboardPreferences: router({
     get: protectedProcedure.query(async ({ ctx }) => {
@@ -293,8 +280,7 @@ export const appRouter = router({
       const current = (await db.select().from(userDashboardPreferences).where(eq(userDashboardPreferences.userId, ctx.user.id)).limit(1))[0];
       if (current) await db.update(userDashboardPreferences).set({ preferencesJson: input.preferencesJson }).where(eq(userDashboardPreferences.id, current.id)); else await db.insert(userDashboardPreferences).values({ userId: ctx.user.id, preferencesJson: input.preferencesJson });
       return { success: true };
-    }),
-  }),
+    }) }),
 
   dashboard: router({
     get: protectedProcedure.query(async ({ ctx }) => {
@@ -336,8 +322,7 @@ export const appRouter = router({
         return {
           day,
           entries: daily.filter(movement => movement.type === "entry").reduce((sum, movement) => sum + Math.abs(movement.quantity), 0),
-          exits: daily.filter(movement => movement.type === "exit").reduce((sum, movement) => sum + Math.abs(movement.quantity), 0),
-        };
+          exits: daily.filter(movement => movement.type === "exit").reduce((sum, movement) => sum + Math.abs(movement.quantity), 0) };
       });
       const salesTrend = dayKeys.map(day => ({ day, revenueCents: paidSales.filter(sale => sale.createdAt.toISOString().slice(0, 10) === day).reduce((sum, sale) => sum + sale.totalCents, 0), invoices: paidSales.filter(sale => sale.createdAt.toISOString().slice(0, 10) === day).length }));
       const customerMap = new Map(customerRows.map(customer => [customer.id, customer]));
@@ -359,17 +344,14 @@ export const appRouter = router({
           todayRevenueCents: todaySales.reduce((sum, sale) => sum + sale.totalCents, 0),
           averageBasketCents: monthlySales.length ? Math.round(monthlyRevenueCents / monthlySales.length) : 0,
           duePayrollCents,
-          draftInventories: inventories.filter(inventory => inventory.status === "draft").length,
-        },
+          draftInventories: inventories.filter(inventory => inventory.status === "draft").length },
         lowStock: lowStock.slice(0, 6),
         recentMovements: movements.slice(0, 6),
         trend,
         salesTrend,
         recentSales: paidSales.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 5).map(sale => { const customer = sale.customerId ? customerMap.get(sale.customerId) : undefined; return { id: sale.id, invoiceNumber: sale.invoiceNumber, totalCents: sale.totalCents, netProfitCents: sale.netProfitCents, createdAt: sale.createdAt, customerName: customer?.name ?? "Vente comptoir", customerType: customer?.type ?? "ordinary" }; }),
-        unpaidInvoices: saleRows.filter(sale => sale.channel === "invoice" && sale.status !== "paid").sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 5).map(sale => { const customer = sale.customerId ? customerMap.get(sale.customerId) : undefined; return { id: sale.id, invoiceNumber: sale.invoiceNumber, totalCents: sale.totalCents, amountPaidCents: sale.amountPaidCents, balanceCents: Math.max(0, sale.totalCents - sale.amountPaidCents), status: sale.status, createdAt: sale.createdAt, customerName: customer?.name ?? "Client" }; }),
-      };
-    }),
-  }),
+        unpaidInvoices: saleRows.filter(sale => sale.channel === "invoice" && sale.status !== "paid").sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 5).map(sale => { const customer = sale.customerId ? customerMap.get(sale.customerId) : undefined; return { id: sale.id, invoiceNumber: sale.invoiceNumber, totalCents: sale.totalCents, amountPaidCents: sale.amountPaidCents, balanceCents: Math.max(0, sale.totalCents - sale.amountPaidCents), status: sale.status, createdAt: sale.createdAt, customerName: customer?.name ?? "Client" }; }) };
+    }) }),
 
   onboarding: router({
     status: protectedProcedure.query(async ({ ctx }) => {
@@ -403,8 +385,7 @@ export const appRouter = router({
       const db = await requireDb();
       await db.update(companies).set({ onboardingSkippedAt: new Date() }).where(eq(companies.id, ctx.user.companyId));
       return { success: true };
-    }),
-  }),
+    }) }),
 
   products: router({
     list: protectedProcedure.query(({ ctx }) => listProducts(ctx.user.companyId)),
@@ -476,22 +457,19 @@ export const appRouter = router({
       await db.delete(products).where(and(eq(products.id, input.id), companyScope(products.companyId, ctx.user.companyId)));
       await createAudit(ctx.user, "Suppression", "Produit", input.id, "Produit supprimé");
       return { success: true };
-    }),
-  }),
+    }) }),
 
   categories: router({
     list: protectedProcedure.query(async ({ ctx }) => (await requireDb()).select().from(productCategories).where(companyScope(productCategories.companyId, ctx.user.companyId)).orderBy(productCategories.name)),
     create: adminProcedure.input(categoryInput).mutation(async ({ ctx, input }) => { const db = await requireDb(); try { const result = await db.insert(productCategories).values({ ...input, companyId: ctx.user.companyId }); const id = Number(result[0].insertId); await createAudit(ctx.user, "Création", "Catégorie", id, `Catégorie ${input.name} créée`); return { id }; } catch (error) { conflictOr(error, "Cette catégorie existe déjà."); } }),
     update: adminProcedure.input(categoryInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await requireDb(); const current = (await db.select().from(productCategories).where(and(eq(productCategories.id, input.id), companyScope(productCategories.companyId, ctx.user.companyId))).limit(1))[0]; if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Catégorie introuvable." }); try { await db.transaction(async tx => { await tx.update(productCategories).set({ name: input.name }).where(and(eq(productCategories.id, input.id), companyScope(productCategories.companyId, ctx.user.companyId))); await tx.update(products).set({ category: input.name }).where(and(eq(products.category, current.name), companyScope(products.companyId, ctx.user.companyId))); }); await createAudit(ctx.user, "Modification", "Catégorie", input.id, `Catégorie ${current.name} renommée en ${input.name}`); return { success: true }; } catch (error) { conflictOr(error, "Cette catégorie existe déjà."); } }),
-    remove: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await requireDb(); const current = (await db.select().from(productCategories).where(and(eq(productCategories.id, input.id), companyScope(productCategories.companyId, ctx.user.companyId))).limit(1))[0]; if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Catégorie introuvable." }); const usedBy = await db.select({ id: products.id }).from(products).where(and(eq(products.category, current.name), companyScope(products.companyId, ctx.user.companyId))).limit(1); if (!categoryCanBeRemoved(usedBy.length)) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Cette catégorie est utilisée par des produits et ne peut pas être supprimée." }); await db.delete(productCategories).where(and(eq(productCategories.id, input.id), companyScope(productCategories.companyId, ctx.user.companyId))); await createAudit(ctx.user, "Suppression", "Catégorie", input.id, `Catégorie ${current.name} supprimée`); return { success: true }; }),
-  }),
+    remove: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await requireDb(); const current = (await db.select().from(productCategories).where(and(eq(productCategories.id, input.id), companyScope(productCategories.companyId, ctx.user.companyId))).limit(1))[0]; if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Catégorie introuvable." }); const usedBy = await db.select({ id: products.id }).from(products).where(and(eq(products.category, current.name), companyScope(products.companyId, ctx.user.companyId))).limit(1); if (!categoryCanBeRemoved(usedBy.length)) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Cette catégorie est utilisée par des produits et ne peut pas être supprimée." }); await db.delete(productCategories).where(and(eq(productCategories.id, input.id), companyScope(productCategories.companyId, ctx.user.companyId))); await createAudit(ctx.user, "Suppression", "Catégorie", input.id, `Catégorie ${current.name} supprimée`); return { success: true }; }) }),
 
   units: router({
     list: protectedProcedure.query(async ({ ctx }) => (await requireDb()).select().from(productUnits).where(companyScope(productUnits.companyId, ctx.user.companyId)).orderBy(productUnits.name)),
     create: adminProcedure.input(unitInput).mutation(async ({ ctx, input }) => { const db = await requireDb(); try { const result = await db.insert(productUnits).values({ ...input, companyId: ctx.user.companyId }); const id = Number(result[0].insertId); await createAudit(ctx.user, "Création", "Unité", id, `Unité ${input.name} créée`); return { id }; } catch (error) { conflictOr(error, "Cette unité existe déjà."); } }),
     update: adminProcedure.input(unitInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await requireDb(); const current = (await db.select().from(productUnits).where(and(eq(productUnits.id, input.id), companyScope(productUnits.companyId, ctx.user.companyId))).limit(1))[0]; if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Unité introuvable." }); try { await db.transaction(async tx => { await tx.update(productUnits).set({ name: input.name }).where(and(eq(productUnits.id, input.id), companyScope(productUnits.companyId, ctx.user.companyId))); await tx.update(products).set({ unit: input.name }).where(and(eq(products.unit, current.name), companyScope(products.companyId, ctx.user.companyId))); }); await createAudit(ctx.user, "Modification", "Unité", input.id, `Unité ${current.name} renommée en ${input.name}`); return { success: true }; } catch (error) { conflictOr(error, "Cette unité existe déjà."); } }),
-    remove: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await requireDb(); const current = (await db.select().from(productUnits).where(and(eq(productUnits.id, input.id), companyScope(productUnits.companyId, ctx.user.companyId))).limit(1))[0]; if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Unité introuvable." }); const usedBy = await db.select({ id: products.id }).from(products).where(and(eq(products.unit, current.name), companyScope(products.companyId, ctx.user.companyId))).limit(1); if (usedBy.length) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Cette unité est utilisée par des produits et ne peut pas être supprimée." }); await db.delete(productUnits).where(and(eq(productUnits.id, input.id), companyScope(productUnits.companyId, ctx.user.companyId))); await createAudit(ctx.user, "Suppression", "Unité", input.id, `Unité ${current.name} supprimée`); return { success: true }; }),
-  }),
+    remove: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await requireDb(); const current = (await db.select().from(productUnits).where(and(eq(productUnits.id, input.id), companyScope(productUnits.companyId, ctx.user.companyId))).limit(1))[0]; if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Unité introuvable." }); const usedBy = await db.select({ id: products.id }).from(products).where(and(eq(products.unit, current.name), companyScope(products.companyId, ctx.user.companyId))).limit(1); if (usedBy.length) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Cette unité est utilisée par des produits et ne peut pas être supprimée." }); await db.delete(productUnits).where(and(eq(productUnits.id, input.id), companyScope(productUnits.companyId, ctx.user.companyId))); await createAudit(ctx.user, "Suppression", "Unité", input.id, `Unité ${current.name} supprimée`); return { success: true }; }) }),
 
   suppliers: router({
     list: protectedProcedure.query(({ ctx }) => listSuppliers(ctx.user.companyId)),
@@ -520,8 +498,7 @@ export const appRouter = router({
       await db.delete(suppliers).where(and(eq(suppliers.id, input.id), companyScope(suppliers.companyId, ctx.user.companyId)));
       await createAudit(ctx.user, "Suppression", "Fournisseur", input.id, `Fournisseur ${supplier.name} supprimé`);
       return { success: true };
-    }),
-  }),
+    }) }),
 
   purchaseOrders: router({
     list: protectedProcedure.query(async ({ ctx }) => {
@@ -559,8 +536,7 @@ export const appRouter = router({
       notes: z.string().trim().max(2000).nullable().optional(),
       expectedDeliveryDate: z.coerce.date().nullable().optional(),
       items: z.array(z.object({ productId: z.number().int().positive(), quantity: z.number().int().positive().max(MAX_QUANTITY) })).min(1).max(100),
-      deliveryFeeCents: z.number().int().min(0).max(MAX_CENTS).default(0),
-    })).mutation(async ({ ctx, input }) => {
+      deliveryFeeCents: z.number().int().min(0).max(MAX_CENTS).default(0) })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
       const supplier = (await db.select().from(suppliers).where(and(eq(suppliers.id, input.supplierId), companyScope(suppliers.companyId, ctx.user.companyId))).limit(1))[0];
       if (!supplier) throw new TRPCError({ code: "NOT_FOUND", message: "Fournisseur introuvable." });
@@ -659,8 +635,7 @@ export const appRouter = router({
       });
       await createAudit(ctx.user, "Réception", "Bon de commande", input.id, `${result.complete ? "Réception complète" : "Réception partielle"} du bon ${order.orderNumber}`);
       return { success: true, alreadyReceived: false, status: result.status, complete: result.complete };
-    }),
-  }),
+    }) }),
 
   movements: router({
     list: protectedProcedure.query(({ ctx }) => listMovements(ctx.user.companyId)),
@@ -669,8 +644,7 @@ export const appRouter = router({
       supplierId: z.number().int().positive().nullable(),
       type: z.enum(["entry", "exit", "adjustment"]),
       quantity: z.number().int().min(-MAX_QUANTITY).max(MAX_QUANTITY).refine(value => value !== 0, "La quantité doit être différente de zéro."),
-      reason: z.string().trim().min(3).max(255),
-    })).mutation(async ({ ctx, input }) => {
+      reason: z.string().trim().min(3).max(255) })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
       if (input.supplierId !== null) {
         const supplier = (await db.select({ id: suppliers.id }).from(suppliers).where(and(eq(suppliers.id, input.supplierId), companyScope(suppliers.companyId, ctx.user.companyId))).limit(1))[0];
@@ -691,32 +665,12 @@ export const appRouter = router({
           action: "Mouvement enregistré",
           entityType: "Mouvement de stock",
           entityId: String(product.id),
-          detail: `${input.type} de ${Math.abs(resultingQuantity - previousQuantity)} ${product.unit} pour ${product.reference} : ${input.reason}`,
-        });
+          detail: `${input.type} de ${Math.abs(resultingQuantity - previousQuantity)} ${product.unit} pour ${product.reference} : ${input.reason}` });
       });
       return { success: true };
-    }),
-  }),
+    }) }),
 
   audit: router({
-    list: adminProcedure.query(({ ctx }) => listAuditLogs(ctx.user.companyId)),
-  }),
-
-  users: router({
-    list: adminProcedure.query(({ ctx }) => listUsers(ctx.user.companyId)),
-    updateRole: adminProcedure.input(z.object({ id: z.number().int().positive(), role: z.enum(["admin", "seller"]) })).mutation(async ({ ctx, input }) => {
-      if (ctx.user.id === input.id && input.role !== "admin") {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Vous ne pouvez pas retirer votre propre rôle administrateur." });
-      }
-      const db = await requireDb();
-      const target = (await db.select({ id: users.id }).from(users).where(and(eq(users.id, input.id), companyScope(users.companyId, ctx.user.companyId))).limit(1))[0];
-      if (!target) throw new TRPCError({ code: "NOT_FOUND", message: "Utilisateur introuvable dans cette entreprise." });
-      await db.update(users).set({ role: input.role }).where(and(eq(users.id, input.id), companyScope(users.companyId, ctx.user.companyId)));
-      await revokeUserSessions(db, input.id);
-      await createAudit(ctx.user, "Rôle modifié", "Utilisateur", input.id, `Rôle défini sur ${input.role === "admin" ? "administrateur" : "vendeur"}`);
-      return { success: true };
-    }),
-  }),
-});
+    list: adminProcedure.query(({ ctx }) => listAuditLogs(ctx.user.companyId)) }) });
 
 export type AppRouter = typeof appRouter;

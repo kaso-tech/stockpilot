@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
-import { ArrowUpRight, Building2, Edit3, Mail, MapPin, Phone, Plus, Search, Trash2, UsersRound } from "lucide-react";
+import { ArrowUpRight, Building2, Edit3, Plus, Search, Trash2, UsersRound } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";

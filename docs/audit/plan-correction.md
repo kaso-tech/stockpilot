@@ -14,8 +14,8 @@ Règles d'exécution :
 | 3 | Concurrence et intégrité du stock et des encaissements | E1, E2, E3, E9, E13 | ✅ Fait |
 | 4 | Schéma multi-entreprise (contraintes UNIQUE, index) | S1, A8, S5, S8 (partiel), E19 | ✅ Fait |
 | 5 | Sauvegardes complètes, restauration validée, stockage, Drive | E14, E15, S6, B2, B3, B4, B5 | ✅ Fait (B2 partiel) |
-| 6 | Code mort et dépendances (mise à jour + retrait) | §4, §2.5 | 🔄 En cours |
-| 7 | Corrections fonctionnelles (tableau de bord, fuseau horaire, pagination, inventaire, numérotation, remboursements) | E4–E8, E10, E12, E18 (partiel) | ⬜ À faire |
+| 6 | Code mort et dépendances (mise à jour + retrait) | §4, §2.5, H5 | ✅ Fait |
+| 7 | Corrections fonctionnelles (tableau de bord, fuseau horaire, pagination, inventaire, numérotation, remboursements) | E4–E8, E10, E12, E18 (partiel) | 🔄 En cours |
 | 8 | Performance et qualité (lazy loading, écritures par requête, requêtes non bornées, CI) | P1–P6, P10–P11, E22–E24 | ⬜ À faire |
 | 9 | Fonctionnalités manquantes (feuille de route, nécessite arbitrages produit) | §6 | ⏳ À planifier avec le métier |
 
@@ -99,3 +99,23 @@ Tests : `server/test/lot4.schema.db.test.ts` (4 scénarios).
 - La rétention ne compte plus les tentatives échouées.
 - Ajout de `.env.example` documentant toutes les variables d'environnement.
 - Tests : `server/test/lot5.backups.db.test.ts` (aller-retour complet, chiffrement, archive forgée, protection de l'administrateur, API tRPC), tests OAuth Drive.
+
+### Lot 6 — Code mort et dépendances
+
+**Dépendances**
+- Découverte : avec pnpm 10.4, les `overrides` et le correctif `wouter` déclarés dans `pnpm-workspace.yaml` **n'étaient jamais appliqués** (absents du lockfile). Les surcharges sont désormais dans `package.json > pnpm.overrides`. Le correctif wouter (outil Manus qui recensait les routes dans `window`) est supprimé.
+- Mises à jour : `drizzle-orm` 0.45, `mysql2` 3.24, `@trpc/*` 11.19, `axios` 1.20, `express` 4.22, `vite` 7.3, `tailwindcss` 4.3, `vite-plugin-pwa` 2, `vitest` 4, `drizzle-kit`, `esbuild` ; surcharges pour `proxy-addr`, `path-to-regexp`, `qs`, `body-parser`, `lodash`, `dompurify`, `postcss`, `picomatch`, `brace-expansion`, `fast-uri`, `source-map-js`.
+- Retirées (inutilisées) : `@aws-sdk/*`, `streamdown`, `framer-motion`, `date-fns`, `react-hook-form`, `@hookform/resolvers`, `cmdk`, `embla-carousel-react`, `input-otp`, `react-day-picker`, `react-resizable-panels`, `vaul`, `tailwindcss-animate`, `@tailwindcss/typography`, 15 paquets `@radix-ui/*`, `@types/google.maps`, `autoprefixer`, `postcss`, `add`, `pnpm` (dépendance de dev), `@builder.io/vite-plugin-jsx-loc`.
+- **`pnpm audit --prod` : 0 vulnérabilité** (70 avant). Toutes dépendances confondues : 1 modérée restante (esbuild embarqué par drizzle-kit, outil en ligne de commande local).
+
+**Code mort supprimé**
+- Serveur : `_core/llm.ts`, `map.ts`, `voiceTranscription.ts`, `imageGeneration.ts`, `dataApi.ts`, `notification.ts` ; endpoints `system.notifyOwner`, `commerce.remuneration.*`, `users.*`, `backups.removeArchive` ; flux OAuth Manus inutilisé dans `sdk.ts` et `shared/const.ts` ; `listUsers` ; bloc commenté de `cookies.ts`.
+- Client : `AIChatBox`, `Map`, `lib/offlineCache`, 34 composants `components/ui/*` inutilisés ; restes de partage de bons dans `SupplierDetail` (déplacé dans `PurchaseOrderDetail`) ; imports et variables inutilisés.
+- `client/dev-dist/` retiré du dépôt et ignoré ; le collecteur de debug Manus est servi uniquement par le serveur de développement (plus copié dans le build).
+- `noUnusedLocals` activé dans `tsconfig.json` pour empêcher le retour d'imports morts.
+
+**Bogue révélé par le nettoyage** : la fonction `edit` de la page Agents n'était reliée à aucun bouton : la **conversion agent ↔ vendeur était inaccessible**. Un bouton « Modifier ou convertir » est ajouté sur chaque fiche.
+
+**H5** : le script d'analytics n'est injecté que si `VITE_ANALYTICS_ENDPOINT` et `VITE_ANALYTICS_WEBSITE_ID` sont définis.
+
+Bundle principal : 2,04 Mo → 1,83 Mo (le découpage par page arrive au lot 8).

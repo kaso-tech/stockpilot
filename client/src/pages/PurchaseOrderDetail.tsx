@@ -7,9 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
-import { AlertTriangle, ArrowLeft, CalendarCheck2, CalendarClock, CheckCircle2, ClipboardList, Edit3, Mail, MessageCircle, PackageCheck, Printer, RotateCcw, Send, Trash2, Truck } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CalendarCheck2, CalendarClock, ClipboardList, Edit3, MessageCircle, PackageCheck, Printer, RotateCcw, Send, Trash2, Truck } from "lucide-react";
 import { jsPDF } from "jspdf";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useLocation, useRoute } from "wouter";
 
@@ -21,8 +21,7 @@ const statusMeta: Record<Status, { label: string; className: string }> = {
   draft: { label: "En attente", className: "border-amber-400/25 bg-amber-400/10 text-amber-200" },
   sent: { label: "Envoyé", className: "border-sky-400/25 bg-sky-400/10 text-sky-200" },
   received: { label: "Reçu", className: "border-emerald-400/25 bg-emerald-400/10 text-emerald-200" },
-  cancelled: { label: "Annulé", className: "border-rose-400/25 bg-rose-400/10 text-rose-200" },
-};
+  cancelled: { label: "Annulé", className: "border-rose-400/25 bg-rose-400/10 text-rose-200" } };
 
 export default function PurchaseOrderDetail() {
   const [, params] = useRoute("/bons-commande/:id");

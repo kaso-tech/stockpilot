@@ -1,11 +1,10 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { agents, auditLogs, customers, productPriceTiers, products, remunerationProfiles, saleCommissions, saleItems, salePayments, saleSettings, sales, stockAlerts, stockMovements } from "../../drizzle/schema";
+import { agents, auditLogs, customers, productPriceTiers, products, remunerationProfiles, saleCommissions, saleItems, salePayments, saleSettings, sales } from "../../drizzle/schema";
 import { commissionCents, priceForCustomer, priceForQuantityTier } from "../commerceRules";
 import { getDb } from "../db";
 import { protectedProcedure, router } from "../_core/trpc";
-import { resultingStock, signedMovementQuantity } from "../stockRules";
 import { assertPaymentMethodsEnabled, settlementResult } from "../transactionRules";
 import { discountCents, type DiscountType } from "../discountRules";
 import { assertExplicitInvoiceAgentChoice } from "../agentSelectionRules";
@@ -171,5 +170,4 @@ export const transactionsRouter = router({
       result = { status, amountPaidCents, balanceCents: sale.totalCents - amountPaidCents };
     });
     return result!;
-  }),
-});
+  }) });
