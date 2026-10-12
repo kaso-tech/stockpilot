@@ -16,6 +16,11 @@ const requireUser = t.middleware(async opts => {
   if (!ctx.user) {
     throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
   }
+  // Depuis la migration 0044, tout compte appartient à une entreprise : un
+  // compte sans entreprise ne doit jamais accéder aux données (S5).
+  if (!Number.isInteger(ctx.user.companyId) || Number(ctx.user.companyId) <= 0) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Compte non rattaché à une entreprise." });
+  }
 
   return next({
     ctx: {
@@ -33,6 +38,9 @@ export const adminProcedure = t.procedure.use(
 
     if (!ctx.user || ctx.user.role !== 'admin') {
       throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
+    }
+    if (!Number.isInteger(ctx.user.companyId) || Number(ctx.user.companyId) <= 0) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Compte non rattaché à une entreprise." });
     }
 
     return next({

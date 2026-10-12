@@ -11,7 +11,7 @@ const otherSessionId = "22222222-2222-4222-8222-222222222222";
 
 function authenticatedContext() {
   return {
-    user: { id: 7, openId: "session-user", name: "Utilisateur", email: "user@example.test", phone: null, loginMethod: "password", role: "seller", active: true, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date(), sessionId: currentSessionId },
+    user: { id: 7, openId: "session-user", name: "Utilisateur", email: "user@example.test", phone: null, loginMethod: "password", role: "seller", active: true, companyId: 1, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date(), sessionId: currentSessionId },
     req: { protocol: "https", headers: {} },
     res: { clearCookie: vi.fn() },
   } as never;

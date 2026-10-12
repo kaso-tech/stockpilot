@@ -1,4 +1,4 @@
-import { boolean, index, int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { boolean, index, int, mysqlEnum, mysqlTable, text, timestamp, unique, varchar } from "drizzle-orm/mysql-core";
 
 export const companies = mysqlTable("companies", {
   id: int("id").autoincrement().primaryKey(),
@@ -23,7 +23,7 @@ export const users = mysqlTable("users", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
-}, table => [index("users_company_active_idx").on(table.companyId, table.active)]);
+}, table => [index("users_company_active_idx").on(table.companyId, table.active), unique("users_email_unique").on(table.email)]);
 
 export const userSessions = mysqlTable("userSessions", {
   id: varchar("id", { length: 64 }).primaryKey(),
@@ -64,7 +64,7 @@ export const adminFallbackPasswords = mysqlTable("adminFallbackPasswords", {
 export const suppliers = mysqlTable("suppliers", {
   id: int("id").autoincrement().primaryKey(),
   companyId: int("companyId"),
-  name: varchar("name", { length: 160 }).notNull().unique(),
+  name: varchar("name", { length: 160 }).notNull(),
   otherReference: varchar("otherReference", { length: 80 }),
   contactName: varchar("contactName", { length: 160 }),
   address: text("address"),
@@ -74,7 +74,7 @@ export const suppliers = mysqlTable("suppliers", {
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, table => [unique("suppliers_company_name_unique").on(table.companyId, table.name)]);
 
 export const purchaseOrders = mysqlTable("purchaseOrders", {
   id: int("id").autoincrement().primaryKey(),
@@ -95,7 +95,7 @@ export const purchaseOrders = mysqlTable("purchaseOrders", {
   createdByUserId: int("createdByUserId").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, table => [index("purchase_orders_company_created_idx").on(table.companyId, table.createdAt)]);
 
 export const purchaseOrderItems = mysqlTable("purchaseOrderItems", {
   id: int("id").autoincrement().primaryKey(),
@@ -109,12 +109,12 @@ export const purchaseOrderItems = mysqlTable("purchaseOrderItems", {
   purchasePriceCents: int("purchasePriceCents").notNull(),
   lineTotalCents: int("lineTotalCents").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, table => [index("purchase_order_items_order_idx").on(table.purchaseOrderId)]);
 
 export const products = mysqlTable("products", {
   id: int("id").autoincrement().primaryKey(),
   companyId: int("companyId"),
-  reference: varchar("reference", { length: 80 }).notNull().unique(),
+  reference: varchar("reference", { length: 80 }).notNull(),
   name: varchar("name", { length: 200 }).notNull(),
   description: text("description"),
   category: varchar("category", { length: 100 }).notNull(),
@@ -127,7 +127,7 @@ export const products = mysqlTable("products", {
   supplierId: int("supplierId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, table => [unique("products_company_reference_unique").on(table.companyId, table.reference)]);
 
 export const productPriceTiers = mysqlTable("productPriceTiers", {
   id: int("id").autoincrement().primaryKey(),
@@ -137,23 +137,23 @@ export const productPriceTiers = mysqlTable("productPriceTiers", {
   unitPriceCents: int("unitPriceCents").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, table => [index("product_price_tiers_product_idx").on(table.productId)]);
 
 export const productCategories = mysqlTable("productCategories", {
   id: int("id").autoincrement().primaryKey(),
   companyId: int("companyId"),
-  name: varchar("name", { length: 100 }).notNull().unique(),
+  name: varchar("name", { length: 100 }).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, table => [unique("product_categories_company_name_unique").on(table.companyId, table.name)]);
 
 export const productUnits = mysqlTable("productUnits", {
   id: int("id").autoincrement().primaryKey(),
   companyId: int("companyId"),
-  name: varchar("name", { length: 30 }).notNull().unique(),
+  name: varchar("name", { length: 30 }).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, table => [unique("product_units_company_name_unique").on(table.companyId, table.name)]);
 
 export const customers = mysqlTable("customers", {
   id: int("id").autoincrement().primaryKey(),
@@ -169,7 +169,7 @@ export const customers = mysqlTable("customers", {
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, table => [index("customers_company_idx").on(table.companyId)]);
 
 export const agents = mysqlTable("agents", {
   id: int("id").autoincrement().primaryKey(),
@@ -237,7 +237,7 @@ export const saleSettings = mysqlTable("saleSettings", {
   vatRateBasisPoints: int("vatRateBasisPoints").notNull().default(0),
   updatedByUserId: int("updatedByUserId"),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, table => [unique("sale_settings_company_unique").on(table.companyId)]);
 
 export const sales = mysqlTable("sales", {
   id: int("id").autoincrement().primaryKey(),
@@ -281,18 +281,18 @@ export const expenses = mysqlTable("expenses", {
   createdByUserId: int("createdByUserId").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, table => [index("expenses_company_spent_idx").on(table.companyId, table.spentAt)]);
 
 export const expenseBudgets = mysqlTable("expenseBudgets", {
   id: int("id").autoincrement().primaryKey(),
   companyId: int("companyId"),
-  yearMonth: varchar("yearMonth", { length: 7 }).notNull().unique(),
+  yearMonth: varchar("yearMonth", { length: 7 }).notNull(),
   amountCents: int("amountCents").notNull(),
   warningPercent: int("warningPercent").notNull().default(80),
   updatedByUserId: int("updatedByUserId").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, table => [unique("expense_budgets_company_month_unique").on(table.companyId, table.yearMonth)]);
 
 export const salePayments = mysqlTable("salePayments", {
   id: int("id").autoincrement().primaryKey(),
@@ -330,7 +330,7 @@ export const saleCommissions = mysqlTable("saleCommissions", {
   rateBasisPoints: int("rateBasisPoints").notNull(),
   commissionCents: int("commissionCents").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, table => [index("sale_commissions_sale_idx").on(table.saleId), index("sale_commissions_beneficiary_idx").on(table.beneficiaryType, table.beneficiaryId)]);
 
 export const agentPayments = mysqlTable("agentPayments", {
   id: int("id").autoincrement().primaryKey(),
@@ -346,7 +346,7 @@ export const agentPayments = mysqlTable("agentPayments", {
   receiptMimeType: varchar("receiptMimeType", { length: 80 }),
   createdByUserId: int("createdByUserId").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, table => [index("agent_payments_company_beneficiary_idx").on(table.companyId, table.beneficiaryType, table.beneficiaryId)]);
 
 export const inventorySessions = mysqlTable("inventorySessions", {
   id: int("id").autoincrement().primaryKey(),
@@ -367,7 +367,7 @@ export const inventoryItems = mysqlTable("inventoryItems", {
   countedQuantity: int("countedQuantity"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, table => [index("inventory_items_session_idx").on(table.inventorySessionId)]);
 
 export const stockMovements = mysqlTable("stockMovements", {
   id: int("id").autoincrement().primaryKey(),
@@ -425,7 +425,7 @@ export const backupSettings = mysqlTable("backupSettings", {
   lastBackupError: text("lastBackupError"),
   updatedByUserId: int("updatedByUserId"),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, table => [unique("backup_settings_company_unique").on(table.companyId)]);
 
 export const backupArchives = mysqlTable("backupArchives", {
   id: int("id").autoincrement().primaryKey(),

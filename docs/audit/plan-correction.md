@@ -12,8 +12,8 @@ Règles d'exécution :
 | 1 | CI verte et correctifs de sécurité rapides | E20, E21, S2, S3, S4, S7, B1, H2, H3, E16, E17, E11 | ✅ Fait |
 | 2 | Authentification, sessions, CSRF, en-têtes, limitation de débit | A1–A8, A4, H1, H4, B6 (doc) | ✅ Fait |
 | 3 | Concurrence et intégrité du stock et des encaissements | E1, E2, E3, E9, E13 | ✅ Fait |
-| 4 | Schéma multi-entreprise (contraintes UNIQUE, index) | S1, A8, S8 (partiel) | 🔄 En cours |
-| 5 | Sauvegardes complètes, restauration validée, stockage, Drive | E14, E15, S6, B2, B3, B4, B5 | ⬜ À faire |
+| 4 | Schéma multi-entreprise (contraintes UNIQUE, index) | S1, A8, S5, S8 (partiel), E19 | ✅ Fait |
+| 5 | Sauvegardes complètes, restauration validée, stockage, Drive | E14, E15, S6, B2, B3, B4, B5 | 🔄 En cours |
 | 6 | Code mort et dépendances (mise à jour + retrait) | §4, §2.5 | ⬜ À faire |
 | 7 | Corrections fonctionnelles (tableau de bord, fuseau horaire, pagination, inventaire, numérotation, remboursements) | E4–E8, E10, E12, E18 (partiel) | ⬜ À faire |
 | 8 | Performance et qualité (lazy loading, écritures par requête, requêtes non bornées, CI) | P1–P6, P10–P11, E22–E24 | ⬜ À faire |
@@ -67,3 +67,21 @@ Le détail des modifications de chaque lot est consigné dans la section « Jour
 - **E13** : bornes `MAX_CENTS` / `MAX_QUANTITY` sur les prix et quantités produit, paliers, mouvements, réceptions, comptages, rémunérations fixes ; 10 paiements maximum par encaissement.
 - Les erreurs de stock (stock négatif…) remontent en `BAD_REQUEST` avec le nom du produit au lieu d'une erreur 500.
 - Tests : `server/test/lot3.stock.db.test.ts` (7 scénarios dont encaissements et réceptions concurrents). Les anciens tests simulés incompatibles avec les verrous ont été remplacés.
+
+### Lot 4 — Schéma multi-entreprise
+
+Migration **`0044_tenant_scoped_uniques`** (testée sur une base 0043 contenant des données historiques) :
+1. rattache les entrées d'audit orphelines (bogue S4) à l'entreprise de leur auteur ;
+2. **S5** : convertit le locataire historique (`companyId = NULL`) en une vraie entreprise (nom repris des réglages, propriétaire = premier administrateur, assistant de démarrage marqué terminé) et y rattache toutes ses lignes dans les 20 tables concernées ;
+3. supprime les doublons de réglages de vente et de sauvegarde (le plus ancien est conservé) ;
+4. **S1** : remplace les `UNIQUE` globaux par des `UNIQUE(companyId, …)` sur produits (référence), fournisseurs, catégories, unités et budgets ; `UNIQUE(companyId)` sur les réglages de vente et de sauvegarde ;
+5. **A8** : `UNIQUE(email)` sur `users` (insensible à la casse avec la collation par défaut) ;
+6. index manquants : paliers de prix, lignes de bons de commande, lignes d'inventaire, commissions, paiements d'agents, clients, bons de commande, dépenses.
+
+Code : `protectedProcedure` et `adminProcedure` refusent un compte sans entreprise. Les utilisateurs historiques bénéficient désormais du mode hors connexion (**E19**).
+
+**Procédure de déploiement :** sauvegarde complète → `DATABASE_URL=… node scripts/preflight-lot4.mjs` (échoue s'il existe des e-mails en double, à fusionner manuellement) → `pnpm exec drizzle-kit migrate`.
+
+**Non traité volontairement :** `sellerCredentials.username` reste unique globalement (l'identifiant interne n'est plus utilisé pour se connecter depuis le lot 2) ; les clés étrangères (S8) seront ajoutées après nettoyage des orphelins éventuels, dans un lot ultérieur.
+
+Tests : `server/test/lot4.schema.db.test.ts` (4 scénarios).
