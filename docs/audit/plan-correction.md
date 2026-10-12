@@ -10,8 +10,8 @@ Règles d'exécution :
 | Lot | Objet | Constats couverts | Statut |
 |---|---|---|---|
 | 1 | CI verte et correctifs de sécurité rapides | E20, E21, S2, S3, S4, S7, B1, H2, H3, E16, E17, E11 | ✅ Fait |
-| 2 | Authentification, sessions, CSRF, en-têtes, limitation de débit | A1–A8, A4, H1, H4, B6 (doc) | 🔄 En cours |
-| 3 | Concurrence et intégrité du stock et des encaissements | E1, E2, E3, E9, E13 | ⬜ À faire |
+| 2 | Authentification, sessions, CSRF, en-têtes, limitation de débit | A1–A8, A4, H1, H4, B6 (doc) | ✅ Fait |
+| 3 | Concurrence et intégrité du stock et des encaissements | E1, E2, E3, E9, E13 | 🔄 En cours |
 | 4 | Schéma multi-entreprise (contraintes UNIQUE, index) | S1, A8, S8 (partiel) | ⬜ À faire |
 | 5 | Sauvegardes complètes, restauration validée, stockage, Drive | E14, E15, S6, B2, B3, B4, B5 | ⬜ À faire |
 | 6 | Code mort et dépendances (mise à jour + retrait) | §4, §2.5 | ⬜ À faire |
@@ -40,3 +40,19 @@ Le détail des modifications de chaque lot est consigné dans la section « Jour
 - **E16** : `navigateFallbackDenylist` pour `/api/` et `/manus-storage/` dans le service worker.
 - **E17** : la synchronisation hors connexion utilise `COOKIE_NAME`.
 - Tests ajoutés : `server/test/lot1.tenant.db.test.ts` (6 scénarios A/B sur MySQL réel), `dbErrors.test.ts`, `inputRules.test.ts`, `client/src/lib/html.test.ts`.
+
+### Lot 2 — Authentification, sessions, CSRF, en-têtes
+
+- **A1 / A7** : suppression de `auth.localLogin` et `auth.adminFallbackLogin` (sans interface, sessions d'un an non suivies) et du module `adminFallbackAuth`. `authenticateRequest` refuse désormais tout jeton utilisateur sans `sessionId` suivi en base : **les anciens jetons « legacy » sont invalidés, les utilisateurs concernés devront se reconnecter une fois.** Le changement de mot de passe administrateur n'accepte plus le secret d'environnement.
+- **A2** : `trust proxy` configuré (`TRUST_PROXY`, 1 saut par défaut) ; la limitation s'appuie sur `req.ip`, plus jamais sur `X-Forwarded-For` brut.
+- **A3** : le limiteur évince les entrées les plus anciennes quand il est saturé au lieu de refuser tout le monde.
+- **A4** : les mutations `/api/trpc` exigent `Content-Type: application/json` (`server/_core/httpSecurity.ts`) : un formulaire d'un site tiers ne peut plus déclencher d'action.
+- **A5** : limitation sur `emailAvailability` (20 / 15 min) et `registerCompany` (5 / h par IP) ; vérification de mot de passe factice quand le compte n'existe pas (temps de réponse constant).
+- **A6** : révocation des sessions lors d'un changement de mot de passe ou d'e-mail vendeur, d'une désactivation, d'une conversion en agent, d'un changement de rôle et d'un changement de mot de passe administrateur. `sellers.remove` vérifie l'appartenance à l'entreprise.
+- **A8** : recherche des comptes par e-mail en SQL (`lower(email) = ?`) au lieu de charger tous les utilisateurs (l'index unique arrive au lot 4).
+- **H1** : en-têtes `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, CSP `frame-ancestors` (configurable via `FRAME_ANCESTORS`), `HSTS` en production, `x-powered-by` retiré.
+- **H4** : SVG refusé pour logo et signature (serveur et client) ; URL de logo/signature validées.
+- **B6** : la planification Manus reste liée au jeton de l'administrateur (contrainte de la plateforme) ; documenté, à revoir si l'hébergement change.
+- Tests : `server/test/lot2.auth.db.test.ts` (8 scénarios MySQL), `server/_core/httpSecurity.test.ts`, test de saturation du limiteur. Les anciens tests à base de simulations devenus obsolètes ont été remplacés.
+
+**Variables d'environnement nouvelles :** `TRUST_PROXY` (défaut `1`), `FRAME_ANCESTORS` (défaut `'self'`).

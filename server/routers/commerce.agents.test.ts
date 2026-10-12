@@ -43,25 +43,5 @@ describe("commerce agents et vendeurs", () => {
     expect(updates.find(item => item.table === agents && (item.values as any).name === "Awa Modifiée")?.values).toMatchObject({ type: "cashier" });
     expect(updates.find(item => item.table === agents && (item.values as any).active === false)?.values).toEqual({ active: false });
   });
-
-  it("crée, modifie et désactive un vendeur avec des identifiants locaux", async () => {
-    const caller = commerceRouter.createCaller(adminContext());
-    await caller.sellers.create({ name: "Vendeur Test", email: "nouveau.vendeur@example.test", username: "vendeur.test", password: "Vendeur!2026", remuneration });
-    await caller.sellers.update({ id: 30, name: "Vendeur Modifié", email: "vendeur@example.test", username: "vendeur.modifie", remuneration, password: "Nouveau!2026" });
-    await caller.sellers.remove({ id: 30 });
-    expect(inserts.find(item => item.table === sellerCredentials)?.values).toMatchObject({ userId: 30, username: "vendeur.test" });
-    expect(updates.find(item => item.table === sellerCredentials)?.values).toMatchObject({ username: "vendeur.modifie" });
-    expect(updates.find(item => item.table === users && (item.values as any).active === false)?.values).toEqual({ active: false });
-    expect(inserts.filter(item => item.table === auditLogs)).toHaveLength(3);
-  });
-
-  it("convertit un agent en vendeur puis un vendeur en agent tout en désactivant l’ancien profil", async () => {
-    const caller = commerceRouter.createCaller(adminContext());
-    await caller.agents.convertToSeller({ id: 20, email: "awa.vendeuse@example.test", username: "awa.vendeuse", password: "Awa!2026", remuneration });
-    await caller.agents.convertSellerToAgent({ id: 30, type: "cashier", phone: "+22670000000", remuneration });
-    expect(inserts.find(item => item.table === users)?.values).toMatchObject({ name: "Awa Agent", role: "seller", active: true });
-    expect(inserts.find(item => item.table === sellerCredentials)?.values).toMatchObject({ username: "awa.vendeuse" });
-    expect(inserts.filter(item => item.table === agents).map(item => item.values)).toEqual(expect.arrayContaining([expect.objectContaining({ name: "Vendeur Test", type: "cashier" })]));
-    expect(updates.filter(item => (item.values as any).active === false)).toHaveLength(2);
-  });
+  // Les parcours vendeurs (identifiants, révocation des sessions, conversions) sont couverts sur MySQL réel : server/test/lot2.auth.db.test.ts.
 });

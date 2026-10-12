@@ -306,20 +306,23 @@ class SDKServer {
       throw ForbiddenError("User account is inactive");
     }
 
-    if (session.sessionId) {
-      const trackedSession = await db.getUserSessionById(session.sessionId);
-      if (!trackedSession || trackedSession.userId !== user.id || trackedSession.revokedAt || trackedSession.expiresAt <= new Date()) {
-        throw ForbiddenError("Session revoked or expired");
-      }
-      await db.touchUserSession(session.sessionId);
+    // Toute session utilisateur doit être suivie en base pour pouvoir être
+    // révoquée (déconnexion, changement de mot de passe, désactivation).
+    if (!session.sessionId) {
+      throw ForbiddenError("Untracked session");
     }
+    const trackedSession = await db.getUserSessionById(session.sessionId);
+    if (!trackedSession || trackedSession.userId !== user.id || trackedSession.revokedAt || trackedSession.expiresAt <= new Date()) {
+      throw ForbiddenError("Session revoked or expired");
+    }
+    await db.touchUserSession(session.sessionId);
 
     await db.upsertUser({
       openId: user.openId,
       lastSignedIn: signedInAt,
     });
 
-    return { ...user, ...(session.sessionId ? { sessionId: session.sessionId } : {}) };
+    return { ...user, sessionId: session.sessionId };
   }
 }
 

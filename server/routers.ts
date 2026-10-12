@@ -44,7 +44,7 @@ import { MAX_CENTS, MAX_QUANTITY } from "./numericLimits";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { COOKIE_NAME } from "@shared/const";
 import { commerceRouter } from "./routers/commerce";
 import { inventoryRouter } from "./routers/inventory";
 import { payrollRouter } from "./routers/payroll";
@@ -62,36 +62,17 @@ function sessionDeviceLabel(userAgent: string | undefined) {
   return "Appareil inconnu";
 }
 
-function requestIdentity(req: { ip?: string; headers: Record<string, unknown> }) {
-  const forwarded = req.headers["x-forwarded-for"];
-  const forwardedIp = Array.isArray(forwarded) ? forwarded[0] : typeof forwarded === "string" ? forwarded.split(",")[0]?.trim() : undefined;
-  return forwardedIp || req.ip || "unknown";
-}
-
-function assertLoginRateLimit(req: { ip?: string; headers: Record<string, unknown> }, email: string) {
-  const identity = requestIdentity(req);
-  const normalizedEmail = email.trim().toLowerCase();
-  if (!consumeRateLimit(`auth:ip:${identity}`, 30, 15 * 60 * 1000) || !consumeRateLimit(`auth:account:${identity}:${normalizedEmail}`, 10, 15 * 60 * 1000)) {
-    throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop de tentatives. Réessayez plus tard." });
-  }
-}
-
-function legacyAdminFallbackEnabled() {
-  return !ENV.isProduction && process.env.ALLOW_LEGACY_ADMIN_FALLBACK === "true";
-}
-
 import { backupRouter } from "./routers/backups";
 import { transactionsRouter } from "./routers/transactions";
 import { expensesRouter } from "./routers/expenses";
 import { agentPaymentExpenseRows, budgetComparison, expenseBreakdownByCategory, monthlyExpenseTotalCents, operatingNetProfitCents } from "./expenseRules";
 import { sdk } from "./_core/sdk";
 import { ENV } from "./_core/env";
-import { matchesAdminFallbackCredentials } from "./adminFallbackAuth";
 import { hashPassword, verifyPassword } from "./passwords";
 import { categoryCanBeRemoved } from "./categoryRules";
 import { assertSellerSensitiveAction } from "./sellerActionRules";
 import { companyScope } from "./companyScope";
-import { consumeRateLimit } from "./rateLimit";
+import { assertRateLimit, burnPasswordCheck, emailIsTaken, findLoginAccount, revokeUserSessions } from "./authSessions";
 import { conflictOr } from "./dbErrors";
 
 const productInput = z.object({
@@ -207,22 +188,11 @@ export const appRouter = router({
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true } as const;
     }),
-    localLogin: publicProcedure.input(z.object({ username: z.string().trim().min(3).max(320), password: z.string().min(1).max(256) })).mutation(async ({ ctx, input }) => {
-      assertLoginRateLimit(ctx.req, input.username);
-      const db = await requireDb();
-      const row = (await db.select({ openId: users.openId, name: users.name, active: users.active, passwordHash: sellerCredentials.passwordHash }).from(sellerCredentials).innerJoin(users, eq(sellerCredentials.userId, users.id)).where(eq(sellerCredentials.username, input.username)).limit(1))[0];
-      if (!row || !row.active || !(await verifyPassword(input.password, row.passwordHash))) throw new TRPCError({ code: "UNAUTHORIZED", message: "E-mail ou mot de passe incorrect." });
-      const token = await sdk.createSessionToken(row.openId, { name: row.name || input.username, expiresInMs: ONE_YEAR_MS });
-      ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: ONE_YEAR_MS });
-      return { success: true } as const;
-    }),
     passwordLogin: publicProcedure.input(z.object({ email: z.string().trim().email().max(320), password: z.string().min(1).max(256), rememberMe: z.boolean().optional().default(false) })).mutation(async ({ ctx, input }) => {
-      assertLoginRateLimit(ctx.req, input.email);
+      assertRateLimit(ctx.req, "auth:login", 30, 15 * 60 * 1000, input.email);
       const db = await requireDb();
-      const email = input.email.trim().toLowerCase();
-      const accounts = await db.select().from(users);
-      const account = accounts.find(user => user.active && user.email?.trim().toLowerCase() === email && (user.role === "admin" || user.role === "seller"));
-      if (!account) throw new TRPCError({ code: "UNAUTHORIZED", message: "E-mail ou mot de passe incorrect." });
+      const account = await findLoginAccount(db, input.email);
+      if (!account) { await burnPasswordCheck(input.password); throw new TRPCError({ code: "UNAUTHORIZED", message: "E-mail ou mot de passe incorrect." }); }
 
       let passwordValid = false;
       if (account.role === "admin") {
@@ -243,17 +213,16 @@ export const appRouter = router({
       console.info("[Auth password] Session issued", { role: account.role, remembered: input.rememberMe });
       return { success: true, role: account.role } as const;
     }),
-    emailAvailability: publicProcedure.input(z.object({ email: z.string().trim().email().max(320) })).query(async ({ input }) => {
+    emailAvailability: publicProcedure.input(z.object({ email: z.string().trim().email().max(320) })).query(async ({ ctx, input }) => {
+      assertRateLimit(ctx.req, "auth:email-availability", 20, 15 * 60 * 1000);
       const db = await requireDb();
-      const normalizedEmail = input.email.trim().toLowerCase();
-      const accounts = await db.select({ email: users.email }).from(users);
-      return { available: !accounts.some(account => account.email?.trim().toLowerCase() === normalizedEmail) } as const;
+      return { available: !(await emailIsTaken(db, input.email)) } as const;
     }),
     registerCompany: publicProcedure.input(z.object({ companyName: z.string().trim().min(2).max(200), administratorName: z.string().trim().min(2).max(160), email: z.string().trim().email().max(320), password: z.string().min(10).max(256), rememberMe: z.boolean().optional().default(true) })).mutation(async ({ ctx, input }) => {
+      assertRateLimit(ctx.req, "auth:register", 5, 60 * 60 * 1000);
       const db = await requireDb();
       const email = input.email.trim().toLowerCase();
-      const existingAccount = (await db.select().from(users)).find(user => user.email?.trim().toLowerCase() === email);
-      if (existingAccount) throw new TRPCError({ code: "CONFLICT", message: "Cette adresse e-mail est déjà utilisée." });
+      if (await emailIsTaken(db, email)) throw new TRPCError({ code: "CONFLICT", message: "Cette adresse e-mail est déjà utilisée." });
       const sessionDurationMs = input.rememberMe ? REMEMBERED_AUTH_SESSION_MS : STANDARD_AUTH_SESSION_MS;
       const openId = `local_admin_${randomUUID()}`;
       const passwordHash = await hashPassword(input.password);
@@ -281,9 +250,7 @@ export const appRouter = router({
         const now = new Date();
         const sessions = await db.select().from(userSessions).where(eq(userSessions.userId, ctx.user.id)).orderBy(desc(userSessions.lastSeenAt));
         const activeSessions = sessions.filter(session => !session.revokedAt && session.expiresAt > now).map(session => ({ id: session.id, deviceLabel: session.deviceLabel, createdAt: session.createdAt, lastSeenAt: session.lastSeenAt, expiresAt: session.expiresAt, isCurrent: session.id === ctx.user.sessionId }));
-        if (ctx.user.sessionId) return activeSessions;
-        const userAgent = typeof ctx.req.headers["user-agent"] === "string" ? ctx.req.headers["user-agent"] : undefined;
-        return [{ id: "legacy-current", deviceLabel: sessionDeviceLabel(userAgent), createdAt: ctx.user.lastSignedIn, lastSeenAt: ctx.user.lastSignedIn, expiresAt: new Date(ctx.user.lastSignedIn.getTime() + ONE_YEAR_MS), isCurrent: true }, ...activeSessions];
+        return activeSessions;
       }),
       revoke: protectedProcedure.input(z.object({ sessionId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
         if (input.sessionId === ctx.user.sessionId) throw new TRPCError({ code: "BAD_REQUEST", message: "Utilisez la déconnexion pour fermer la session de cet appareil." });
@@ -296,46 +263,19 @@ export const appRouter = router({
       revokeOthers: protectedProcedure.mutation(async ({ ctx }) => {
         if (!ctx.user.sessionId) throw new TRPCError({ code: "BAD_REQUEST", message: "Reconnectez-vous pour révoquer les autres sessions." });
         const db = await requireDb();
-        const sessions = await db.select().from(userSessions).where(eq(userSessions.userId, ctx.user.id));
-        const otherIds = sessions.filter(session => !session.revokedAt && session.id !== ctx.user.sessionId).map(session => session.id);
-        await Promise.all(otherIds.map(sessionId => db.update(userSessions).set({ revokedAt: new Date() }).where(and(eq(userSessions.id, sessionId), eq(userSessions.userId, ctx.user.id)))));
-        return { success: true, revokedCount: otherIds.length } as const;
+        const revokedCount = await revokeUserSessions(db, ctx.user.id, ctx.user.sessionId);
+        return { success: true, revokedCount } as const;
       }),
-    }),
-    adminFallbackLogin: publicProcedure.input(z.object({ email: z.string().trim().email().max(320), password: z.string().min(1).max(256) })).mutation(async ({ ctx, input }) => {
-      assertLoginRateLimit(ctx.req, input.email);
-      const emailMatches = Boolean(ENV.adminFallbackEmail) && input.email.trim().toLowerCase() === ENV.adminFallbackEmail.trim().toLowerCase();
-      if (!emailMatches) {
-        console.info("[Auth fallback] Rejected credentials", { emailMatches, passwordLength: input.password.length, configuredPasswordLength: ENV.adminFallbackPassword.length, reason: "email" });
-        throw new TRPCError({ code: "UNAUTHORIZED", message: "Identifiants administrateur incorrects." });
-      }
-      const db = await requireDb();
-      const adminAccounts = await db.select().from(users).where(eq(users.role, "admin"));
-      const configuredAdmin = adminAccounts.find(account => account.email?.trim().toLowerCase() === input.email.trim().toLowerCase()) ?? (adminAccounts.length === 1 ? adminAccounts[0] : undefined);
-      const adminOpenId = ENV.ownerOpenId;
-      if (!adminOpenId) {
-        console.info("[Auth fallback] Rejected credentials", { emailMatches, passwordLength: input.password.length, configuredPasswordLength: ENV.adminFallbackPassword.length, reason: "admin-account" });
-        throw new TRPCError({ code: "UNAUTHORIZED", message: "Identifiants administrateur incorrects." });
-      }
-      const override = (await db.select().from(adminFallbackPasswords).where(eq(adminFallbackPasswords.ownerOpenId, adminOpenId)).limit(1))[0];
-      const passwordValid = override ? await verifyPassword(input.password, override.passwordHash) : legacyAdminFallbackEnabled() && matchesAdminFallbackCredentials(input, { email: ENV.adminFallbackEmail, password: ENV.adminFallbackPassword });
-      if (!passwordValid) {
-        console.info("[Auth fallback] Rejected credentials", { emailMatches, passwordLength: input.password.length, configuredPasswordLength: ENV.adminFallbackPassword.length, overridePresent: Boolean(override), reason: "password" });
-        throw new TRPCError({ code: "UNAUTHORIZED", message: "Identifiants administrateur incorrects." });
-      }
-      const token = await sdk.createSessionToken(adminOpenId, { name: configuredAdmin?.name || "Administrateur", expiresInMs: ONE_YEAR_MS });
-      ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: ONE_YEAR_MS });
-      console.info("[Auth fallback] Session issued", { overridePresent: Boolean(override) });
-      return { success: true } as const;
     }),
     adminFallbackPasswordChange: adminProcedure.input(z.object({ currentPassword: z.string().min(1), newPassword: z.string().min(10).max(256) })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
       const override = (await db.select().from(adminFallbackPasswords).where(eq(adminFallbackPasswords.ownerOpenId, ctx.user.openId)).limit(1))[0];
-      const currentValid = override ? await verifyPassword(input.currentPassword, override.passwordHash) : legacyAdminFallbackEnabled() && matchesAdminFallbackCredentials({ email: ENV.adminFallbackEmail, password: input.currentPassword }, { email: ENV.adminFallbackEmail, password: ENV.adminFallbackPassword });
+      const currentValid = Boolean(override) && await verifyPassword(input.currentPassword, override!.passwordHash);
       if (!currentValid) throw new TRPCError({ code: "UNAUTHORIZED", message: "Le mot de passe actuel est incorrect." });
       const passwordHash = await hashPassword(input.newPassword);
       if (override) await db.update(adminFallbackPasswords).set({ passwordHash, updatedByUserId: ctx.user.id }).where(eq(adminFallbackPasswords.id, override.id));
       else await db.insert(adminFallbackPasswords).values({ ownerOpenId: ctx.user.openId, passwordHash, updatedByUserId: ctx.user.id });
+      await revokeUserSessions(db, ctx.user.id, ctx.user.sessionId);
       return { success: true } as const;
     }),
   }),
@@ -791,6 +731,7 @@ export const appRouter = router({
       const target = (await db.select({ id: users.id }).from(users).where(and(eq(users.id, input.id), companyScope(users.companyId, ctx.user.companyId))).limit(1))[0];
       if (!target) throw new TRPCError({ code: "NOT_FOUND", message: "Utilisateur introuvable dans cette entreprise." });
       await db.update(users).set({ role: input.role }).where(and(eq(users.id, input.id), companyScope(users.companyId, ctx.user.companyId)));
+      await revokeUserSessions(db, input.id);
       await createAudit(ctx.user, "Rôle modifié", "Utilisateur", input.id, `Rôle défini sur ${input.role === "admin" ? "administrateur" : "vendeur"}`);
       return { success: true };
     }),

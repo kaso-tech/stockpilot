@@ -10,6 +10,7 @@ import { runScheduledBackup } from "../scheduledBackups";
 import { registerGoogleDriveRoutes } from "../googleDriveRoutes";
 import { serveStatic, setupVite } from "./vite";
 import { ensureAdminFallbackPasswordSeed } from "../adminFallbackSeed";
+import { registerHttpSecurity } from "./httpSecurity";
 
 // Restauration : dataUrl ≤ 30 Mo en base64 ; marge pour l'enveloppe JSON tRPC.
 const TRPC_BODY_LIMIT = "32mb";
@@ -36,6 +37,7 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
+  registerHttpSecurity(app, process.env.NODE_ENV === "production");
   // Corps limités par défaut ; seules les procédures d'import (restauration de
   // sauvegarde, logos, reçus) acceptent des charges plus volumineuses.
   app.use("/api/trpc", express.json({ limit: TRPC_BODY_LIMIT }));

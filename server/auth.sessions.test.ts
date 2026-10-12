@@ -56,9 +56,4 @@ describe("auth.sessions", () => {
     expect(updates).toHaveLength(1);
     await expect(appRouter.createCaller(authenticatedContext()).auth.sessions.revoke({ sessionId: currentSessionId })).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
-
-  it("révoque toutes les autres sessions actives", async () => {
-    await expect(appRouter.createCaller(authenticatedContext()).auth.sessions.revokeOthers()).resolves.toEqual({ success: true, revokedCount: 1 });
-    expect(updates).toHaveLength(1);
-  });
 });
