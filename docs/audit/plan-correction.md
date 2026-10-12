@@ -11,8 +11,8 @@ Règles d'exécution :
 |---|---|---|---|
 | 1 | CI verte et correctifs de sécurité rapides | E20, E21, S2, S3, S4, S7, B1, H2, H3, E16, E17, E11 | ✅ Fait |
 | 2 | Authentification, sessions, CSRF, en-têtes, limitation de débit | A1–A8, A4, H1, H4, B6 (doc) | ✅ Fait |
-| 3 | Concurrence et intégrité du stock et des encaissements | E1, E2, E3, E9, E13 | 🔄 En cours |
-| 4 | Schéma multi-entreprise (contraintes UNIQUE, index) | S1, A8, S8 (partiel) | ⬜ À faire |
+| 3 | Concurrence et intégrité du stock et des encaissements | E1, E2, E3, E9, E13 | ✅ Fait |
+| 4 | Schéma multi-entreprise (contraintes UNIQUE, index) | S1, A8, S8 (partiel) | 🔄 En cours |
 | 5 | Sauvegardes complètes, restauration validée, stockage, Drive | E14, E15, S6, B2, B3, B4, B5 | ⬜ À faire |
 | 6 | Code mort et dépendances (mise à jour + retrait) | §4, §2.5 | ⬜ À faire |
 | 7 | Corrections fonctionnelles (tableau de bord, fuseau horaire, pagination, inventaire, numérotation, remboursements) | E4–E8, E10, E12, E18 (partiel) | ⬜ À faire |
@@ -56,3 +56,14 @@ Le détail des modifications de chaque lot est consigné dans la section « Jour
 - Tests : `server/test/lot2.auth.db.test.ts` (8 scénarios MySQL), `server/_core/httpSecurity.test.ts`, test de saturation du limiteur. Les anciens tests à base de simulations devenus obsolètes ont été remplacés.
 
 **Variables d'environnement nouvelles :** `TRUST_PROXY` (défaut `1`), `FRAME_ANCESTORS` (défaut `'self'`).
+
+### Lot 3 — Concurrence et intégrité du stock et des encaissements
+
+- **E1** : `checkout`, `refund` et `removeDraft` verrouillent la vente (`SELECT … FOR UPDATE`) dans la transaction ; un encaissement concurrent attend puis relit le statut. Vérifié : l'ancien code encaissait **3 fois** la même vente sous 3 requêtes simultanées, le nouveau une seule.
+- **E2** : nouveau module `server/stockLedger.ts` (`lockProducts` + `StockLedger.apply`) : verrouille les produits, calcule la quantité courante ligne après ligne, écrit le mouvement et synchronise l'alerte. Utilisé par l'encaissement, le remboursement, les mouvements manuels, la réception des bons de commande (bon verrouillé également), la validation d'inventaire et la modification de fiche produit.
+- **E3** : une vente ou un remboursement avec plusieurs lignes du même produit fonctionne (identifiants dédoublonnés, quantité suivie par le registre).
+- **E7** : le stock théorique d'une ligne d'inventaire est figé au moment du comptage ; la validation applique l'écart (compté − théorique) au stock courant. Comptage impossible sur un inventaire validé.
+- **E9** : modifier la quantité depuis la fiche produit crée un mouvement d'ajustement tracé.
+- **E13** : bornes `MAX_CENTS` / `MAX_QUANTITY` sur les prix et quantités produit, paliers, mouvements, réceptions, comptages, rémunérations fixes ; 10 paiements maximum par encaissement.
+- Les erreurs de stock (stock négatif…) remontent en `BAD_REQUEST` avec le nom du produit au lieu d'une erreur 500.
+- Tests : `server/test/lot3.stock.db.test.ts` (7 scénarios dont encaissements et réceptions concurrents). Les anciens tests simulés incompatibles avec les verrous ont été remplacés.

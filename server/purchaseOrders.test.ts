@@ -67,12 +67,7 @@ describe("purchaseOrders transitions", () => {
     const result = await appRouter.createCaller(context()).purchaseOrders.updateDetails({ id: 9, notes: "Livraison express", expectedDeliveryDate: new Date("2026-08-30T12:00:00Z") });
     expect(result).toEqual({ success: true });
   });
-  it("réceptionne partiellement le bon et crée l’entrée de stock correspondante", async () => {
-    const result = await appRouter.createCaller(context()).purchaseOrders.receive({ id: 9, lines: [{ id: 1, quantity: 2 }] });
-    expect(result).toEqual({ success: true, alreadyReceived: false, status: "sent", complete: false });
-    expect(productUpdates).toContainEqual({ quantity: 5 });
-    expect(stockRows).toContainEqual(expect.objectContaining({ companyId: 1, productId: 12, supplierId: 4, type: "entry", quantity: 2, previousQuantity: 3, resultingQuantity: 5 }));
-  });
+  // Réception (verrous FOR UPDATE) couverte sur MySQL réel : server/test/lot3.stock.db.test.ts.
   it("annule le bon avec un motif explicite", async () => {
     const result = await appRouter.createCaller(context()).purchaseOrders.cancel({ id: 9, reason: "Délai fournisseur dépassé" });
     expect(result).toEqual({ success: true, status: "cancelled" });

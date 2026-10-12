@@ -74,6 +74,7 @@ import { assertSellerSensitiveAction } from "./sellerActionRules";
 import { companyScope } from "./companyScope";
 import { assertRateLimit, burnPasswordCheck, emailIsTaken, findLoginAccount, revokeUserSessions } from "./authSessions";
 import { conflictOr } from "./dbErrors";
+import { lockProducts } from "./stockLedger";
 
 const productInput = z.object({
   reference: z.string().trim().min(2).max(80),
@@ -81,15 +82,15 @@ const productInput = z.object({
   description: z.string().trim().max(2000).nullable(),
   category: z.string().trim().min(2).max(100),
   unit: z.string().trim().min(1).max(30),
-  purchasePriceCents: z.number().int().min(0),
-  retailPriceCents: z.number().int().min(0),
-  wholesalePriceCents: z.number().int().min(0),
-  quantity: z.number().int().min(0),
-  minimumQuantity: z.number().int().min(0),
+  purchasePriceCents: z.number().int().min(0).max(MAX_CENTS),
+  retailPriceCents: z.number().int().min(0).max(MAX_CENTS),
+  wholesalePriceCents: z.number().int().min(0).max(MAX_CENTS),
+  quantity: z.number().int().min(0).max(MAX_QUANTITY),
+  minimumQuantity: z.number().int().min(0).max(MAX_QUANTITY),
   supplierId: z.number().int().positive().nullable(),
-  priceTiers: z.array(z.object({ minQuantity: z.number().int().min(2), unitPriceCents: z.number().int().min(0) })).max(12).default([]),
-  retailPriceTiers: z.array(z.object({ minQuantity: z.number().int().min(2), unitPriceCents: z.number().int().min(0) })).max(12).default([]),
-  wholesalePriceTiers: z.array(z.object({ minQuantity: z.number().int().min(2), unitPriceCents: z.number().int().min(0) })).max(12).default([]),
+  priceTiers: z.array(z.object({ minQuantity: z.number().int().min(2).max(MAX_QUANTITY), unitPriceCents: z.number().int().min(0).max(MAX_CENTS) })).max(12).default([]),
+  retailPriceTiers: z.array(z.object({ minQuantity: z.number().int().min(2).max(MAX_QUANTITY), unitPriceCents: z.number().int().min(0).max(MAX_CENTS) })).max(12).default([]),
+  wholesalePriceTiers: z.array(z.object({ minQuantity: z.number().int().min(2).max(MAX_QUANTITY), unitPriceCents: z.number().int().min(0).max(MAX_CENTS) })).max(12).default([]),
 }).superRefine((input, ctx) => { for (const [label, tiers] of [["détail", input.retailPriceTiers.length ? input.retailPriceTiers : input.priceTiers], ["grossiste", input.wholesalePriceTiers]] as const) { const seen = new Set<number>(); for (const tier of tiers) { if (seen.has(tier.minQuantity)) ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Chaque seuil ${label} doit être unique.` }); seen.add(tier.minQuantity); } } });
 
 const supplierInput = z.object({
@@ -446,7 +447,7 @@ export const appRouter = router({
       if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Produit introuvable." });
       await assertSupplierInCompany(values.supplierId, ctx.user.companyId);
       try {
-        await db.transaction(async tx => { await tx.update(products).set(values).where(and(eq(products.id, id), companyScope(products.companyId, ctx.user.companyId))); await tx.delete(productPriceTiers).where(eq(productPriceTiers.productId, id)); const tiers = [...retailTiers.map(tier => ({ ...tier, productId: id, customerType: "retail" as const })), ...wholesalePriceTiers.map(tier => ({ ...tier, productId: id, customerType: "wholesale" as const }))]; if (tiers.length) await tx.insert(productPriceTiers).values(tiers); });
+        await db.transaction(async tx => { const { quantity: requestedQuantity, ...productValues } = values; const ledger = await lockProducts(tx, [id], ctx.user.companyId); await tx.update(products).set(productValues).where(and(eq(products.id, id), companyScope(products.companyId, ctx.user.companyId))); const delta = requestedQuantity - ledger.quantity(id); if (delta !== 0) await ledger.apply(id, { type: "adjustment", quantity: delta, reason: "Correction depuis la fiche produit", createdByUserId: ctx.user.id }); await tx.delete(productPriceTiers).where(eq(productPriceTiers.productId, id)); const tiers = [...retailTiers.map(tier => ({ ...tier, productId: id, customerType: "retail" as const })), ...wholesalePriceTiers.map(tier => ({ ...tier, productId: id, customerType: "wholesale" as const }))]; if (tiers.length) await tx.insert(productPriceTiers).values(tiers); });
       } catch (error) {
         conflictOr(error, "Cette référence produit existe déjà.");
       }
@@ -624,7 +625,7 @@ export const appRouter = router({
       await createAudit(ctx.user, "Annulation", "Bon de commande", input.id, `Bon ${order.orderNumber} annulé : ${input.reason}`);
       return { success: true, status: "cancelled" as const };
     }),
-    receive: adminProcedure.input(z.object({ id: z.number().int().positive(), lines: z.array(z.object({ id: z.number().int().positive(), quantity: z.number().int().positive() })).min(1).max(100) })).mutation(async ({ ctx, input }) => {
+    receive: adminProcedure.input(z.object({ id: z.number().int().positive(), lines: z.array(z.object({ id: z.number().int().positive(), quantity: z.number().int().positive().max(MAX_QUANTITY) })).min(1).max(100) })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
       const order = (await db.select().from(purchaseOrders).where(and(eq(purchaseOrders.id, input.id), companyScope(purchaseOrders.companyId, ctx.user.companyId))).limit(1))[0];
       if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Bon de commande introuvable." });
@@ -640,16 +641,16 @@ export const appRouter = router({
         if (line.quantity > item.quantity - item.receivedQuantity) throw new TRPCError({ code: "BAD_REQUEST", message: `La quantité reçue dépasse le reliquat de ${item.productName}.` });
       }
       const result = await db.transaction(async tx => {
+        const lockedOrder = (await tx.select().from(purchaseOrders).where(and(eq(purchaseOrders.id, input.id), companyScope(purchaseOrders.companyId, ctx.user.companyId))).limit(1).for("update"))[0];
+        if (!lockedOrder || lockedOrder.status === "cancelled" || lockedOrder.status === "received") throw new TRPCError({ code: "CONFLICT", message: "Ce bon a été modifié. Actualisez la page avant de poursuivre." });
+        const ledger = await lockProducts(tx, items.map(item => item.productId), ctx.user.companyId);
         for (const item of items.filter(value => requestedByItemId.has(value.id))) {
           const receivedNow = requestedByItemId.get(item.id) ?? 0;
-          const product = (await tx.select().from(products).where(and(eq(products.id, item.productId), companyScope(products.companyId, ctx.user.companyId))).limit(1))[0];
-          if (!product) throw new TRPCError({ code: "NOT_FOUND", message: `Produit ${item.productName} introuvable.` });
-          const resultingQuantity = product.quantity + receivedNow;
-          await tx.update(products).set({ quantity: resultingQuantity }).where(and(eq(products.id, product.id), companyScope(products.companyId, ctx.user.companyId)));
+          if (!ledger.has(item.productId)) throw new TRPCError({ code: "NOT_FOUND", message: `Produit ${item.productName} introuvable.` });
           const quantityUpdate = await tx.update(purchaseOrderItems).set({ receivedQuantity: item.receivedQuantity + receivedNow }).where(and(eq(purchaseOrderItems.id, item.id), eq(purchaseOrderItems.purchaseOrderId, input.id), eq(purchaseOrderItems.receivedQuantity, item.receivedQuantity)));
           const affected = Number((quantityUpdate as unknown as Array<{ affectedRows?: number }>)[0]?.affectedRows ?? 0);
           if (!affected) throw new TRPCError({ code: "CONFLICT", message: "Ce bon a été modifié. Actualisez la page avant de poursuivre." });
-          await tx.insert(stockMovements).values({ companyId: ctx.user.companyId, productId: product.id, supplierId: order.supplierId, type: "entry", quantity: receivedNow, previousQuantity: product.quantity, resultingQuantity, reason: `Réception partielle du bon ${order.orderNumber}`, createdByUserId: ctx.user.id });
+          await ledger.apply(item.productId, { type: "entry", quantity: receivedNow, supplierId: order.supplierId, reason: `Réception partielle du bon ${order.orderNumber}`, createdByUserId: ctx.user.id });
         }
         const complete = items.every(item => item.receivedQuantity + (requestedByItemId.get(item.id) ?? 0) >= item.quantity);
         const status = complete ? "received" : "sent";
@@ -667,7 +668,7 @@ export const appRouter = router({
       productId: z.number().int().positive(),
       supplierId: z.number().int().positive().nullable(),
       type: z.enum(["entry", "exit", "adjustment"]),
-      quantity: z.number().int().refine(value => value !== 0, "La quantité doit être différente de zéro."),
+      quantity: z.number().int().min(-MAX_QUANTITY).max(MAX_QUANTITY).refine(value => value !== 0, "La quantité doit être différente de zéro."),
       reason: z.string().trim().min(3).max(255),
     })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
@@ -681,38 +682,18 @@ export const appRouter = router({
         try { assertSellerSensitiveAction(settings, "stock_correction"); } catch (error) { throw new TRPCError({ code: "FORBIDDEN", message: error instanceof Error ? error.message : "Correction de stock non autorisée." }); }
       }
       await db.transaction(async tx => {
-        const row = await tx.select().from(products).where(and(eq(products.id, input.productId), companyScope(products.companyId, ctx.user.companyId))).limit(1);
-        const product = row[0];
-        if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Produit introuvable." });
-        const signedQuantity = signedMovementQuantity(input.type, input.quantity);
-        let resultingQuantity: number;
-        try {
-          resultingQuantity = resultingStock(product.quantity, input.type, input.quantity);
-        } catch (error) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "Mouvement invalide." });
-        }
-        await tx.update(products).set({ quantity: resultingQuantity }).where(and(eq(products.id, product.id), companyScope(products.companyId, ctx.user.companyId)));
-        await tx.insert(stockMovements).values({
-          companyId: ctx.user.companyId,
-          productId: product.id,
-          supplierId: input.supplierId,
-          type: input.type,
-          quantity: signedQuantity,
-          previousQuantity: product.quantity,
-          resultingQuantity,
-          reason: input.reason,
-          createdByUserId: ctx.user.id,
-        });
+        const ledger = await lockProducts(tx, [input.productId], ctx.user.companyId);
+        const product = ledger.product(input.productId);
+        const { resultingQuantity, previousQuantity } = await ledger.apply(product.id, { type: input.type, quantity: input.quantity, reason: input.reason, supplierId: input.supplierId, createdByUserId: ctx.user.id });
         await tx.insert(auditLogs).values({
           companyId: ctx.user.companyId,
           actorUserId: ctx.user.id,
           action: "Mouvement enregistré",
           entityType: "Mouvement de stock",
           entityId: String(product.id),
-          detail: `${input.type} de ${Math.abs(signedQuantity)} ${product.unit} pour ${product.reference} : ${input.reason}`,
+          detail: `${input.type} de ${Math.abs(resultingQuantity - previousQuantity)} ${product.unit} pour ${product.reference} : ${input.reason}`,
         });
       });
-      await syncStockAlert(input.productId, ctx.user.companyId);
       return { success: true };
     }),
   }),
