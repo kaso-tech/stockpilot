@@ -79,7 +79,7 @@ export const suppliers = mysqlTable("suppliers", {
 export const purchaseOrders = mysqlTable("purchaseOrders", {
   id: int("id").autoincrement().primaryKey(),
   companyId: int("companyId"),
-  orderNumber: varchar("orderNumber", { length: 60 }).notNull().unique(),
+  orderNumber: varchar("orderNumber", { length: 60 }).notNull(),
   supplierId: int("supplierId").notNull(),
   status: mysqlEnum("status", ["draft", "sent", "received", "cancelled"]).notNull().default("draft"),
   subtotalCents: int("subtotalCents").notNull().default(0),
@@ -95,7 +95,7 @@ export const purchaseOrders = mysqlTable("purchaseOrders", {
   createdByUserId: int("createdByUserId").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-}, table => [index("purchase_orders_company_created_idx").on(table.companyId, table.createdAt)]);
+}, table => [index("purchase_orders_company_created_idx").on(table.companyId, table.createdAt), unique("purchase_orders_company_number_unique").on(table.companyId, table.orderNumber)]);
 
 export const purchaseOrderItems = mysqlTable("purchaseOrderItems", {
   id: int("id").autoincrement().primaryKey(),
@@ -205,6 +205,8 @@ export const saleSettings = mysqlTable("saleSettings", {
   requireSalesAgent: boolean("requireSalesAgent").notNull().default(false),
   requireCashier: boolean("requireCashier").notNull().default(false),
   currency: mysqlEnum("currency", ["USD", "EUR", "XOF"]).notNull().default("XOF"),
+  /** Fuseau IANA utilisé pour les journées et mois comptables (tableau de bord, paie, dépenses). */
+  timezone: varchar("timezone", { length: 64 }).notNull().default("Africa/Abidjan"),
   primaryColor: varchar("primaryColor", { length: 7 }).notNull().default("#007B8B"),
   companyName: varchar("companyName", { length: 200 }).notNull().default("StockPilot"),
   companyLogoUrl: text("companyLogoUrl"),
@@ -242,7 +244,10 @@ export const saleSettings = mysqlTable("saleSettings", {
 export const sales = mysqlTable("sales", {
   id: int("id").autoincrement().primaryKey(),
   companyId: int("companyId"),
-  invoiceNumber: varchar("invoiceNumber", { length: 60 }).notNull().unique(),
+  invoiceNumber: varchar("invoiceNumber", { length: 60 }).notNull(),
+  /** Numéro de l'avoir émis lors d'un remboursement (séquence AV par entreprise). */
+  creditNoteNumber: varchar("creditNoteNumber", { length: 60 }),
+  refundedAt: timestamp("refundedAt"),
   offlineOperationId: varchar("offlineOperationId", { length: 80 }).unique(),
   channel: mysqlEnum("channel", ["pos", "invoice", "quote"]).notNull().default("invoice"),
   customerId: int("customerId"),
@@ -266,7 +271,7 @@ export const sales = mysqlTable("sales", {
   deliveryAddress: text("deliveryAddress"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   voidedAt: timestamp("voidedAt"),
-}, table => [index("sales_company_created_idx").on(table.companyId, table.createdAt), index("sales_company_status_idx").on(table.companyId, table.status), index("sales_offline_user_idx").on(table.offlineOperationId, table.sellerUserId)]);
+}, table => [unique("sales_company_invoice_number_unique").on(table.companyId, table.invoiceNumber), index("sales_company_created_idx").on(table.companyId, table.createdAt), index("sales_company_status_idx").on(table.companyId, table.status), index("sales_offline_user_idx").on(table.offlineOperationId, table.sellerUserId)]);
 
 export const expenses = mysqlTable("expenses", {
   id: int("id").autoincrement().primaryKey(),
@@ -453,3 +458,16 @@ export type Sale = typeof sales.$inferSelect;
 export type SaleItem = typeof saleItems.$inferSelect;
 export type Supplier = typeof suppliers.$inferSelect;
 export type StockMovement = typeof stockMovements.$inferSelect;
+
+/**
+ * Compteurs de numérotation par entreprise, série et année (factures FAC, tickets POS,
+ * devis DEV, avoirs AV, bons de commande BC) : numérotation continue et sans collision.
+ */
+export const documentSequences = mysqlTable("documentSequences", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  series: varchar("series", { length: 10 }).notNull(),
+  year: int("year").notNull(),
+  lastValue: int("lastValue").notNull().default(0),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [unique("document_sequences_company_series_year_unique").on(table.companyId, table.series, table.year)]);

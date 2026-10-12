@@ -14,6 +14,8 @@ import { companyScope } from "../companyScope";
 import { assertSafeDatabaseInt, MAX_CENTS, MAX_DISCOUNT_BASIS_POINTS, MAX_LINE_ITEMS, MAX_QUANTITY } from "../numericLimits";
 import { calculateCommercialTotals } from "../commercialTotals";
 import { lockProducts } from "../stockLedger";
+import { nextDocumentNumber } from "../documentNumbers";
+import { companyTimezone, dayKey } from "../companyTime";
 
 const paymentMethod = z.enum(["cash", "card", "mobile_money", "bank_transfer", "credit"]);
 const discountInput = z.object({ type: z.enum(["none", "percent", "fixed"]), value: z.number().int().min(0).max(MAX_CENTS) }).superRefine((value, ctx) => { if (value.type === "percent" && value.value > MAX_DISCOUNT_BASIS_POINTS) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Le pourcentage de remise est invalide." }); });
@@ -27,10 +29,8 @@ async function dbOrThrow() {
   return db;
 }
 
-function invoiceNumber(channel: "pos" | "invoice" | "quote") {
-  const prefix = channel === "pos" ? "POS" : channel === "quote" ? "DEV" : "FAC";
-  return `${prefix}-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-${Date.now().toString().slice(-7)}`;
-}
+const listInput = z.object({ channel: z.enum(["pos", "invoice", "quote"]).optional(), limit: z.number().int().min(1).max(1000).optional() }).optional();
+const SERIES_BY_CHANNEL = { pos: "POS", invoice: "FAC", quote: "DEV" } as const;
 
 async function validateAgents(tx: any, companyId: number | null, selected: { salesAgentId: number | null; cashierId: number | null; salesAgentSelectionMade?: boolean; cashierSelectionMade?: boolean }, channel?: "pos" | "invoice" | "quote") {
   const settings = (await tx.select().from(saleSettings).where(companyScope(saleSettings.companyId, companyId)).limit(1))[0];
@@ -49,10 +49,13 @@ async function validateAgents(tx: any, companyId: number | null, selected: { sal
 }
 
 export const transactionsRouter = router({
-  list: protectedProcedure.query(async ({ ctx }) => {
+  list: protectedProcedure.input(listInput).query(async ({ ctx, input }) => {
     const db = await dbOrThrow();
+    // Filtre par canal côté serveur et limite extensible (« Charger plus ») : les
+    // devis ou factures anciens ne sont plus masqués par les 100 derniers tickets (E12).
+    const scope = input?.channel ? and(companyScope(sales.companyId, ctx.user.companyId), eq(sales.channel, input.channel)) : companyScope(sales.companyId, ctx.user.companyId);
     const [rows, customerRows] = await Promise.all([
-      db.select().from(sales).where(companyScope(sales.companyId, ctx.user.companyId)).orderBy(desc(sales.createdAt)).limit(100),
+      db.select().from(sales).where(scope).orderBy(desc(sales.createdAt), desc(sales.id)).limit(input?.limit ?? 100),
       db.select().from(customers).where(companyScope(customers.companyId, ctx.user.companyId)),
     ]);
     const customerNames = new Map(customerRows.map(customer => [customer.id, customer.name]));
@@ -63,16 +66,24 @@ export const transactionsRouter = router({
     await db.transaction(async tx => {
       const sale = (await tx.select().from(sales).where(and(eq(sales.id, input.saleId), companyScope(sales.companyId, ctx.user.companyId))).limit(1).for("update"))[0];
       if (!sale || (sale.channel !== "invoice" && sale.channel !== "quote")) throw new TRPCError({ code: "NOT_FOUND", message: "Document introuvable." });
-      if (sale.status !== "draft" || sale.amountPaidCents > 0) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Seules les factures non encaissées peuvent être supprimées." });
+      if (sale.status !== "draft" || sale.amountPaidCents > 0) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Seuls les documents non encaissés peuvent être annulés." });
       if (ctx.user.role === "seller") { const settings = (await tx.select().from(saleSettings).where(companyScope(saleSettings.companyId, ctx.user.companyId)).limit(1))[0]; try { assertSellerSensitiveAction(settings, "invoice_cancellation"); } catch (error) { throw new TRPCError({ code: "FORBIDDEN", message: error instanceof Error ? error.message : "Annulation non autorisée." }); } }
-      await tx.delete(saleItems).where(eq(saleItems.saleId, sale.id));
-      await tx.delete(sales).where(and(eq(sales.id, sale.id), companyScope(sales.companyId, ctx.user.companyId)));
-      await tx.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Suppression", entityType: "Facture", entityId: String(sale.id), detail: `Facture ${sale.invoiceNumber} supprimée avant encaissement` });
+      if (sale.channel === "invoice") {
+        // Une facture numérotée n'est jamais supprimée : elle est annulée pour
+        // préserver la continuité de la numérotation (E5).
+        await tx.update(sales).set({ status: "void", voidedAt: new Date() }).where(and(eq(sales.id, sale.id), companyScope(sales.companyId, ctx.user.companyId)));
+        await tx.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Annulation", entityType: "Facture", entityId: String(sale.id), detail: `Facture ${sale.invoiceNumber} annulée avant encaissement` });
+      } else {
+        await tx.delete(saleItems).where(eq(saleItems.saleId, sale.id));
+        await tx.delete(sales).where(and(eq(sales.id, sale.id), companyScope(sales.companyId, ctx.user.companyId)));
+        await tx.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Suppression", entityType: "Devis", entityId: String(sale.id), detail: `Devis ${sale.invoiceNumber} supprimé` });
+      }
     });
     return { success: true };
   }),
-  refund: protectedProcedure.input(z.object({ saleId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+  refund: protectedProcedure.input(z.object({ saleId: z.number().int().positive(), method: paymentMethod.optional() })).mutation(async ({ ctx, input }) => {
     const db = await dbOrThrow();
+    let creditNoteNumber = "";
     await db.transaction(async tx => {
       const sale = (await tx.select().from(sales).where(and(eq(sales.id, input.saleId), companyScope(sales.companyId, ctx.user.companyId))).limit(1).for("update"))[0];
       if (!sale) throw new TRPCError({ code: "NOT_FOUND", message: "Facture introuvable." });
@@ -85,11 +96,20 @@ export const transactionsRouter = router({
       const ledger = await lockProducts(tx, items.map(item => item.productId), ctx.user.companyId);
       ledger.assertAll(items.map(item => item.productId), "Un produit de cette facture est introuvable ; le remboursement ne peut pas être finalisé.");
       for (const item of items) await ledger.apply(item.productId, { type: "entry", quantity: item.quantity, reason: `Remboursement ${sale.invoiceNumber}`, createdByUserId: ctx.user.id });
-      await tx.delete(saleCommissions).where(eq(saleCommissions.saleId, sale.id));
-      await tx.update(sales).set({ status: "void", amountPaidCents: 0 }).where(and(eq(sales.id, sale.id), companyScope(sales.companyId, ctx.user.companyId)));
-      await tx.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Remboursement", entityType: "Facture", entityId: String(sale.id), detail: `Facture ${sale.invoiceNumber} remboursée pour ${sale.amountPaidCents} centimes ; stock réintégré et commissions annulées.` });
+      // Avoir numéroté (E8) : la facture d'origine est conservée et annulée, le
+      // remboursement est tracé par un paiement négatif (la caisse reste juste) et
+      // les commissions sont contrepassées au lieu d'être effacées (elles ont pu être versées).
+      const timezone = await companyTimezone(tx, ctx.user.companyId);
+      creditNoteNumber = await nextDocumentNumber(tx, ctx.user.companyId!, "AV", Number(dayKey(new Date(), timezone).slice(0, 4)));
+      await tx.insert(salePayments).values({ saleId: sale.id, method: input.method ?? sale.paymentMethod, amountCents: -sale.amountPaidCents, createdByUserId: ctx.user.id });
+      const commissions = await tx.select().from(saleCommissions).where(eq(saleCommissions.saleId, sale.id));
+      const totals = new Map<string, { row: typeof commissions[number]; cents: number }>();
+      for (const row of commissions) { const key = `${row.beneficiaryType}:${row.beneficiaryId}`; const current = totals.get(key); totals.set(key, { row, cents: (current?.cents ?? 0) + row.commissionCents }); }
+      for (const { row, cents } of Array.from(totals.values())) if (cents !== 0) await tx.insert(saleCommissions).values({ saleId: sale.id, beneficiaryType: row.beneficiaryType, beneficiaryId: row.beneficiaryId, commissionBasis: row.commissionBasis, rateBasisPoints: row.rateBasisPoints, commissionCents: -cents });
+      await tx.update(sales).set({ status: "void", amountPaidCents: 0, creditNoteNumber, refundedAt: new Date(), voidedAt: new Date() }).where(and(eq(sales.id, sale.id), companyScope(sales.companyId, ctx.user.companyId)));
+      await tx.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Remboursement", entityType: "Facture", entityId: String(sale.id), detail: `Facture ${sale.invoiceNumber} remboursée pour ${sale.amountPaidCents} centimes (avoir ${creditNoteNumber}) ; stock réintégré et commissions contrepassées.` });
     });
-    return { success: true };
+    return { success: true, creditNoteNumber };
   }),
   createDraft: protectedProcedure.input(z.object({ channel: z.enum(["pos", "invoice", "quote"]), customerId: z.number().int().positive().nullable(), note: z.string().trim().max(1000).nullable(), deliveryAddress: z.string().trim().max(1500).nullable().optional(), deliveryFeeCents: z.number().int().min(0).max(MAX_CENTS).default(0), items: z.array(itemInput).min(1).max(MAX_LINE_ITEMS), invoiceDiscount: discountInput.default({ type: "none", value: 0 }), offlineOperationId: z.string().trim().min(8).max(80).optional() }).merge(agentSelection)).mutation(async ({ ctx, input }) => {
     if ((input.channel === "invoice" || input.channel === "quote") && !input.customerId) throw new TRPCError({ code: "BAD_REQUEST", message: "Un client est obligatoire pour créer ce document." });
@@ -120,7 +140,8 @@ export const transactionsRouter = router({
       const totalCents = commercialTotals.totalCents;
       const totalCostCents = assertSafeDatabaseInt(lines.reduce((sum, line) => sum + line.lineCostCents, 0), "Coût total");
       const assigned = await validateAgents(tx, ctx.user.companyId, input, input.channel);
-      const number = invoiceNumber(input.channel);
+      const timezone = await companyTimezone(tx, ctx.user.companyId);
+      const number = await nextDocumentNumber(tx, ctx.user.companyId!, SERIES_BY_CHANNEL[input.channel], Number(dayKey(new Date(), timezone).slice(0, 4)));
       const result = await tx.insert(sales).values({ companyId: ctx.user.companyId, invoiceNumber: number, offlineOperationId: input.offlineOperationId, channel: input.channel, customerId: customer?.id ?? null, sellerUserId: ctx.user.id, ...assigned, paymentMethod: "cash", amountPaidCents: 0, subtotalCents, invoiceDiscountType: input.invoiceDiscount.type, invoiceDiscountValue: input.invoiceDiscount.value, invoiceDiscountCents, vatRateBasisPoints: commercialTotals.vatRateBasisPoints, vatCents: commercialTotals.vatCents, deliveryFeeCents: commercialTotals.deliveryFeeCents, totalCents, totalCostCents, netProfitCents: assertSafeDatabaseInt(totalCents - totalCostCents, "Bénéfice net"), note: input.note, deliveryAddress: input.deliveryAddress?.trim() || null, status: "draft" });
       const saleId = Number(result[0].insertId);
       for (const line of lines) await tx.insert(saleItems).values({ saleId, productId: line.product.id, productName: line.product.name, productReference: line.product.reference, quantity: line.quantity, unitPriceCents: line.unitPriceCents, purchasePriceCents: line.product.purchasePriceCents, discountType: line.discount.type, discountValue: line.discount.value, discountCents: line.lineDiscountCents, lineSubtotalCents: line.lineSubtotalCents, lineTotalCents: line.lineTotalCents, lineCostCents: line.lineCostCents });
@@ -158,11 +179,21 @@ export const transactionsRouter = router({
         const ledger = await lockProducts(tx, items.map((item: any) => item.productId), ctx.user.companyId);
         ledger.assertAll(items.map((item: any) => item.productId), "Produit introuvable.");
         for (const item of items) await ledger.apply(item.productId, { type: "exit", quantity: item.quantity, reason: `Vente ${sale.invoiceNumber}`, createdByUserId: ctx.user.id });
-        const profiles = await tx.select().from(remunerationProfiles).where(and(eq(remunerationProfiles.active, true), companyScope(remunerationProfiles.companyId, ctx.user.companyId)));
-        const beneficiaries = [{ type: "user" as const, id: sale.sellerUserId }, ...(assigned.salesAgentId ? [{ type: "agent" as const, id: assigned.salesAgentId }] : []), ...(assigned.cashierId ? [{ type: "agent" as const, id: assigned.cashierId }] : [])];
-        for (const beneficiary of beneficiaries) { const profile = profiles.find((item: any) => item.beneficiaryType === beneficiary.type && item.beneficiaryId === beneficiary.id); if (profile) { const value = commissionCents({ remunerationMode: profile.remunerationMode, commissionBasis: profile.commissionBasis, rateBasisPoints: profile.rateBasisPoints, invoiceRevenueCents: sale.totalCents, invoiceNetProfitCents: sale.netProfitCents }); if (value > 0) await tx.insert(saleCommissions).values({ saleId: sale.id, beneficiaryType: beneficiary.type, beneficiaryId: beneficiary.id, commissionBasis: profile.commissionBasis, rateBasisPoints: profile.rateBasisPoints, commissionCents: value }); } }
       }
       for (let index = 0; index < input.payments.length; index += 1) { const payment = input.payments[index]!; await tx.insert(salePayments).values({ saleId: sale.id, offlineOperationId: index === 0 ? input.offlineOperationId : undefined, method: payment.method, amountCents: payment.amountCents, createdByUserId: ctx.user.id }); }
+      // Commissions calculées sur la part encaissée (E10) : un acompte ne génère
+      // que la commission correspondante, le solde suivra au prochain encaissement.
+      if (sale.totalCents > 0 && settlement.paidCents > 0) {
+        const share = Math.min(1, settlement.paidCents / sale.totalCents);
+        const profiles = await tx.select().from(remunerationProfiles).where(and(eq(remunerationProfiles.active, true), companyScope(remunerationProfiles.companyId, ctx.user.companyId)));
+        const beneficiaries = [{ type: "user" as const, id: sale.sellerUserId }, ...(assigned.salesAgentId ? [{ type: "agent" as const, id: assigned.salesAgentId }] : []), ...(assigned.cashierId ? [{ type: "agent" as const, id: assigned.cashierId }] : [])];
+        for (const beneficiary of beneficiaries) {
+          const profile = profiles.find((item: any) => item.beneficiaryType === beneficiary.type && item.beneficiaryId === beneficiary.id);
+          if (!profile) continue;
+          const value = commissionCents({ remunerationMode: profile.remunerationMode, commissionBasis: profile.commissionBasis, rateBasisPoints: profile.rateBasisPoints, invoiceRevenueCents: settlement.paidCents, invoiceNetProfitCents: Math.round(sale.netProfitCents * share) });
+          if (value > 0) await tx.insert(saleCommissions).values({ saleId: sale.id, beneficiaryType: beneficiary.type, beneficiaryId: beneficiary.id, commissionBasis: profile.commissionBasis, rateBasisPoints: profile.rateBasisPoints, commissionCents: value });
+        }
+      }
       const amountPaidCents = sale.amountPaidCents + settlement.paidCents;
       const status = settlement.status;
       await tx.update(sales).set({ ...assigned, status, amountPaidCents, paymentMethod: input.payments[0].method, note: input.note ?? sale.note }).where(and(eq(sales.id, sale.id), companyScope(sales.companyId, ctx.user.companyId)));

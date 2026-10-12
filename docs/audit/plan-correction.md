@@ -15,8 +15,8 @@ Règles d'exécution :
 | 4 | Schéma multi-entreprise (contraintes UNIQUE, index) | S1, A8, S5, S8 (partiel), E19 | ✅ Fait |
 | 5 | Sauvegardes complètes, restauration validée, stockage, Drive | E14, E15, S6, B2, B3, B4, B5 | ✅ Fait (B2 partiel) |
 | 6 | Code mort et dépendances (mise à jour + retrait) | §4, §2.5, H5 | ✅ Fait |
-| 7 | Corrections fonctionnelles (tableau de bord, fuseau horaire, pagination, inventaire, numérotation, remboursements) | E4–E8, E10, E12, E18 (partiel) | 🔄 En cours |
-| 8 | Performance et qualité (lazy loading, écritures par requête, requêtes non bornées, CI) | P1–P6, P10–P11, E22–E24 | ⬜ À faire |
+| 7 | Corrections fonctionnelles (tableau de bord, fuseau horaire, pagination, inventaire, numérotation, remboursements) | E4–E8, E10, E12, E18 | ✅ Fait |
+| 8 | Performance et qualité (lazy loading, écritures par requête, requêtes non bornées, CI) | P1–P6, P10–P11, E22–E24 | 🔄 En cours |
 | 9 | Fonctionnalités manquantes (feuille de route, nécessite arbitrages produit) | §6 | ⏳ À planifier avec le métier |
 
 Le détail des modifications de chaque lot est consigné dans la section « Journal » ci-dessous au fil de l'eau.
@@ -119,3 +119,19 @@ Tests : `server/test/lot4.schema.db.test.ts` (4 scénarios).
 **H5** : le script d'analytics n'est injecté que si `VITE_ANALYTICS_ENDPOINT` et `VITE_ANALYTICS_WEBSITE_ID` sont définis.
 
 Bundle principal : 2,04 Mo → 1,83 Mo (le découpage par page arrive au lot 8).
+
+### Lot 7 — Corrections fonctionnelles
+
+Migration **`0045_sequences_timezone_credit_notes`** : table `documentSequences`, unicité des numéros **par entreprise** (`sales`, `purchaseOrders`), colonnes `sales.creditNoteNumber` / `refundedAt`, `saleSettings.timezone` (défaut `Africa/Abidjan`, UTC+0).
+
+- **E4** : le tableau de bord charge les commissions (via les ventes de l'entreprise) et les paiements d'agents pour toutes les entreprises : « paie due » et dépenses d'agents sont justes.
+- **E5** : numérotation continue par entreprise, série et année : `FAC-2026-000001`, `POS-…`, `DEV-…`, `AV-…` (avoirs), `BC-…` (bons de commande). Le compteur est incrémenté dans la transaction du document (aucun doublon en parallèle, aucun trou en cas d'échec). Une facture non encaissée n'est plus supprimée mais **annulée** (seuls les devis restent supprimables). Les numéros existants ne sont pas renumérotés.
+- **E6** : fuseau horaire par entreprise (Paramètres › Devise) utilisé pour « aujourd'hui », le mois en cours, les tendances, la paie, les dépenses et l'année de numérotation (`server/companyTime.ts`).
+- **E8** : un remboursement émet un **avoir numéroté**, enregistre un paiement négatif (la caisse reste juste), contrepasse les commissions au lieu de les effacer et conserve la facture (statut annulé, date de remboursement). L'avoir est affiché sur la facture.
+- **E10** : les commissions sont calculées sur la part réellement encaissée à chaque règlement (acompte puis solde).
+- **E12** : `transactions.list` filtre par canal côté serveur (les devis n'étaient plus visibles au-delà des 100 dernières ventes tous canaux confondus) ; limite extensible et bouton « Charger plus » sur Factures, Devis, Mouvements, Journal d'audit et Historique des paramètres.
+- **E18** : une opération hors connexion bloquée peut être **retirée de la file** depuis le journal de synchronisation (statut « Retirée », conservée pour la traçabilité), après régularisation manuelle.
+- **E7, E9** : traités au lot 3.
+- Tests : `server/test/lot7.functional.db.test.ts` (6 scénarios), `server/companyTime.test.ts`.
+
+**Restent à arbitrer (lot 9)** : remboursements partiels ligne à ligne et avoirs partiels (nécessitent un écran de sélection des articles).

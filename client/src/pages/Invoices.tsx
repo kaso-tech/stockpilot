@@ -1,4 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { LoadMore, usePagedLimit } from "@/components/LoadMore";
 import { CheckoutSheet } from "@/components/CheckoutSheet";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -36,7 +37,8 @@ export default function Invoices() {
   const [deleteTarget, setDeleteTarget] = useState<Invoice | null>(null);
   const [refundTarget, setRefundTarget] = useState<Invoice | null>(null);
   const utils = trpc.useUtils();
-  const { data: transactions = [], isLoading } = trpc.transactions.list.useQuery();
+  const paging = usePagedLimit();
+  const { data: transactions = [], isLoading, isFetching } = trpc.transactions.list.useQuery({ channel: "invoice", limit: paging.limit });
   const { data: detail } = trpc.commerce.sales.detail.useQuery({ id: selectedId ?? 0 }, { enabled: Boolean(selectedId) });
   const { data: identity } = trpc.commerce.settings.get.useQuery();
   const { data: agents = [] } = trpc.commerce.agents.list.useQuery();
@@ -47,19 +49,19 @@ export default function Invoices() {
       setPreviewOpen(false);
       setSelectedId(null);
       window.history.replaceState({}, "", "/factures");
-      toast.success("Facture non encaissée supprimée.");
+      toast.success("Facture non encaissée annulée.");
     },
     onError: error => toast.error(error.message),
   });
   const refund = trpc.transactions.refund.useMutation({
-    onSuccess: () => {
+    onSuccess: result => {
       utils.transactions.list.invalidate();
       utils.movements.list.invalidate();
       utils.products.list.invalidate();
       utils.dashboard.get.invalidate();
       setRefundTarget(null);
       setPreviewOpen(false);
-      toast.success("Remboursement enregistré. Le stock a été réintégré.");
+      toast.success(`Remboursement enregistré (avoir ${result.creditNoteNumber}). Le stock a été réintégré.`);
     },
     onError: error => toast.error(error.message),
   });
@@ -151,18 +153,19 @@ export default function Invoices() {
           </div>
         </CardContent>
       </Card>
+      <LoadMore shown={transactions.length} limit={paging.limit} onMore={paging.loadMore} loading={isFetching} />
 
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-h-[92vh] max-w-2xl overflow-y-auto">
           <DialogHeader><DialogTitle>Aperçu de facture</DialogTitle></DialogHeader>
-          {detail ? <><div id="invoice-print"><InvoiceDocument detail={detail} identity={identity} /></div><div className="grid gap-2 sm:grid-cols-3"><Button variant="outline" onClick={downloadPdf}><Download className="mr-2 h-4 w-4" />Générer PDF</Button><Button variant="outline" onClick={() => print("a4")}><Printer className="mr-2 h-4 w-4" />Imprimer</Button><Button variant="outline" onClick={emailPdf}><Mail className="mr-2 h-4 w-4" />E-mail + PDF</Button><Button variant="outline" className="sm:col-span-3" onClick={() => print("ticket")}><ReceiptText className="mr-2 h-4 w-4" />Imprimer au format ticket</Button>{(detail.sale.status === "draft" || detail.sale.status === "partial") && <Button className="sm:col-span-3 bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => { setCheckoutSale(detail.sale); setPreviewOpen(false); }}><WalletCards className="mr-2 h-4 w-4" />Encaisser le solde</Button>}{detail.sale.status === "draft" && <Button variant="outline" className="sm:col-span-3 border-rose-400/30 text-rose-300" onClick={() => setDeleteTarget(detail.sale)}><Trash2 className="mr-2 h-4 w-4" />Supprimer la facture</Button>}{(detail.sale.status === "paid" || detail.sale.status === "partial") && <Button variant="outline" className="sm:col-span-3 border-amber-400/30 text-amber-600" onClick={() => askRefund(detail.sale)}><Undo2 className="mr-2 h-4 w-4" />Rembourser la facture</Button>}</div></> : <p className="py-12 text-center text-muted-foreground">Chargement…</p>}
+          {detail ? <><div id="invoice-print"><InvoiceDocument detail={detail} identity={identity} /></div><div className="grid gap-2 sm:grid-cols-3"><Button variant="outline" onClick={downloadPdf}><Download className="mr-2 h-4 w-4" />Générer PDF</Button><Button variant="outline" onClick={() => print("a4")}><Printer className="mr-2 h-4 w-4" />Imprimer</Button><Button variant="outline" onClick={emailPdf}><Mail className="mr-2 h-4 w-4" />E-mail + PDF</Button><Button variant="outline" className="sm:col-span-3" onClick={() => print("ticket")}><ReceiptText className="mr-2 h-4 w-4" />Imprimer au format ticket</Button>{(detail.sale.status === "draft" || detail.sale.status === "partial") && <Button className="sm:col-span-3 bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => { setCheckoutSale(detail.sale); setPreviewOpen(false); }}><WalletCards className="mr-2 h-4 w-4" />Encaisser le solde</Button>}{detail.sale.status === "draft" && <Button variant="outline" className="sm:col-span-3 border-rose-400/30 text-rose-300" onClick={() => setDeleteTarget(detail.sale)}><Trash2 className="mr-2 h-4 w-4" />Annuler la facture</Button>}{(detail.sale.status === "paid" || detail.sale.status === "partial") && <Button variant="outline" className="sm:col-span-3 border-amber-400/30 text-amber-600" onClick={() => askRefund(detail.sale)}><Undo2 className="mr-2 h-4 w-4" />Rembourser la facture</Button>}</div></> : <p className="py-12 text-center text-muted-foreground">Chargement…</p>}
         </DialogContent>
       </Dialog>
 
       <CheckoutSheet open={Boolean(checkoutSale)} onOpenChange={(open: boolean) => !open && setCheckoutSale(null)} sale={checkoutSale} agents={agents} settings={identity} onComplete={() => { setCheckoutSale(null); utils.transactions.list.invalidate(); }} />
 
       <AlertDialog open={Boolean(deleteTarget)} onOpenChange={open => !open && setDeleteTarget(null)}>
-        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Supprimer cette facture ?</AlertDialogTitle><AlertDialogDescription>Cette action est irréversible. Seules les factures non encaissées peuvent être supprimées.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Annuler</AlertDialogCancel><AlertDialogAction onClick={() => deleteTarget && removeDraft.mutate({ saleId: deleteTarget.id })} className="bg-rose-600 text-white hover:bg-rose-700">Supprimer</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Annuler cette facture ?</AlertDialogTitle><AlertDialogDescription>La facture restera visible avec le statut « annulée » afin de préserver la continuité de la numérotation. Seules les factures non encaissées peuvent être annulées.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Annuler</AlertDialogCancel><AlertDialogAction onClick={() => deleteTarget && removeDraft.mutate({ saleId: deleteTarget.id })} className="bg-rose-600 text-white hover:bg-rose-700">Annuler la facture</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
       </AlertDialog>
 
       <AlertDialog open={Boolean(refundTarget)} onOpenChange={open => !open && setRefundTarget(null)}>

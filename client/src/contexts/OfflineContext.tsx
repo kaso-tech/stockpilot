@@ -20,7 +20,7 @@ export type OfflinePosDraft = { channel: "pos"; customerId: null; salesAgentId: 
 export type OfflineInvoiceDraft = { channel: "invoice" | "quote"; customerId: number; salesAgentId: number | null; cashierId: number | null; salesAgentSelectionMade: boolean; cashierSelectionMade: boolean; note: null; deliveryAddress: string | null; deliveryFeeCents: number; invoiceDiscount: Discount; items: Array<{ productId: number; quantity: number; manualUnitPriceCents: number | null; discount: Discount }> };
 export type OfflineCheckout = { settlementMode: "full" | "partial"; payments: OfflinePayment[]; salesAgentId: number | null; cashierId: number | null; note: null };
 export type OfflineSale = { id: string; ownerUserId: number; companyId: number; kind: "pos_sale" | "invoice_draft"; createdAt: number; status: "pending" | "syncing" | "failed"; error?: string; draft: OfflinePosDraft | OfflineInvoiceDraft; checkout?: OfflineCheckout };
-export type SyncLogEntry = { id: string; ownerUserId: number; companyId: number; operationId: string; kind: OfflineSale["kind"]; summary: string; status: "queued" | "syncing" | "succeeded" | "failed"; createdAt: number; updatedAt: number; attemptCount: number; error?: string };
+export type SyncLogEntry = { id: string; ownerUserId: number; companyId: number; operationId: string; kind: OfflineSale["kind"]; summary: string; status: "queued" | "syncing" | "succeeded" | "failed" | "discarded"; createdAt: number; updatedAt: number; attemptCount: number; error?: string };
 
 const maxLogEntries = 150;
 function summaryFor(item: OfflineSale) { const quantity = item.draft.items.reduce((sum, line) => sum + line.quantity, 0); const title = item.kind === "pos_sale" ? "Vente comptoir" : item.draft.channel === "quote" ? "Devis" : item.checkout?.settlementMode === "partial" ? "Facture · règlement partiel" : "Brouillon de facture"; return `${title} · ${quantity} article${quantity > 1 ? "s" : ""}`; }
@@ -28,7 +28,7 @@ function authHeaders() { try { const raw = sessionStorage.getItem("manus-cookie"
 const syncClient = createTRPCProxyClient<AppRouter>({ links: [httpBatchLink({ url: "/api/trpc", transformer: superjson, headers: authHeaders, fetch: (input, init) => globalThis.fetch(input, { ...(init ?? {}), credentials: "include" }) })] });
 
 export type PersistenceStatus = "idle" | "saving" | "saved" | "error";
-type OfflineContextValue = { isOnline: boolean; sales: OfflineSale[]; syncLog: SyncLogEntry[]; pendingCount: number; failedCount: number; pendingProductQuantities: Record<number, number>; persistenceStatus: PersistenceStatus; persistenceError: string | null; retryPersistence: () => void; queuePosSale: (draft: OfflinePosDraft, checkout: OfflineCheckout) => void; queueInvoiceDraft: (draft: OfflineInvoiceDraft) => void; queueInvoiceSale: (draft: OfflineInvoiceDraft, checkout: OfflineCheckout) => void; syncNow: () => Promise<void>; retryOperation: (operationId: string) => Promise<void>; clearCompletedSyncLog: () => void };
+type OfflineContextValue = { isOnline: boolean; sales: OfflineSale[]; syncLog: SyncLogEntry[]; pendingCount: number; failedCount: number; pendingProductQuantities: Record<number, number>; persistenceStatus: PersistenceStatus; persistenceError: string | null; retryPersistence: () => void; queuePosSale: (draft: OfflinePosDraft, checkout: OfflineCheckout) => void; queueInvoiceDraft: (draft: OfflineInvoiceDraft) => void; queueInvoiceSale: (draft: OfflineInvoiceDraft, checkout: OfflineCheckout) => void; syncNow: () => Promise<void>; retryOperation: (operationId: string) => Promise<void>; discardOperation: (operationId: string) => void; clearCompletedSyncLog: () => void };
 const OfflineContext = createContext<OfflineContextValue | null>(null);
 
 type ScopedRecord = { ownerUserId?: unknown; companyId?: unknown };
@@ -188,12 +188,24 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
     if (hydratedScopeKey && navigator.onLine) void syncNow();
   }, [hydratedScopeKey, syncNow]);
 
+  /**
+   * Retire une opération bloquée de la file (E18) : la vente a été gérée à la main
+   * (régularisation de stock, nouvelle saisie…). L'entrée reste dans le journal
+   * avec le statut « Retirée » pour la traçabilité.
+   */
+  const discardOperation = useCallback((operationId: string) => {
+    const item = salesRef.current.find(record => record.id === operationId && record.ownerUserId === user?.id);
+    if (!item || item.status === "syncing") return;
+    persistState(salesRef.current.filter(record => record.id !== operationId), logRef.current);
+    upsertLog(item, "discarded", { error: item.error });
+  }, [persistState, upsertLog, user?.id]);
+
   const clearCompletedSyncLog = useCallback(() => persistState(salesRef.current, logRef.current.filter(entry => entry.status !== "succeeded")), [persistState]);
   useEffect(() => { const online = () => { setIsOnline(true); void syncNow(); }; const offline = () => setIsOnline(false); window.addEventListener("online", online); window.addEventListener("offline", offline); if (navigator.onLine) void syncNow(); return () => { window.removeEventListener("online", online); window.removeEventListener("offline", offline); }; }, [syncNow]);
   const accountSales = useMemo(() => sales.filter(sale => sale.ownerUserId === user?.id && sale.companyId === (user?.companyId ?? null)), [sales, user?.companyId, user?.id]);
   const accountLog = useMemo(() => syncLog.filter(entry => entry.ownerUserId === user?.id && entry.companyId === (user?.companyId ?? null)).sort((a, b) => b.updatedAt - a.updatedAt), [syncLog, user?.companyId, user?.id]);
   const pendingProductQuantities = useMemo(() => accountSales.reduce<Record<number, number>>((totals, sale) => { if (sale.kind !== "pos_sale" || sale.status === "failed") return totals; for (const item of sale.draft.items) totals[item.productId] = (totals[item.productId] ?? 0) + item.quantity; return totals; }, {}), [accountSales]);
-  const value = useMemo(() => ({ isOnline, sales: accountSales, syncLog: accountLog, pendingCount: accountSales.length, failedCount: accountLog.filter(entry => entry.status === "failed").length, pendingProductQuantities, persistenceStatus, persistenceError, retryPersistence, queuePosSale, queueInvoiceDraft, queueInvoiceSale, syncNow, retryOperation, clearCompletedSyncLog }), [accountLog, accountSales, clearCompletedSyncLog, isOnline, pendingProductQuantities, persistenceError, persistenceStatus, queueInvoiceDraft, queueInvoiceSale, queuePosSale, retryOperation, retryPersistence, syncNow]);
+  const value = useMemo(() => ({ isOnline, sales: accountSales, syncLog: accountLog, pendingCount: accountSales.length, failedCount: accountLog.filter(entry => entry.status === "failed").length, pendingProductQuantities, persistenceStatus, persistenceError, retryPersistence, queuePosSale, queueInvoiceDraft, queueInvoiceSale, syncNow, retryOperation, discardOperation, clearCompletedSyncLog }), [accountLog, discardOperation, accountSales, clearCompletedSyncLog, isOnline, pendingProductQuantities, persistenceError, persistenceStatus, queueInvoiceDraft, queueInvoiceSale, queuePosSale, retryOperation, retryPersistence, syncNow]);
   return <OfflineContext.Provider value={value}>{children}</OfflineContext.Provider>;
 }
 

@@ -11,6 +11,7 @@ import { storagePut } from "../storage";
 import { companyScope } from "../companyScope";
 import { MAX_CENTS } from "../numericLimits";
 import { safeFileUrl } from "../inputRules";
+import { companyTimezone, monthKey } from "../companyTime";
 
 const expenseInput = z.object({
   category: z.enum(expenseCategories),
@@ -44,8 +45,8 @@ export const expensesRouter = router({
     }),
   }),
   report: adminProcedure.input(z.object({ yearMonth: z.string().regex(/^\d{4}-\d{2}$/) })).query(async ({ ctx, input }) => {
-    const db = await dbOrThrow(); const [rows, payments] = await Promise.all([db.select().from(expenses).where(companyScope(expenses.companyId, ctx.user.companyId)).orderBy(desc(expenses.spentAt)), db.select().from(agentPayments).where(companyScope(agentPayments.companyId, ctx.user.companyId)).orderBy(desc(agentPayments.paidAt))]); const agentRows = agentPaymentExpenseRows(payments); const breakdown = expenseBreakdownByCategory([...rows, ...agentRows], input.yearMonth); const agentPaymentCents = expenseTotalCents(agentRows.filter(row => row.spentAt.toISOString().slice(0, 7) === input.yearMonth));
-    return { yearMonth: input.yearMonth, totalCents: expenseTotalCents(breakdown), breakdown, count: rows.filter(row => row.spentAt.toISOString().slice(0, 7) === input.yearMonth).length + agentRows.filter(row => row.spentAt.toISOString().slice(0, 7) === input.yearMonth).length, agentPaymentCents, agentPaymentCount: agentRows.filter(row => row.spentAt.toISOString().slice(0, 7) === input.yearMonth).length };
+    const db = await dbOrThrow(); const timezone = await companyTimezone(db, ctx.user.companyId); const inMonth = (date: Date) => monthKey(date, timezone) === input.yearMonth; const [rows, payments] = await Promise.all([db.select().from(expenses).where(companyScope(expenses.companyId, ctx.user.companyId)).orderBy(desc(expenses.spentAt)), db.select().from(agentPayments).where(companyScope(agentPayments.companyId, ctx.user.companyId)).orderBy(desc(agentPayments.paidAt))]); const agentRows = agentPaymentExpenseRows(payments); const breakdown = expenseBreakdownByCategory([...rows, ...agentRows], input.yearMonth, timezone); const agentPaymentCents = expenseTotalCents(agentRows.filter(row => inMonth(row.spentAt)));
+    return { yearMonth: input.yearMonth, totalCents: expenseTotalCents(breakdown), breakdown, count: rows.filter(row => inMonth(row.spentAt)).length + agentRows.filter(row => inMonth(row.spentAt)).length, agentPaymentCents, agentPaymentCount: agentRows.filter(row => inMonth(row.spentAt)).length };
   }),
   uploadReceipt: adminProcedure.input(z.object({ dataUrl: z.string().min(30).max(7_000_000), filename: z.string().trim().min(1).max(180) })).mutation(async ({ ctx, input }) => {
     const match = input.dataUrl.match(/^data:(application\/pdf|image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/); if (!match) throw new TRPCError({ code: "BAD_REQUEST", message: "Le justificatif doit être un PDF, PNG, JPEG ou WEBP." });

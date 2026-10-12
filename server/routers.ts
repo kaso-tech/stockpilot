@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, getTableColumns, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import {
@@ -70,6 +70,8 @@ import { companyScope } from "./companyScope";
 import { assertRateLimit, burnPasswordCheck, emailIsTaken, findLoginAccount, revokeUserSessions } from "./authSessions";
 import { conflictOr } from "./dbErrors";
 import { lockProducts } from "./stockLedger";
+import { nextDocumentNumber } from "./documentNumbers";
+import { companyTimezone, dayKey, lastDayKeys, monthKey } from "./companyTime";
 
 const productInput = z.object({
   reference: z.string().trim().min(2).max(80),
@@ -286,45 +288,42 @@ export const appRouter = router({
     get: protectedProcedure.query(async ({ ctx }) => {
       const db = await requireDb();
       const companyId = ctx.user.companyId;
-      const [productRows, movements, saleRows, customerRows, inventories, profiles, commissions, payments, expenseRows, budgetRows] = await Promise.all([listProducts(companyId), listMovements(companyId, 250), db.select().from(sales).where(companyScope(sales.companyId, companyId)), db.select().from(customers).where(companyScope(customers.companyId, companyId)), db.select().from(inventorySessions).where(companyScope(inventorySessions.companyId, companyId)), db.select().from(remunerationProfiles).where(companyScope(remunerationProfiles.companyId, companyId)), companyId === null ? db.select().from(saleCommissions) : Promise.resolve([]), companyId === null ? db.select().from(agentPayments) : Promise.resolve([]), db.select().from(expenses).where(companyScope(expenses.companyId, companyId)), db.select().from(expenseBudgets).where(companyScope(expenseBudgets.companyId, companyId))]);
+      const [productRows, movements, saleRows, customerRows, inventories, profiles, commissions, payments, expenseRows, budgetRows] = await Promise.all([listProducts(companyId), listMovements(companyId, 250), db.select().from(sales).where(companyScope(sales.companyId, companyId)), db.select().from(customers).where(companyScope(customers.companyId, companyId)), db.select().from(inventorySessions).where(companyScope(inventorySessions.companyId, companyId)), db.select().from(remunerationProfiles).where(companyScope(remunerationProfiles.companyId, companyId)), db.select(getTableColumns(saleCommissions)).from(saleCommissions).innerJoin(sales, eq(saleCommissions.saleId, sales.id)).where(companyScope(sales.companyId, companyId)), db.select().from(agentPayments).where(companyScope(agentPayments.companyId, companyId)), db.select().from(expenses).where(companyScope(expenses.companyId, companyId)), db.select().from(expenseBudgets).where(companyScope(expenseBudgets.companyId, companyId))]);
       const lowStock = productRows.filter(product => product.quantity <= product.minimumQuantity);
       const totalValueCents = productRows.reduce(
         (sum, product) => sum + product.quantity * product.purchasePriceCents,
         0,
       );
-      const today = new Date().toISOString().slice(0, 10);
+      const timezone = await companyTimezone(db, companyId);
+      const today = dayKey(new Date(), timezone);
       const month = today.slice(0, 7);
       const paidSales = saleRows.filter(sale => sale.status === "paid");
-      const monthlySales = paidSales.filter(sale => sale.createdAt.toISOString().slice(0, 7) === month);
-      const todaySales = paidSales.filter(sale => sale.createdAt.toISOString().slice(0, 10) === today);
+      const monthlySales = paidSales.filter(sale => monthKey(sale.createdAt, timezone) === month);
+      const todaySales = paidSales.filter(sale => dayKey(sale.createdAt, timezone) === today);
       const monthlyRevenueCents = monthlySales.reduce((sum, sale) => sum + sale.totalCents, 0);
       const monthlyMarginCents = monthlySales.reduce((sum, sale) => sum + sale.netProfitCents, 0);
       const agentExpenseRows = agentPaymentExpenseRows(payments);
-      const monthlyManualExpenseCents = monthlyExpenseTotalCents(expenseRows, month);
-      const monthlyAgentPaymentCents = monthlyExpenseTotalCents(agentExpenseRows, month);
+      const monthlyManualExpenseCents = monthlyExpenseTotalCents(expenseRows, month, timezone);
+      const monthlyAgentPaymentCents = monthlyExpenseTotalCents(agentExpenseRows, month, timezone);
       const monthlyExpenseCents = monthlyManualExpenseCents + monthlyAgentPaymentCents;
       const monthlyOperatingProfitCents = operatingNetProfitCents(monthlyMarginCents, monthlyExpenseCents);
       const currentBudget = budgetRows.find(budget => budget.yearMonth === month);
       const expenseBudget = budgetComparison(currentBudget?.amountCents ?? null, monthlyExpenseCents, currentBudget?.warningPercent ?? 80);
       const duePayrollCents = profiles.reduce((sum, profile) => {
-        const commissionCents = commissions.filter(item => item.beneficiaryType === profile.beneficiaryType && item.beneficiaryId === profile.beneficiaryId && item.createdAt.toISOString().slice(0, 7) === month).reduce((total, item) => total + item.commissionCents, 0);
+        const commissionCents = commissions.filter(item => item.beneficiaryType === profile.beneficiaryType && item.beneficiaryId === profile.beneficiaryId && monthKey(item.createdAt, timezone) === month).reduce((total, item) => total + item.commissionCents, 0);
         const fixedCents = profile.remunerationMode === "commission" ? 0 : profile.fixedMonthlyCents;
         const paidCents = payments.filter(item => item.beneficiaryType === profile.beneficiaryType && item.beneficiaryId === profile.beneficiaryId && item.periodLabel === month).reduce((total, item) => total + item.amountCents, 0);
         return sum + Math.max(0, fixedCents + commissionCents - paidCents);
       }, 0);
-      const dayKeys = Array.from({ length: 7 }, (_, index) => {
-        const date = new Date();
-        date.setDate(date.getDate() - (6 - index));
-        return date.toISOString().slice(0, 10);
-      });
+      const dayKeys = lastDayKeys(7, timezone);
       const trend = dayKeys.map(day => {
-        const daily = movements.filter(movement => movement.occurredAt.toISOString().slice(0, 10) === day);
+        const daily = movements.filter(movement => dayKey(movement.occurredAt, timezone) === day);
         return {
           day,
           entries: daily.filter(movement => movement.type === "entry").reduce((sum, movement) => sum + Math.abs(movement.quantity), 0),
           exits: daily.filter(movement => movement.type === "exit").reduce((sum, movement) => sum + Math.abs(movement.quantity), 0) };
       });
-      const salesTrend = dayKeys.map(day => ({ day, revenueCents: paidSales.filter(sale => sale.createdAt.toISOString().slice(0, 10) === day).reduce((sum, sale) => sum + sale.totalCents, 0), invoices: paidSales.filter(sale => sale.createdAt.toISOString().slice(0, 10) === day).length }));
+      const salesTrend = dayKeys.map(day => ({ day, revenueCents: paidSales.filter(sale => dayKey(sale.createdAt, timezone) === day).reduce((sum, sale) => sum + sale.totalCents, 0), invoices: paidSales.filter(sale => dayKey(sale.createdAt, timezone) === day).length }));
       const customerMap = new Map(customerRows.map(customer => [customer.id, customer]));
       return {
         summary: {
@@ -336,7 +335,7 @@ export const appRouter = router({
           monthlyMarginCents,
           monthlyExpenseCents,
           monthlyOperatingProfitCents,
-          expenseBreakdown: expenseBreakdownByCategory([...expenseRows, ...agentExpenseRows], month),
+          expenseBreakdown: expenseBreakdownByCategory([...expenseRows, ...agentExpenseRows], month, timezone),
           monthlyManualExpenseCents,
           monthlyAgentPaymentCents,
           expenseBudget,
@@ -549,8 +548,9 @@ export const appRouter = router({
       });
       const subtotalCents = selected.reduce((sum, item) => sum + item.lineTotalCents, 0);
       const totals = calculateCommercialTotals({ subtotalCents, vatRateBasisPoints: settings?.vatEnabled ? settings.vatRateBasisPoints : 0, deliveryFeeCents: input.deliveryFeeCents });
-      const orderNumber = `BC-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+      let orderNumber = "";
       const orderId = await db.transaction(async tx => {
+        orderNumber = await nextDocumentNumber(tx, ctx.user.companyId!, "BC", Number(dayKey(new Date(), await companyTimezone(tx, ctx.user.companyId)).slice(0, 4)));
         const result = await tx.insert(purchaseOrders).values({ companyId: ctx.user.companyId, orderNumber, supplierId: input.supplierId, subtotalCents: totals.subtotalCents, vatRateBasisPoints: totals.vatRateBasisPoints, vatCents: totals.vatCents, deliveryFeeCents: totals.deliveryFeeCents, totalCents: totals.totalCents, notes: input.notes ?? null, expectedDeliveryDate: input.expectedDeliveryDate ?? null, createdByUserId: ctx.user.id });
         const id = Number(result[0].insertId);
         await tx.insert(purchaseOrderItems).values(selected.map(item => ({ purchaseOrderId: id, productId: item.product.id, productName: item.product.name, productReference: item.product.reference, unit: item.product.unit, quantity: item.quantity, purchasePriceCents: item.product.purchasePriceCents, lineTotalCents: item.lineTotalCents })));
@@ -638,7 +638,7 @@ export const appRouter = router({
     }) }),
 
   movements: router({
-    list: protectedProcedure.query(({ ctx }) => listMovements(ctx.user.companyId)),
+    list: protectedProcedure.input(z.object({ limit: z.number().int().min(1).max(2000).optional() }).optional()).query(({ ctx, input }) => listMovements(ctx.user.companyId, input?.limit ?? 100)),
     create: protectedProcedure.input(z.object({
       productId: z.number().int().positive(),
       supplierId: z.number().int().positive().nullable(),
@@ -671,6 +671,8 @@ export const appRouter = router({
     }) }),
 
   audit: router({
-    list: adminProcedure.query(({ ctx }) => listAuditLogs(ctx.user.companyId)) }) });
+    list: adminProcedure.input(z.object({ limit: z.number().int().min(1).max(2000).optional() }).optional()).query(({ ctx, input }) => listAuditLogs(ctx.user.companyId, input?.limit ?? 100)),
+  }),
+});
 
 export type AppRouter = typeof appRouter;
