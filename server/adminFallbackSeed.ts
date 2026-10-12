@@ -16,7 +16,7 @@ export async function ensureAdminFallbackPasswordSeed() {
   const db = await getDb();
   if (!db) return;
 
-  const accounts = await db.select({ id: users.id, openId: users.openId, email: users.email, name: users.name }).from(users).where(eq(users.role, "admin"));
+  const accounts = await db.select({ id: users.id, openId: users.openId, email: users.email, name: users.name }).from(users).where(eq(users.role, "admin")); // tenant-scope-ok: amorçage local hors production
   const admin = findConfiguredAdmin(accounts, ENV.adminFallbackEmail) ?? (accounts.length === 1 ? accounts[0] : undefined);
   if (!admin) {
     console.warn("[Auth fallback] Seed skipped: configured administrator account was not found.");

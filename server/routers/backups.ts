@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { parse as parseCookie } from "cookie";
 import { z } from "zod";
 import { backupSettings, auditLogs } from "../../drizzle/schema";
@@ -22,7 +22,7 @@ export function cronFor(hours: number) {
 }
 
 async function dbOrThrow() { const db = await getDb(); if (!db) throw new Error("Base de données indisponible."); return db; }
-async function getOrCreateSettings(companyId: number | null) { const db = await dbOrThrow(); const current = (await db.select().from(backupSettings).where(companyScope(backupSettings.companyId, companyId)).limit(1))[0]; if (current) return current; const result = await db.insert(backupSettings).values({ companyId }); return (await db.select().from(backupSettings).where(eq(backupSettings.id, Number(result[0].insertId))).limit(1))[0]!; }
+async function getOrCreateSettings(companyId: number | null) { const db = await dbOrThrow(); const current = (await db.select().from(backupSettings).where(companyScope(backupSettings.companyId, companyId)).limit(1))[0]; if (current) return current; const result = await db.insert(backupSettings).values({ companyId }); return (await db.select().from(backupSettings).where(and(eq(backupSettings.id, Number(result[0].insertId)), companyScope(backupSettings.companyId, companyId))).limit(1))[0]!; }
 
 export const backupRouter = router({
   get: adminProcedure.query(async ({ ctx }) => { const settings = await getOrCreateSettings(ctx.user.companyId); const archives = await listBackups(30, ctx.user.companyId); return { settings: { automaticEnabled: settings.automaticEnabled, frequencyHours: settings.frequencyHours, retentionCount: settings.retentionCount, googleDriveFolderId: settings.googleDriveFolderId, googleDriveConfigured: googleDriveConfigured(), googleDriveConnected: Boolean(settings.googleDriveRefreshTokenEncrypted), scheduleNextAt: settings.scheduleNextAt, lastBackupAt: settings.lastBackupAt, lastBackupStatus: settings.lastBackupStatus, lastBackupError: settings.lastBackupError }, archives }; }),
@@ -31,7 +31,7 @@ export const backupRouter = router({
       if (taskUid) nextExecutionAt = (await updateHeartbeatJob(taskUid, { cron: cronFor(input.frequencyHours), path: "/api/scheduled/backup", method: "POST", payload: { companyId: ctx.user.companyId }, description: "Sauvegarde automatique StockPilot", enable: true }, sessionToken)).nextExecutionAt ?? null;
       else { const job = await createHeartbeatJob({ name: `stockpilot-automatic-backup-${ctx.user.companyId ?? "legacy"}`, cron: cronFor(input.frequencyHours), path: "/api/scheduled/backup", method: "POST", payload: { companyId: ctx.user.companyId }, description: "Sauvegarde automatique StockPilot" }, sessionToken); taskUid = job.taskUid; nextExecutionAt = job.nextExecutionAt ?? null; }
     } else if (taskUid) nextExecutionAt = (await updateHeartbeatJob(taskUid, { enable: false }, sessionToken)).nextExecutionAt ?? null;
-    await db.update(backupSettings).set({ ...input, scheduleCronTaskUid: taskUid, scheduleNextAt: nextExecutionAt ? new Date(nextExecutionAt) : null, updatedByUserId: ctx.user.id }).where(eq(backupSettings.id, current.id));
+    await db.update(backupSettings).set({ ...input, scheduleCronTaskUid: taskUid, scheduleNextAt: nextExecutionAt ? new Date(nextExecutionAt) : null, updatedByUserId: ctx.user.id }).where(and(eq(backupSettings.id, current.id), companyScope(backupSettings.companyId, ctx.user.companyId)));
     await db.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Sauvegarde configurée", entityType: "Sauvegarde", entityId: String(current.id), detail: input.automaticEnabled ? `Sauvegarde automatique toutes les ${input.frequencyHours} h activée` : "Sauvegarde automatique suspendue" });
     return { success: true, nextExecutionAt };
   }),

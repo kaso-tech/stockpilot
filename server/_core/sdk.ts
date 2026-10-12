@@ -126,18 +126,16 @@ class SDKServer {
       });
       const { openId, appId, name, sid } = payload as Record<string, unknown>;
 
-      if (
-        !isNonEmptyString(openId) ||
-        !isNonEmptyString(appId) ||
-        !isNonEmptyString(name)
-      ) {
+      // appId n'est exigé que si l'application en déclare un (hébergement Manus) :
+      // il empêche alors la réutilisation d'un jeton d'une autre application.
+      if (!isNonEmptyString(openId) || !isNonEmptyString(name) || (ENV.appId && appId !== ENV.appId)) {
         console.warn("[Auth] Session payload missing required fields");
         return null;
       }
 
       return {
         openId,
-        appId,
+        appId: typeof appId === "string" ? appId : "",
         name,
         ...(isNonEmptyString(sid) ? { sessionId: sid } : {}),
       };
@@ -203,7 +201,7 @@ class SDKServer {
 
     const sessionUserId = session.openId;
     const signedInAt = new Date();
-    let user = await db.getUserByOpenId(sessionUserId);
+    const user = await db.getUserByOpenId(sessionUserId);
 
     if (!user) {
       throw ForbiddenError("User not found");
@@ -222,18 +220,18 @@ class SDKServer {
     if (!trackedSession || trackedSession.userId !== user.id || trackedSession.revokedAt || trackedSession.expiresAt <= new Date()) {
       throw ForbiddenError("Session revoked or expired");
     }
-    await db.touchUserSession(session.sessionId);
-
-    await db.upsertUser({
-      openId: user.openId,
-      lastSignedIn: signedInAt,
-    });
+    // Activité enregistrée au plus toutes les 5 minutes (P2) au lieu de deux
+    // écritures en base à chaque requête.
+    if (signedInAt.getTime() - trackedSession.lastSeenAt.getTime() >= ACTIVITY_WRITE_INTERVAL_MS) {
+      await db.recordUserActivity(session.sessionId, user.id, signedInAt);
+    }
 
     return { ...user, sessionId: session.sessionId };
   }
 }
 
 const CRON_OPEN_ID_PREFIX = "cron_";
+const ACTIVITY_WRITE_INTERVAL_MS = 5 * 60 * 1000;
 
 /** Result of `sdk.authenticateRequest`. Cron callbacks set `isCron=true` and `taskUid`; see `/home/ubuntu/skills/webdev-periodic-updates/SKILL.md`. */
 export type AuthenticatedUser = User & {

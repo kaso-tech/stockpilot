@@ -4,52 +4,60 @@ import DashboardLayout from "@/components/DashboardLayout";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { lazy, Suspense } from "react";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { PreferencesProvider } from "./contexts/PreferencesContext";
 import { OfflineProvider } from "./contexts/OfflineContext";
-import Alerts from "./pages/Alerts";
-import Agents from "./pages/Agents";
-import AgentDetail from "./pages/AgentDetail";
-import Customers from "./pages/Customers";
-import CustomerDetail from "./pages/CustomerDetail";
-import Home from "./pages/Home";
-import Invoices from "./pages/Invoices";
-import InvoiceDetail from "./pages/InvoiceDetail";
-import InvoiceCreate from "./pages/InvoiceCreate";
-import Quotes from "./pages/Quotes";
-import Inventories from "./pages/Inventories";
-import Movements from "./pages/Movements";
-import PointOfSale from "./pages/PointOfSale";
-import Products from "./pages/Products";
-import ProductDetail from "./pages/ProductDetail";
-import Suppliers from "./pages/Suppliers";
-import SupplierDetail from "./pages/SupplierDetail";
-import PurchaseOrderDetail from "./pages/PurchaseOrderDetail";
-import PurchaseOrders from "./pages/PurchaseOrders";
-import AuditLog from "./pages/AuditLog";
-import SettingsIndex from "./pages/SettingsIndex";
-import SettingsAppearance from "./pages/SettingsAppearance";
-import SettingsCurrency from "./pages/SettingsCurrency";
-import SettingsIdentity from "./pages/SettingsIdentity";
-import SettingsPrinting from "./pages/SettingsPrinting";
-import SettingsFiscal from "./pages/SettingsFiscal";
-import Backups from "./pages/Backups";
-import Expenses from "./pages/Expenses";
-import Categories from "./pages/Categories";
-import Units from "./pages/Units";
-import SettingsPos from "./pages/SettingsPos";
-import SettingsPosSection from "./pages/SettingsPosSection";
-import SettingsHistory from "./pages/SettingsHistory";
-import SettingsDashboard from "./pages/SettingsDashboard";
-import SettingsSecurity from "./pages/SettingsSecurity";
-import DataExchange from "./pages/DataExchange";
-import SyncJournal from "./pages/SyncJournal";
-import TermsOfUse from "./pages/TermsOfUse";
-import PrivacyPolicy from "./pages/PrivacyPolicy";
+
+// Chaque page est chargée à la demande (P1) ; le service worker précache tous les fragments pour le mode hors connexion.
+const Alerts = lazy(() => import("./pages/Alerts"));
+const Agents = lazy(() => import("./pages/Agents"));
+const AgentDetail = lazy(() => import("./pages/AgentDetail"));
+const Customers = lazy(() => import("./pages/Customers"));
+const CustomerDetail = lazy(() => import("./pages/CustomerDetail"));
+const Home = lazy(() => import("./pages/Home"));
+const Invoices = lazy(() => import("./pages/Invoices"));
+const InvoiceDetail = lazy(() => import("./pages/InvoiceDetail"));
+const InvoiceCreate = lazy(() => import("./pages/InvoiceCreate"));
+const Quotes = lazy(() => import("./pages/Quotes"));
+const Inventories = lazy(() => import("./pages/Inventories"));
+const Movements = lazy(() => import("./pages/Movements"));
+const PointOfSale = lazy(() => import("./pages/PointOfSale"));
+const Products = lazy(() => import("./pages/Products"));
+const ProductDetail = lazy(() => import("./pages/ProductDetail"));
+const Suppliers = lazy(() => import("./pages/Suppliers"));
+const SupplierDetail = lazy(() => import("./pages/SupplierDetail"));
+const PurchaseOrderDetail = lazy(() => import("./pages/PurchaseOrderDetail"));
+const PurchaseOrders = lazy(() => import("./pages/PurchaseOrders"));
+const AuditLog = lazy(() => import("./pages/AuditLog"));
+const SettingsIndex = lazy(() => import("./pages/SettingsIndex"));
+const SettingsAppearance = lazy(() => import("./pages/SettingsAppearance"));
+const SettingsCurrency = lazy(() => import("./pages/SettingsCurrency"));
+const SettingsIdentity = lazy(() => import("./pages/SettingsIdentity"));
+const SettingsPrinting = lazy(() => import("./pages/SettingsPrinting"));
+const SettingsFiscal = lazy(() => import("./pages/SettingsFiscal"));
+const Backups = lazy(() => import("./pages/Backups"));
+const Expenses = lazy(() => import("./pages/Expenses"));
+const Categories = lazy(() => import("./pages/Categories"));
+const Units = lazy(() => import("./pages/Units"));
+const SettingsPos = lazy(() => import("./pages/SettingsPos"));
+const SettingsPosSection = lazy(() => import("./pages/SettingsPosSection"));
+const SettingsHistory = lazy(() => import("./pages/SettingsHistory"));
+const SettingsDashboard = lazy(() => import("./pages/SettingsDashboard"));
+const SettingsSecurity = lazy(() => import("./pages/SettingsSecurity"));
+const DataExchange = lazy(() => import("./pages/DataExchange"));
+const SyncJournal = lazy(() => import("./pages/SyncJournal"));
+const TermsOfUse = lazy(() => import("./pages/TermsOfUse"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+
+function PageFallback() {
+  return <div className="grid min-h-[40vh] place-items-center text-sm text-muted-foreground" role="status">Chargement…</div>;
+}
 
 function DashboardRouter() {
   return (
     <DashboardLayout>
+      <Suspense fallback={<PageFallback />}>
       <Switch>
         <Route path={"/"} component={Home} />
         <Route path={"/pos"} component={PointOfSale} />
@@ -95,18 +103,14 @@ function DashboardRouter() {
         <Route path={"/404"} component={NotFound} />
         <Route component={NotFound} />
       </Switch>
+      </Suspense>
     </DashboardLayout>
   );
 }
 
 function Router() {
-  return <Switch><Route path="/conditions-utilisation" component={TermsOfUse} /><Route path="/politique-confidentialite" component={PrivacyPolicy} /><Route component={DashboardRouter} /></Switch>;
+  return <Suspense fallback={<PageFallback />}><Switch><Route path="/conditions-utilisation" component={TermsOfUse} /><Route path="/politique-confidentialite" component={PrivacyPolicy} /><Route component={DashboardRouter} /></Switch></Suspense>;
 }
-
-// NOTE: About Theme
-// - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
-//   to keep consistent foreground/background color across components
-// - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
 
 function App() {
   return (

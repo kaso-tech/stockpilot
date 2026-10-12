@@ -34,7 +34,7 @@ export async function emailIsTaken(db: DbClient, email: string, exceptUserId?: n
   const normalized = email.trim().toLowerCase();
   const conditions = [sql`lower(${users.email}) = ${normalized}`];
   if (exceptUserId !== undefined) conditions.push(ne(users.id, exceptUserId));
-  return Boolean((await db.select({ id: users.id }).from(users).where(and(...conditions)).limit(1))[0]);
+  return Boolean((await db.select({ id: users.id }).from(users).where(and(...conditions)).limit(1))[0]); // tenant-scope-ok: e-mail unique sur toute la plateforme
 }
 
 let dummyHash: Promise<string> | null = null;

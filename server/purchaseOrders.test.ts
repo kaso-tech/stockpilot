@@ -7,7 +7,7 @@ import { getDb } from "./db";
 import { appRouter } from "./routers";
 
 const mockedGetDb = vi.mocked(getDb);
-function context(): TrpcContext { return { user: { id: 1, openId: "admin-order", name: "Admin", email: "admin@example.test", phone: null, loginMethod: "password", role: "admin", active: true, companyId: 1, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }, req: { protocol: "https", headers: {} } as TrpcContext["req"], res: { clearCookie: () => undefined } as TrpcContext["res"] }; }
+function context(): TrpcContext { return { user: { id: 1, openId: "admin-order", name: "Admin", email: "admin@example.test", phone: null, loginMethod: "password", role: "admin", active: true, companyId: 1, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }, req: { protocol: "https", headers: {} } as TrpcContext["req"], res: { clearCookie: () => undefined } as unknown as TrpcContext["res"] }; }
 function chain(values: unknown[]) { return Object.assign(values, { then: (resolve: (value: unknown[]) => unknown) => resolve([...values]), limit: async () => values, orderBy: async () => values }); }
 function mockDatabase(rows: Map<unknown, unknown[]>) {
   const from = (table: unknown) => ({ where: () => chain(rows.get(table) ?? []), limit: async () => rows.get(table) ?? [], orderBy: async () => rows.get(table) ?? [], then: (resolve: (value: unknown[]) => unknown) => resolve([...(rows.get(table) ?? [])]) });

@@ -394,12 +394,12 @@ export const appRouter = router({
       if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Produit introuvable." });
       const [tiers, movements, lines, supplier] = await Promise.all([
         db.select().from(productPriceTiers).where(eq(productPriceTiers.productId, product.id)),
-        db.select().from(stockMovements).where(eq(stockMovements.productId, product.id)).orderBy(desc(stockMovements.occurredAt)),
+        db.select().from(stockMovements).where(and(eq(stockMovements.productId, product.id), companyScope(stockMovements.companyId, ctx.user.companyId))).orderBy(desc(stockMovements.occurredAt)),
         db.select().from(saleItems).where(eq(saleItems.productId, product.id)),
         product.supplierId ? (await db.select().from(suppliers).where(and(eq(suppliers.id, product.supplierId), companyScope(suppliers.companyId, ctx.user.companyId))).limit(1))[0] ?? null : null,
       ]);
       const uniqueSaleIds = Array.from(new Set(lines.map(line => line.saleId)));
-      const saleRows = (await Promise.all(uniqueSaleIds.map(async saleId => (await db.select().from(sales).where(eq(sales.id, saleId)).limit(1))[0] ?? null))).filter((sale): sale is NonNullable<typeof sale> => Boolean(sale)).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      const saleRows = uniqueSaleIds.length ? (await db.select().from(sales).where(and(inArray(sales.id, uniqueSaleIds), companyScope(sales.companyId, ctx.user.companyId)))).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()) : [];
       const revenueCents = lines.reduce((sum, line) => sum + line.lineTotalCents, 0);
       const costCents = lines.reduce((sum, line) => sum + line.lineCostCents, 0);
       const unitsSold = lines.reduce((sum, line) => sum + line.quantity, 0);

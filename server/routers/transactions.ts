@@ -55,7 +55,7 @@ export const transactionsRouter = router({
     // devis ou factures anciens ne sont plus masqués par les 100 derniers tickets (E12).
     const scope = input?.channel ? and(companyScope(sales.companyId, ctx.user.companyId), eq(sales.channel, input.channel)) : companyScope(sales.companyId, ctx.user.companyId);
     const [rows, customerRows] = await Promise.all([
-      db.select().from(sales).where(scope).orderBy(desc(sales.createdAt), desc(sales.id)).limit(input?.limit ?? 100),
+      db.select().from(sales).where(scope).orderBy(desc(sales.createdAt), desc(sales.id)).limit(input?.limit ?? 100), // tenant-scope-ok: `scope` contient companyScope
       db.select().from(customers).where(companyScope(customers.companyId, ctx.user.companyId)),
     ]);
     const customerNames = new Map(customerRows.map(customer => [customer.id, customer.name]));

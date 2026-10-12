@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { agents, auditLogs, remunerationProfiles, sellerCredentials, users } from "../../drizzle/schema";
+import { agents, remunerationProfiles, sellerCredentials, users } from "../../drizzle/schema";
 import type { TrpcContext } from "../_core/context";
 
 vi.mock("../db", () => ({ getDb: vi.fn() }));
@@ -9,7 +9,7 @@ import { commerceRouter } from "./commerce";
 const mockedGetDb = vi.mocked(getDb);
 const remuneration = { remunerationMode: "commission" as const, fixedMonthlyCents: 0, commissionBasis: "revenue" as const, rateBasisPoints: 750, active: true };
 
-function adminContext(): TrpcContext { return { user: { id: 1, openId: "admin-agent-test", name: "Admin", email: "admin@example.test", loginMethod: "manus", role: "admin", active: true, companyId: 1, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }, req: { protocol: "https", headers: {} } as TrpcContext["req"], res: { clearCookie: () => undefined } as TrpcContext["res"] }; }
+function adminContext(): TrpcContext { return { user: { id: 1, openId: "admin-agent-test", name: "Admin", email: "admin@example.test", phone: null, loginMethod: "manus", role: "admin", active: true, companyId: 1, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }, req: { protocol: "https", headers: {} } as TrpcContext["req"], res: { clearCookie: () => undefined } as unknown as TrpcContext["res"] }; }
 
 describe("commerce agents et vendeurs", () => {
   const inserts: Array<{ table: unknown; values: unknown }> = [];

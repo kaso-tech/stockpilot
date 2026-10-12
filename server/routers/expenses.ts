@@ -38,7 +38,7 @@ export const expensesRouter = router({
     save: adminProcedure.input(z.object({ yearMonth: z.string().regex(/^\d{4}-\d{2}$/), amountCents: z.number().int().min(0).max(MAX_CENTS), warningPercent: z.number().int().min(50).max(100) })).mutation(async ({ ctx, input }) => {
       const db = await dbOrThrow();
       const current = (await db.select().from(expenseBudgets).where(and(eq(expenseBudgets.yearMonth, input.yearMonth), companyScope(expenseBudgets.companyId, ctx.user.companyId))).limit(1))[0];
-      if (current) await db.update(expenseBudgets).set({ amountCents: input.amountCents, warningPercent: input.warningPercent, updatedByUserId: ctx.user.id }).where(eq(expenseBudgets.id, current.id));
+      if (current) await db.update(expenseBudgets).set({ amountCents: input.amountCents, warningPercent: input.warningPercent, updatedByUserId: ctx.user.id }).where(and(eq(expenseBudgets.id, current.id), companyScope(expenseBudgets.companyId, ctx.user.companyId)));
       else await db.insert(expenseBudgets).values({ ...input, companyId: ctx.user.companyId, updatedByUserId: ctx.user.id });
       await db.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Budget dépenses", entityType: "Budget", entityId: input.yearMonth, detail: `Budget mensuel fixé à ${input.amountCents} centimes` });
       return { success: true };

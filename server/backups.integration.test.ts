@@ -5,7 +5,7 @@ const { getDbMock, storagePutMock } = vi.hoisted(() => ({ getDbMock: vi.fn(), st
 vi.mock("./db", () => ({ getDb: getDbMock }));
 vi.mock("./storage", () => ({ storagePut: storagePutMock, storageGetSignedUrl: vi.fn() }));
 
-import { createBackupSnapshot, restoreBackupPayload } from "./backups";
+import { createBackupSnapshot } from "./backups";
 
 function archiveDb() {
   const where = vi.fn().mockResolvedValue([]);

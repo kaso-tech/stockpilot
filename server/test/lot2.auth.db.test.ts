@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { and, eq, isNull } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import { ctx, realDb, realDbUrl, resetDatabase, seedTenant, type SeededTenant } from "./realDb";
 import { appRouter } from "../routers";
 import { sdk } from "../_core/sdk";
@@ -94,7 +94,7 @@ describe.skipIf(!realDbUrl)("Lot 2 — authentification et sessions (MySQL réel
     const attempts = async (ip: string, spoofed: string) => {
       const { context } = publicCtx(ip);
       (context.req.headers as Record<string, string>)["x-forwarded-for"] = spoofed;
-      return appRouter.createCaller(context).auth.passwordLogin({ email: `x${Math.random()}@nova.test`, password: "faux" }).catch(error => error.code as string);
+      return appRouter.createCaller(context).auth.passwordLogin({ email: `x${Math.random()}@nova.test`, password: "faux" }).then(() => "OK", error => error.code as string);
     };
     const codes: string[] = [];
     for (let index = 0; index < 31; index += 1) codes.push(await attempts("198.51.100.7", `10.0.0.${index}`));
