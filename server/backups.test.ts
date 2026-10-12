@@ -30,6 +30,6 @@ describe("archives de sauvegarde StockPilot", () => {
       source: "StockPilot",
       companyId: 12,
       tables: { saleItems: [{ id: 1, saleId: 999 }] },
-    }))).toThrow("vente absente");
+    }))).toThrow("absente de la sauvegarde (sales)");
   });
 });

@@ -13,8 +13,8 @@ Règles d'exécution :
 | 2 | Authentification, sessions, CSRF, en-têtes, limitation de débit | A1–A8, A4, H1, H4, B6 (doc) | ✅ Fait |
 | 3 | Concurrence et intégrité du stock et des encaissements | E1, E2, E3, E9, E13 | ✅ Fait |
 | 4 | Schéma multi-entreprise (contraintes UNIQUE, index) | S1, A8, S5, S8 (partiel), E19 | ✅ Fait |
-| 5 | Sauvegardes complètes, restauration validée, stockage, Drive | E14, E15, S6, B2, B3, B4, B5 | 🔄 En cours |
-| 6 | Code mort et dépendances (mise à jour + retrait) | §4, §2.5 | ⬜ À faire |
+| 5 | Sauvegardes complètes, restauration validée, stockage, Drive | E14, E15, S6, B2, B3, B4, B5 | ✅ Fait (B2 partiel) |
+| 6 | Code mort et dépendances (mise à jour + retrait) | §4, §2.5 | 🔄 En cours |
 | 7 | Corrections fonctionnelles (tableau de bord, fuseau horaire, pagination, inventaire, numérotation, remboursements) | E4–E8, E10, E12, E18 (partiel) | ⬜ À faire |
 | 8 | Performance et qualité (lazy loading, écritures par requête, requêtes non bornées, CI) | P1–P6, P10–P11, E22–E24 | ⬜ À faire |
 | 9 | Fonctionnalités manquantes (feuille de route, nécessite arbitrages produit) | §6 | ⏳ À planifier avec le métier |
@@ -85,3 +85,17 @@ Code : `protectedProcedure` et `adminProcedure` refusent un compte sans entrepri
 **Non traité volontairement :** `sellerCredentials.username` reste unique globalement (l'identifiant interne n'est plus utilisé pour se connecter depuis le lot 2) ; les clés étrangères (S8) seront ajoutées après nettoyage des orphelins éventuels, dans un lot ultérieur.
 
 Tests : `server/test/lot4.schema.db.test.ts` (4 scénarios).
+
+### Lot 5 — Sauvegardes, restauration, Google Drive
+
+- **Bogue critique découvert** : l'ancienne restauration transmettait les dates de l'archive sous forme de texte à Drizzle (`value.toISOString is not a function`) : **aucune archive réelle ne pouvait être restaurée**. Les valeurs sont désormais converties selon le type de chaque colonne.
+- **E14** : format d'archive **version 2** couvrant les 27 tables métier de l'entreprise (paliers de prix, catégories, unités, paiements, bons de commande et leurs lignes, dépenses, budgets, préférences, mots de passe administrateurs…). Les archives version 1 restent restaurables (seules leurs 17 tables sont alors remplacées).
+- **E15** : la restauration supprime puis réinsère l'ensemble des tables dans une transaction, enfants compris ; elle refuse une archive qui ne contient pas le compte administrateur actif de la personne qui restaure (verrouillage impossible).
+- **S6** : validation stricte de l'archive : colonnes connues uniquement, types contrôlés, toutes les références (produits, clients, vendeurs, agents, fournisseurs, ventes…) doivent pointer vers des lignes présentes dans l'archive : une archive forgée ne peut plus viser les données d'une autre entreprise.
+- **B2 (partiel)** : l'API de stockage Manus n'offre pas de suppression ; les fichiers d'archives périmés ne peuvent donc pas être effacés physiquement. Mesure compensatoire : avec `BACKUP_ENCRYPTION_KEY`, les archives sont **chiffrées (AES-256-GCM)** au repos et sur Google Drive, illisibles sans la clé. À compléter dès qu'une API de suppression est disponible (ou en migrant vers S3, déjà en dépendance).
+- **B3** : clé dédiée `DRIVE_TOKEN_ENCRYPTION_KEY` pour les jetons Drive, relecture des jetons existants avec l'ancienne clé, plus aucune clé codée en dur (`server/secretBox.ts`).
+- **B4** : `PUBLIC_APP_URL` pour une URI de retour OAuth fixe (le protocole est de toute façon correct grâce à `trust proxy`) ; le `state` OAuth expire après 10 minutes.
+- **B5** : un échec de copie Drive n'est plus présenté comme une sauvegarde ratée : l'archive est conservée, l'erreur Drive est indiquée sur l'archive et dans le statut.
+- La rétention ne compte plus les tentatives échouées.
+- Ajout de `.env.example` documentant toutes les variables d'environnement.
+- Tests : `server/test/lot5.backups.db.test.ts` (aller-retour complet, chiffrement, archive forgée, protection de l'administrateur, API tRPC), tests OAuth Drive.

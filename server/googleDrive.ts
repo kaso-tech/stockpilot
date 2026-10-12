@@ -1,4 +1,5 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
+import { randomBytes } from "crypto";
+import { legacyKeyFromJwtSecret, openString, parseKey, sealString } from "./secretBox";
 import { and, eq } from "drizzle-orm";
 import { backupArchives, backupSettings } from "../drizzle/schema";
 import { getDb } from "./db";
@@ -12,12 +13,30 @@ const DRIVE_FILES_URL = "https://www.googleapis.com/upload/drive/v3/files?upload
 
 function clientId() { return process.env.GOOGLE_DRIVE_CLIENT_ID ?? ""; }
 function clientSecret() { return process.env.GOOGLE_DRIVE_CLIENT_SECRET ?? ""; }
-function encryptionKey() { return createHash("sha256").update(process.env.JWT_SECRET ?? "stockpilot-dev-key").digest(); }
+/**
+ * Clé dédiée aux jetons Google Drive (B3). À défaut, repli sur l'ancienne
+ * dérivation depuis JWT_SECRET pour ne pas casser les connexions existantes.
+ * Plus aucune clé codée en dur.
+ */
+function encryptionKey() {
+  const key = parseKey(process.env.DRIVE_TOKEN_ENCRYPTION_KEY, "DRIVE_TOKEN_ENCRYPTION_KEY") ?? legacyKeyFromJwtSecret();
+  if (!key) throw new Error("Aucune clé de chiffrement des jetons Google Drive n’est configurée.");
+  return key;
+}
 function requireConfig() { if (!clientId() || !clientSecret()) throw new Error("Google Drive n’est pas encore configuré. Ajoutez l’identifiant et le secret OAuth Google dans les secrets du projet."); }
 
 export function googleDriveConfigured() { return Boolean(clientId() && clientSecret()); }
-export function encryptSecret(value: string) { const iv = randomBytes(12); const cipher = createCipheriv("aes-256-gcm", encryptionKey(), iv); const encrypted = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]); return [iv.toString("base64"), cipher.getAuthTag().toString("base64"), encrypted.toString("base64")].join("."); }
-export function decryptSecret(value: string) { const [ivEncoded, tagEncoded, encryptedEncoded] = value.split("."); if (!ivEncoded || !tagEncoded || !encryptedEncoded) throw new Error("Jeton Google Drive invalide."); const decipher = createDecipheriv("aes-256-gcm", encryptionKey(), Buffer.from(ivEncoded, "base64")); decipher.setAuthTag(Buffer.from(tagEncoded, "base64")); return Buffer.concat([decipher.update(Buffer.from(encryptedEncoded, "base64")), decipher.final()]).toString("utf8"); }
+export function encryptSecret(value: string) { return sealString(encryptionKey(), value); }
+export function decryptSecret(value: string) {
+  try {
+    return openString(encryptionKey(), value);
+  } catch (error) {
+    // Jetons chiffrés avant l'introduction de DRIVE_TOKEN_ENCRYPTION_KEY.
+    const legacy = legacyKeyFromJwtSecret();
+    if (legacy && process.env.DRIVE_TOKEN_ENCRYPTION_KEY) return openString(legacy, value);
+    throw error instanceof Error && error.message === "Secret chiffré invalide." ? new Error("Jeton Google Drive invalide.") : error;
+  }
+}
 
 export function buildGoogleDriveAuthorizationUrl(redirectUri: string, state: string) { requireConfig(); const url = new URL(GOOGLE_AUTH_URL); url.searchParams.set("client_id", clientId()); url.searchParams.set("redirect_uri", redirectUri); url.searchParams.set("response_type", "code"); url.searchParams.set("scope", DRIVE_SCOPE); url.searchParams.set("access_type", "offline"); url.searchParams.set("prompt", "consent"); url.searchParams.set("state", state); return url.toString(); }
 
