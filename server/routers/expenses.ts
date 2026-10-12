@@ -9,13 +9,15 @@ import { adminProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { storagePut } from "../storage";
 import { companyScope } from "../companyScope";
+import { MAX_CENTS } from "../numericLimits";
+import { safeFileUrl } from "../inputRules";
 
 const expenseInput = z.object({
   category: z.enum(expenseCategories),
   description: z.string().trim().min(2).max(300),
-  amountCents: z.number().int().positive(),
+  amountCents: z.number().int().positive().max(MAX_CENTS),
   spentAt: z.date(),
-  receiptUrl: z.string().max(1024).nullable().optional(),
+  receiptUrl: safeFileUrl.nullable().optional(),
   receiptName: z.string().trim().max(180).nullable().optional(),
   receiptMimeType: z.string().trim().max(80).nullable().optional(),
 });
@@ -32,12 +34,12 @@ export const expensesRouter = router({
       const db = await dbOrThrow();
       return (await db.select().from(expenseBudgets).where(and(eq(expenseBudgets.yearMonth, input.yearMonth), companyScope(expenseBudgets.companyId, ctx.user.companyId))).limit(1))[0] ?? null;
     }),
-    save: adminProcedure.input(z.object({ yearMonth: z.string().regex(/^\d{4}-\d{2}$/), amountCents: z.number().int().min(0), warningPercent: z.number().int().min(50).max(100) })).mutation(async ({ ctx, input }) => {
+    save: adminProcedure.input(z.object({ yearMonth: z.string().regex(/^\d{4}-\d{2}$/), amountCents: z.number().int().min(0).max(MAX_CENTS), warningPercent: z.number().int().min(50).max(100) })).mutation(async ({ ctx, input }) => {
       const db = await dbOrThrow();
       const current = (await db.select().from(expenseBudgets).where(and(eq(expenseBudgets.yearMonth, input.yearMonth), companyScope(expenseBudgets.companyId, ctx.user.companyId))).limit(1))[0];
       if (current) await db.update(expenseBudgets).set({ amountCents: input.amountCents, warningPercent: input.warningPercent, updatedByUserId: ctx.user.id }).where(eq(expenseBudgets.id, current.id));
       else await db.insert(expenseBudgets).values({ ...input, companyId: ctx.user.companyId, updatedByUserId: ctx.user.id });
-      await db.insert(auditLogs).values({ actorUserId: ctx.user.id, action: "Budget dépenses", entityType: "Budget", entityId: input.yearMonth, detail: `Budget mensuel fixé à ${input.amountCents} centimes` });
+      await db.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Budget dépenses", entityType: "Budget", entityId: input.yearMonth, detail: `Budget mensuel fixé à ${input.amountCents} centimes` });
       return { success: true };
     }),
   }),
@@ -59,20 +61,20 @@ export const expensesRouter = router({
     const db = await dbOrThrow();
     const result = await db.insert(expenses).values({ ...input, companyId: ctx.user.companyId, createdByUserId: ctx.user.id });
     const id = Number(result[0].insertId);
-    await db.insert(auditLogs).values({ actorUserId: ctx.user.id, action: "Création", entityType: "Dépense", entityId: String(id), detail: `Dépense ${input.category} de ${input.amountCents} centimes créée` });
+    await db.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Création", entityType: "Dépense", entityId: String(id), detail: `Dépense ${input.category} de ${input.amountCents} centimes créée` });
     return { id };
   }),
   update: adminProcedure.input(expenseInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
     const db = await dbOrThrow();
     const { id, ...data } = input;
     await db.update(expenses).set(data).where(and(eq(expenses.id, id), companyScope(expenses.companyId, ctx.user.companyId)));
-    await db.insert(auditLogs).values({ actorUserId: ctx.user.id, action: "Modification", entityType: "Dépense", entityId: String(id), detail: `Dépense ${data.category} de ${data.amountCents} centimes modifiée` });
+    await db.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Modification", entityType: "Dépense", entityId: String(id), detail: `Dépense ${data.category} de ${data.amountCents} centimes modifiée` });
     return { success: true };
   }),
   remove: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
     const db = await dbOrThrow();
     await db.delete(expenses).where(and(eq(expenses.id, input.id), companyScope(expenses.companyId, ctx.user.companyId)));
-    await db.insert(auditLogs).values({ actorUserId: ctx.user.id, action: "Suppression", entityType: "Dépense", entityId: String(input.id), detail: "Dépense supprimée" });
+    await db.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Suppression", entityType: "Dépense", entityId: String(input.id), detail: "Dépense supprimée" });
     return { success: true };
   }),
 });

@@ -8,10 +8,12 @@ import { adminProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { storagePut } from "../storage";
 import { companyScope } from "../companyScope";
+import { MAX_CENTS } from "../numericLimits";
+import { safeFileUrl } from "../inputRules";
 
 async function dbOrThrow() { const db = await getDb(); if (!db) throw new Error("Base de données indisponible."); return db; }
 function currentPeriodLabel() { return new Date().toISOString().slice(0, 7); }
-export const payrollPaymentInput = z.object({ beneficiaryType: z.enum(["user", "agent"]), beneficiaryId: z.number().int().positive(), amountCents: z.number().int().positive(), periodLabel: z.string().regex(/^\d{4}-\d{2}$/).optional(), note: z.string().trim().max(1000).nullable(), receiptUrl: z.string().max(1024).nullable().optional(), receiptName: z.string().trim().max(180).nullable().optional(), receiptMimeType: z.string().trim().max(80).nullable().optional() });
+export const payrollPaymentInput = z.object({ beneficiaryType: z.enum(["user", "agent"]), beneficiaryId: z.number().int().positive(), amountCents: z.number().int().positive().max(MAX_CENTS), periodLabel: z.string().regex(/^\d{4}-\d{2}$/).optional(), note: z.string().trim().max(1000).nullable(), receiptUrl: safeFileUrl.nullable().optional(), receiptName: z.string().trim().max(180).nullable().optional(), receiptMimeType: z.string().trim().max(80).nullable().optional() });
 
 export const payrollRouter = router({
   overview: adminProcedure.input(z.object({ periodLabel: z.string().regex(/^\d{4}-\d{2}$/).optional() }).optional()).query(async ({ ctx, input }) => {
@@ -23,5 +25,5 @@ export const payrollRouter = router({
     return { periodLabel, agents: agentRows, users: userRows.filter(user => user.role === "seller"), profiles, commissions: scopedCommissions, payments, balances };
   }),
   uploadReceipt: adminProcedure.input(z.object({ dataUrl: z.string().min(30).max(7_000_000), filename: z.string().trim().min(1).max(180) })).mutation(async ({ ctx, input }) => { const match = input.dataUrl.match(/^data:(application\/pdf|image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/); if (!match) throw new TRPCError({ code: "BAD_REQUEST", message: "Le reçu doit être un PDF, PNG, JPEG ou WEBP." }); const mimeType = match[1]; const buffer = Buffer.from(match[2], "base64"); if (buffer.byteLength > 5 * 1024 * 1024) throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "Le reçu ne doit pas dépasser 5 Mo." }); const extension = mimeType === "application/pdf" ? "pdf" : mimeType === "image/jpeg" ? "jpg" : mimeType.split("/")[1]; const { url } = await storagePut(`company/${ctx.user.companyId ?? "legacy"}/payroll/${randomUUID()}.${extension}`, buffer, mimeType); return { url, filename: input.filename, mimeType }; }),
-  pay: adminProcedure.input(payrollPaymentInput).mutation(async ({ ctx, input }) => { const db = await dbOrThrow(); const result = await db.insert(agentPayments).values({ ...input, companyId: ctx.user.companyId, periodLabel: input.periodLabel ?? currentPeriodLabel(), createdByUserId: ctx.user.id }); return { id: Number(result[0].insertId) }; }),
+  pay: adminProcedure.input(payrollPaymentInput).mutation(async ({ ctx, input }) => { const db = await dbOrThrow(); const beneficiary = input.beneficiaryType === "user" ? (await db.select({ id: users.id }).from(users).where(and(eq(users.id, input.beneficiaryId), companyScope(users.companyId, ctx.user.companyId))).limit(1))[0] : (await db.select({ id: agents.id }).from(agents).where(and(eq(agents.id, input.beneficiaryId), companyScope(agents.companyId, ctx.user.companyId))).limit(1))[0]; if (!beneficiary) throw new TRPCError({ code: "NOT_FOUND", message: "Bénéficiaire introuvable." }); const result = await db.insert(agentPayments).values({ ...input, companyId: ctx.user.companyId, periodLabel: input.periodLabel ?? currentPeriodLabel(), createdByUserId: ctx.user.id }); return { id: Number(result[0].insertId) }; }),
 });

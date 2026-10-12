@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { escapeHtml } from "@/lib/html";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -12,7 +13,6 @@ import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
 
 const labels: Record<string, string> = { entry: "Entrée", exit: "Sortie", adjustment: "Ajustement" };
-function escapeHtml(value: unknown) { return String(value ?? "").replace(/[&<>'"]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character] ?? character); }
 
 export default function ProductDetail() {
   const [, params] = useRoute("/produits/:id");

@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { escapeHtml } from "@/lib/html";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,7 +26,6 @@ const paymentMethods: Array<{ id: Method; label: string; icon: typeof Banknote; 
 ];
 
 const receiptMethodLabel: Record<Method, string> = { cash: "Espèces", mobile_money: "Mobile money", card: "Carte", bank_transfer: "Virement", credit: "Crédit" };
-const escapeHtml = (value: unknown) => String(value ?? "").replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[character] || character);
 export function printPosReceipt(detail: any, identity: PaymentSettings | undefined, receiptWindow: Window | null) {
   const popup = receiptWindow && !receiptWindow.closed ? receiptWindow : window.open("", "stockpilot-pos-receipt", "width=460,height=760");
   if (!popup) return false;

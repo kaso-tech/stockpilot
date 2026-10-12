@@ -12,6 +12,7 @@ import {
   type OfflineScope,
 } from "@/lib/offlineStore";
 import { createSingleFlight } from "@/lib/singleFlight";
+import { COOKIE_NAME } from "@shared/const";
 
 type Discount = { type: "none" | "percent" | "fixed"; value: number };
 export type OfflinePayment = { method: "cash" | "card" | "mobile_money" | "bank_transfer" | "credit"; amountCents: number };
@@ -23,7 +24,7 @@ export type SyncLogEntry = { id: string; ownerUserId: number; companyId: number;
 
 const maxLogEntries = 150;
 function summaryFor(item: OfflineSale) { const quantity = item.draft.items.reduce((sum, line) => sum + line.quantity, 0); const title = item.kind === "pos_sale" ? "Vente comptoir" : item.draft.channel === "quote" ? "Devis" : item.checkout?.settlementMode === "partial" ? "Facture · règlement partiel" : "Brouillon de facture"; return `${title} · ${quantity} article${quantity > 1 ? "s" : ""}`; }
-function authHeaders() { try { const raw = sessionStorage.getItem("manus-cookie"); const cookie = raw?.split(";").find(value => value.trim().startsWith("manus_session=")); const token = cookie?.trim().slice("manus_session=".length); return token ? { Authorization: `Bearer ${token}` } : {}; } catch { return {}; } }
+function authHeaders() { try { const raw = sessionStorage.getItem("manus-cookie"); const prefix = `${COOKIE_NAME}=`; const cookie = raw?.split(";").find(value => value.trim().startsWith(prefix)); const token = cookie?.trim().slice(prefix.length); return token ? { Authorization: `Bearer ${token}` } : {}; } catch { return {}; } }
 const syncClient = createTRPCProxyClient<AppRouter>({ links: [httpBatchLink({ url: "/api/trpc", transformer: superjson, headers: authHeaders, fetch: (input, init) => globalThis.fetch(input, { ...(init ?? {}), credentials: "include" }) })] });
 
 export type PersistenceStatus = "idle" | "saving" | "saved" | "error";

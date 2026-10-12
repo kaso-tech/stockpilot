@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { userSessions } from "../drizzle/schema";
 
 vi.mock("./db", () => ({ getDb: vi.fn() }));
@@ -26,6 +26,9 @@ describe("auth.sessions", () => {
   ];
 
   beforeEach(() => {
+    // Horloge figée : les fixtures utilisent des dates absolues.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-08-24T12:00:00Z"));
     updates.length = 0;
     const db: any = {
       select: () => ({ from: (table: unknown) => {
@@ -35,6 +38,10 @@ describe("auth.sessions", () => {
       update: () => ({ set: (values: Record<string, unknown>) => ({ where: async () => { updates.push({ values, id: otherSessionId }); } }) }),
     };
     mockedGetDb.mockResolvedValue(db);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("liste les sessions actives et identifie la session courante", async () => {

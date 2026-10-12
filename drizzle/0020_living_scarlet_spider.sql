@@ -6,4 +6,5 @@ CREATE TABLE `productCategories` (
 	CONSTRAINT `productCategories_id` PRIMARY KEY(`id`),
 	CONSTRAINT `productCategories_name_unique` UNIQUE(`name`)
 );
+--> statement-breakpoint
 INSERT IGNORE INTO `productCategories` (`name`) SELECT DISTINCT `category` FROM `products` WHERE `category` <> '';

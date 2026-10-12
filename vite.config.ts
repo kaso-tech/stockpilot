@@ -175,6 +175,8 @@ const plugins = [
       clientsClaim: true,
       skipWaiting: true,
       navigateFallback: "/index.html",
+      // Les routes serveur (API, OAuth Google Drive, fichiers stockés) ne doivent jamais être servies par la coquille PWA.
+      navigateFallbackDenylist: [/^\/api\//, /^\/manus-storage\//],
       cleanupOutdatedCaches: true,
       maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
     },

@@ -11,6 +11,9 @@ import { registerGoogleDriveRoutes } from "../googleDriveRoutes";
 import { serveStatic, setupVite } from "./vite";
 import { ensureAdminFallbackPasswordSeed } from "../adminFallbackSeed";
 
+// Restauration : dataUrl ≤ 30 Mo en base64 ; marge pour l'enveloppe JSON tRPC.
+const TRPC_BODY_LIMIT = "32mb";
+
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
     const server = net.createServer();
@@ -33,9 +36,11 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
-  // Configure body parser with larger size limit for file uploads
-  app.use(express.json({ limit: "50mb" }));
-  app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  // Corps limités par défaut ; seules les procédures d'import (restauration de
+  // sauvegarde, logos, reçus) acceptent des charges plus volumineuses.
+  app.use("/api/trpc", express.json({ limit: TRPC_BODY_LIMIT }));
+  app.use(express.json({ limit: "1mb" }));
+  app.use(express.urlencoded({ limit: "1mb", extended: true }));
   registerStorageProxy(app);
   registerGoogleDriveRoutes(app);
   app.post("/api/scheduled/backup", runScheduledBackup);
