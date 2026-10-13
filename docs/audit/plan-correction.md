@@ -17,7 +17,7 @@ Règles d'exécution :
 | 6 | Code mort et dépendances (mise à jour + retrait) | §4, §2.5, H5 | ✅ Fait |
 | 7 | Corrections fonctionnelles (tableau de bord, fuseau horaire, pagination, inventaire, numérotation, remboursements) | E4–E8, E10, E12, E18 | ✅ Fait |
 | 8 | Performance et qualité (lazy loading, écritures par requête, requêtes non bornées, CI) | P1–P7, P9–P11, E22–E24 | ✅ Fait |
-| 9 | Fonctionnalités manquantes (feuille de route, nécessite arbitrages produit) | §6 | ⏳ À planifier avec le métier |
+| 9 | Fonctionnalités manquantes (feuille de route, nécessite arbitrages produit) | §6, P8, B2, P12 | ⏳ Décisions attendues |
 
 Le détail des modifications de chaque lot est consigné dans la section « Journal » ci-dessous au fil de l'eau.
 
@@ -157,3 +157,21 @@ Migration **`0045_sequences_timezone_credit_notes`** : table `documentSequences`
 **Non traités dans ce lot (justification)**
 - **P8** (catégories et unités stockées en texte dans les produits) : passer à des clés étrangères impose de reprendre les écrans produits, l'import CSV et les sauvegardes ; proposé au lot 9.
 - **P12** (couplage à la plateforme Manus : stockage Forge, tâches planifiées) : choix d'hébergement ; à traiter si l'application quitte Manus (le stockage S3 serait alors la cible naturelle, cf. B2).
+
+### Lot 9 — Fonctionnalités manquantes : proposition et décisions attendues
+
+Ces évolutions ne corrigent pas un défaut : elles ajoutent des capacités et engagent des choix produit, techniques ou contractuels. Ordre proposé, avec la décision nécessaire avant de commencer :
+
+| # | Fonctionnalité | Décision nécessaire | Effort estimé |
+|---|---|---|---|
+| 9.1 | **Mot de passe oublié** et **vérification d'e-mail** à l'inscription | Fournisseur d'envoi d'e-mails (SMTP, Brevo, SES…) et domaine expéditeur | 2–3 j |
+| 9.2 | **Remboursements partiels / retours article par article** avec avoir partiel | Règles : retour en stock ou non, remboursement en espèces ou avoir client réutilisable | 3–4 j |
+| 9.3 | **Rôles fins** (gérant, caissier, comptable, lecture seule) remplaçant le couple admin/vendeur | Matrice des droits par rôle | 4–5 j |
+| 9.4 | **Catégories et unités par identifiant** (P8) | Aucune (migration technique), à planifier avec 9.3 car elle touche les mêmes écrans | 2 j |
+| 9.5 | **Export comptable** (journal des ventes, FEC) et **clôture de caisse** (Z de caisse, fond de caisse, écarts) | Référentiel comptable visé (France / SYSCOHADA) et plan de comptes | 4–6 j |
+| 9.6 | **TVA par produit** (plusieurs taux) | Taux applicables par pays | 2 j |
+| 9.7 | **Multi-dépôts / transferts**, **lots et dates de péremption**, **valorisation CMUP/FIFO** | Priorisation métier (secteurs ciblés) | 8–12 j |
+| 9.8 | **Abonnements SaaS** (plans, limites, facturation), **console super-administrateur**, suppression d'entreprise et export RGPD | Offre commerciale et prestataire de paiement (Stripe, CinetPay, Paydunya…) | 10+ j |
+| 9.9 | **Envoi des factures et devis par e-mail/WhatsApp** depuis le serveur | Lié à 9.1 (e-mail) ; API WhatsApp Business ou lien de partage | 2–3 j |
+| 9.10 | **Stockage S3 avec suppression réelle** des archives (fin de B2, P12) | Rester sur Manus ou héberger ailleurs | 1–2 j |
+| 9.11 | Tests de bout en bout automatisés (Playwright) en CI à partir des scripts `scripts/verify_*.mjs` | Aucune | 2–3 j |
