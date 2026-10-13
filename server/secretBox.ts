@@ -1,4 +1,9 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  randomBytes,
+} from "crypto";
 
 /**
  * Chiffrement symétrique AES-256-GCM. Format : base64(iv).base64(tag).base64(données).
@@ -7,8 +12,13 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypt
 export function parseKey(raw: string | undefined, name: string): Buffer | null {
   if (!raw) return null;
   const value = raw.trim();
-  const key = /^[0-9a-fA-F]{64}$/.test(value) ? Buffer.from(value, "hex") : Buffer.from(value, "base64");
-  if (key.length !== 32) throw new Error(`${name} doit contenir 32 octets (64 caractères hexadécimaux ou base64).`);
+  const key = /^[0-9a-fA-F]{64}$/.test(value)
+    ? Buffer.from(value, "hex")
+    : Buffer.from(value, "base64");
+  if (key.length !== 32)
+    throw new Error(
+      `${name} doit contenir 32 octets (64 caractères hexadécimaux ou base64).`
+    );
   return key;
 }
 
@@ -22,13 +32,27 @@ export function sealBuffer(key: Buffer, plain: Buffer) {
   const iv = randomBytes(12);
   const cipher = createCipheriv("aes-256-gcm", key, iv);
   const encrypted = Buffer.concat([cipher.update(plain), cipher.final()]);
-  return { iv: iv.toString("base64"), tag: cipher.getAuthTag().toString("base64"), data: encrypted.toString("base64") };
+  return {
+    iv: iv.toString("base64"),
+    tag: cipher.getAuthTag().toString("base64"),
+    data: encrypted.toString("base64"),
+  };
 }
 
-export function openBuffer(key: Buffer, sealed: { iv: string; tag: string; data: string }) {
-  const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(sealed.iv, "base64"));
+export function openBuffer(
+  key: Buffer,
+  sealed: { iv: string; tag: string; data: string }
+) {
+  const decipher = createDecipheriv(
+    "aes-256-gcm",
+    key,
+    Buffer.from(sealed.iv, "base64")
+  );
   decipher.setAuthTag(Buffer.from(sealed.tag, "base64"));
-  return Buffer.concat([decipher.update(Buffer.from(sealed.data, "base64")), decipher.final()]);
+  return Buffer.concat([
+    decipher.update(Buffer.from(sealed.data, "base64")),
+    decipher.final(),
+  ]);
 }
 
 export function sealString(key: Buffer, value: string) {

@@ -3,23 +3,79 @@ import { Badge } from "@/components/ui/badge";
 import { BarcodeCameraDialog } from "@/components/BarcodeCameraDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
-import { Camera, ChevronRight, Edit3, History, PackagePlus, Plus, RotateCcw, Search, SlidersHorizontal, Trash2 } from "lucide-react";
+import {
+  Camera,
+  ChevronRight,
+  Edit3,
+  History,
+  PackagePlus,
+  Plus,
+  RotateCcw,
+  Search,
+  SlidersHorizontal,
+  Trash2,
+} from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 
 type PriceTierForm = { minQuantity: string; unitPrice: string };
-type ProductForm = { reference: string; name: string; description: string; category: string; unit: string; purchasePrice: string; retailPrice: string; wholesalePrice: string; quantity: string; minimumQuantity: string; supplierId: string; retailTiersEnabled: boolean; wholesaleTiersEnabled: boolean; retailPriceTiers: PriceTierForm[]; wholesalePriceTiers: PriceTierForm[] };
+type ProductForm = {
+  reference: string;
+  name: string;
+  description: string;
+  category: string;
+  unit: string;
+  purchasePrice: string;
+  retailPrice: string;
+  wholesalePrice: string;
+  quantity: string;
+  minimumQuantity: string;
+  supplierId: string;
+  retailTiersEnabled: boolean;
+  wholesaleTiersEnabled: boolean;
+  retailPriceTiers: PriceTierForm[];
+  wholesalePriceTiers: PriceTierForm[];
+};
 type NamedEntity = { id: number; name: string };
 
-const emptyProduct: ProductForm = { reference: "", name: "", description: "", category: "", unit: "unité", purchasePrice: "", retailPrice: "", wholesalePrice: "", quantity: "0", minimumQuantity: "0", supplierId: "none", retailTiersEnabled: false, wholesaleTiersEnabled: false, retailPriceTiers: [], wholesalePriceTiers: [] };
+const emptyProduct: ProductForm = {
+  reference: "",
+  name: "",
+  description: "",
+  category: "",
+  unit: "unité",
+  purchasePrice: "",
+  retailPrice: "",
+  wholesalePrice: "",
+  quantity: "0",
+  minimumQuantity: "0",
+  supplierId: "none",
+  retailTiersEnabled: false,
+  wholesaleTiersEnabled: false,
+  retailPriceTiers: [],
+  wholesalePriceTiers: [],
+};
 
 export default function Products() {
   const { user } = useAuth();
@@ -39,71 +95,1255 @@ export default function Products() {
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [detailId, setDetailId] = useState<number | null>(null);
-  const [purchasePriceTarget, setPurchasePriceTarget] = useState<{ id: number; name: string; purchasePriceCents: number } | null>(null);
+  const [purchasePriceTarget, setPurchasePriceTarget] = useState<{
+    id: number;
+    name: string;
+    purchasePriceCents: number;
+  } | null>(null);
   const [purchasePrice, setPurchasePrice] = useState("");
   const [form, setForm] = useState<ProductForm>(emptyProduct);
-  const canEditPurchasePrice = canManage || Boolean(settings?.sellerCanEditPurchasePrice);
-  const catalogCategories = useMemo(() => Array.from(new Set(products.map(product => product.category))).sort(), [products]);
-  const filtered = useMemo(() => products.filter(product => {
-    const matchesSearch = [product.name, product.reference, product.category].some(value => value.toLowerCase().includes(query.toLowerCase()));
-    const matchesCategory = filterCategory === "all" || product.category === filterCategory;
-    const matchesSupplier = filterSupplier === "all" || (filterSupplier === "none" ? product.supplierId === null : product.supplierId === Number(filterSupplier));
-    const matchesStock = filterStatus === "all" || (filterStatus === "alert" ? product.quantity <= product.minimumQuantity : product.quantity > product.minimumQuantity);
-    return matchesSearch && matchesCategory && matchesSupplier && matchesStock;
-  }), [products, query, filterCategory, filterSupplier, filterStatus]);
-  const detailProduct = products.find(product => product.id === detailId) ?? null;
-  const refresh = () => { utils.products.list.invalidate(); utils.movements.list.invalidate(); utils.dashboard.get.invalidate(); };
-  const create = trpc.products.create.useMutation({ onSuccess: () => { refresh(); close(); toast.success("Produit créé.", { description: "La référence est disponible dans le catalogue et le point de vente." }); }, onError: error => toast.error(error.message) });
-  const update = trpc.products.update.useMutation({ onSuccess: () => { refresh(); close(); toast.success("Produit mis à jour.", { description: "Les niveaux de stock et tarifs ont été actualisés." }); }, onError: error => toast.error(error.message) });
-  const updatePurchasePrice = trpc.products.updatePurchasePrice.useMutation({ onSuccess: () => { refresh(); setPurchasePriceTarget(null); toast.success("Coût d’achat mis à jour."); }, onError: error => toast.error(error.message) });
-  const remove = trpc.products.remove.useMutation({ onSuccess: () => { refresh(); toast.success("Produit supprimé."); }, onError: error => toast.error(error.message) });
-  const reset = () => { setForm(emptyProduct); setEditingId(null); };
-  const close = () => { setOpen(false); reset(); };
-  const edit = (product: typeof products[number]) => {
-    const retail = product.retailPriceTiers ?? product.priceTiers ?? []; const wholesale = product.wholesalePriceTiers ?? [];
+  const canEditPurchasePrice =
+    canManage || Boolean(settings?.sellerCanEditPurchasePrice);
+  const catalogCategories = useMemo(
+    () => Array.from(new Set(products.map(product => product.category))).sort(),
+    [products]
+  );
+  const filtered = useMemo(
+    () =>
+      products.filter(product => {
+        const matchesSearch = [
+          product.name,
+          product.reference,
+          product.category,
+        ].some(value => value.toLowerCase().includes(query.toLowerCase()));
+        const matchesCategory =
+          filterCategory === "all" || product.category === filterCategory;
+        const matchesSupplier =
+          filterSupplier === "all" ||
+          (filterSupplier === "none"
+            ? product.supplierId === null
+            : product.supplierId === Number(filterSupplier));
+        const matchesStock =
+          filterStatus === "all" ||
+          (filterStatus === "alert"
+            ? product.quantity <= product.minimumQuantity
+            : product.quantity > product.minimumQuantity);
+        return (
+          matchesSearch && matchesCategory && matchesSupplier && matchesStock
+        );
+      }),
+    [products, query, filterCategory, filterSupplier, filterStatus]
+  );
+  const detailProduct =
+    products.find(product => product.id === detailId) ?? null;
+  const refresh = () => {
+    utils.products.list.invalidate();
+    utils.movements.list.invalidate();
+    utils.dashboard.get.invalidate();
+  };
+  const create = trpc.products.create.useMutation({
+    onSuccess: () => {
+      refresh();
+      close();
+      toast.success("Produit créé.", {
+        description:
+          "La référence est disponible dans le catalogue et le point de vente.",
+      });
+    },
+    onError: error => toast.error(error.message),
+  });
+  const update = trpc.products.update.useMutation({
+    onSuccess: () => {
+      refresh();
+      close();
+      toast.success("Produit mis à jour.", {
+        description: "Les niveaux de stock et tarifs ont été actualisés.",
+      });
+    },
+    onError: error => toast.error(error.message),
+  });
+  const updatePurchasePrice = trpc.products.updatePurchasePrice.useMutation({
+    onSuccess: () => {
+      refresh();
+      setPurchasePriceTarget(null);
+      toast.success("Coût d’achat mis à jour.");
+    },
+    onError: error => toast.error(error.message),
+  });
+  const remove = trpc.products.remove.useMutation({
+    onSuccess: () => {
+      refresh();
+      toast.success("Produit supprimé.");
+    },
+    onError: error => toast.error(error.message),
+  });
+  const reset = () => {
+    setForm(emptyProduct);
+    setEditingId(null);
+  };
+  const close = () => {
+    setOpen(false);
+    reset();
+  };
+  const edit = (product: (typeof products)[number]) => {
+    const retail = product.retailPriceTiers ?? product.priceTiers ?? [];
+    const wholesale = product.wholesalePriceTiers ?? [];
     setEditingId(product.id);
-    setForm({ reference: product.reference, name: product.name, description: product.description || "", category: product.category, unit: product.unit, purchasePrice: (product.purchasePriceCents / 100).toFixed(2), retailPrice: (product.retailPriceCents / 100).toFixed(2), wholesalePrice: (product.wholesalePriceCents / 100).toFixed(2), quantity: String(product.quantity), minimumQuantity: String(product.minimumQuantity), supplierId: product.supplierId ? String(product.supplierId) : "none", retailTiersEnabled: retail.length > 0, wholesaleTiersEnabled: wholesale.length > 0, retailPriceTiers: retail.map(tier => ({ minQuantity: String(tier.minQuantity), unitPrice: (tier.unitPriceCents / 100).toFixed(2) })), wholesalePriceTiers: wholesale.map(tier => ({ minQuantity: String(tier.minQuantity), unitPrice: (tier.unitPriceCents / 100).toFixed(2) })) });
+    setForm({
+      reference: product.reference,
+      name: product.name,
+      description: product.description || "",
+      category: product.category,
+      unit: product.unit,
+      purchasePrice: (product.purchasePriceCents / 100).toFixed(2),
+      retailPrice: (product.retailPriceCents / 100).toFixed(2),
+      wholesalePrice: (product.wholesalePriceCents / 100).toFixed(2),
+      quantity: String(product.quantity),
+      minimumQuantity: String(product.minimumQuantity),
+      supplierId: product.supplierId ? String(product.supplierId) : "none",
+      retailTiersEnabled: retail.length > 0,
+      wholesaleTiersEnabled: wholesale.length > 0,
+      retailPriceTiers: retail.map(tier => ({
+        minQuantity: String(tier.minQuantity),
+        unitPrice: (tier.unitPriceCents / 100).toFixed(2),
+      })),
+      wholesalePriceTiers: wholesale.map(tier => ({
+        minQuantity: String(tier.minQuantity),
+        unitPrice: (tier.unitPriceCents / 100).toFixed(2),
+      })),
+    });
     setOpen(true);
   };
-  useEffect(() => { const target = Number(new URLSearchParams(window.location.search).get("modifier")); if (!editingId && target > 0) { const product = products.find(item => item.id === target); if (product) { edit(product); setLocation("/produits"); } } }, [editingId, products, setLocation]);
+  useEffect(() => {
+    const target = Number(
+      new URLSearchParams(window.location.search).get("modifier")
+    );
+    if (!editingId && target > 0) {
+      const product = products.find(item => item.id === target);
+      if (product) {
+        edit(product);
+        setLocation("/produits");
+      }
+    }
+  }, [editingId, products, setLocation]);
   const save = () => {
-    const makeTiers = (tiers: PriceTierForm[]) => tiers.map(tier => ({ minQuantity: Number(tier.minQuantity), unitPriceCents: Math.round(Number(tier.unitPrice.replace(",", ".")) * 100) }));
-    const retailPriceTiers = form.retailTiersEnabled ? makeTiers(form.retailPriceTiers) : [];
-    const wholesalePriceTiers = form.wholesaleTiersEnabled ? makeTiers(form.wholesalePriceTiers) : [];
-    const data = { reference: form.reference.trim(), name: form.name.trim(), description: form.description.trim() || null, category: form.category.trim(), unit: form.unit.trim(), purchasePriceCents: Math.round(Number(form.purchasePrice) * 100), retailPriceCents: Math.round(Number(form.retailPrice) * 100), wholesalePriceCents: Math.round(Number(form.wholesalePrice) * 100), quantity: Number(form.quantity), minimumQuantity: Number(form.minimumQuantity), supplierId: form.supplierId === "none" ? null : Number(form.supplierId), retailPriceTiers, wholesalePriceTiers };
-    const invalid = [...retailPriceTiers, ...wholesalePriceTiers].some(tier => !Number.isInteger(tier.minQuantity) || tier.minQuantity < 2 || !Number.isFinite(tier.unitPriceCents) || tier.unitPriceCents < 0);
-    const duplicated = new Set(retailPriceTiers.map(tier => tier.minQuantity)).size !== retailPriceTiers.length || new Set(wholesalePriceTiers.map(tier => tier.minQuantity)).size !== wholesalePriceTiers.length;
-    if (!data.reference || !data.name || !data.category || !data.unit || [data.purchasePriceCents, data.retailPriceCents, data.wholesalePriceCents].some(Number.isNaN)) return toast.error("Renseignez les champs requis et sélectionnez une catégorie et une unité.");
-    if (invalid || duplicated) return toast.error("Chaque palier doit avoir un seuil unique d’au moins 2 et un prix valide.");
-    if (editingId) update.mutate({ id: editingId, ...data }); else create.mutate(data);
+    const makeTiers = (tiers: PriceTierForm[]) =>
+      tiers.map(tier => ({
+        minQuantity: Number(tier.minQuantity),
+        unitPriceCents: Math.round(
+          Number(tier.unitPrice.replace(",", ".")) * 100
+        ),
+      }));
+    const retailPriceTiers = form.retailTiersEnabled
+      ? makeTiers(form.retailPriceTiers)
+      : [];
+    const wholesalePriceTiers = form.wholesaleTiersEnabled
+      ? makeTiers(form.wholesalePriceTiers)
+      : [];
+    const data = {
+      reference: form.reference.trim(),
+      name: form.name.trim(),
+      description: form.description.trim() || null,
+      category: form.category.trim(),
+      unit: form.unit.trim(),
+      purchasePriceCents: Math.round(Number(form.purchasePrice) * 100),
+      retailPriceCents: Math.round(Number(form.retailPrice) * 100),
+      wholesalePriceCents: Math.round(Number(form.wholesalePrice) * 100),
+      quantity: Number(form.quantity),
+      minimumQuantity: Number(form.minimumQuantity),
+      supplierId: form.supplierId === "none" ? null : Number(form.supplierId),
+      retailPriceTiers,
+      wholesalePriceTiers,
+    };
+    const invalid = [...retailPriceTiers, ...wholesalePriceTiers].some(
+      tier =>
+        !Number.isInteger(tier.minQuantity) ||
+        tier.minQuantity < 2 ||
+        !Number.isFinite(tier.unitPriceCents) ||
+        tier.unitPriceCents < 0
+    );
+    const duplicated =
+      new Set(retailPriceTiers.map(tier => tier.minQuantity)).size !==
+        retailPriceTiers.length ||
+      new Set(wholesalePriceTiers.map(tier => tier.minQuantity)).size !==
+        wholesalePriceTiers.length;
+    if (
+      !data.reference ||
+      !data.name ||
+      !data.category ||
+      !data.unit ||
+      [
+        data.purchasePriceCents,
+        data.retailPriceCents,
+        data.wholesalePriceCents,
+      ].some(Number.isNaN)
+    )
+      return toast.error(
+        "Renseignez les champs requis et sélectionnez une catégorie et une unité."
+      );
+    if (invalid || duplicated)
+      return toast.error(
+        "Chaque palier doit avoir un seuil unique d’au moins 2 et un prix valide."
+      );
+    if (editingId) update.mutate({ id: editingId, ...data });
+    else create.mutate(data);
   };
   const savePurchasePrice = () => {
     if (!purchasePriceTarget) return;
-    const purchasePriceCents = Math.round(Number(purchasePrice.replace(",", ".")) * 100);
-    if (!Number.isInteger(purchasePriceCents) || purchasePriceCents < 0) return toast.error("Saisissez un coût d’achat valide.");
-    updatePurchasePrice.mutate({ id: purchasePriceTarget.id, purchasePriceCents });
+    const purchasePriceCents = Math.round(
+      Number(purchasePrice.replace(",", ".")) * 100
+    );
+    if (!Number.isInteger(purchasePriceCents) || purchasePriceCents < 0)
+      return toast.error("Saisissez un coût d’achat valide.");
+    updatePurchasePrice.mutate({
+      id: purchasePriceTarget.id,
+      purchasePriceCents,
+    });
   };
-  const clearFilters = () => { setQuery(""); setFilterCategory("all"); setFilterSupplier("all"); setFilterStatus("all"); };
-  const hasFilters = Boolean(query) || filterCategory !== "all" || filterSupplier !== "all" || filterStatus !== "all";
-  return <div className="mx-auto max-w-[1500px] space-y-6"><header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">Catalogue</p><h1 className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-3xl">Produits & références</h1></div>{canManage && <Button onClick={() => { reset(); setOpen(true); }} className="h-10 bg-primary text-primary-foreground hover:bg-primary/90"><PackagePlus className="mr-2 h-4 w-4" />Ajouter un produit</Button>}</header><Card className="border-white/[0.07] bg-[#111722] shadow-none"><CardContent className="p-0"><div className="border-b border-white/[0.07] p-4"><div className="flex flex-col gap-3 xl:flex-row"><div className="relative min-w-0 flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" /><Input value={query} onChange={event => setQuery(event.target.value)} placeholder="Rechercher une référence…" className="border-white/10 bg-white/[0.03] pl-9" /></div><Select value={filterCategory} onValueChange={setFilterCategory}><SelectTrigger className="xl:w-40"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Toutes catégories</SelectItem>{catalogCategories.map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select><Select value={filterSupplier} onValueChange={setFilterSupplier}><SelectTrigger className="xl:w-44"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Tous fournisseurs</SelectItem><SelectItem value="none">Sans fournisseur</SelectItem>{suppliers.map(item => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent></Select><Select value={filterStatus} onValueChange={setFilterStatus}><SelectTrigger className="xl:w-40"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Tous statuts</SelectItem><SelectItem value="alert">Sous le seuil</SelectItem><SelectItem value="healthy">Stock sain</SelectItem></SelectContent></Select>{hasFilters && <Button onClick={clearFilters} variant="ghost" className="text-slate-400"><RotateCcw className="mr-2 h-4 w-4" />Réinitialiser</Button>}</div></div>{isLoading ? <div className="px-6 py-16 text-center text-sm text-slate-500">Chargement du catalogue…</div> : !filtered.length ? <EmptyCatalog /> : <ProductCards products={filtered} canManage={canManage} canEditPurchasePrice={canEditPurchasePrice} onOpen={id => setLocation(`/produits/${id}`)} onEdit={edit} onPurchasePrice={product => { setPurchasePriceTarget(product); setPurchasePrice((product.purchasePriceCents / 100).toFixed(2)); }} onRemove={product => { if (window.confirm(`Supprimer ${product.name} ?`)) remove.mutate({ id: product.id }); }} />}</CardContent></Card><ProductDialog open={open} form={form} setForm={setForm} suppliers={suppliers} categories={categories} units={units} editing={Boolean(editingId)} pending={create.isPending || update.isPending} onClose={close} onSave={save} /><PurchasePriceDialog product={purchasePriceTarget} value={purchasePrice} pending={updatePurchasePrice.isPending} onChange={setPurchasePrice} onClose={() => setPurchasePriceTarget(null)} onSave={savePurchasePrice} /></div>;
-  return <div className="mx-auto max-w-[1500px] space-y-6"><header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">Catalogue</p><h1 className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-3xl">Produits & références</h1></div>{canManage && <Button onClick={() => { reset(); setOpen(true); }} className="h-10 bg-primary text-primary-foreground hover:bg-primary/90"><PackagePlus className="mr-2 h-4 w-4" />Ajouter un produit</Button>}</header><Card className="border-white/[0.07] bg-[#111722] shadow-none"><CardContent className="p-0"><div className="border-b border-white/[0.07] p-4"><div className="flex flex-col gap-3 xl:flex-row"><div className="relative min-w-0 flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" /><Input value={query} onChange={event => setQuery(event.target.value)} placeholder="Rechercher une référence…" className="border-white/10 bg-white/[0.03] pl-9" /></div><Select value={filterCategory} onValueChange={setFilterCategory}><SelectTrigger className="xl:w-40"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Toutes catégories</SelectItem>{catalogCategories.map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select><Select value={filterSupplier} onValueChange={setFilterSupplier}><SelectTrigger className="xl:w-44"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Tous fournisseurs</SelectItem><SelectItem value="none">Sans fournisseur</SelectItem>{suppliers.map(item => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent></Select><Select value={filterStatus} onValueChange={setFilterStatus}><SelectTrigger className="xl:w-40"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Tous statuts</SelectItem><SelectItem value="alert">Sous le seuil</SelectItem><SelectItem value="healthy">Stock sain</SelectItem></SelectContent></Select>{hasFilters && <Button onClick={clearFilters} variant="ghost" className="text-slate-400"><RotateCcw className="mr-2 h-4 w-4" />Réinitialiser</Button>}</div></div>{isLoading ? <div className="px-6 py-16 text-center text-sm text-slate-500">Chargement du catalogue…</div> : !filtered.length ? <EmptyCatalog /> : <div className="overflow-x-auto"><table className="w-full min-w-[1040px] text-left"><thead className="bg-white/[0.018] text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500"><tr><th className="px-6 py-3">Produit</th><th className="px-4 py-3">Achat</th><th className="px-4 py-3">Détail</th><th className="px-4 py-3">Gros</th><th className="px-4 py-3">Stock</th><th className="px-6 py-3 text-right">Actions</th></tr></thead><tbody className="divide-y divide-white/[0.06]">{filtered.map(product => { const low = product.quantity <= product.minimumQuantity; const retail = product.retailPriceTiers ?? product.priceTiers ?? []; const wholesale = product.wholesalePriceTiers ?? []; return <tr key={product.id} className="text-sm hover:bg-white/[0.018]"><td className="px-6 py-4"><button onClick={() => setDetailId(product.id)} className="text-left"><p className="font-medium text-slate-100 hover:text-primary">{product.name}</p><p className="mt-0.5 text-xs text-slate-500">{product.reference} · {product.category}</p>{(retail.length || wholesale.length) ? <p className="mt-1 text-[11px] text-primary">{retail.length ? `Détail : ${retail.map(tier => `${tier.minQuantity}+`).join(" · ")}` : ""}{retail.length && wholesale.length ? " · " : ""}{wholesale.length ? `Gros : ${wholesale.map(tier => `${tier.minQuantity}+`).join(" · ")}` : ""}</p> : null}</button></td><td className="px-4 py-4 text-slate-400">{formatCurrency(product.purchasePriceCents)}</td><td className="px-4 py-4 font-medium text-cyan-200">{formatCurrency(product.retailPriceCents)}</td><td className="px-4 py-4 font-medium text-violet-200">{formatCurrency(product.wholesalePriceCents)}</td><td className="px-4 py-4"><Badge className={`border-0 ${low ? "bg-amber-400/10 text-amber-300" : "bg-emerald-400/10 text-emerald-300"}`}>{product.quantity} {product.unit}</Badge><p className="mt-1 text-[10px] text-slate-500">Alerte à {product.minimumQuantity} {product.unit}</p></td><td className="px-6 py-4 text-right">{(canManage || canEditPurchasePrice) && <div className="flex justify-end gap-1">{canManage && <><Button size="icon" variant="ghost" onClick={() => setDetailId(product.id)} className="h-8 w-8 text-primary"><History className="h-4 w-4" /></Button><Button size="icon" variant="ghost" onClick={() => edit(product)} className="h-8 w-8 text-slate-400"><Edit3 className="h-4 w-4" /></Button><Button size="icon" variant="ghost" onClick={() => { if (window.confirm(`Supprimer ${product.name} ?`)) remove.mutate({ id: product.id }); }} className="h-8 w-8 text-rose-300"><Trash2 className="h-4 w-4" /></Button></>}{!canManage && canEditPurchasePrice && <Button size="sm" variant="outline" onClick={() => { setPurchasePriceTarget(product); setPurchasePrice((product.purchasePriceCents / 100).toFixed(2)); }} className="border-primary/30 text-primary"><Edit3 className="mr-2 h-3.5 w-3.5" />Coût</Button>}</div>}</td></tr>; })}</tbody></table></div>}</CardContent></Card><ProductDialog open={open} form={form} setForm={setForm} suppliers={suppliers} categories={categories} units={units} editing={Boolean(editingId)} pending={create.isPending || update.isPending} onClose={close} onSave={save} /><ProductDetailDialog product={detailProduct} supplierName={suppliers.find(supplier => supplier.id === detailProduct?.supplierId)?.name ?? "Aucun fournisseur"} movements={movements.filter(movement => movement.productId === detailId)} onClose={() => setDetailId(null)} /><PurchasePriceDialog product={purchasePriceTarget} value={purchasePrice} pending={updatePurchasePrice.isPending} onChange={setPurchasePrice} onClose={() => setPurchasePriceTarget(null)} onSave={savePurchasePrice} /></div>;
+  const clearFilters = () => {
+    setQuery("");
+    setFilterCategory("all");
+    setFilterSupplier("all");
+    setFilterStatus("all");
+  };
+  const hasFilters =
+    Boolean(query) ||
+    filterCategory !== "all" ||
+    filterSupplier !== "all" ||
+    filterStatus !== "all";
+  return (
+    <div className="mx-auto max-w-[1500px] space-y-6">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
+            Catalogue
+          </p>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+            Produits & références
+          </h1>
+        </div>
+        {canManage && (
+          <Button
+            onClick={() => {
+              reset();
+              setOpen(true);
+            }}
+            className="h-10 bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            <PackagePlus className="mr-2 h-4 w-4" />
+            Ajouter un produit
+          </Button>
+        )}
+      </header>
+      <Card className="border-white/[0.07] bg-[#111722] shadow-none">
+        <CardContent className="p-0">
+          <div className="border-b border-white/[0.07] p-4">
+            <div className="flex flex-col gap-3 xl:flex-row">
+              <div className="relative min-w-0 flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                <Input
+                  value={query}
+                  onChange={event => setQuery(event.target.value)}
+                  placeholder="Rechercher une référence…"
+                  className="border-white/10 bg-white/[0.03] pl-9"
+                />
+              </div>
+              <Select value={filterCategory} onValueChange={setFilterCategory}>
+                <SelectTrigger className="xl:w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Toutes catégories</SelectItem>
+                  {catalogCategories.map(value => (
+                    <SelectItem key={value} value={value}>
+                      {value}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={filterSupplier} onValueChange={setFilterSupplier}>
+                <SelectTrigger className="xl:w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous fournisseurs</SelectItem>
+                  <SelectItem value="none">Sans fournisseur</SelectItem>
+                  {suppliers.map(item => (
+                    <SelectItem key={item.id} value={String(item.id)}>
+                      {item.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="xl:w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous statuts</SelectItem>
+                  <SelectItem value="alert">Sous le seuil</SelectItem>
+                  <SelectItem value="healthy">Stock sain</SelectItem>
+                </SelectContent>
+              </Select>
+              {hasFilters && (
+                <Button
+                  onClick={clearFilters}
+                  variant="ghost"
+                  className="text-slate-400"
+                >
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  Réinitialiser
+                </Button>
+              )}
+            </div>
+          </div>
+          {isLoading ? (
+            <div className="px-6 py-16 text-center text-sm text-slate-500">
+              Chargement du catalogue…
+            </div>
+          ) : !filtered.length ? (
+            <EmptyCatalog />
+          ) : (
+            <ProductCards
+              products={filtered}
+              canManage={canManage}
+              canEditPurchasePrice={canEditPurchasePrice}
+              onOpen={id => setLocation(`/produits/${id}`)}
+              onEdit={edit}
+              onPurchasePrice={product => {
+                setPurchasePriceTarget(product);
+                setPurchasePrice((product.purchasePriceCents / 100).toFixed(2));
+              }}
+              onRemove={product => {
+                if (window.confirm(`Supprimer ${product.name} ?`))
+                  remove.mutate({ id: product.id });
+              }}
+            />
+          )}
+        </CardContent>
+      </Card>
+      <ProductDialog
+        open={open}
+        form={form}
+        setForm={setForm}
+        suppliers={suppliers}
+        categories={categories}
+        units={units}
+        editing={Boolean(editingId)}
+        pending={create.isPending || update.isPending}
+        onClose={close}
+        onSave={save}
+      />
+      <PurchasePriceDialog
+        product={purchasePriceTarget}
+        value={purchasePrice}
+        pending={updatePurchasePrice.isPending}
+        onChange={setPurchasePrice}
+        onClose={() => setPurchasePriceTarget(null)}
+        onSave={savePurchasePrice}
+      />
+    </div>
+  );
+  return (
+    <div className="mx-auto max-w-[1500px] space-y-6">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
+            Catalogue
+          </p>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+            Produits & références
+          </h1>
+        </div>
+        {canManage && (
+          <Button
+            onClick={() => {
+              reset();
+              setOpen(true);
+            }}
+            className="h-10 bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            <PackagePlus className="mr-2 h-4 w-4" />
+            Ajouter un produit
+          </Button>
+        )}
+      </header>
+      <Card className="border-white/[0.07] bg-[#111722] shadow-none">
+        <CardContent className="p-0">
+          <div className="border-b border-white/[0.07] p-4">
+            <div className="flex flex-col gap-3 xl:flex-row">
+              <div className="relative min-w-0 flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                <Input
+                  value={query}
+                  onChange={event => setQuery(event.target.value)}
+                  placeholder="Rechercher une référence…"
+                  className="border-white/10 bg-white/[0.03] pl-9"
+                />
+              </div>
+              <Select value={filterCategory} onValueChange={setFilterCategory}>
+                <SelectTrigger className="xl:w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Toutes catégories</SelectItem>
+                  {catalogCategories.map(value => (
+                    <SelectItem key={value} value={value}>
+                      {value}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={filterSupplier} onValueChange={setFilterSupplier}>
+                <SelectTrigger className="xl:w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous fournisseurs</SelectItem>
+                  <SelectItem value="none">Sans fournisseur</SelectItem>
+                  {suppliers.map(item => (
+                    <SelectItem key={item.id} value={String(item.id)}>
+                      {item.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="xl:w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous statuts</SelectItem>
+                  <SelectItem value="alert">Sous le seuil</SelectItem>
+                  <SelectItem value="healthy">Stock sain</SelectItem>
+                </SelectContent>
+              </Select>
+              {hasFilters && (
+                <Button
+                  onClick={clearFilters}
+                  variant="ghost"
+                  className="text-slate-400"
+                >
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  Réinitialiser
+                </Button>
+              )}
+            </div>
+          </div>
+          {isLoading ? (
+            <div className="px-6 py-16 text-center text-sm text-slate-500">
+              Chargement du catalogue…
+            </div>
+          ) : !filtered.length ? (
+            <EmptyCatalog />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1040px] text-left">
+                <thead className="bg-white/[0.018] text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">
+                  <tr>
+                    <th className="px-6 py-3">Produit</th>
+                    <th className="px-4 py-3">Achat</th>
+                    <th className="px-4 py-3">Détail</th>
+                    <th className="px-4 py-3">Gros</th>
+                    <th className="px-4 py-3">Stock</th>
+                    <th className="px-6 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/[0.06]">
+                  {filtered.map(product => {
+                    const low = product.quantity <= product.minimumQuantity;
+                    const retail =
+                      product.retailPriceTiers ?? product.priceTiers ?? [];
+                    const wholesale = product.wholesalePriceTiers ?? [];
+                    return (
+                      <tr
+                        key={product.id}
+                        className="text-sm hover:bg-white/[0.018]"
+                      >
+                        <td className="px-6 py-4">
+                          <button
+                            onClick={() => setDetailId(product.id)}
+                            className="text-left"
+                          >
+                            <p className="font-medium text-slate-100 hover:text-primary">
+                              {product.name}
+                            </p>
+                            <p className="mt-0.5 text-xs text-slate-500">
+                              {product.reference} · {product.category}
+                            </p>
+                            {retail.length || wholesale.length ? (
+                              <p className="mt-1 text-[11px] text-primary">
+                                {retail.length
+                                  ? `Détail : ${retail.map(tier => `${tier.minQuantity}+`).join(" · ")}`
+                                  : ""}
+                                {retail.length && wholesale.length ? " · " : ""}
+                                {wholesale.length
+                                  ? `Gros : ${wholesale.map(tier => `${tier.minQuantity}+`).join(" · ")}`
+                                  : ""}
+                              </p>
+                            ) : null}
+                          </button>
+                        </td>
+                        <td className="px-4 py-4 text-slate-400">
+                          {formatCurrency(product.purchasePriceCents)}
+                        </td>
+                        <td className="px-4 py-4 font-medium text-cyan-200">
+                          {formatCurrency(product.retailPriceCents)}
+                        </td>
+                        <td className="px-4 py-4 font-medium text-violet-200">
+                          {formatCurrency(product.wholesalePriceCents)}
+                        </td>
+                        <td className="px-4 py-4">
+                          <Badge
+                            className={`border-0 ${low ? "bg-amber-400/10 text-amber-300" : "bg-emerald-400/10 text-emerald-300"}`}
+                          >
+                            {product.quantity} {product.unit}
+                          </Badge>
+                          <p className="mt-1 text-[10px] text-slate-500">
+                            Alerte à {product.minimumQuantity} {product.unit}
+                          </p>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          {(canManage || canEditPurchasePrice) && (
+                            <div className="flex justify-end gap-1">
+                              {canManage && (
+                                <>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => setDetailId(product.id)}
+                                    className="h-8 w-8 text-primary"
+                                  >
+                                    <History className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => edit(product)}
+                                    className="h-8 w-8 text-slate-400"
+                                  >
+                                    <Edit3 className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      if (
+                                        window.confirm(
+                                          `Supprimer ${product.name} ?`
+                                        )
+                                      )
+                                        remove.mutate({ id: product.id });
+                                    }}
+                                    className="h-8 w-8 text-rose-300"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              )}
+                              {!canManage && canEditPurchasePrice && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setPurchasePriceTarget(product);
+                                    setPurchasePrice(
+                                      (
+                                        product.purchasePriceCents / 100
+                                      ).toFixed(2)
+                                    );
+                                  }}
+                                  className="border-primary/30 text-primary"
+                                >
+                                  <Edit3 className="mr-2 h-3.5 w-3.5" />
+                                  Coût
+                                </Button>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      <ProductDialog
+        open={open}
+        form={form}
+        setForm={setForm}
+        suppliers={suppliers}
+        categories={categories}
+        units={units}
+        editing={Boolean(editingId)}
+        pending={create.isPending || update.isPending}
+        onClose={close}
+        onSave={save}
+      />
+      <ProductDetailDialog
+        product={detailProduct}
+        supplierName={
+          suppliers.find(supplier => supplier.id === detailProduct?.supplierId)
+            ?.name ?? "Aucun fournisseur"
+        }
+        movements={movements.filter(
+          movement => movement.productId === detailId
+        )}
+        onClose={() => setDetailId(null)}
+      />
+      <PurchasePriceDialog
+        product={purchasePriceTarget}
+        value={purchasePrice}
+        pending={updatePurchasePrice.isPending}
+        onChange={setPurchasePrice}
+        onClose={() => setPurchasePriceTarget(null)}
+        onSave={savePurchasePrice}
+      />
+    </div>
+  );
 }
 
-function EmptyCatalog() { return <div className="px-6 py-16 text-center"><SlidersHorizontal className="mx-auto h-6 w-6 text-slate-600" /><p className="mt-3 font-medium text-slate-300">Aucune référence trouvée</p><p className="mt-1 text-xs text-slate-500">Modifiez vos filtres ou ajoutez un produit.</p></div>; }
+function EmptyCatalog() {
+  return (
+    <div className="px-6 py-16 text-center">
+      <SlidersHorizontal className="mx-auto h-6 w-6 text-slate-600" />
+      <p className="mt-3 font-medium text-slate-300">
+        Aucune référence trouvée
+      </p>
+      <p className="mt-1 text-xs text-slate-500">
+        Modifiez vos filtres ou ajoutez un produit.
+      </p>
+    </div>
+  );
+}
 
-function ProductCards({ products, onOpen }: { products: any[]; canManage: boolean; canEditPurchasePrice: boolean; onOpen: (id: number) => void; onEdit: (product: any) => void; onPurchasePrice: (product: any) => void; onRemove: (product: any) => void }) { return <div className="space-y-2 p-3 sm:p-4">{products.map(product => { const low = product.quantity <= product.minimumQuantity; return <article key={product.id} role="button" tabIndex={0} onClick={() => onOpen(product.id)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(product.id); } }} className="group flex cursor-pointer items-center gap-3 rounded-xl border border-white/[0.07] bg-[#0e141f] px-3 py-3 text-left transition hover:border-primary/35 hover:bg-white/[0.025] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:px-4"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/[0.08] text-xs font-bold text-primary">{product.name.slice(0, 1).toUpperCase()}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-slate-100 group-hover:text-primary">{product.name}</p><p className="mt-0.5 truncate text-xs text-slate-500">{product.reference} · {product.category}</p></div><div className="hidden min-w-28 text-right sm:block"><p className="text-[10px] uppercase tracking-wide text-slate-500">Détail</p><p className="mt-0.5 text-sm font-semibold text-cyan-200">{formatCurrency(product.retailPriceCents)}</p></div><div className="min-w-20 text-right"><p className={`text-sm font-semibold ${low ? "text-amber-300" : "text-slate-100"}`}>{product.quantity} {product.unit}</p><p className="mt-0.5 text-[10px] text-slate-500">{low ? "Seuil atteint" : "En stock"}</p></div><ChevronRight className="h-4 w-4 shrink-0 text-slate-600 transition group-hover:text-primary" /></article>; })}</div>; }
+function ProductCards({
+  products,
+  onOpen,
+}: {
+  products: any[];
+  canManage: boolean;
+  canEditPurchasePrice: boolean;
+  onOpen: (id: number) => void;
+  onEdit: (product: any) => void;
+  onPurchasePrice: (product: any) => void;
+  onRemove: (product: any) => void;
+}) {
+  return (
+    <div className="space-y-2 p-3 sm:p-4">
+      {products.map(product => {
+        const low = product.quantity <= product.minimumQuantity;
+        return (
+          <article
+            key={product.id}
+            role="button"
+            tabIndex={0}
+            onClick={() => onOpen(product.id)}
+            onKeyDown={event => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onOpen(product.id);
+              }
+            }}
+            className="group flex cursor-pointer items-center gap-3 rounded-xl border border-white/[0.07] bg-[#0e141f] px-3 py-3 text-left transition hover:border-primary/35 hover:bg-white/[0.025] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:px-4"
+          >
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/[0.08] text-xs font-bold text-primary">
+              {product.name.slice(0, 1).toUpperCase()}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-slate-100 group-hover:text-primary">
+                {product.name}
+              </p>
+              <p className="mt-0.5 truncate text-xs text-slate-500">
+                {product.reference} · {product.category}
+              </p>
+            </div>
+            <div className="hidden min-w-28 text-right sm:block">
+              <p className="text-[10px] uppercase tracking-wide text-slate-500">
+                Détail
+              </p>
+              <p className="mt-0.5 text-sm font-semibold text-cyan-200">
+                {formatCurrency(product.retailPriceCents)}
+              </p>
+            </div>
+            <div className="min-w-20 text-right">
+              <p
+                className={`text-sm font-semibold ${low ? "text-amber-300" : "text-slate-100"}`}
+              >
+                {product.quantity} {product.unit}
+              </p>
+              <p className="mt-0.5 text-[10px] text-slate-500">
+                {low ? "Seuil atteint" : "En stock"}
+              </p>
+            </div>
+            <ChevronRight className="h-4 w-4 shrink-0 text-slate-600 transition group-hover:text-primary" />
+          </article>
+        );
+      })}
+    </div>
+  );
+}
 
-function ProductDetailDialog({ product, supplierName, movements, onClose }: { product: any; supplierName: string; movements: Array<{ id: number; type: string; quantity: number; previousQuantity: number; resultingQuantity: number; reason: string; occurredAt: Date | string; operatorName: string | null }>; onClose: () => void }) { const labels: Record<string, string> = { entry: "Entrée", exit: "Sortie", adjustment: "Ajustement" }; return <Dialog open={Boolean(product)} onOpenChange={value => !value && onClose()}><DialogContent className="max-h-[85vh] overflow-y-auto border-white/10 bg-[#141b27] text-slate-100 sm:max-w-2xl"><DialogHeader><DialogTitle>{product?.name ?? "Fiche produit"}</DialogTitle><DialogDescription className="text-slate-400">{product?.reference} · {product?.category}</DialogDescription></DialogHeader>{product && <><div className="grid gap-3 sm:grid-cols-3"><Metric label="Stock disponible" value={`${product.quantity} ${product.unit}`} tone="primary" /><Metric label="Seuil personnalisé" value={`${product.minimumQuantity} ${product.unit}`} tone="warning" /><Metric label="Fournisseur" value={supplierName} tone="neutral" /></div><div className="mt-5"><h3 className="text-sm font-semibold">Historique des mouvements</h3><div className="mt-3 divide-y divide-white/[0.07] rounded-xl border border-white/[0.08]">{movements.length ? movements.map(movement => <div key={movement.id} className="flex items-center justify-between gap-3 px-4 py-3"><div><p className="text-sm font-medium">{labels[movement.type] ?? movement.type} · {movement.quantity > 0 ? "+" : ""}{movement.quantity} {product.unit}</p><p className="mt-1 text-xs text-slate-500">{movement.reason} · {formatDate(movement.occurredAt)}{movement.operatorName ? ` · ${movement.operatorName}` : ""}</p></div><p className="text-right text-sm text-slate-300">{movement.previousQuantity} → <span className="font-semibold">{movement.resultingQuantity}</span></p></div>) : <p className="px-4 py-10 text-center text-sm text-slate-500">Aucun mouvement enregistré pour ce produit.</p>}</div></div></>}</DialogContent></Dialog>; }
-function PurchasePriceDialog({ product, value, pending, onChange, onClose, onSave }: { product: { id: number; name: string } | null; value: string; pending: boolean; onChange: (value: string) => void; onClose: () => void; onSave: () => void }) { return <Dialog open={Boolean(product)} onOpenChange={open => !open && onClose()}><DialogContent className="border-white/10 bg-[#141b27] text-slate-100 sm:max-w-md"><DialogHeader><DialogTitle>Modifier le coût d’achat</DialogTitle><DialogDescription className="text-slate-400">{product?.name} — cette action est consignée dans le journal.</DialogDescription></DialogHeader><Field label="Nouveau coût d’achat"><Input type="number" min="0" step="0.01" value={value} onChange={event => onChange(event.target.value)} /></Field><DialogFooter><Button variant="ghost" onClick={onClose}>Annuler</Button><Button onClick={onSave} disabled={pending} className="bg-primary text-primary-foreground hover:bg-primary/90">Enregistrer</Button></DialogFooter></DialogContent></Dialog>; }
-function Metric({ label, value, tone }: { label: string; value: string; tone: "primary" | "warning" | "neutral" }) { const classes = tone === "primary" ? "bg-primary/10 text-primary" : tone === "warning" ? "bg-amber-400/10 text-amber-300" : "bg-white/[0.04] text-slate-100"; return <div className={`rounded-xl p-3 ${classes}`}><p className="text-xs text-slate-400">{label}</p><p className="mt-1 truncate text-lg font-semibold">{value}</p></div>; }
+function ProductDetailDialog({
+  product,
+  supplierName,
+  movements,
+  onClose,
+}: {
+  product: any;
+  supplierName: string;
+  movements: Array<{
+    id: number;
+    type: string;
+    quantity: number;
+    previousQuantity: number;
+    resultingQuantity: number;
+    reason: string;
+    occurredAt: Date | string;
+    operatorName: string | null;
+  }>;
+  onClose: () => void;
+}) {
+  const labels: Record<string, string> = {
+    entry: "Entrée",
+    exit: "Sortie",
+    adjustment: "Ajustement",
+  };
+  return (
+    <Dialog open={Boolean(product)} onOpenChange={value => !value && onClose()}>
+      <DialogContent className="max-h-[85vh] overflow-y-auto border-white/10 bg-[#141b27] text-slate-100 sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{product?.name ?? "Fiche produit"}</DialogTitle>
+          <DialogDescription className="text-slate-400">
+            {product?.reference} · {product?.category}
+          </DialogDescription>
+        </DialogHeader>
+        {product && (
+          <>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Metric
+                label="Stock disponible"
+                value={`${product.quantity} ${product.unit}`}
+                tone="primary"
+              />
+              <Metric
+                label="Seuil personnalisé"
+                value={`${product.minimumQuantity} ${product.unit}`}
+                tone="warning"
+              />
+              <Metric label="Fournisseur" value={supplierName} tone="neutral" />
+            </div>
+            <div className="mt-5">
+              <h3 className="text-sm font-semibold">
+                Historique des mouvements
+              </h3>
+              <div className="mt-3 divide-y divide-white/[0.07] rounded-xl border border-white/[0.08]">
+                {movements.length ? (
+                  movements.map(movement => (
+                    <div
+                      key={movement.id}
+                      className="flex items-center justify-between gap-3 px-4 py-3"
+                    >
+                      <div>
+                        <p className="text-sm font-medium">
+                          {labels[movement.type] ?? movement.type} ·{" "}
+                          {movement.quantity > 0 ? "+" : ""}
+                          {movement.quantity} {product.unit}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {movement.reason} · {formatDate(movement.occurredAt)}
+                          {movement.operatorName
+                            ? ` · ${movement.operatorName}`
+                            : ""}
+                        </p>
+                      </div>
+                      <p className="text-right text-sm text-slate-300">
+                        {movement.previousQuantity} →{" "}
+                        <span className="font-semibold">
+                          {movement.resultingQuantity}
+                        </span>
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="px-4 py-10 text-center text-sm text-slate-500">
+                    Aucun mouvement enregistré pour ce produit.
+                  </p>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+function PurchasePriceDialog({
+  product,
+  value,
+  pending,
+  onChange,
+  onClose,
+  onSave,
+}: {
+  product: { id: number; name: string } | null;
+  value: string;
+  pending: boolean;
+  onChange: (value: string) => void;
+  onClose: () => void;
+  onSave: () => void;
+}) {
+  return (
+    <Dialog open={Boolean(product)} onOpenChange={open => !open && onClose()}>
+      <DialogContent className="border-white/10 bg-[#141b27] text-slate-100 sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Modifier le coût d’achat</DialogTitle>
+          <DialogDescription className="text-slate-400">
+            {product?.name} — cette action est consignée dans le journal.
+          </DialogDescription>
+        </DialogHeader>
+        <Field label="Nouveau coût d’achat">
+          <Input
+            type="number"
+            min="0"
+            step="0.01"
+            value={value}
+            onChange={event => onChange(event.target.value)}
+          />
+        </Field>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>
+            Annuler
+          </Button>
+          <Button
+            onClick={onSave}
+            disabled={pending}
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            Enregistrer
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+function Metric({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "primary" | "warning" | "neutral";
+}) {
+  const classes =
+    tone === "primary"
+      ? "bg-primary/10 text-primary"
+      : tone === "warning"
+        ? "bg-amber-400/10 text-amber-300"
+        : "bg-white/[0.04] text-slate-100";
+  return (
+    <div className={`rounded-xl p-3 ${classes}`}>
+      <p className="text-xs text-slate-400">{label}</p>
+      <p className="mt-1 truncate text-lg font-semibold">{value}</p>
+    </div>
+  );
+}
 
-function ProductDialog({ open, form, setForm, suppliers, categories, units, editing, pending, onClose, onSave }: { open: boolean; form: ProductForm; setForm: (value: ProductForm) => void; suppliers: NamedEntity[]; categories: NamedEntity[]; units: NamedEntity[]; editing: boolean; pending: boolean; onClose: () => void; onSave: () => void }) {
+function ProductDialog({
+  open,
+  form,
+  setForm,
+  suppliers,
+  categories,
+  units,
+  editing,
+  pending,
+  onClose,
+  onSave,
+}: {
+  open: boolean;
+  form: ProductForm;
+  setForm: (value: ProductForm) => void;
+  suppliers: NamedEntity[];
+  categories: NamedEntity[];
+  units: NamedEntity[];
+  editing: boolean;
+  pending: boolean;
+  onClose: () => void;
+  onSave: () => void;
+}) {
   const [scannerOpen, setScannerOpen] = useState(false);
-  const updateTiers = (kind: "retail" | "wholesale", tiers: PriceTierForm[]) => setForm({ ...form, [kind === "retail" ? "retailPriceTiers" : "wholesalePriceTiers"]: tiers });
-  const section = (kind: "retail" | "wholesale", title: string, description: string) => { const enabled = kind === "retail" ? form.retailTiersEnabled : form.wholesaleTiersEnabled; const tiers = kind === "retail" ? form.retailPriceTiers : form.wholesalePriceTiers; const toggle = (checked: boolean) => setForm({ ...form, [kind === "retail" ? "retailTiersEnabled" : "wholesaleTiersEnabled"]: checked, [kind === "retail" ? "retailPriceTiers" : "wholesalePriceTiers"]: checked && !tiers.length ? [{ minQuantity: "5", unitPrice: "" }] : tiers }); const copyFromRetail = kind === "wholesale" && form.retailPriceTiers.length ? () => { setForm({ ...form, wholesaleTiersEnabled: true, wholesalePriceTiers: form.retailPriceTiers.map(tier => ({ ...tier })) }); toast.success("Paliers détail copiés vers grossiste."); } : undefined; return <TierSection title={title} description={description} enabled={enabled} tiers={tiers} onToggle={toggle} onChange={tiers => updateTiers(kind, tiers)} copyFromRetail={copyFromRetail} />; };
-  return <><Dialog open={open} onOpenChange={value => !value && onClose()}><DialogContent className="max-h-[90vh] overflow-y-auto border-white/10 bg-[#141b27] text-slate-100 sm:max-w-xl"><DialogHeader><DialogTitle>{editing ? "Modifier le produit" : "Nouveau produit"}</DialogTitle><DialogDescription className="text-slate-400">Configurez indépendamment les paliers du prix détail et du prix grossiste.</DialogDescription></DialogHeader><div className="grid gap-4 py-2 sm:grid-cols-2"><Field label="Référence *"><div className="flex gap-2"><Input value={form.reference} onChange={event => setForm({ ...form, reference: event.target.value })} /><Button type="button" variant="outline" size="icon" aria-label="Scanner le code-barres" onClick={() => setScannerOpen(true)} className="shrink-0 border-primary/30 text-primary"><Camera className="h-4 w-4" /></Button></div></Field><Field label="Nom *"><Input value={form.name} onChange={event => setForm({ ...form, name: event.target.value })} /></Field><div className="sm:col-span-2"><Field label="Description"><Textarea value={form.description} onChange={event => setForm({ ...form, description: event.target.value })} placeholder="Description du produit" /></Field></div><Field label="Catégorie *"><ManagedSelect value={form.category} items={categories} placeholder="Sélectionner une catégorie" onChange={value => setForm({ ...form, category: value })} /></Field><Field label="Unité *"><ManagedSelect value={form.unit} items={units} placeholder="Sélectionner une unité" onChange={value => setForm({ ...form, unit: value })} /></Field><Field label="Prix d’achat *"><Input type="number" step="0.01" value={form.purchasePrice} onChange={event => setForm({ ...form, purchasePrice: event.target.value })} /></Field><Field label="Prix détail *"><Input type="number" step="0.01" value={form.retailPrice} onChange={event => setForm({ ...form, retailPrice: event.target.value })} /></Field><Field label="Prix grossiste *"><Input type="number" step="0.01" value={form.wholesalePrice} onChange={event => setForm({ ...form, wholesalePrice: event.target.value })} /></Field><Field label="Stock initial *"><Input type="number" min="0" value={form.quantity} onChange={event => setForm({ ...form, quantity: event.target.value })} /></Field><Field label="Seuil d’alerte personnalisé *"><Input type="number" min="0" value={form.minimumQuantity} onChange={event => setForm({ ...form, minimumQuantity: event.target.value })} /></Field><Field label="Fournisseur"><Select value={form.supplierId} onValueChange={value => setForm({ ...form, supplierId: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Aucun fournisseur</SelectItem>{suppliers.map(item => <SelectItem key={item.id} value={String(item.id)}>{item.name}</SelectItem>)}</SelectContent></Select></Field><div className="space-y-3 sm:col-span-2">{section("retail", "Paliers par quantité — détail", "Appliqués uniquement aux clients détail et aux ventes POS sans client.")}{section("wholesale", "Paliers par quantité — grossiste", "Appliqués uniquement lorsque le client sélectionné est grossiste.")}</div></div><DialogFooter><Button variant="ghost" onClick={onClose}>Annuler</Button><Button onClick={onSave} disabled={pending} className="bg-primary text-primary-foreground hover:bg-primary/90">{editing ? "Enregistrer" : "Créer"}</Button></DialogFooter></DialogContent></Dialog><BarcodeCameraDialog open={scannerOpen} onOpenChange={setScannerOpen} onDetected={code => setForm({ ...form, reference: code })} /></>;
+  const updateTiers = (kind: "retail" | "wholesale", tiers: PriceTierForm[]) =>
+    setForm({
+      ...form,
+      [kind === "retail" ? "retailPriceTiers" : "wholesalePriceTiers"]: tiers,
+    });
+  const section = (
+    kind: "retail" | "wholesale",
+    title: string,
+    description: string
+  ) => {
+    const enabled =
+      kind === "retail" ? form.retailTiersEnabled : form.wholesaleTiersEnabled;
+    const tiers =
+      kind === "retail" ? form.retailPriceTiers : form.wholesalePriceTiers;
+    const toggle = (checked: boolean) =>
+      setForm({
+        ...form,
+        [kind === "retail" ? "retailTiersEnabled" : "wholesaleTiersEnabled"]:
+          checked,
+        [kind === "retail" ? "retailPriceTiers" : "wholesalePriceTiers"]:
+          checked && !tiers.length
+            ? [{ minQuantity: "5", unitPrice: "" }]
+            : tiers,
+      });
+    const copyFromRetail =
+      kind === "wholesale" && form.retailPriceTiers.length
+        ? () => {
+            setForm({
+              ...form,
+              wholesaleTiersEnabled: true,
+              wholesalePriceTiers: form.retailPriceTiers.map(tier => ({
+                ...tier,
+              })),
+            });
+            toast.success("Paliers détail copiés vers grossiste.");
+          }
+        : undefined;
+    return (
+      <TierSection
+        title={title}
+        description={description}
+        enabled={enabled}
+        tiers={tiers}
+        onToggle={toggle}
+        onChange={tiers => updateTiers(kind, tiers)}
+        copyFromRetail={copyFromRetail}
+      />
+    );
+  };
+  return (
+    <>
+      <Dialog open={open} onOpenChange={value => !value && onClose()}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto border-white/10 bg-[#141b27] text-slate-100 sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>
+              {editing ? "Modifier le produit" : "Nouveau produit"}
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Configurez indépendamment les paliers du prix détail et du prix
+              grossiste.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-2 sm:grid-cols-2">
+            <Field label="Référence *">
+              <div className="flex gap-2">
+                <Input
+                  value={form.reference}
+                  onChange={event =>
+                    setForm({ ...form, reference: event.target.value })
+                  }
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  aria-label="Scanner le code-barres"
+                  onClick={() => setScannerOpen(true)}
+                  className="shrink-0 border-primary/30 text-primary"
+                >
+                  <Camera className="h-4 w-4" />
+                </Button>
+              </div>
+            </Field>
+            <Field label="Nom *">
+              <Input
+                value={form.name}
+                onChange={event =>
+                  setForm({ ...form, name: event.target.value })
+                }
+              />
+            </Field>
+            <div className="sm:col-span-2">
+              <Field label="Description">
+                <Textarea
+                  value={form.description}
+                  onChange={event =>
+                    setForm({ ...form, description: event.target.value })
+                  }
+                  placeholder="Description du produit"
+                />
+              </Field>
+            </div>
+            <Field label="Catégorie *">
+              <ManagedSelect
+                value={form.category}
+                items={categories}
+                placeholder="Sélectionner une catégorie"
+                onChange={value => setForm({ ...form, category: value })}
+              />
+            </Field>
+            <Field label="Unité *">
+              <ManagedSelect
+                value={form.unit}
+                items={units}
+                placeholder="Sélectionner une unité"
+                onChange={value => setForm({ ...form, unit: value })}
+              />
+            </Field>
+            <Field label="Prix d’achat *">
+              <Input
+                type="number"
+                step="0.01"
+                value={form.purchasePrice}
+                onChange={event =>
+                  setForm({ ...form, purchasePrice: event.target.value })
+                }
+              />
+            </Field>
+            <Field label="Prix détail *">
+              <Input
+                type="number"
+                step="0.01"
+                value={form.retailPrice}
+                onChange={event =>
+                  setForm({ ...form, retailPrice: event.target.value })
+                }
+              />
+            </Field>
+            <Field label="Prix grossiste *">
+              <Input
+                type="number"
+                step="0.01"
+                value={form.wholesalePrice}
+                onChange={event =>
+                  setForm({ ...form, wholesalePrice: event.target.value })
+                }
+              />
+            </Field>
+            <Field label="Stock initial *">
+              <Input
+                type="number"
+                min="0"
+                value={form.quantity}
+                onChange={event =>
+                  setForm({ ...form, quantity: event.target.value })
+                }
+              />
+            </Field>
+            <Field label="Seuil d’alerte personnalisé *">
+              <Input
+                type="number"
+                min="0"
+                value={form.minimumQuantity}
+                onChange={event =>
+                  setForm({ ...form, minimumQuantity: event.target.value })
+                }
+              />
+            </Field>
+            <Field label="Fournisseur">
+              <Select
+                value={form.supplierId}
+                onValueChange={value => setForm({ ...form, supplierId: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Aucun fournisseur</SelectItem>
+                  {suppliers.map(item => (
+                    <SelectItem key={item.id} value={String(item.id)}>
+                      {item.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <div className="space-y-3 sm:col-span-2">
+              {section(
+                "retail",
+                "Paliers par quantité — détail",
+                "Appliqués uniquement aux clients détail et aux ventes POS sans client."
+              )}
+              {section(
+                "wholesale",
+                "Paliers par quantité — grossiste",
+                "Appliqués uniquement lorsque le client sélectionné est grossiste."
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={onClose}>
+              Annuler
+            </Button>
+            <Button
+              onClick={onSave}
+              disabled={pending}
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              {editing ? "Enregistrer" : "Créer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <BarcodeCameraDialog
+        open={scannerOpen}
+        onOpenChange={setScannerOpen}
+        onDetected={code => setForm({ ...form, reference: code })}
+      />
+    </>
+  );
 }
 
-function TierSection({ title, description, enabled, tiers, onToggle, onChange, copyFromRetail }: { title: string; description: string; enabled: boolean; tiers: PriceTierForm[]; onToggle: (enabled: boolean) => void; onChange: (tiers: PriceTierForm[]) => void; copyFromRetail?: () => void }) { return <div className="rounded-xl border border-primary/20 bg-primary/[0.04] p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm font-semibold">{title}</p><p className="mt-1 text-xs text-slate-400">{description}</p></div><div className="flex items-center gap-2">{copyFromRetail && <Button type="button" variant="outline" size="sm" onClick={copyFromRetail} className="border-primary/30 text-primary">Dupliquer le détail</Button>}<label className="flex shrink-0 cursor-pointer items-center gap-2 text-sm font-medium text-primary"><input type="checkbox" checked={enabled} onChange={event => onToggle(event.target.checked)} />Activer</label></div></div>{enabled && <div className="mt-4 space-y-2">{tiers.map((tier, index) => <div key={index} className="grid grid-cols-[1fr_1fr_auto] gap-2"><Input type="number" min="2" value={tier.minQuantity} onChange={event => onChange(tiers.map((value, position) => position === index ? { ...value, minQuantity: event.target.value } : value))} placeholder="À partir de" /><Input type="number" min="0" step="0.01" value={tier.unitPrice} onChange={event => onChange(tiers.map((value, position) => position === index ? { ...value, unitPrice: event.target.value } : value))} placeholder="Prix unitaire" /><Button type="button" size="icon" variant="ghost" aria-label="Supprimer le palier" onClick={() => onChange(tiers.filter((_, position) => position !== index))} className="text-rose-300"><Trash2 className="h-4 w-4" /></Button></div>)}<Button type="button" variant="outline" size="sm" onClick={() => onChange([...tiers, { minQuantity: "", unitPrice: "" }])} className="border-primary/30 text-primary"><Plus className="mr-1 h-3.5 w-3.5" />Ajouter un palier</Button></div>}</div>; }
-function ManagedSelect({ value, items, placeholder, onChange }: { value: string; items: NamedEntity[]; placeholder: string; onChange: (value: string) => void }) { return <Select value={value} onValueChange={onChange}><SelectTrigger><SelectValue placeholder={items.length ? placeholder : "Créez une valeur d’abord"} /></SelectTrigger><SelectContent>{items.map(item => <SelectItem key={item.id} value={item.name}>{item.name}</SelectItem>)}</SelectContent></Select>; }
-function Field({ label, children }: { label: string; children: ReactNode }) { return <div className="space-y-2"><Label className="text-xs text-slate-300">{label}</Label>{children}</div>; }
+function TierSection({
+  title,
+  description,
+  enabled,
+  tiers,
+  onToggle,
+  onChange,
+  copyFromRetail,
+}: {
+  title: string;
+  description: string;
+  enabled: boolean;
+  tiers: PriceTierForm[];
+  onToggle: (enabled: boolean) => void;
+  onChange: (tiers: PriceTierForm[]) => void;
+  copyFromRetail?: () => void;
+}) {
+  return (
+    <div className="rounded-xl border border-primary/20 bg-primary/[0.04] p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold">{title}</p>
+          <p className="mt-1 text-xs text-slate-400">{description}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {copyFromRetail && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={copyFromRetail}
+              className="border-primary/30 text-primary"
+            >
+              Dupliquer le détail
+            </Button>
+          )}
+          <label className="flex shrink-0 cursor-pointer items-center gap-2 text-sm font-medium text-primary">
+            <input
+              type="checkbox"
+              checked={enabled}
+              onChange={event => onToggle(event.target.checked)}
+            />
+            Activer
+          </label>
+        </div>
+      </div>
+      {enabled && (
+        <div className="mt-4 space-y-2">
+          {tiers.map((tier, index) => (
+            <div key={index} className="grid grid-cols-[1fr_1fr_auto] gap-2">
+              <Input
+                type="number"
+                min="2"
+                value={tier.minQuantity}
+                onChange={event =>
+                  onChange(
+                    tiers.map((value, position) =>
+                      position === index
+                        ? { ...value, minQuantity: event.target.value }
+                        : value
+                    )
+                  )
+                }
+                placeholder="À partir de"
+              />
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={tier.unitPrice}
+                onChange={event =>
+                  onChange(
+                    tiers.map((value, position) =>
+                      position === index
+                        ? { ...value, unitPrice: event.target.value }
+                        : value
+                    )
+                  )
+                }
+                placeholder="Prix unitaire"
+              />
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                aria-label="Supprimer le palier"
+                onClick={() =>
+                  onChange(tiers.filter((_, position) => position !== index))
+                }
+                className="text-rose-300"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          ))}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              onChange([...tiers, { minQuantity: "", unitPrice: "" }])
+            }
+            className="border-primary/30 text-primary"
+          >
+            <Plus className="mr-1 h-3.5 w-3.5" />
+            Ajouter un palier
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+function ManagedSelect({
+  value,
+  items,
+  placeholder,
+  onChange,
+}: {
+  value: string;
+  items: NamedEntity[];
+  placeholder: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger>
+        <SelectValue
+          placeholder={items.length ? placeholder : "Créez une valeur d’abord"}
+        />
+      </SelectTrigger>
+      <SelectContent>
+        {items.map(item => (
+          <SelectItem key={item.id} value={item.name}>
+            {item.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="space-y-2">
+      <Label className="text-xs text-slate-300">{label}</Label>
+      {children}
+    </div>
+  );
+}

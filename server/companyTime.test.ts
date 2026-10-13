@@ -10,7 +10,11 @@ describe("dates comptables par fuseau (E6)", () => {
   });
 
   it("produit les dernières journées dans l'ordre", () => {
-    expect(lastDayKeys(3, "UTC", new Date("2026-10-12T10:00:00Z"))).toEqual(["2026-10-10", "2026-10-11", "2026-10-12"]);
+    expect(lastDayKeys(3, "UTC", new Date("2026-10-12T10:00:00Z"))).toEqual([
+      "2026-10-10",
+      "2026-10-11",
+      "2026-10-12",
+    ]);
   });
 
   it("valide les fuseaux IANA", () => {

@@ -3,51 +3,219 @@ import { escapeHtml } from "@/lib/html";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { blankCheckoutAmounts, checkoutAmountToCents, distributeIntegralPayment, isExactIntegralPayment, isPosCheckout, updateIntegralPayment, type CheckoutPaymentMethod } from "@/lib/checkoutRules";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
+  blankCheckoutAmounts,
+  checkoutAmountToCents,
+  distributeIntegralPayment,
+  isExactIntegralPayment,
+  isPosCheckout,
+  updateIntegralPayment,
+  type CheckoutPaymentMethod,
+} from "@/lib/checkoutRules";
 import { formatCurrency } from "@/lib/format";
 import { shouldPromptForAssignment } from "@/lib/assignmentRules";
 import { trpc } from "@/lib/trpc";
-import { useOffline, type OfflineInvoiceDraft, type OfflinePosDraft } from "@/contexts/OfflineContext";
+import {
+  useOffline,
+  type OfflineInvoiceDraft,
+  type OfflinePosDraft,
+} from "@/contexts/OfflineContext";
 import { Banknote, CreditCard, Landmark, Smartphone, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 type Method = CheckoutPaymentMethod;
-type Agent = { id: number; name: string; type: "sales_agent" | "cashier"; active: boolean };
-type PaymentSettings = { defaultSalesAgentId?: number | null; defaultCashierId?: number | null; paymentCashEnabled?: boolean; paymentCardEnabled?: boolean; paymentMobileMoneyEnabled?: boolean; paymentBankTransferEnabled?: boolean; paymentCreditEnabled?: boolean; companyName?: string | null; companyLogoUrl?: string | null; companyAddress?: string | null; companyPhone?: string | null; companyEmail?: string | null; companyFooter?: string | null; ticketHeader?: string | null; ticketFooter?: string | null; ticketWidthMm?: "58" | "80" | null };
-const paymentMethods: Array<{ id: Method; label: string; icon: typeof Banknote; setting: keyof PaymentSettings }> = [
-  { id: "cash", label: "Espèces", icon: Banknote, setting: "paymentCashEnabled" },
-  { id: "mobile_money", label: "Mobile money", icon: Smartphone, setting: "paymentMobileMoneyEnabled" },
-  { id: "card", label: "Carte", icon: CreditCard, setting: "paymentCardEnabled" },
-  { id: "bank_transfer", label: "Virement", icon: Landmark, setting: "paymentBankTransferEnabled" },
-  { id: "credit", label: "Crédit", icon: Landmark, setting: "paymentCreditEnabled" },
+type Agent = {
+  id: number;
+  name: string;
+  type: "sales_agent" | "cashier";
+  active: boolean;
+};
+type PaymentSettings = {
+  defaultSalesAgentId?: number | null;
+  defaultCashierId?: number | null;
+  paymentCashEnabled?: boolean;
+  paymentCardEnabled?: boolean;
+  paymentMobileMoneyEnabled?: boolean;
+  paymentBankTransferEnabled?: boolean;
+  paymentCreditEnabled?: boolean;
+  companyName?: string | null;
+  companyLogoUrl?: string | null;
+  companyAddress?: string | null;
+  companyPhone?: string | null;
+  companyEmail?: string | null;
+  companyFooter?: string | null;
+  ticketHeader?: string | null;
+  ticketFooter?: string | null;
+  ticketWidthMm?: "58" | "80" | null;
+};
+const paymentMethods: Array<{
+  id: Method;
+  label: string;
+  icon: typeof Banknote;
+  setting: keyof PaymentSettings;
+}> = [
+  {
+    id: "cash",
+    label: "Espèces",
+    icon: Banknote,
+    setting: "paymentCashEnabled",
+  },
+  {
+    id: "mobile_money",
+    label: "Mobile money",
+    icon: Smartphone,
+    setting: "paymentMobileMoneyEnabled",
+  },
+  {
+    id: "card",
+    label: "Carte",
+    icon: CreditCard,
+    setting: "paymentCardEnabled",
+  },
+  {
+    id: "bank_transfer",
+    label: "Virement",
+    icon: Landmark,
+    setting: "paymentBankTransferEnabled",
+  },
+  {
+    id: "credit",
+    label: "Crédit",
+    icon: Landmark,
+    setting: "paymentCreditEnabled",
+  },
 ];
 
-const receiptMethodLabel: Record<Method, string> = { cash: "Espèces", mobile_money: "Mobile money", card: "Carte", bank_transfer: "Virement", credit: "Crédit" };
-export function printPosReceipt(detail: any, identity: PaymentSettings | undefined, receiptWindow: Window | null) {
-  const popup = receiptWindow && !receiptWindow.closed ? receiptWindow : window.open("", "stockpilot-pos-receipt", "width=460,height=760");
+const receiptMethodLabel: Record<Method, string> = {
+  cash: "Espèces",
+  mobile_money: "Mobile money",
+  card: "Carte",
+  bank_transfer: "Virement",
+  credit: "Crédit",
+};
+export function printPosReceipt(
+  detail: any,
+  identity: PaymentSettings | undefined,
+  receiptWindow: Window | null
+) {
+  const popup =
+    receiptWindow && !receiptWindow.closed
+      ? receiptWindow
+      : window.open("", "stockpilot-pos-receipt", "width=460,height=760");
   if (!popup) return false;
-  const sale = detail.sale; const payments = detail.payments?.length ? detail.payments : [{ method: sale.paymentMethod, amountCents: sale.amountPaidCents }]; const width = identity?.ticketWidthMm || "80";
-  const items = detail.items.map((item: any) => `<div class="item"><div><strong>${escapeHtml(item.productName)}</strong><small>${item.quantity} × ${formatCurrency(item.unitPriceCents)}${item.discountCents > 0 ? ` · Remise -${formatCurrency(item.discountCents)}` : ""}</small></div><b>${formatCurrency(item.lineTotalCents)}</b></div>`).join("");
-  const paymentLines = payments.map((payment: any) => `<div class="row"><span>${escapeHtml(receiptMethodLabel[payment.method as Method] || payment.method)}</span><b>${formatCurrency(payment.amountCents)}</b></div>`).join("");
-  popup.document.write(`<!doctype html><html><head><title>Reçu ${escapeHtml(sale.invoiceNumber)}</title><style>@page{size:${width}mm auto;margin:0}*{box-sizing:border-box}body{width:${width}mm;margin:0 auto;padding:7mm 5mm;font-family:Arial,sans-serif;color:#14213d;font-size:11px}.center{text-align:center}.logo{max-width:42mm;max-height:18mm;object-fit:contain;margin:0 auto 3mm}.muted{color:#5f6b7a;font-size:9px}.divider{border-top:1px dashed #94a3b8;margin:4mm 0}.item,.row{display:flex;justify-content:space-between;gap:3mm;align-items:flex-start;margin:2.5mm 0}.item strong{display:block;font-size:11px}.item small{display:block;color:#5f6b7a;margin-top:1mm}.total{display:flex;justify-content:space-between;font-size:15px;font-weight:700;margin-top:3mm}.badge{display:inline-block;background:#007B8B;color:#fff;border-radius:99px;padding:1mm 3mm;font-size:9px;font-weight:bold;letter-spacing:.06em}.footer{margin-top:6mm;text-align:center;font-size:9px;color:#5f6b7a}</style></head><body><header class="center">${identity?.companyLogoUrl ? `<img class="logo" src="${escapeHtml(identity.companyLogoUrl)}" alt="Logo" />` : ""}<strong>${escapeHtml(identity?.companyName || "StockPilot")}</strong>${identity?.companyAddress ? `<div class="muted">${escapeHtml(identity.companyAddress)}</div>` : ""}${identity?.companyPhone ? `<div class="muted">${escapeHtml(identity.companyPhone)}</div>` : ""}<div class="divider"></div><span class="badge">REÇU POS</span><h3>${escapeHtml(sale.invoiceNumber)}</h3><div class="muted">${new Date(sale.createdAt).toLocaleString("fr-FR")}</div>${identity?.ticketHeader ? `<p>${escapeHtml(identity.ticketHeader)}</p>` : ""}</header><div class="divider"></div>${items}<div class="divider"></div>${sale.invoiceDiscountCents > 0 ? `<div class="row"><span>Remise facture</span><b>-${formatCurrency(sale.invoiceDiscountCents)}</b></div>` : ""}<div class="total"><span>TOTAL</span><span>${formatCurrency(sale.totalCents)}</span></div><div class="divider"></div><strong>Règlement</strong>${paymentLines}<div class="divider"></div><div class="row"><span>Vendeur</span><span>${escapeHtml(detail.participants?.seller?.name || "—")}</span></div>${detail.participants?.cashier ? `<div class="row"><span>Caissier</span><span>${escapeHtml(detail.participants.cashier.name)}</span></div>` : ""}${detail.participants?.salesAgent ? `<div class="row"><span>Agent commercial</span><span>${escapeHtml(detail.participants.salesAgent.name)}</span></div>` : ""}<footer class="footer">${escapeHtml(identity?.ticketFooter || identity?.companyFooter || "Merci de votre achat")}</footer></body></html>`);
-  popup.document.close(); popup.focus(); window.setTimeout(() => { popup.print(); popup.close(); }, 280); return true;
+  const sale = detail.sale;
+  const payments = detail.payments?.length
+    ? detail.payments
+    : [{ method: sale.paymentMethod, amountCents: sale.amountPaidCents }];
+  const width = identity?.ticketWidthMm || "80";
+  const items = detail.items
+    .map(
+      (item: any) =>
+        `<div class="item"><div><strong>${escapeHtml(item.productName)}</strong><small>${item.quantity} × ${formatCurrency(item.unitPriceCents)}${item.discountCents > 0 ? ` · Remise -${formatCurrency(item.discountCents)}` : ""}</small></div><b>${formatCurrency(item.lineTotalCents)}</b></div>`
+    )
+    .join("");
+  const paymentLines = payments
+    .map(
+      (payment: any) =>
+        `<div class="row"><span>${escapeHtml(receiptMethodLabel[payment.method as Method] || payment.method)}</span><b>${formatCurrency(payment.amountCents)}</b></div>`
+    )
+    .join("");
+  popup.document.write(
+    `<!doctype html><html><head><title>Reçu ${escapeHtml(sale.invoiceNumber)}</title><style>@page{size:${width}mm auto;margin:0}*{box-sizing:border-box}body{width:${width}mm;margin:0 auto;padding:7mm 5mm;font-family:Arial,sans-serif;color:#14213d;font-size:11px}.center{text-align:center}.logo{max-width:42mm;max-height:18mm;object-fit:contain;margin:0 auto 3mm}.muted{color:#5f6b7a;font-size:9px}.divider{border-top:1px dashed #94a3b8;margin:4mm 0}.item,.row{display:flex;justify-content:space-between;gap:3mm;align-items:flex-start;margin:2.5mm 0}.item strong{display:block;font-size:11px}.item small{display:block;color:#5f6b7a;margin-top:1mm}.total{display:flex;justify-content:space-between;font-size:15px;font-weight:700;margin-top:3mm}.badge{display:inline-block;background:#007B8B;color:#fff;border-radius:99px;padding:1mm 3mm;font-size:9px;font-weight:bold;letter-spacing:.06em}.footer{margin-top:6mm;text-align:center;font-size:9px;color:#5f6b7a}</style></head><body><header class="center">${identity?.companyLogoUrl ? `<img class="logo" src="${escapeHtml(identity.companyLogoUrl)}" alt="Logo" />` : ""}<strong>${escapeHtml(identity?.companyName || "StockPilot")}</strong>${identity?.companyAddress ? `<div class="muted">${escapeHtml(identity.companyAddress)}</div>` : ""}${identity?.companyPhone ? `<div class="muted">${escapeHtml(identity.companyPhone)}</div>` : ""}<div class="divider"></div><span class="badge">REÇU POS</span><h3>${escapeHtml(sale.invoiceNumber)}</h3><div class="muted">${new Date(sale.createdAt).toLocaleString("fr-FR")}</div>${identity?.ticketHeader ? `<p>${escapeHtml(identity.ticketHeader)}</p>` : ""}</header><div class="divider"></div>${items}<div class="divider"></div>${sale.invoiceDiscountCents > 0 ? `<div class="row"><span>Remise facture</span><b>-${formatCurrency(sale.invoiceDiscountCents)}</b></div>` : ""}<div class="total"><span>TOTAL</span><span>${formatCurrency(sale.totalCents)}</span></div><div class="divider"></div><strong>Règlement</strong>${paymentLines}<div class="divider"></div><div class="row"><span>Vendeur</span><span>${escapeHtml(detail.participants?.seller?.name || "—")}</span></div>${detail.participants?.cashier ? `<div class="row"><span>Caissier</span><span>${escapeHtml(detail.participants.cashier.name)}</span></div>` : ""}${detail.participants?.salesAgent ? `<div class="row"><span>Agent commercial</span><span>${escapeHtml(detail.participants.salesAgent.name)}</span></div>` : ""}<footer class="footer">${escapeHtml(identity?.ticketFooter || identity?.companyFooter || "Merci de votre achat")}</footer></body></html>`
+  );
+  popup.document.close();
+  popup.focus();
+  window.setTimeout(() => {
+    popup.print();
+    popup.close();
+  }, 280);
+  return true;
 }
 
-export function printOfflinePosReceipt(draft: OfflinePosDraft, checkout: { payments: Array<{ method: Method; amountCents: number }> }, totalCents: number, identity: PaymentSettings | undefined, receiptWindow: Window | null, operationId: string) {
-  const popup = receiptWindow && !receiptWindow.closed ? receiptWindow : window.open("", "stockpilot-offline-pos-receipt", "width=460,height=760");
+export function printOfflinePosReceipt(
+  draft: OfflinePosDraft,
+  checkout: { payments: Array<{ method: Method; amountCents: number }> },
+  totalCents: number,
+  identity: PaymentSettings | undefined,
+  receiptWindow: Window | null,
+  operationId: string
+) {
+  const popup =
+    receiptWindow && !receiptWindow.closed
+      ? receiptWindow
+      : window.open(
+          "",
+          "stockpilot-offline-pos-receipt",
+          "width=460,height=760"
+        );
   if (!popup) return false;
   const width = identity?.ticketWidthMm || "80";
-  const paidCents = checkout.payments.reduce((sum, payment) => sum + payment.amountCents, 0);
-  const items = draft.items.map(item => `<div class="item"><div><strong>${escapeHtml(item.productName)}</strong><small>${item.quantity} × ${formatCurrency(item.unitPriceCents)}</small></div><b>${formatCurrency(item.lineTotalCents)}</b></div>`).join("");
-  const payments = checkout.payments.map(payment => `<div class="row"><span>${escapeHtml(receiptMethodLabel[payment.method])}</span><b>${formatCurrency(payment.amountCents)}</b></div>`).join("");
-  popup.document.write(`<!doctype html><html><head><title>Reçu provisoire</title><style>@page{size:${width}mm auto;margin:0}*{box-sizing:border-box}body{width:${width}mm;margin:0 auto;padding:7mm 5mm;font-family:Arial,sans-serif;color:#14213d;font-size:11px}.center{text-align:center}.muted{color:#5f6b7a;font-size:9px}.divider{border-top:1px dashed #94a3b8;margin:4mm 0}.item,.row{display:flex;justify-content:space-between;gap:3mm;align-items:flex-start;margin:2.5mm 0}.item strong{display:block;font-size:11px}.item small{display:block;color:#5f6b7a;margin-top:1mm}.total{display:flex;justify-content:space-between;font-size:15px;font-weight:700;margin-top:3mm}.badge{display:inline-block;background:#b45309;color:#fff;border-radius:99px;padding:1mm 3mm;font-size:9px;font-weight:bold;letter-spacing:.06em}.notice{margin:3mm 0;padding:2mm;border:1px solid #f59e0b;background:#fffbeb;color:#92400e;font-size:9px;text-align:center}.footer{margin-top:6mm;text-align:center;font-size:9px;color:#5f6b7a}</style></head><body><header class="center"><strong>${escapeHtml(identity?.companyName || "StockPilot")}</strong>${identity?.companyAddress ? `<div class="muted">${escapeHtml(identity.companyAddress)}</div>` : ""}${identity?.companyPhone ? `<div class="muted">${escapeHtml(identity.companyPhone)}</div>` : ""}<div class="divider"></div><span class="badge">REÇU PROVISOIRE</span><h3>PROV-${escapeHtml(operationId.slice(-8).toUpperCase())}</h3><div class="muted">${new Date().toLocaleString("fr-FR")}</div></header><div class="notice">Vente enregistrée hors connexion. Ce reçu sera confirmé après synchronisation.</div><div class="divider"></div>${items}<div class="divider"></div><div class="total"><span>TOTAL</span><span>${formatCurrency(totalCents)}</span></div><div class="divider"></div><strong>Règlement</strong>${payments}<div class="divider"></div><div class="row"><span>Montant encaissé</span><b>${formatCurrency(paidCents)}</b></div><footer class="footer">${escapeHtml(identity?.ticketFooter || identity?.companyFooter || "Merci de votre achat")}</footer></body></html>`);
-  popup.document.close(); popup.focus(); window.setTimeout(() => { popup.print(); popup.close(); }, 280); return true;
+  const paidCents = checkout.payments.reduce(
+    (sum, payment) => sum + payment.amountCents,
+    0
+  );
+  const items = draft.items
+    .map(
+      item =>
+        `<div class="item"><div><strong>${escapeHtml(item.productName)}</strong><small>${item.quantity} × ${formatCurrency(item.unitPriceCents)}</small></div><b>${formatCurrency(item.lineTotalCents)}</b></div>`
+    )
+    .join("");
+  const payments = checkout.payments
+    .map(
+      payment =>
+        `<div class="row"><span>${escapeHtml(receiptMethodLabel[payment.method])}</span><b>${formatCurrency(payment.amountCents)}</b></div>`
+    )
+    .join("");
+  popup.document.write(
+    `<!doctype html><html><head><title>Reçu provisoire</title><style>@page{size:${width}mm auto;margin:0}*{box-sizing:border-box}body{width:${width}mm;margin:0 auto;padding:7mm 5mm;font-family:Arial,sans-serif;color:#14213d;font-size:11px}.center{text-align:center}.muted{color:#5f6b7a;font-size:9px}.divider{border-top:1px dashed #94a3b8;margin:4mm 0}.item,.row{display:flex;justify-content:space-between;gap:3mm;align-items:flex-start;margin:2.5mm 0}.item strong{display:block;font-size:11px}.item small{display:block;color:#5f6b7a;margin-top:1mm}.total{display:flex;justify-content:space-between;font-size:15px;font-weight:700;margin-top:3mm}.badge{display:inline-block;background:#b45309;color:#fff;border-radius:99px;padding:1mm 3mm;font-size:9px;font-weight:bold;letter-spacing:.06em}.notice{margin:3mm 0;padding:2mm;border:1px solid #f59e0b;background:#fffbeb;color:#92400e;font-size:9px;text-align:center}.footer{margin-top:6mm;text-align:center;font-size:9px;color:#5f6b7a}</style></head><body><header class="center"><strong>${escapeHtml(identity?.companyName || "StockPilot")}</strong>${identity?.companyAddress ? `<div class="muted">${escapeHtml(identity.companyAddress)}</div>` : ""}${identity?.companyPhone ? `<div class="muted">${escapeHtml(identity.companyPhone)}</div>` : ""}<div class="divider"></div><span class="badge">REÇU PROVISOIRE</span><h3>PROV-${escapeHtml(operationId.slice(-8).toUpperCase())}</h3><div class="muted">${new Date().toLocaleString("fr-FR")}</div></header><div class="notice">Vente enregistrée hors connexion. Ce reçu sera confirmé après synchronisation.</div><div class="divider"></div>${items}<div class="divider"></div><div class="total"><span>TOTAL</span><span>${formatCurrency(totalCents)}</span></div><div class="divider"></div><strong>Règlement</strong>${payments}<div class="divider"></div><div class="row"><span>Montant encaissé</span><b>${formatCurrency(paidCents)}</b></div><footer class="footer">${escapeHtml(identity?.ticketFooter || identity?.companyFooter || "Merci de votre achat")}</footer></body></html>`
+  );
+  popup.document.close();
+  popup.focus();
+  window.setTimeout(() => {
+    popup.print();
+    popup.close();
+  }, 280);
+  return true;
 }
 
-export function CheckoutSheet({ open, onOpenChange, sale, agents, settings, onComplete }: { open: boolean; onOpenChange: (open: boolean) => void; sale: { id: number | null; totalCents: number; amountPaidCents?: number; invoiceNumber?: string; channel?: "pos" | "invoice"; salesAgentId?: number | null; cashierId?: number | null; offlineDraft?: OfflinePosDraft | OfflineInvoiceDraft } | null; agents: Agent[]; settings?: PaymentSettings; onComplete: (saleId: number | null, receiptWindow?: Window | null) => void }) {
+export function CheckoutSheet({
+  open,
+  onOpenChange,
+  sale,
+  agents,
+  settings,
+  onComplete,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  sale: {
+    id: number | null;
+    totalCents: number;
+    amountPaidCents?: number;
+    invoiceNumber?: string;
+    channel?: "pos" | "invoice";
+    salesAgentId?: number | null;
+    cashierId?: number | null;
+    offlineDraft?: OfflinePosDraft | OfflineInvoiceDraft;
+  } | null;
+  agents: Agent[];
+  settings?: PaymentSettings;
+  onComplete: (saleId: number | null, receiptWindow?: Window | null) => void;
+}) {
   const utils = trpc.useUtils();
   const { isOnline, queuePosSale, queueInvoiceSale } = useOffline();
   const receiptWindowRef = useRef<Window | null>(null);
@@ -55,43 +223,468 @@ export function CheckoutSheet({ open, onOpenChange, sale, agents, settings, onCo
   const isPos = isPosCheckout(sale);
   const [mode, setMode] = useState<"full" | "partial">("full");
   const [checked, setChecked] = useState<Method[]>([]);
-  const [amounts, setAmounts] = useState<Record<Method, string>>(blankCheckoutAmounts);
+  const [amounts, setAmounts] =
+    useState<Record<Method, string>>(blankCheckoutAmounts);
   const [salesAgentId, setSalesAgentId] = useState("");
   const [cashierId, setCashierId] = useState("");
   const total = sale?.totalCents ?? 0;
   const previouslyPaid = sale?.amountPaidCents ?? 0;
   const remaining = Math.max(0, total - previouslyPaid);
-  const enabledMethods = paymentMethods.filter(method => settings?.[method.setting] !== false);
+  const enabledMethods = paymentMethods.filter(
+    method => settings?.[method.setting] !== false
+  );
 
   useEffect(() => {
     if (!open || !sale) return;
-    setMode("full"); setChecked([]); setAmounts(blankCheckoutAmounts);
-    setSalesAgentId(settings?.defaultSalesAgentId ? String(settings.defaultSalesAgentId) : sale.salesAgentId ? String(sale.salesAgentId) : "");
-    setCashierId(settings?.defaultCashierId ? String(settings.defaultCashierId) : sale.cashierId ? String(sale.cashierId) : "");
-  }, [open, sale?.id, sale?.salesAgentId, sale?.cashierId, settings?.defaultSalesAgentId, settings?.defaultCashierId]);
+    setMode("full");
+    setChecked([]);
+    setAmounts(blankCheckoutAmounts);
+    setSalesAgentId(
+      settings?.defaultSalesAgentId
+        ? String(settings.defaultSalesAgentId)
+        : sale.salesAgentId
+          ? String(sale.salesAgentId)
+          : ""
+    );
+    setCashierId(
+      settings?.defaultCashierId
+        ? String(settings.defaultCashierId)
+        : sale.cashierId
+          ? String(sale.cashierId)
+          : ""
+    );
+  }, [
+    open,
+    sale?.id,
+    sale?.salesAgentId,
+    sale?.cashierId,
+    settings?.defaultSalesAgentId,
+    settings?.defaultCashierId,
+  ]);
 
-  const paidCents = useMemo(() => checked.reduce((sum, method) => sum + checkoutAmountToCents(amounts[method]), 0), [amounts, checked]);
-  const toggle = (method: Method) => setChecked(current => {
-    const next = current.includes(method) ? current.filter(value => value !== method) : [...current, method];
-    setAmounts(amounts => mode === "full" ? distributeIntegralPayment(next, amounts, remaining) : { ...amounts, ...(next.includes(method) ? {} : { [method]: "" }) });
-    return next;
-  });
-  const updateAmount = (method: Method, value: string) => setAmounts(current => {
-    return mode === "full" ? updateIntegralPayment(checked, current, method, value, remaining) : { ...current, [method]: value };
-  });
-  const changeMode = (next: "full" | "partial") => { if (isPos) return; setMode(next); if (next === "full") setAmounts(current => distributeIntegralPayment(checked, current, remaining)); };
+  const paidCents = useMemo(
+    () =>
+      checked.reduce(
+        (sum, method) => sum + checkoutAmountToCents(amounts[method]),
+        0
+      ),
+    [amounts, checked]
+  );
+  const toggle = (method: Method) =>
+    setChecked(current => {
+      const next = current.includes(method)
+        ? current.filter(value => value !== method)
+        : [...current, method];
+      setAmounts(amounts =>
+        mode === "full"
+          ? distributeIntegralPayment(next, amounts, remaining)
+          : { ...amounts, ...(next.includes(method) ? {} : { [method]: "" }) }
+      );
+      return next;
+    });
+  const updateAmount = (method: Method, value: string) =>
+    setAmounts(current => {
+      return mode === "full"
+        ? updateIntegralPayment(checked, current, method, value, remaining)
+        : { ...current, [method]: value };
+    });
+  const changeMode = (next: "full" | "partial") => {
+    if (isPos) return;
+    setMode(next);
+    if (next === "full")
+      setAmounts(current =>
+        distributeIntegralPayment(checked, current, remaining)
+      );
+  };
   const validFull = isExactIntegralPayment(checked, amounts, remaining);
-  const validPartial = checked.length > 0 && paidCents > 0 && paidCents < remaining;
+  const validPartial =
+    checked.length > 0 && paidCents > 0 && paidCents < remaining;
   const hasDefaultSalesAgent = Boolean(settings?.defaultSalesAgentId);
   const hasDefaultCashier = Boolean(settings?.defaultCashierId);
-  const agentSelectionValid = (hasDefaultSalesAgent || salesAgentId !== "") && (hasDefaultCashier || cashierId !== "");
-  const canSubmit = Boolean(sale) && agentSelectionValid && (mode === "full" ? validFull : validPartial);
-  const checkout = trpc.transactions.checkout.useMutation({ onSuccess: result => { toast.success(result.status === "paid" ? "Règlement intégral validé." : `Règlement partiel validé · solde ${formatCurrency(result.balanceCents)}`); utils.transactions.list.invalidate(); utils.products.list.invalidate(); utils.dashboard.get.invalidate(); const completedSale = sale; const receiptWindow = receiptWindowRef.current; const popupBlocked = receiptPopupBlockedRef.current; onOpenChange(false); if (isPos && completedSale && typeof completedSale.id === "number" && result.status === "paid") { if (popupBlocked) toast.error("Autorisez les fenêtres contextuelles pour imprimer le reçu POS."); else void utils.commerce.sales.detail.fetch({ id: completedSale.id }).then(detail => { if (!printPosReceipt(detail, settings, receiptWindow)) toast.error("Autorisez les fenêtres contextuelles pour imprimer le reçu POS."); }).catch(() => { receiptWindow?.close(); toast.error("Le reçu POS n’a pas pu être généré."); }); } else receiptWindow?.close(); if (completedSale) onComplete(completedSale.id, receiptWindow); receiptWindowRef.current = null; receiptPopupBlockedRef.current = false; }, onError: error => { receiptWindowRef.current?.close(); receiptWindowRef.current = null; receiptPopupBlockedRef.current = false; toast.error(error.message); } });
-  const submit = () => { if (!sale || !canSubmit) return; const payments = checked.map(method => ({ method, amountCents: checkoutAmountToCents(amounts[method]) })).filter(payment => payment.amountCents > 0); const assignment = { salesAgentId: salesAgentId === "none" ? null : Number(salesAgentId), cashierId: cashierId === "none" ? null : Number(cashierId), note: null }; if (!isOnline && sale.offlineDraft) { if (sale.offlineDraft.channel === "pos") { const operationId = globalThis.crypto?.randomUUID?.() ?? `offline-${Date.now()}`; const offlineCheckout = { settlementMode: "full" as const, payments, ...assignment }; const receiptWindow = window.open("", "stockpilot-offline-pos-receipt", "width=460,height=760"); queuePosSale(sale.offlineDraft, offlineCheckout); if (!printOfflinePosReceipt(sale.offlineDraft, offlineCheckout, sale.totalCents, settings, receiptWindow, operationId)) toast.error("Autorisez les fenêtres contextuelles pour imprimer le reçu provisoire."); toast.success("Vente enregistrée hors connexion et reçu provisoire imprimé."); onOpenChange(false); onComplete(null, receiptWindow); return; } queueInvoiceSale(sale.offlineDraft, { settlementMode: mode, payments, ...assignment }); toast.success(mode === "partial" ? "Encaissement partiel enregistré hors connexion." : "Facture enregistrée hors connexion."); onOpenChange(false); onComplete(null); return; } if (sale.id === null) return; if (isPos) { receiptWindowRef.current = window.open("", "stockpilot-pos-receipt", "width=460,height=760"); receiptPopupBlockedRef.current = !receiptWindowRef.current; if (receiptWindowRef.current) { receiptWindowRef.current.document.write("<title>Préparation du reçu…</title><p style='font-family:Arial;padding:24px'>Préparation du reçu…</p>"); receiptWindowRef.current.document.close(); } } checkout.mutate({ saleId: sale.id, settlementMode: isPos ? "full" : mode, payments, ...assignment }); };
-  const salesAgents = agents.filter(agent => agent.active && agent.type === "sales_agent"); const cashiers = agents.filter(agent => agent.active && agent.type === "cashier"); const showSalesAgentSelect = !hasDefaultSalesAgent && shouldPromptForAssignment(settings?.defaultSalesAgentId); const showCashierSelect = !hasDefaultCashier && shouldPromptForAssignment(settings?.defaultCashierId); const defaultSalesAgent = salesAgents.find(agent => agent.id === settings?.defaultSalesAgentId); const defaultCashier = cashiers.find(agent => agent.id === settings?.defaultCashierId); const difference = remaining - paidCents;
+  const agentSelectionValid =
+    (hasDefaultSalesAgent || salesAgentId !== "") &&
+    (hasDefaultCashier || cashierId !== "");
+  const canSubmit =
+    Boolean(sale) &&
+    agentSelectionValid &&
+    (mode === "full" ? validFull : validPartial);
+  const checkout = trpc.transactions.checkout.useMutation({
+    onSuccess: result => {
+      toast.success(
+        result.status === "paid"
+          ? "Règlement intégral validé."
+          : `Règlement partiel validé · solde ${formatCurrency(result.balanceCents)}`
+      );
+      utils.transactions.list.invalidate();
+      utils.products.list.invalidate();
+      utils.dashboard.get.invalidate();
+      const completedSale = sale;
+      const receiptWindow = receiptWindowRef.current;
+      const popupBlocked = receiptPopupBlockedRef.current;
+      onOpenChange(false);
+      if (
+        isPos &&
+        completedSale &&
+        typeof completedSale.id === "number" &&
+        result.status === "paid"
+      ) {
+        if (popupBlocked)
+          toast.error(
+            "Autorisez les fenêtres contextuelles pour imprimer le reçu POS."
+          );
+        else
+          void utils.commerce.sales.detail
+            .fetch({ id: completedSale.id })
+            .then(detail => {
+              if (!printPosReceipt(detail, settings, receiptWindow))
+                toast.error(
+                  "Autorisez les fenêtres contextuelles pour imprimer le reçu POS."
+                );
+            })
+            .catch(() => {
+              receiptWindow?.close();
+              toast.error("Le reçu POS n’a pas pu être généré.");
+            });
+      } else receiptWindow?.close();
+      if (completedSale) onComplete(completedSale.id, receiptWindow);
+      receiptWindowRef.current = null;
+      receiptPopupBlockedRef.current = false;
+    },
+    onError: error => {
+      receiptWindowRef.current?.close();
+      receiptWindowRef.current = null;
+      receiptPopupBlockedRef.current = false;
+      toast.error(error.message);
+    },
+  });
+  const submit = () => {
+    if (!sale || !canSubmit) return;
+    const payments = checked
+      .map(method => ({
+        method,
+        amountCents: checkoutAmountToCents(amounts[method]),
+      }))
+      .filter(payment => payment.amountCents > 0);
+    const assignment = {
+      salesAgentId: salesAgentId === "none" ? null : Number(salesAgentId),
+      cashierId: cashierId === "none" ? null : Number(cashierId),
+      note: null,
+    };
+    if (!isOnline && sale.offlineDraft) {
+      if (sale.offlineDraft.channel === "pos") {
+        const operationId =
+          globalThis.crypto?.randomUUID?.() ?? `offline-${Date.now()}`;
+        const offlineCheckout = {
+          settlementMode: "full" as const,
+          payments,
+          ...assignment,
+        };
+        const receiptWindow = window.open(
+          "",
+          "stockpilot-offline-pos-receipt",
+          "width=460,height=760"
+        );
+        queuePosSale(sale.offlineDraft, offlineCheckout);
+        if (
+          !printOfflinePosReceipt(
+            sale.offlineDraft,
+            offlineCheckout,
+            sale.totalCents,
+            settings,
+            receiptWindow,
+            operationId
+          )
+        )
+          toast.error(
+            "Autorisez les fenêtres contextuelles pour imprimer le reçu provisoire."
+          );
+        toast.success(
+          "Vente enregistrée hors connexion et reçu provisoire imprimé."
+        );
+        onOpenChange(false);
+        onComplete(null, receiptWindow);
+        return;
+      }
+      queueInvoiceSale(sale.offlineDraft, {
+        settlementMode: mode,
+        payments,
+        ...assignment,
+      });
+      toast.success(
+        mode === "partial"
+          ? "Encaissement partiel enregistré hors connexion."
+          : "Facture enregistrée hors connexion."
+      );
+      onOpenChange(false);
+      onComplete(null);
+      return;
+    }
+    if (sale.id === null) return;
+    if (isPos) {
+      receiptWindowRef.current = window.open(
+        "",
+        "stockpilot-pos-receipt",
+        "width=460,height=760"
+      );
+      receiptPopupBlockedRef.current = !receiptWindowRef.current;
+      if (receiptWindowRef.current) {
+        receiptWindowRef.current.document.write(
+          "<title>Préparation du reçu…</title><p style='font-family:Arial;padding:24px'>Préparation du reçu…</p>"
+        );
+        receiptWindowRef.current.document.close();
+      }
+    }
+    checkout.mutate({
+      saleId: sale.id,
+      settlementMode: isPos ? "full" : mode,
+      payments,
+      ...assignment,
+    });
+  };
+  const salesAgents = agents.filter(
+    agent => agent.active && agent.type === "sales_agent"
+  );
+  const cashiers = agents.filter(
+    agent => agent.active && agent.type === "cashier"
+  );
+  const showSalesAgentSelect =
+    !hasDefaultSalesAgent &&
+    shouldPromptForAssignment(settings?.defaultSalesAgentId);
+  const showCashierSelect =
+    !hasDefaultCashier && shouldPromptForAssignment(settings?.defaultCashierId);
+  const defaultSalesAgent = salesAgents.find(
+    agent => agent.id === settings?.defaultSalesAgentId
+  );
+  const defaultCashier = cashiers.find(
+    agent => agent.id === settings?.defaultCashierId
+  );
+  const difference = remaining - paidCents;
 
-  return <Sheet open={open} onOpenChange={onOpenChange}><SheetContent side="right" className="w-full overflow-y-auto border-white/10 bg-[#111722] p-0 text-slate-100 sm:!inset-y-auto sm:!left-1/2 sm:!right-auto sm:!top-1/2 sm:!h-auto sm:!max-h-[88vh] sm:!w-[min(94vw,620px)] sm:!max-w-none sm:!-translate-x-1/2 sm:!-translate-y-1/2 sm:!rounded-2xl"><SheetHeader className="border-b border-white/[0.08] px-5 py-4 text-left"><SheetTitle className="text-lg text-white">Encaissement</SheetTitle><p className="text-xs text-slate-400">{sale?.invoiceNumber || "Vente comptoir"}</p></SheetHeader><div className="space-y-4 p-5"><section className="rounded-xl border border-[#00bcd4]/20 bg-[#00bcd4]/[0.07] p-4"><p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#a7f3ff]">Total à encaisser</p><p className="mt-1 text-2xl font-semibold text-white">{formatCurrency(remaining)}</p>{previouslyPaid > 0 && <p className="mt-1 text-xs text-slate-400">Déjà encaissé : {formatCurrency(previouslyPaid)}</p>}</section>{!isPos && <div className="flex rounded-xl bg-white/[0.04] p-1"><Button type="button" onClick={() => changeMode("full")} variant="ghost" className={`flex-1 ${mode === "full" ? "bg-[#00bcd4] text-slate-950 hover:bg-[#66ddea]" : "text-slate-400"}`}>Intégral</Button><Button type="button" onClick={() => changeMode("partial")} variant="ghost" className={`flex-1 ${mode === "partial" ? "bg-[#00bcd4] text-slate-950 hover:bg-[#66ddea]" : "text-slate-400"}`}>Partiel</Button></div>}<section><Label className="text-sm font-semibold text-slate-200">Moyens de paiement</Label>{!enabledMethods.length ? <p className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/[0.08] p-3 text-sm text-amber-200">Aucun moyen de paiement n’est activé dans les réglages POS.</p> : <div className="mt-2 space-y-2">{enabledMethods.map(({ id, label, icon: Icon }) => <div key={id} className={`rounded-xl border p-2.5 transition ${checked.includes(id) ? "border-[#00bcd4]/40 bg-[#00bcd4]/[0.06]" : "border-white/[0.08] bg-white/[0.02]"}`}><div className="flex items-center gap-3"><Checkbox id={`payment-${id}`} checked={checked.includes(id)} onCheckedChange={() => toggle(id)} /><Label htmlFor={`payment-${id}`} className="flex flex-1 cursor-pointer items-center gap-2 text-sm text-slate-200"><Icon className="h-4 w-4 text-[#66ddea]" />{label}</Label>{checked.includes(id) && <div className="relative w-28"><Input value={amounts[id]} onChange={event => updateAmount(id, event.target.value)} inputMode="decimal" className="h-8 border-white/10 bg-black/10 pr-9 text-right text-sm" /><span className="absolute right-2 top-2 text-[10px] text-slate-500">FCFA</span></div>}</div></div>)}</div>}<div className="mt-3 space-y-1 text-sm"><div className="flex justify-between"><span className="text-slate-400">Montant saisi</span><span className={difference === 0 ? "font-semibold text-emerald-300" : "font-semibold text-amber-300"}>{formatCurrency(paidCents)}</span></div><div className="flex justify-between"><span className="text-slate-400">{mode === "full" ? "Écart à répartir" : "Solde restant"}</span><span className={difference === 0 ? "font-semibold text-emerald-300" : "font-semibold text-slate-100"}>{formatCurrency(Math.abs(difference))}</span></div>{mode === "full" && checked.length > 0 && difference !== 0 && <p className="pt-1 text-xs text-amber-300">La répartition doit être égale au total pour valider.</p>}</div></section><section className="grid gap-3 sm:grid-cols-2">{hasDefaultSalesAgent ? <AgentReadOnly label="Agent commercial" name={defaultSalesAgent?.name || "Agent par défaut"} /> : showSalesAgentSelect && <AgentSelect label="Agent commercial" value={salesAgentId} onChange={setSalesAgentId} agents={salesAgents} />}{hasDefaultCashier ? <AgentReadOnly label="Caissier" name={defaultCashier?.name || "Caissier par défaut"} /> : showCashierSelect && <AgentSelect label="Caissier" value={cashierId} onChange={setCashierId} agents={cashiers} />}</section><div className="flex gap-3 border-t border-white/[0.08] pt-4"><Button variant="outline" onClick={() => onOpenChange(false)} className="flex-1 border-white/10 text-slate-200"><X className="mr-2 h-4 w-4" />Annuler</Button><Button onClick={submit} disabled={checkout.isPending || !canSubmit} className="flex-1 bg-[#007B8B] text-white hover:bg-[#006976]">Valider l’encaissement</Button></div></div></SheetContent></Sheet>;
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="right"
+        className="w-full overflow-y-auto border-white/10 bg-[#111722] p-0 text-slate-100 sm:!inset-y-auto sm:!left-1/2 sm:!right-auto sm:!top-1/2 sm:!h-auto sm:!max-h-[88vh] sm:!w-[min(94vw,620px)] sm:!max-w-none sm:!-translate-x-1/2 sm:!-translate-y-1/2 sm:!rounded-2xl"
+      >
+        <SheetHeader className="border-b border-white/[0.08] px-5 py-4 text-left">
+          <SheetTitle className="text-lg text-white">Encaissement</SheetTitle>
+          <p className="text-xs text-slate-400">
+            {sale?.invoiceNumber || "Vente comptoir"}
+          </p>
+        </SheetHeader>
+        <div className="space-y-4 p-5">
+          <section className="rounded-xl border border-[#00bcd4]/20 bg-[#00bcd4]/[0.07] p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#a7f3ff]">
+              Total à encaisser
+            </p>
+            <p className="mt-1 text-2xl font-semibold text-white">
+              {formatCurrency(remaining)}
+            </p>
+            {previouslyPaid > 0 && (
+              <p className="mt-1 text-xs text-slate-400">
+                Déjà encaissé : {formatCurrency(previouslyPaid)}
+              </p>
+            )}
+          </section>
+          {!isPos && (
+            <div className="flex rounded-xl bg-white/[0.04] p-1">
+              <Button
+                type="button"
+                onClick={() => changeMode("full")}
+                variant="ghost"
+                className={`flex-1 ${mode === "full" ? "bg-[#00bcd4] text-slate-950 hover:bg-[#66ddea]" : "text-slate-400"}`}
+              >
+                Intégral
+              </Button>
+              <Button
+                type="button"
+                onClick={() => changeMode("partial")}
+                variant="ghost"
+                className={`flex-1 ${mode === "partial" ? "bg-[#00bcd4] text-slate-950 hover:bg-[#66ddea]" : "text-slate-400"}`}
+              >
+                Partiel
+              </Button>
+            </div>
+          )}
+          <section>
+            <Label className="text-sm font-semibold text-slate-200">
+              Moyens de paiement
+            </Label>
+            {!enabledMethods.length ? (
+              <p className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/[0.08] p-3 text-sm text-amber-200">
+                Aucun moyen de paiement n’est activé dans les réglages POS.
+              </p>
+            ) : (
+              <div className="mt-2 space-y-2">
+                {enabledMethods.map(({ id, label, icon: Icon }) => (
+                  <div
+                    key={id}
+                    className={`rounded-xl border p-2.5 transition ${checked.includes(id) ? "border-[#00bcd4]/40 bg-[#00bcd4]/[0.06]" : "border-white/[0.08] bg-white/[0.02]"}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Checkbox
+                        id={`payment-${id}`}
+                        checked={checked.includes(id)}
+                        onCheckedChange={() => toggle(id)}
+                      />
+                      <Label
+                        htmlFor={`payment-${id}`}
+                        className="flex flex-1 cursor-pointer items-center gap-2 text-sm text-slate-200"
+                      >
+                        <Icon className="h-4 w-4 text-[#66ddea]" />
+                        {label}
+                      </Label>
+                      {checked.includes(id) && (
+                        <div className="relative w-28">
+                          <Input
+                            value={amounts[id]}
+                            onChange={event =>
+                              updateAmount(id, event.target.value)
+                            }
+                            inputMode="decimal"
+                            className="h-8 border-white/10 bg-black/10 pr-9 text-right text-sm"
+                          />
+                          <span className="absolute right-2 top-2 text-[10px] text-slate-500">
+                            FCFA
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="mt-3 space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Montant saisi</span>
+                <span
+                  className={
+                    difference === 0
+                      ? "font-semibold text-emerald-300"
+                      : "font-semibold text-amber-300"
+                  }
+                >
+                  {formatCurrency(paidCents)}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">
+                  {mode === "full" ? "Écart à répartir" : "Solde restant"}
+                </span>
+                <span
+                  className={
+                    difference === 0
+                      ? "font-semibold text-emerald-300"
+                      : "font-semibold text-slate-100"
+                  }
+                >
+                  {formatCurrency(Math.abs(difference))}
+                </span>
+              </div>
+              {mode === "full" && checked.length > 0 && difference !== 0 && (
+                <p className="pt-1 text-xs text-amber-300">
+                  La répartition doit être égale au total pour valider.
+                </p>
+              )}
+            </div>
+          </section>
+          <section className="grid gap-3 sm:grid-cols-2">
+            {hasDefaultSalesAgent ? (
+              <AgentReadOnly
+                label="Agent commercial"
+                name={defaultSalesAgent?.name || "Agent par défaut"}
+              />
+            ) : (
+              showSalesAgentSelect && (
+                <AgentSelect
+                  label="Agent commercial"
+                  value={salesAgentId}
+                  onChange={setSalesAgentId}
+                  agents={salesAgents}
+                />
+              )
+            )}
+            {hasDefaultCashier ? (
+              <AgentReadOnly
+                label="Caissier"
+                name={defaultCashier?.name || "Caissier par défaut"}
+              />
+            ) : (
+              showCashierSelect && (
+                <AgentSelect
+                  label="Caissier"
+                  value={cashierId}
+                  onChange={setCashierId}
+                  agents={cashiers}
+                />
+              )
+            )}
+          </section>
+          <div className="flex gap-3 border-t border-white/[0.08] pt-4">
+            <Button
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              className="flex-1 border-white/10 text-slate-200"
+            >
+              <X className="mr-2 h-4 w-4" />
+              Annuler
+            </Button>
+            <Button
+              onClick={submit}
+              disabled={checkout.isPending || !canSubmit}
+              className="flex-1 bg-[#007B8B] text-white hover:bg-[#006976]"
+            >
+              Valider l’encaissement
+            </Button>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
 }
 
-function AgentReadOnly({ label, name }: { label: string; name: string }) { return <div className="space-y-1.5"><Label className="text-slate-300">{label}</Label><div className="rounded-lg border border-primary/25 bg-primary/[0.07] px-3 py-2 text-sm text-slate-100"><span className="mr-2 text-[10px] font-semibold uppercase tracking-wide text-primary">Par défaut</span>{name}</div></div>; }
-function AgentSelect({ label, value, onChange, agents }: { label: string; value: string; onChange: (value: string) => void; agents: Agent[] }) { return <div className="space-y-1.5"><Label>{label} <span className="text-rose-300">*</span></Label><Select value={value || undefined} onValueChange={onChange}><SelectTrigger><SelectValue placeholder="Choisir un agent ou Aucun" /></SelectTrigger><SelectContent><SelectItem value="none">Aucun</SelectItem>{agents.map(agent => <SelectItem key={agent.id} value={String(agent.id)}>{agent.name}</SelectItem>)}</SelectContent></Select></div>; }
+function AgentReadOnly({ label, name }: { label: string; name: string }) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-slate-300">{label}</Label>
+      <div className="rounded-lg border border-primary/25 bg-primary/[0.07] px-3 py-2 text-sm text-slate-100">
+        <span className="mr-2 text-[10px] font-semibold uppercase tracking-wide text-primary">
+          Par défaut
+        </span>
+        {name}
+      </div>
+    </div>
+  );
+}
+function AgentSelect({
+  label,
+  value,
+  onChange,
+  agents,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  agents: Agent[];
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label>
+        {label} <span className="text-rose-300">*</span>
+      </Label>
+      <Select value={value || undefined} onValueChange={onChange}>
+        <SelectTrigger>
+          <SelectValue placeholder="Choisir un agent ou Aucun" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="none">Aucun</SelectItem>
+          {agents.map(agent => (
+            <SelectItem key={agent.id} value={String(agent.id)}>
+              {agent.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}

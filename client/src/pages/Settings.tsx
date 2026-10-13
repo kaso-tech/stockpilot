@@ -5,18 +5,39 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { usePreferences, type Currency } from "@/contexts/PreferencesContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import { formatCurrency, type PriceGrouping, type PriceRounding } from "@/lib/format";
+import {
+  formatCurrency,
+  type PriceGrouping,
+  type PriceRounding,
+} from "@/lib/format";
 import { normalizePrimaryColor, primaryForeground } from "@/lib/primaryColor";
 import { trpc } from "@/lib/trpc";
-import { Check, ChevronLeft, FileText, ImageUp, Moon, Palette, Save, Sun } from "lucide-react";
+import {
+  Check,
+  ChevronLeft,
+  FileText,
+  ImageUp,
+  Moon,
+  Palette,
+  Save,
+  Sun,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Link } from "wouter";
 import { Restricted } from "./AuditLog";
 
 const COMMON_TIMEZONES = [
-  { value: "Africa/Abidjan", label: "Afrique de l’Ouest — UTC+0 (Abidjan, Dakar, Bamako, Ouagadougou, Lomé)" },
-  { value: "Africa/Lagos", label: "Afrique de l’Ouest/Centrale — UTC+1 (Cotonou, Niamey, Douala, Libreville, Kinshasa)" },
+  {
+    value: "Africa/Abidjan",
+    label:
+      "Afrique de l’Ouest — UTC+0 (Abidjan, Dakar, Bamako, Ouagadougou, Lomé)",
+  },
+  {
+    value: "Africa/Lagos",
+    label:
+      "Afrique de l’Ouest/Centrale — UTC+1 (Cotonou, Niamey, Douala, Libreville, Kinshasa)",
+  },
   { value: "Africa/Casablanca", label: "Maroc — Casablanca" },
   { value: "Africa/Algiers", label: "Algérie / Tunisie — UTC+1" },
   { value: "Africa/Johannesburg", label: "Afrique australe — UTC+2" },
@@ -27,48 +48,809 @@ const COMMON_TIMEZONES = [
   { value: "UTC", label: "UTC" },
 ];
 function timezoneOptions(current: string | undefined) {
-  return current && !COMMON_TIMEZONES.some(zone => zone.value === current) ? [{ value: current, label: current }, ...COMMON_TIMEZONES] : COMMON_TIMEZONES;
+  return current && !COMMON_TIMEZONES.some(zone => zone.value === current)
+    ? [{ value: current, label: current }, ...COMMON_TIMEZONES]
+    : COMMON_TIMEZONES;
 }
 
 export type SettingsSection = "appearance" | "currency" | "identity";
-type Identity = { companyName: string; companyLogoUrl: string | null; companySignatureUrl: string | null; companySignatureLabel: string; companyAgreementLabel: string; companySignatureAlignment: "left" | "center" | "right"; companyAddress: string; companyPhone: string; companyEmail: string; companyFooter: string };
-const blankIdentity: Identity = { companyName: "StockPilot", companyLogoUrl: null, companySignatureUrl: null, companySignatureLabel: "Signature & cachet", companyAgreementLabel: "Bon pour accord", companySignatureAlignment: "right", companyAddress: "", companyPhone: "", companyEmail: "", companyFooter: "" };
-const currencies: Array<{ code: Currency; name: string; display: string; symbol: string }> = [{ code: "XOF", name: "Franc CFA", display: "FCFA", symbol: "FCFA" }, { code: "USD", name: "Dollar américain", display: "USD", symbol: "$" }, { code: "EUR", name: "Euro", display: "EUR", symbol: "€" }];
-const primaryPresets = ["#007B8B", "#2563EB", "#6D28D9", "#BE123C", "#B45309", "#15803D"];
-const groupingOptions: Array<{ value: PriceGrouping; label: string; preview: string }> = [{ value: "space", label: "Espace", preview: "2 500 000" }, { value: "comma", label: "Virgule", preview: "2,500,000" }, { value: "none", label: "Sans séparateur", preview: "2500000" }];
-const roundingOptions: Array<{ value: PriceRounding; label: string }> = [{ value: "none", label: "Valeur exacte" }, { value: "unit", label: "À l’unité" }, { value: "ten", label: "À la dizaine" }, { value: "hundred", label: "À la centaine" }, { value: "thousand", label: "Au millier" }];
+type Identity = {
+  companyName: string;
+  companyLogoUrl: string | null;
+  companySignatureUrl: string | null;
+  companySignatureLabel: string;
+  companyAgreementLabel: string;
+  companySignatureAlignment: "left" | "center" | "right";
+  companyAddress: string;
+  companyPhone: string;
+  companyEmail: string;
+  companyFooter: string;
+};
+const blankIdentity: Identity = {
+  companyName: "StockPilot",
+  companyLogoUrl: null,
+  companySignatureUrl: null,
+  companySignatureLabel: "Signature & cachet",
+  companyAgreementLabel: "Bon pour accord",
+  companySignatureAlignment: "right",
+  companyAddress: "",
+  companyPhone: "",
+  companyEmail: "",
+  companyFooter: "",
+};
+const currencies: Array<{
+  code: Currency;
+  name: string;
+  display: string;
+  symbol: string;
+}> = [
+  { code: "XOF", name: "Franc CFA", display: "FCFA", symbol: "FCFA" },
+  { code: "USD", name: "Dollar américain", display: "USD", symbol: "$" },
+  { code: "EUR", name: "Euro", display: "EUR", symbol: "€" },
+];
+const primaryPresets = [
+  "#007B8B",
+  "#2563EB",
+  "#6D28D9",
+  "#BE123C",
+  "#B45309",
+  "#15803D",
+];
+const groupingOptions: Array<{
+  value: PriceGrouping;
+  label: string;
+  preview: string;
+}> = [
+  { value: "space", label: "Espace", preview: "2 500 000" },
+  { value: "comma", label: "Virgule", preview: "2,500,000" },
+  { value: "none", label: "Sans séparateur", preview: "2500000" },
+];
+const roundingOptions: Array<{ value: PriceRounding; label: string }> = [
+  { value: "none", label: "Valeur exacte" },
+  { value: "unit", label: "À l’unité" },
+  { value: "ten", label: "À la dizaine" },
+  { value: "hundred", label: "À la centaine" },
+  { value: "thousand", label: "Au millier" },
+];
 
 export default function Settings({ section }: { section: SettingsSection }) {
-  const { user } = useAuth(); const isAdmin = user?.role === "admin";
-  const { theme, setTheme } = useTheme(); const { currency, setCurrency, primaryColor, setPrimaryColor, priceGrouping, setPriceGrouping, priceRounding, setPriceRounding } = usePreferences(); const utils = trpc.useUtils();
-  const { data } = trpc.commerce.settings.get.useQuery(undefined, { enabled: isAdmin });
-  const [identity, setIdentity] = useState<Identity>(blankIdentity); const [primaryDraft, setPrimaryDraft] = useState(primaryColor);
-  useEffect(() => { if (data) { setIdentity({ companyName: data.companyName || "StockPilot", companyLogoUrl: data.companyLogoUrl || null, companySignatureUrl: data.companySignatureUrl || null, companySignatureLabel: data.companySignatureLabel || "Signature & cachet", companyAgreementLabel: data.companyAgreementLabel || "Bon pour accord", companySignatureAlignment: data.companySignatureAlignment || "right", companyAddress: data.companyAddress || "", companyPhone: data.companyPhone || "", companyEmail: data.companyEmail || "", companyFooter: data.companyFooter || "" }); setPrimaryDraft(normalizePrimaryColor(data.primaryColor)); } }, [data]);
-  const save = trpc.commerce.settings.save.useMutation({ onSuccess: () => { utils.commerce.settings.get.invalidate(); toast.success("Préférences enregistrées."); }, onError: error => toast.error(error.message) });
-  const uploadLogo = trpc.commerce.settings.uploadLogo.useMutation({ onSuccess: result => { setIdentity(current => ({ ...current, companyLogoUrl: result.url })); toast.success("Logo enregistré."); }, onError: error => toast.error(error.message) });
-  const uploadSignature = trpc.commerce.settings.uploadSignature.useMutation({ onSuccess: result => { setIdentity(current => ({ ...current, companySignatureUrl: result.url })); toast.success("Signature ou cachet enregistré."); }, onError: error => toast.error(error.message) });
-  if (!isAdmin && section !== "appearance") return <Restricted title="Paramètres" description="Ce réglage est réservé aux administrateurs." />;
-  const base = { defaultSalesAgentId: data?.defaultSalesAgentId ?? null, defaultCashierId: data?.defaultCashierId ?? null, requireSalesAgent: data?.requireSalesAgent ?? false, requireCashier: data?.requireCashier ?? false };
-  const updateCurrency = (next: Currency) => { setCurrency(next); save.mutate({ ...base, currency: next }); };
-  const updateTimezone = (timezone: string) => save.mutate({ ...base, currency: data?.currency ?? currency, timezone });
-  const updateGrouping = (next: PriceGrouping) => { setPriceGrouping(next); toast.success("Séparateur de prix appliqué."); };
-  const updateRounding = (next: PriceRounding) => { setPriceRounding(next); toast.success("Arrondi des prix appliqué."); };
-  const updatePrimaryColor = (nextColor: string) => { const next = normalizePrimaryColor(nextColor); setPrimaryDraft(next); setPrimaryColor(next); save.mutate({ ...base, currency: data?.currency ?? currency, primaryColor: next }); };
-  const saveIdentity = () => save.mutate({ ...base, currency: data?.currency ?? currency, companyName: identity.companyName, companyLogoUrl: identity.companyLogoUrl, companySignatureUrl: identity.companySignatureUrl, companySignatureLabel: identity.companySignatureLabel, companyAgreementLabel: identity.companyAgreementLabel, companySignatureAlignment: identity.companySignatureAlignment, companyAddress: identity.companyAddress || null, companyPhone: identity.companyPhone || null, companyEmail: identity.companyEmail || null, companyFooter: identity.companyFooter || null });
-  const readImage = (file: File | undefined, mutate: (payload: { dataUrl: string; filename: string }) => void, label: string) => { if (!file) return; if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) return toast.error("Choisissez une image PNG, JPEG ou WEBP."); if (file.size > 2 * 1024 * 1024) return toast.error(`${label} ne doit pas dépasser 2 Mo.`); const reader = new FileReader(); reader.onload = () => mutate({ dataUrl: String(reader.result), filename: file.name }); reader.readAsDataURL(file); };
-  const title = section === "appearance" ? "Apparence" : section === "currency" ? "Devise" : "Identité de l’entreprise";
-  return <div className="mx-auto max-w-5xl space-y-6"><Link href="/parametres" className="inline-flex items-center gap-1 text-sm text-primary hover:underline"><ChevronLeft className="h-4 w-4" />Retour aux paramètres</Link><header><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Paramètres</p><h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">{title}</h1></header>
-    {section === "appearance" && <div className="space-y-6"><Card className="border-border bg-card"><CardContent className="p-6"><div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><ThemeOption active={theme === "dark"} onClick={() => setTheme("dark")} icon={Moon} label="Sombre" detail="Cockpit nuit" preview="bg-[#0d1420]" /><ThemeOption active={theme === "light"} onClick={() => setTheme("light")} icon={Sun} label="Clair bleu" detail="Lisibilité renforcée" preview="bg-[#eaf4ff]" /></div></CardContent></Card>{isAdmin && <><Card className="border-border bg-card"><CardContent className="space-y-5 p-6"><div className="flex items-center gap-3"><Palette className="h-5 w-5 text-primary" /><div><h2 className="font-semibold">Couleur principale</h2><p className="mt-1 text-sm text-muted-foreground">Elle s’applique aux boutons, icônes, badges et états actifs de toute l’application.</p></div></div><div className="flex flex-wrap gap-3">{primaryPresets.map(color => <button key={color} type="button" aria-label={`Choisir ${color}`} title={color} onClick={() => updatePrimaryColor(color)} className={`grid h-11 w-11 place-items-center rounded-xl border-2 transition ${primaryColor === color ? "border-foreground" : "border-transparent hover:border-border"}`} style={{ backgroundColor: color }}>{primaryColor === color && <Check className="h-5 w-5" style={{ color: color === "#B45309" ? "#111827" : "white" }} />}</button>)}</div><div className="flex flex-wrap items-end gap-3"><label className="grid gap-2 text-sm font-medium"><span>Couleur personnalisée</span><span className="flex h-10 items-center gap-2 rounded-md border border-input bg-background px-2"><input aria-label="Couleur principale personnalisée" type="color" value={primaryDraft} onChange={event => { const next = event.target.value.toUpperCase(); setPrimaryDraft(next); setPrimaryColor(next); }} className="h-7 w-8 cursor-pointer border-0 bg-transparent p-0" /><span className="font-mono text-sm text-muted-foreground">{primaryDraft}</span></span></label><Button onClick={() => updatePrimaryColor(primaryDraft)} disabled={save.isPending} className="bg-primary text-primary-foreground hover:bg-primary/90"><Save className="mr-2 h-4 w-4" />Appliquer la couleur</Button></div></CardContent></Card><InvoiceColorPreview color={primaryColor} identity={identity} /></>}</div>}
-    {section === "currency" && <div className="max-w-2xl space-y-6"><Card className="border-border bg-card"><CardContent className="p-6"><div className="space-y-2">{currencies.map(item => <button key={item.code} onClick={() => updateCurrency(item.code)} className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition ${currency === item.code ? "border-primary bg-primary/10" : "border-border hover:bg-muted"}`}><span className="grid h-9 w-9 place-items-center rounded-lg bg-primary/10 text-sm font-bold text-primary">{item.symbol}</span><span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{item.name}</span><span className="text-xs text-muted-foreground">{item.display}</span></span>{currency === item.code && <Check className="h-5 w-5 text-primary" />}</button>)}</div></CardContent></Card><Card className="border-border bg-card"><CardContent className="space-y-6 p-6"><div><h2 className="font-semibold">Affichage des prix</h2></div><div><p className="mb-3 text-sm font-medium">Séparateur de milliers</p><div className="grid gap-2 sm:grid-cols-3">{groupingOptions.map(option => <button key={option.value} type="button" onClick={() => updateGrouping(option.value)} className={`rounded-xl border p-3 text-left transition ${priceGrouping === option.value ? "border-primary bg-primary/10" : "border-border hover:bg-muted"}`}><span className="block text-sm font-medium">{option.label}</span><span className="mt-1 block font-mono text-xs text-muted-foreground">{option.preview}</span></button>)}</div></div><div><p className="mb-3 text-sm font-medium">Arrondi automatique</p><div className="flex flex-wrap gap-2">{roundingOptions.map(option => <Button key={option.value} type="button" size="sm" variant={priceRounding === option.value ? "default" : "outline"} onClick={() => updateRounding(option.value)} className={priceRounding === option.value ? "bg-primary text-primary-foreground hover:bg-primary/90" : "border-border text-muted-foreground"}>{option.label}</Button>)}</div></div><div className="rounded-xl border border-primary/20 bg-primary/[0.06] p-4"><p className="text-xs font-medium uppercase tracking-[0.14em] text-primary">Aperçu</p><p className="mt-2 text-2xl font-semibold text-foreground">{formatCurrency(2_568_730)}</p><p className="mt-1 text-sm text-muted-foreground">Le format choisi s’applique immédiatement aux montants de l’application.</p></div></CardContent></Card><Card className="border-border bg-card"><CardContent className="space-y-3 p-6"><div><h2 className="font-semibold">Fuseau horaire</h2><p className="mt-1 text-sm text-muted-foreground">Détermine la journée et le mois comptables (ventes du jour, paie, dépenses, numérotation annuelle).</p></div><select aria-label="Fuseau horaire" value={data?.timezone ?? "Africa/Abidjan"} onChange={event => updateTimezone(event.target.value)} className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm">{timezoneOptions(data?.timezone).map(zone => <option key={zone.value} value={zone.value}>{zone.label}</option>)}</select></CardContent></Card></div>}
-    {section === "identity" && <Card className="border-border bg-card"><CardContent className="p-6"><div className="grid gap-5 sm:grid-cols-[180px_minmax(0,1fr)]"><div className="space-y-4"><UploadPanel image={identity.companyLogoUrl} alt="Logo de l’entreprise" action={uploadLogo.isPending ? "Envoi…" : "Choisir un logo"} hint="Logo de l’entreprise" onFile={file => readImage(file, uploadLogo.mutate, "Le logo")} /><UploadPanel image={identity.companySignatureUrl} alt="Signature ou cachet" action={uploadSignature.isPending ? "Envoi…" : "Charger une signature"} hint="Signature / cachet" accent onFile={file => readImage(file, uploadSignature.mutate, "La signature")} /></div><div className="grid gap-4 sm:grid-cols-2"><Field label="Raison sociale *"><Input value={identity.companyName} onChange={event => setIdentity(current => ({ ...current, companyName: event.target.value }))} /></Field><Field label="Téléphone"><Input value={identity.companyPhone} onChange={event => setIdentity(current => ({ ...current, companyPhone: event.target.value }))} /></Field><Field label="E-mail"><Input type="email" value={identity.companyEmail} onChange={event => setIdentity(current => ({ ...current, companyEmail: event.target.value }))} /></Field><Field label="Adresse"><Input value={identity.companyAddress} onChange={event => setIdentity(current => ({ ...current, companyAddress: event.target.value }))} /></Field><Field label="Libellé signature/cachet"><Input value={identity.companySignatureLabel} onChange={event => setIdentity(current => ({ ...current, companySignatureLabel: event.target.value }))} /></Field><Field label="Alignement de la signature"><select aria-label="Alignement de la signature" value={identity.companySignatureAlignment} onChange={event => setIdentity(current => ({ ...current, companySignatureAlignment: event.target.value as Identity["companySignatureAlignment"] }))} className="h-10 rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-primary"><option value="left">À gauche</option><option value="center">Au centre</option><option value="right">À droite</option></select></Field><Field label="Mention Bon pour accord" className="sm:col-span-2"><Input value={identity.companyAgreementLabel} onChange={event => setIdentity(current => ({ ...current, companyAgreementLabel: event.target.value }))} /></Field><Field label="Mention de bas de page" className="sm:col-span-2"><Textarea value={identity.companyFooter} onChange={event => setIdentity(current => ({ ...current, companyFooter: event.target.value }))} rows={3} /></Field></div></div><div className="mt-6 flex justify-end"><Button onClick={saveIdentity} disabled={save.isPending || !identity.companyName.trim()} className="bg-primary text-primary-foreground hover:bg-primary/90"><Save className="mr-2 h-4 w-4" />{save.isPending ? "Enregistrement…" : "Enregistrer l’identité"}</Button></div></CardContent></Card>}
-  </div>;
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+  const { theme, setTheme } = useTheme();
+  const {
+    currency,
+    setCurrency,
+    primaryColor,
+    setPrimaryColor,
+    priceGrouping,
+    setPriceGrouping,
+    priceRounding,
+    setPriceRounding,
+  } = usePreferences();
+  const utils = trpc.useUtils();
+  const { data } = trpc.commerce.settings.get.useQuery(undefined, {
+    enabled: isAdmin,
+  });
+  const [identity, setIdentity] = useState<Identity>(blankIdentity);
+  const [primaryDraft, setPrimaryDraft] = useState(primaryColor);
+  useEffect(() => {
+    if (data) {
+      setIdentity({
+        companyName: data.companyName || "StockPilot",
+        companyLogoUrl: data.companyLogoUrl || null,
+        companySignatureUrl: data.companySignatureUrl || null,
+        companySignatureLabel:
+          data.companySignatureLabel || "Signature & cachet",
+        companyAgreementLabel: data.companyAgreementLabel || "Bon pour accord",
+        companySignatureAlignment: data.companySignatureAlignment || "right",
+        companyAddress: data.companyAddress || "",
+        companyPhone: data.companyPhone || "",
+        companyEmail: data.companyEmail || "",
+        companyFooter: data.companyFooter || "",
+      });
+      setPrimaryDraft(normalizePrimaryColor(data.primaryColor));
+    }
+  }, [data]);
+  const save = trpc.commerce.settings.save.useMutation({
+    onSuccess: () => {
+      utils.commerce.settings.get.invalidate();
+      toast.success("Préférences enregistrées.");
+    },
+    onError: error => toast.error(error.message),
+  });
+  const uploadLogo = trpc.commerce.settings.uploadLogo.useMutation({
+    onSuccess: result => {
+      setIdentity(current => ({ ...current, companyLogoUrl: result.url }));
+      toast.success("Logo enregistré.");
+    },
+    onError: error => toast.error(error.message),
+  });
+  const uploadSignature = trpc.commerce.settings.uploadSignature.useMutation({
+    onSuccess: result => {
+      setIdentity(current => ({ ...current, companySignatureUrl: result.url }));
+      toast.success("Signature ou cachet enregistré.");
+    },
+    onError: error => toast.error(error.message),
+  });
+  if (!isAdmin && section !== "appearance")
+    return (
+      <Restricted
+        title="Paramètres"
+        description="Ce réglage est réservé aux administrateurs."
+      />
+    );
+  const base = {
+    defaultSalesAgentId: data?.defaultSalesAgentId ?? null,
+    defaultCashierId: data?.defaultCashierId ?? null,
+    requireSalesAgent: data?.requireSalesAgent ?? false,
+    requireCashier: data?.requireCashier ?? false,
+  };
+  const updateCurrency = (next: Currency) => {
+    setCurrency(next);
+    save.mutate({ ...base, currency: next });
+  };
+  const updateTimezone = (timezone: string) =>
+    save.mutate({ ...base, currency: data?.currency ?? currency, timezone });
+  const updateGrouping = (next: PriceGrouping) => {
+    setPriceGrouping(next);
+    toast.success("Séparateur de prix appliqué.");
+  };
+  const updateRounding = (next: PriceRounding) => {
+    setPriceRounding(next);
+    toast.success("Arrondi des prix appliqué.");
+  };
+  const updatePrimaryColor = (nextColor: string) => {
+    const next = normalizePrimaryColor(nextColor);
+    setPrimaryDraft(next);
+    setPrimaryColor(next);
+    save.mutate({
+      ...base,
+      currency: data?.currency ?? currency,
+      primaryColor: next,
+    });
+  };
+  const saveIdentity = () =>
+    save.mutate({
+      ...base,
+      currency: data?.currency ?? currency,
+      companyName: identity.companyName,
+      companyLogoUrl: identity.companyLogoUrl,
+      companySignatureUrl: identity.companySignatureUrl,
+      companySignatureLabel: identity.companySignatureLabel,
+      companyAgreementLabel: identity.companyAgreementLabel,
+      companySignatureAlignment: identity.companySignatureAlignment,
+      companyAddress: identity.companyAddress || null,
+      companyPhone: identity.companyPhone || null,
+      companyEmail: identity.companyEmail || null,
+      companyFooter: identity.companyFooter || null,
+    });
+  const readImage = (
+    file: File | undefined,
+    mutate: (payload: { dataUrl: string; filename: string }) => void,
+    label: string
+  ) => {
+    if (!file) return;
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type))
+      return toast.error("Choisissez une image PNG, JPEG ou WEBP.");
+    if (file.size > 2 * 1024 * 1024)
+      return toast.error(`${label} ne doit pas dépasser 2 Mo.`);
+    const reader = new FileReader();
+    reader.onload = () =>
+      mutate({ dataUrl: String(reader.result), filename: file.name });
+    reader.readAsDataURL(file);
+  };
+  const title =
+    section === "appearance"
+      ? "Apparence"
+      : section === "currency"
+        ? "Devise"
+        : "Identité de l’entreprise";
+  return (
+    <div className="mx-auto max-w-5xl space-y-6">
+      <Link
+        href="/parametres"
+        className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+      >
+        <ChevronLeft className="h-4 w-4" />
+        Retour aux paramètres
+      </Link>
+      <header>
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+          Paramètres
+        </p>
+        <h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">
+          {title}
+        </h1>
+      </header>
+      {section === "appearance" && (
+        <div className="space-y-6">
+          <Card className="border-border bg-card">
+            <CardContent className="p-6">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <ThemeOption
+                  active={theme === "dark"}
+                  onClick={() => setTheme("dark")}
+                  icon={Moon}
+                  label="Sombre"
+                  detail="Cockpit nuit"
+                  preview="bg-[#0d1420]"
+                />
+                <ThemeOption
+                  active={theme === "light"}
+                  onClick={() => setTheme("light")}
+                  icon={Sun}
+                  label="Clair bleu"
+                  detail="Lisibilité renforcée"
+                  preview="bg-[#eaf4ff]"
+                />
+              </div>
+            </CardContent>
+          </Card>
+          {isAdmin && (
+            <>
+              <Card className="border-border bg-card">
+                <CardContent className="space-y-5 p-6">
+                  <div className="flex items-center gap-3">
+                    <Palette className="h-5 w-5 text-primary" />
+                    <div>
+                      <h2 className="font-semibold">Couleur principale</h2>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Elle s’applique aux boutons, icônes, badges et états
+                        actifs de toute l’application.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    {primaryPresets.map(color => (
+                      <button
+                        key={color}
+                        type="button"
+                        aria-label={`Choisir ${color}`}
+                        title={color}
+                        onClick={() => updatePrimaryColor(color)}
+                        className={`grid h-11 w-11 place-items-center rounded-xl border-2 transition ${primaryColor === color ? "border-foreground" : "border-transparent hover:border-border"}`}
+                        style={{ backgroundColor: color }}
+                      >
+                        {primaryColor === color && (
+                          <Check
+                            className="h-5 w-5"
+                            style={{
+                              color: color === "#B45309" ? "#111827" : "white",
+                            }}
+                          />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap items-end gap-3">
+                    <label className="grid gap-2 text-sm font-medium">
+                      <span>Couleur personnalisée</span>
+                      <span className="flex h-10 items-center gap-2 rounded-md border border-input bg-background px-2">
+                        <input
+                          aria-label="Couleur principale personnalisée"
+                          type="color"
+                          value={primaryDraft}
+                          onChange={event => {
+                            const next = event.target.value.toUpperCase();
+                            setPrimaryDraft(next);
+                            setPrimaryColor(next);
+                          }}
+                          className="h-7 w-8 cursor-pointer border-0 bg-transparent p-0"
+                        />
+                        <span className="font-mono text-sm text-muted-foreground">
+                          {primaryDraft}
+                        </span>
+                      </span>
+                    </label>
+                    <Button
+                      onClick={() => updatePrimaryColor(primaryDraft)}
+                      disabled={save.isPending}
+                      className="bg-primary text-primary-foreground hover:bg-primary/90"
+                    >
+                      <Save className="mr-2 h-4 w-4" />
+                      Appliquer la couleur
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+              <InvoiceColorPreview color={primaryColor} identity={identity} />
+            </>
+          )}
+        </div>
+      )}
+      {section === "currency" && (
+        <div className="max-w-2xl space-y-6">
+          <Card className="border-border bg-card">
+            <CardContent className="p-6">
+              <div className="space-y-2">
+                {currencies.map(item => (
+                  <button
+                    key={item.code}
+                    onClick={() => updateCurrency(item.code)}
+                    className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition ${currency === item.code ? "border-primary bg-primary/10" : "border-border hover:bg-muted"}`}
+                  >
+                    <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
+                      {item.symbol}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-semibold">
+                        {item.name}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {item.display}
+                      </span>
+                    </span>
+                    {currency === item.code && (
+                      <Check className="h-5 w-5 text-primary" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-border bg-card">
+            <CardContent className="space-y-6 p-6">
+              <div>
+                <h2 className="font-semibold">Affichage des prix</h2>
+              </div>
+              <div>
+                <p className="mb-3 text-sm font-medium">
+                  Séparateur de milliers
+                </p>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {groupingOptions.map(option => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => updateGrouping(option.value)}
+                      className={`rounded-xl border p-3 text-left transition ${priceGrouping === option.value ? "border-primary bg-primary/10" : "border-border hover:bg-muted"}`}
+                    >
+                      <span className="block text-sm font-medium">
+                        {option.label}
+                      </span>
+                      <span className="mt-1 block font-mono text-xs text-muted-foreground">
+                        {option.preview}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="mb-3 text-sm font-medium">Arrondi automatique</p>
+                <div className="flex flex-wrap gap-2">
+                  {roundingOptions.map(option => (
+                    <Button
+                      key={option.value}
+                      type="button"
+                      size="sm"
+                      variant={
+                        priceRounding === option.value ? "default" : "outline"
+                      }
+                      onClick={() => updateRounding(option.value)}
+                      className={
+                        priceRounding === option.value
+                          ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                          : "border-border text-muted-foreground"
+                      }
+                    >
+                      {option.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-xl border border-primary/20 bg-primary/[0.06] p-4">
+                <p className="text-xs font-medium uppercase tracking-[0.14em] text-primary">
+                  Aperçu
+                </p>
+                <p className="mt-2 text-2xl font-semibold text-foreground">
+                  {formatCurrency(2_568_730)}
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Le format choisi s’applique immédiatement aux montants de
+                  l’application.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-border bg-card">
+            <CardContent className="space-y-3 p-6">
+              <div>
+                <h2 className="font-semibold">Fuseau horaire</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Détermine la journée et le mois comptables (ventes du jour,
+                  paie, dépenses, numérotation annuelle).
+                </p>
+              </div>
+              <select
+                aria-label="Fuseau horaire"
+                value={data?.timezone ?? "Africa/Abidjan"}
+                onChange={event => updateTimezone(event.target.value)}
+                className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+              >
+                {timezoneOptions(data?.timezone).map(zone => (
+                  <option key={zone.value} value={zone.value}>
+                    {zone.label}
+                  </option>
+                ))}
+              </select>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+      {section === "identity" && (
+        <Card className="border-border bg-card">
+          <CardContent className="p-6">
+            <div className="grid gap-5 sm:grid-cols-[180px_minmax(0,1fr)]">
+              <div className="space-y-4">
+                <UploadPanel
+                  image={identity.companyLogoUrl}
+                  alt="Logo de l’entreprise"
+                  action={uploadLogo.isPending ? "Envoi…" : "Choisir un logo"}
+                  hint="Logo de l’entreprise"
+                  onFile={file => readImage(file, uploadLogo.mutate, "Le logo")}
+                />
+                <UploadPanel
+                  image={identity.companySignatureUrl}
+                  alt="Signature ou cachet"
+                  action={
+                    uploadSignature.isPending
+                      ? "Envoi…"
+                      : "Charger une signature"
+                  }
+                  hint="Signature / cachet"
+                  accent
+                  onFile={file =>
+                    readImage(file, uploadSignature.mutate, "La signature")
+                  }
+                />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Raison sociale *">
+                  <Input
+                    value={identity.companyName}
+                    onChange={event =>
+                      setIdentity(current => ({
+                        ...current,
+                        companyName: event.target.value,
+                      }))
+                    }
+                  />
+                </Field>
+                <Field label="Téléphone">
+                  <Input
+                    value={identity.companyPhone}
+                    onChange={event =>
+                      setIdentity(current => ({
+                        ...current,
+                        companyPhone: event.target.value,
+                      }))
+                    }
+                  />
+                </Field>
+                <Field label="E-mail">
+                  <Input
+                    type="email"
+                    value={identity.companyEmail}
+                    onChange={event =>
+                      setIdentity(current => ({
+                        ...current,
+                        companyEmail: event.target.value,
+                      }))
+                    }
+                  />
+                </Field>
+                <Field label="Adresse">
+                  <Input
+                    value={identity.companyAddress}
+                    onChange={event =>
+                      setIdentity(current => ({
+                        ...current,
+                        companyAddress: event.target.value,
+                      }))
+                    }
+                  />
+                </Field>
+                <Field label="Libellé signature/cachet">
+                  <Input
+                    value={identity.companySignatureLabel}
+                    onChange={event =>
+                      setIdentity(current => ({
+                        ...current,
+                        companySignatureLabel: event.target.value,
+                      }))
+                    }
+                  />
+                </Field>
+                <Field label="Alignement de la signature">
+                  <select
+                    aria-label="Alignement de la signature"
+                    value={identity.companySignatureAlignment}
+                    onChange={event =>
+                      setIdentity(current => ({
+                        ...current,
+                        companySignatureAlignment: event.target
+                          .value as Identity["companySignatureAlignment"],
+                      }))
+                    }
+                    className="h-10 rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-primary"
+                  >
+                    <option value="left">À gauche</option>
+                    <option value="center">Au centre</option>
+                    <option value="right">À droite</option>
+                  </select>
+                </Field>
+                <Field
+                  label="Mention Bon pour accord"
+                  className="sm:col-span-2"
+                >
+                  <Input
+                    value={identity.companyAgreementLabel}
+                    onChange={event =>
+                      setIdentity(current => ({
+                        ...current,
+                        companyAgreementLabel: event.target.value,
+                      }))
+                    }
+                  />
+                </Field>
+                <Field label="Mention de bas de page" className="sm:col-span-2">
+                  <Textarea
+                    value={identity.companyFooter}
+                    onChange={event =>
+                      setIdentity(current => ({
+                        ...current,
+                        companyFooter: event.target.value,
+                      }))
+                    }
+                    rows={3}
+                  />
+                </Field>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end">
+              <Button
+                onClick={saveIdentity}
+                disabled={save.isPending || !identity.companyName.trim()}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                <Save className="mr-2 h-4 w-4" />
+                {save.isPending ? "Enregistrement…" : "Enregistrer l’identité"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
 }
 
-function InvoiceColorPreview({ color, identity }: { color: string; identity: Identity }) {
+function InvoiceColorPreview({
+  color,
+  identity,
+}: {
+  color: string;
+  identity: Identity;
+}) {
   const [format, setFormat] = useState<"a4" | "ticket">("a4");
   const foreground = primaryForeground(color);
-  return <Card className="border-border bg-card"><CardContent className="p-6"><div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-3"><FileText className="h-5 w-5 text-primary" /><div><h2 className="font-semibold">Aperçu de facture</h2><p className="mt-1 text-sm text-muted-foreground">Comparez le rendu A4 et ticket avec votre couleur principale.</p></div></div><div className="flex rounded-lg border border-border bg-muted/40 p-1"><Button type="button" size="sm" variant="ghost" onClick={() => setFormat("a4")} className={format === "a4" ? "bg-primary text-primary-foreground hover:bg-primary/90" : "text-muted-foreground"}><FileText className="mr-1.5 h-3.5 w-3.5" />A4</Button><Button type="button" size="sm" variant="ghost" onClick={() => setFormat("ticket")} className={format === "ticket" ? "bg-primary text-primary-foreground hover:bg-primary/90" : "text-muted-foreground"}>Ticket</Button></div></div>{format === "a4" ? <article className="mx-auto max-w-2xl overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-800 shadow-sm"><div className="flex items-start justify-between px-5 py-4" style={{ backgroundColor: color, color: foreground }}><div><p className="text-lg font-bold">{identity.companyName || "Votre entreprise"}</p><p className="mt-1 text-xs opacity-80">Facture FAC-2026-0042</p></div><span className="rounded-full border border-current/30 px-2.5 py-1 text-xs font-semibold">PAYÉE</span></div><div className="space-y-4 p-5 text-sm"><div className="flex justify-between"><span className="text-slate-500">Client</span><b>Client comptoir</b></div><div className="border-y border-slate-200 py-3"><div className="flex justify-between"><span>Produit de démonstration</span><b>{formatCurrency(250_000)}</b></div><div className="mt-2 flex justify-between text-slate-500"><span>Quantité</span><span>1</span></div></div><div className="flex items-center justify-between"><span className="font-semibold">Total à payer</span><span className="text-xl font-bold" style={{ color }}>{formatCurrency(250_000)}</span></div><div className="h-1.5 rounded-full" style={{ backgroundColor: color }} /></div></article> : <article className="mx-auto max-w-[280px] rounded-md bg-white p-4 font-mono text-[11px] text-slate-800 shadow-sm ring-1 ring-slate-200"><div className="mb-3 border-b border-dashed border-slate-300 pb-3 text-center"><div className="mx-auto mb-2 inline-block rounded-full px-3 py-1 text-[10px] font-bold tracking-[0.14em]" style={{ backgroundColor: color, color: foreground }}>TICKET DE CAISSE</div><p className="font-sans text-base font-bold">{identity.companyName || "Votre entreprise"}</p><p className="mt-1 text-slate-500">POS-2026-0042 · Comptoir</p></div><div className="space-y-2 border-b border-dashed border-slate-300 pb-3"><div className="flex justify-between gap-3"><span>Produit de démonstration ×1</span><b>{formatCurrency(250_000)}</b></div><div className="flex justify-between text-slate-500"><span>Espèces</span><span>{formatCurrency(250_000)}</span></div></div><div className="mt-3 flex items-center justify-between text-sm font-bold"><span>TOTAL</span><span style={{ color }}>{formatCurrency(250_000)}</span></div><div className="mt-3 border-t border-dashed border-slate-300 pt-3 text-center text-[10px] text-slate-500">Merci de votre achat · À bientôt</div></article>}</CardContent></Card>;
+  return (
+    <Card className="border-border bg-card">
+      <CardContent className="p-6">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <FileText className="h-5 w-5 text-primary" />
+            <div>
+              <h2 className="font-semibold">Aperçu de facture</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Comparez le rendu A4 et ticket avec votre couleur principale.
+              </p>
+            </div>
+          </div>
+          <div className="flex rounded-lg border border-border bg-muted/40 p-1">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => setFormat("a4")}
+              className={
+                format === "a4"
+                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                  : "text-muted-foreground"
+              }
+            >
+              <FileText className="mr-1.5 h-3.5 w-3.5" />
+              A4
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => setFormat("ticket")}
+              className={
+                format === "ticket"
+                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                  : "text-muted-foreground"
+              }
+            >
+              Ticket
+            </Button>
+          </div>
+        </div>
+        {format === "a4" ? (
+          <article className="mx-auto max-w-2xl overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-800 shadow-sm">
+            <div
+              className="flex items-start justify-between px-5 py-4"
+              style={{ backgroundColor: color, color: foreground }}
+            >
+              <div>
+                <p className="text-lg font-bold">
+                  {identity.companyName || "Votre entreprise"}
+                </p>
+                <p className="mt-1 text-xs opacity-80">Facture FAC-2026-0042</p>
+              </div>
+              <span className="rounded-full border border-current/30 px-2.5 py-1 text-xs font-semibold">
+                PAYÉE
+              </span>
+            </div>
+            <div className="space-y-4 p-5 text-sm">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Client</span>
+                <b>Client comptoir</b>
+              </div>
+              <div className="border-y border-slate-200 py-3">
+                <div className="flex justify-between">
+                  <span>Produit de démonstration</span>
+                  <b>{formatCurrency(250_000)}</b>
+                </div>
+                <div className="mt-2 flex justify-between text-slate-500">
+                  <span>Quantité</span>
+                  <span>1</span>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="font-semibold">Total à payer</span>
+                <span className="text-xl font-bold" style={{ color }}>
+                  {formatCurrency(250_000)}
+                </span>
+              </div>
+              <div
+                className="h-1.5 rounded-full"
+                style={{ backgroundColor: color }}
+              />
+            </div>
+          </article>
+        ) : (
+          <article className="mx-auto max-w-[280px] rounded-md bg-white p-4 font-mono text-[11px] text-slate-800 shadow-sm ring-1 ring-slate-200">
+            <div className="mb-3 border-b border-dashed border-slate-300 pb-3 text-center">
+              <div
+                className="mx-auto mb-2 inline-block rounded-full px-3 py-1 text-[10px] font-bold tracking-[0.14em]"
+                style={{ backgroundColor: color, color: foreground }}
+              >
+                TICKET DE CAISSE
+              </div>
+              <p className="font-sans text-base font-bold">
+                {identity.companyName || "Votre entreprise"}
+              </p>
+              <p className="mt-1 text-slate-500">POS-2026-0042 · Comptoir</p>
+            </div>
+            <div className="space-y-2 border-b border-dashed border-slate-300 pb-3">
+              <div className="flex justify-between gap-3">
+                <span>Produit de démonstration ×1</span>
+                <b>{formatCurrency(250_000)}</b>
+              </div>
+              <div className="flex justify-between text-slate-500">
+                <span>Espèces</span>
+                <span>{formatCurrency(250_000)}</span>
+              </div>
+            </div>
+            <div className="mt-3 flex items-center justify-between text-sm font-bold">
+              <span>TOTAL</span>
+              <span style={{ color }}>{formatCurrency(250_000)}</span>
+            </div>
+            <div className="mt-3 border-t border-dashed border-slate-300 pt-3 text-center text-[10px] text-slate-500">
+              Merci de votre achat · À bientôt
+            </div>
+          </article>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
-function UploadPanel({ image, alt, action, hint, accent = false, onFile }: { image: string | null; alt: string; action: string; hint: string; accent?: boolean; onFile: (file?: File) => void }) { return <div className={`rounded-xl border border-dashed p-4 text-center ${accent ? "border-primary/30 bg-primary/[0.04]" : "border-border bg-muted/20"}`}><div className="grid h-24 place-items-center overflow-hidden rounded-lg bg-muted/40">{image ? <img src={image} alt={alt} className="h-full w-full object-contain p-2" /> : <ImageUp className="h-7 w-7 text-muted-foreground" />}</div><label className="mt-3 inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-primary/25 px-3 py-2 text-xs font-semibold text-primary"><ImageUp className="h-3.5 w-3.5" />{action}<input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={event => onFile(event.target.files?.[0])} /></label><p className="mt-2 text-[10px] text-muted-foreground">{hint} · PNG, JPEG, WEBP ou SVG · 2 Mo max.</p></div>; }
-function Field({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) { return <label className={`grid gap-2 text-sm font-medium ${className}`}><span>{label}</span>{children}</label>; }
-function ThemeOption({ active, onClick, icon: Icon, label, detail, preview }: { active: boolean; onClick: () => void; icon: typeof Moon; label: string; detail: string; preview: string }) { return <button onClick={onClick} className={`relative rounded-xl border p-3 text-left transition ${active ? "border-primary bg-primary/10" : "border-border hover:bg-muted"}`}><span className={`mb-4 block h-14 rounded-lg ${preview} ring-1 ring-inset ring-border`} /><span className="flex items-center gap-2 text-sm font-semibold"><Icon className="h-4 w-4 text-primary" />{label}</span><span className="mt-1 block text-xs text-muted-foreground">{detail}</span>{active && <span className="absolute right-3 top-3 grid h-5 w-5 place-items-center rounded-full bg-primary text-primary-foreground"><Check className="h-3.5 w-3.5" /></span>}</button>; }
+function UploadPanel({
+  image,
+  alt,
+  action,
+  hint,
+  accent = false,
+  onFile,
+}: {
+  image: string | null;
+  alt: string;
+  action: string;
+  hint: string;
+  accent?: boolean;
+  onFile: (file?: File) => void;
+}) {
+  return (
+    <div
+      className={`rounded-xl border border-dashed p-4 text-center ${accent ? "border-primary/30 bg-primary/[0.04]" : "border-border bg-muted/20"}`}
+    >
+      <div className="grid h-24 place-items-center overflow-hidden rounded-lg bg-muted/40">
+        {image ? (
+          <img
+            src={image}
+            alt={alt}
+            className="h-full w-full object-contain p-2"
+          />
+        ) : (
+          <ImageUp className="h-7 w-7 text-muted-foreground" />
+        )}
+      </div>
+      <label className="mt-3 inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-primary/25 px-3 py-2 text-xs font-semibold text-primary">
+        <ImageUp className="h-3.5 w-3.5" />
+        {action}
+        <input
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          className="hidden"
+          onChange={event => onFile(event.target.files?.[0])}
+        />
+      </label>
+      <p className="mt-2 text-[10px] text-muted-foreground">
+        {hint} · PNG, JPEG, WEBP ou SVG · 2 Mo max.
+      </p>
+    </div>
+  );
+}
+function Field({
+  label,
+  children,
+  className = "",
+}: {
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <label className={`grid gap-2 text-sm font-medium ${className}`}>
+      <span>{label}</span>
+      {children}
+    </label>
+  );
+}
+function ThemeOption({
+  active,
+  onClick,
+  icon: Icon,
+  label,
+  detail,
+  preview,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: typeof Moon;
+  label: string;
+  detail: string;
+  preview: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`relative rounded-xl border p-3 text-left transition ${active ? "border-primary bg-primary/10" : "border-border hover:bg-muted"}`}
+    >
+      <span
+        className={`mb-4 block h-14 rounded-lg ${preview} ring-1 ring-inset ring-border`}
+      />
+      <span className="flex items-center gap-2 text-sm font-semibold">
+        <Icon className="h-4 w-4 text-primary" />
+        {label}
+      </span>
+      <span className="mt-1 block text-xs text-muted-foreground">{detail}</span>
+      {active && (
+        <span className="absolute right-3 top-3 grid h-5 w-5 place-items-center rounded-full bg-primary text-primary-foreground">
+          <Check className="h-3.5 w-3.5" />
+        </span>
+      )}
+    </button>
+  );
+}

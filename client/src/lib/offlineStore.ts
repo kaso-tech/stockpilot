@@ -46,7 +46,15 @@ const legacyMigrationName = "localStorage-to-indexeddb-v1";
 const maxLogEntries = 150;
 
 export function offlineScopeKey(scope: OfflineScope) {
-  if (!Number.isInteger(scope.companyId) || Number(scope.companyId) <= 0 || !Number.isInteger(scope.userId) || scope.userId <= 0) throw new Error("Un périmètre offline entreprise/utilisateur valide est requis.");
+  if (
+    !Number.isInteger(scope.companyId) ||
+    Number(scope.companyId) <= 0 ||
+    !Number.isInteger(scope.userId) ||
+    scope.userId <= 0
+  )
+    throw new Error(
+      "Un périmètre offline entreprise/utilisateur valide est requis."
+    );
   return `company:${scope.companyId}:user:${scope.userId}`;
 }
 
@@ -81,7 +89,8 @@ class StockPilotOfflineDatabase extends Dexie {
 export const offlineDatabase = new StockPilotOfflineDatabase();
 
 export async function requestPersistentOfflineStorage() {
-  if (typeof navigator === "undefined" || !navigator.storage?.persist) return false;
+  if (typeof navigator === "undefined" || !navigator.storage?.persist)
+    return false;
   try {
     return await navigator.storage.persist();
   } catch {
@@ -118,7 +127,8 @@ function migrationKey(scope: OfflineScope) {
 
 function getLegacyStorage(storage?: Pick<Storage, "getItem" | "removeItem">) {
   if (storage) return storage;
-  if (typeof globalThis === "undefined" || !("localStorage" in globalThis)) return undefined;
+  if (typeof globalThis === "undefined" || !("localStorage" in globalThis))
+    return undefined;
   try {
     return globalThis.localStorage;
   } catch {
@@ -131,7 +141,10 @@ function getLegacyStorage(storage?: Pick<Storage, "getItem" | "removeItem">) {
  * The legacy keys are removed after the IndexedDB transaction succeeds, so the
  * old global store cannot remain a runtime fallback or leak another scope.
  */
-export async function migrateLegacyOfflineStorage(scope: OfflineScope, storage?: Pick<Storage, "getItem" | "removeItem">) {
+export async function migrateLegacyOfflineStorage(
+  scope: OfflineScope,
+  storage?: Pick<Storage, "getItem" | "removeItem">
+) {
   const legacyStorage = getLegacyStorage(storage);
   if (!legacyStorage) return false;
 
@@ -143,56 +156,108 @@ export async function migrateLegacyOfflineStorage(scope: OfflineScope, storage?:
     return false;
   }
 
-  const legacySales = parseLegacyArray(legacyStorage.getItem(legacyQueueKey)).filter(value => belongsToScope(value, scope));
-  const legacyLog = parseLegacyArray(legacyStorage.getItem(legacySyncLogKey)).filter(value => belongsToScope(value, scope));
+  const legacySales = parseLegacyArray(
+    legacyStorage.getItem(legacyQueueKey)
+  ).filter(value => belongsToScope(value, scope));
+  const legacyLog = parseLegacyArray(
+    legacyStorage.getItem(legacySyncLogKey)
+  ).filter(value => belongsToScope(value, scope));
 
-  await offlineDatabase.transaction("rw", offlineDatabase.operations, offlineDatabase.snapshots, offlineDatabase.migrations, async () => {
-    const scopeKey = offlineScopeKey(scope);
-    const existingOperations = await offlineDatabase.operations.where("scopeKey").equals(scopeKey).toArray();
-    const existingIds = new Set(existingOperations.map(operation => operation.id));
-    const operations = legacySales
-      .filter((value): value is { id: string; kind?: string; createdAt: number; status?: string; error?: string } => {
-        if (!value || typeof value !== "object") return false;
-        const record = value as { id?: unknown; createdAt?: unknown };
-        return typeof record.id === "string" && typeof record.createdAt === "number";
-      })
-      .filter(value => !existingIds.has(value.id))
-      .map(value => {
-        const payload = scopedRecord(value as object, scope);
-        return {
-          id: value.id,
-          scopeKey,
-          type: value.kind ?? "offline_sale",
-          payload,
-          createdAt: value.createdAt,
-          attempts: value.status === "failed" ? 1 : 0,
-          lastError: value.error,
-        } satisfies OfflineOperation;
+  await offlineDatabase.transaction(
+    "rw",
+    offlineDatabase.operations,
+    offlineDatabase.snapshots,
+    offlineDatabase.migrations,
+    async () => {
+      const scopeKey = offlineScopeKey(scope);
+      const existingOperations = await offlineDatabase.operations
+        .where("scopeKey")
+        .equals(scopeKey)
+        .toArray();
+      const existingIds = new Set(
+        existingOperations.map(operation => operation.id)
+      );
+      const operations = legacySales
+        .filter(
+          (
+            value
+          ): value is {
+            id: string;
+            kind?: string;
+            createdAt: number;
+            status?: string;
+            error?: string;
+          } => {
+            if (!value || typeof value !== "object") return false;
+            const record = value as { id?: unknown; createdAt?: unknown };
+            return (
+              typeof record.id === "string" &&
+              typeof record.createdAt === "number"
+            );
+          }
+        )
+        .filter(value => !existingIds.has(value.id))
+        .map(value => {
+          const payload = scopedRecord(value as object, scope);
+          return {
+            id: value.id,
+            scopeKey,
+            type: value.kind ?? "offline_sale",
+            payload,
+            createdAt: value.createdAt,
+            attempts: value.status === "failed" ? 1 : 0,
+            lastError: value.error,
+          } satisfies OfflineOperation;
+        });
+      if (operations.length)
+        await offlineDatabase.operations.bulkPut(operations);
+
+      const snapshot = await offlineDatabase.snapshots.get(scopeKey);
+      const currentPayload = snapshot?.payload as
+        | { syncLog?: unknown }
+        | undefined;
+      const currentLog = Array.isArray(currentPayload?.syncLog)
+        ? currentPayload.syncLog
+        : [];
+      const logsByOperation = new Map<string, object>();
+      for (const entry of currentLog) {
+        if (
+          entry &&
+          typeof entry === "object" &&
+          typeof (entry as { operationId?: unknown }).operationId === "string"
+        ) {
+          logsByOperation.set(
+            (entry as { operationId: string }).operationId,
+            entry
+          );
+        }
+      }
+      for (const entry of legacyLog) {
+        if (
+          entry &&
+          typeof entry === "object" &&
+          typeof (entry as { operationId?: unknown }).operationId === "string"
+        ) {
+          const operationId = (entry as { operationId: string }).operationId;
+          if (!logsByOperation.has(operationId))
+            logsByOperation.set(operationId, scopedRecord(entry, scope));
+        }
+      }
+      await offlineDatabase.snapshots.put({
+        scopeKey,
+        savedAt: Date.now(),
+        payload: {
+          syncLog: Array.from(logsByOperation.values()).slice(-maxLogEntries),
+        },
       });
-    if (operations.length) await offlineDatabase.operations.bulkPut(operations);
-
-    const snapshot = await offlineDatabase.snapshots.get(scopeKey);
-    const currentPayload = snapshot?.payload as { syncLog?: unknown } | undefined;
-    const currentLog = Array.isArray(currentPayload?.syncLog) ? currentPayload.syncLog : [];
-    const logsByOperation = new Map<string, object>();
-    for (const entry of currentLog) {
-      if (entry && typeof entry === "object" && typeof (entry as { operationId?: unknown }).operationId === "string") {
-        logsByOperation.set((entry as { operationId: string }).operationId, entry);
-      }
+      await offlineDatabase.migrations.put({
+        key,
+        scopeKey,
+        name: legacyMigrationName,
+        completedAt: Date.now(),
+      });
     }
-    for (const entry of legacyLog) {
-      if (entry && typeof entry === "object" && typeof (entry as { operationId?: unknown }).operationId === "string") {
-        const operationId = (entry as { operationId: string }).operationId;
-        if (!logsByOperation.has(operationId)) logsByOperation.set(operationId, scopedRecord(entry, scope));
-      }
-    }
-    await offlineDatabase.snapshots.put({
-      scopeKey,
-      savedAt: Date.now(),
-      payload: { syncLog: Array.from(logsByOperation.values()).slice(-maxLogEntries) },
-    });
-    await offlineDatabase.migrations.put({ key, scopeKey, name: legacyMigrationName, completedAt: Date.now() });
-  });
+  );
 
   // Legacy entries from another user/company cannot be proven safe and are
   // deliberately discarded rather than left in a global browser store.
@@ -201,24 +266,45 @@ export async function migrateLegacyOfflineStorage(scope: OfflineScope, storage?:
   return legacySales.length > 0 || legacyLog.length > 0;
 }
 
-export async function replaceOfflineSnapshot(scope: OfflineScope, payload: unknown) {
-  await offlineDatabase.snapshots.put({ scopeKey: offlineScopeKey(scope), savedAt: Date.now(), payload });
+export async function replaceOfflineSnapshot(
+  scope: OfflineScope,
+  payload: unknown
+) {
+  await offlineDatabase.snapshots.put({
+    scopeKey: offlineScopeKey(scope),
+    savedAt: Date.now(),
+    payload,
+  });
 }
 
 export async function getOfflineSnapshot(scope: OfflineScope) {
   return offlineDatabase.snapshots.get(offlineScopeKey(scope));
 }
 
-export async function replaceOfflinePreferences(scope: OfflineScope, payload: unknown) {
-  await offlineDatabase.preferences.put({ scopeKey: offlineScopeKey(scope), savedAt: Date.now(), payload });
+export async function replaceOfflinePreferences(
+  scope: OfflineScope,
+  payload: unknown
+) {
+  await offlineDatabase.preferences.put({
+    scopeKey: offlineScopeKey(scope),
+    savedAt: Date.now(),
+    payload,
+  });
 }
 
 export async function getOfflinePreferences(scope: OfflineScope) {
   return offlineDatabase.preferences.get(offlineScopeKey(scope));
 }
 
-export async function replaceOfflineQueryCache(scope: OfflineScope, dehydratedState: unknown) {
-  await offlineDatabase.queryCaches.put({ scopeKey: offlineScopeKey(scope), savedAt: Date.now(), dehydratedState });
+export async function replaceOfflineQueryCache(
+  scope: OfflineScope,
+  dehydratedState: unknown
+) {
+  await offlineDatabase.queryCaches.put({
+    scopeKey: offlineScopeKey(scope),
+    savedAt: Date.now(),
+    dehydratedState,
+  });
 }
 
 export async function getOfflineQueryCache(scope: OfflineScope) {
@@ -235,46 +321,106 @@ export async function clearOfflinePreferences(scope: OfflineScope) {
 
 export async function readOfflineScope(scope: OfflineScope) {
   const scopeKey = offlineScopeKey(scope);
-  return offlineDatabase.transaction("r", offlineDatabase.operations, offlineDatabase.snapshots, async () => {
-    const [operations, snapshot] = await Promise.all([
-      offlineDatabase.operations.where("scopeKey").equals(scopeKey).sortBy("createdAt"),
-      offlineDatabase.snapshots.get(scopeKey),
-    ]);
-    return { operations, snapshot };
-  });
+  return offlineDatabase.transaction(
+    "r",
+    offlineDatabase.operations,
+    offlineDatabase.snapshots,
+    async () => {
+      const [operations, snapshot] = await Promise.all([
+        offlineDatabase.operations
+          .where("scopeKey")
+          .equals(scopeKey)
+          .sortBy("createdAt"),
+        offlineDatabase.snapshots.get(scopeKey),
+      ]);
+      return { operations, snapshot };
+    }
+  );
 }
 
-export async function queueOfflineOperation(scope: OfflineScope, operation: Omit<OfflineOperation, "scopeKey" | "attempts">) {
-  await offlineDatabase.operations.put({ ...operation, scopeKey: offlineScopeKey(scope), attempts: 0 });
+export async function queueOfflineOperation(
+  scope: OfflineScope,
+  operation: Omit<OfflineOperation, "scopeKey" | "attempts">
+) {
+  await offlineDatabase.operations.put({
+    ...operation,
+    scopeKey: offlineScopeKey(scope),
+    attempts: 0,
+  });
 }
 
 export async function listOfflineOperations(scope: OfflineScope) {
-  return offlineDatabase.operations.where("scopeKey").equals(offlineScopeKey(scope)).sortBy("createdAt");
+  return offlineDatabase.operations
+    .where("scopeKey")
+    .equals(offlineScopeKey(scope))
+    .sortBy("createdAt");
 }
 
-export async function replaceOfflineOperations(scope: OfflineScope, operations: Array<Omit<OfflineOperation, "scopeKey">>) {
+export async function replaceOfflineOperations(
+  scope: OfflineScope,
+  operations: Array<Omit<OfflineOperation, "scopeKey">>
+) {
   const scopeKey = offlineScopeKey(scope);
-  await offlineDatabase.transaction("rw", offlineDatabase.operations, async () => {
-    await offlineDatabase.operations.where("scopeKey").equals(scopeKey).delete();
-    if (operations.length) await offlineDatabase.operations.bulkPut(operations.map(operation => ({ ...operation, scopeKey })));
-  });
+  await offlineDatabase.transaction(
+    "rw",
+    offlineDatabase.operations,
+    async () => {
+      await offlineDatabase.operations
+        .where("scopeKey")
+        .equals(scopeKey)
+        .delete();
+      if (operations.length)
+        await offlineDatabase.operations.bulkPut(
+          operations.map(operation => ({ ...operation, scopeKey }))
+        );
+    }
+  );
 }
 
-export async function replaceOfflineScope(scope: OfflineScope, operations: Array<Omit<OfflineOperation, "scopeKey">>, payload: unknown) {
+export async function replaceOfflineScope(
+  scope: OfflineScope,
+  operations: Array<Omit<OfflineOperation, "scopeKey">>,
+  payload: unknown
+) {
   const scopeKey = offlineScopeKey(scope);
-  await offlineDatabase.transaction("rw", offlineDatabase.operations, offlineDatabase.snapshots, async () => {
-    await offlineDatabase.operations.where("scopeKey").equals(scopeKey).delete();
-    if (operations.length) await offlineDatabase.operations.bulkPut(operations.map(operation => ({ ...operation, scopeKey })));
-    await offlineDatabase.snapshots.put({ scopeKey, savedAt: Date.now(), payload });
-  });
+  await offlineDatabase.transaction(
+    "rw",
+    offlineDatabase.operations,
+    offlineDatabase.snapshots,
+    async () => {
+      await offlineDatabase.operations
+        .where("scopeKey")
+        .equals(scopeKey)
+        .delete();
+      if (operations.length)
+        await offlineDatabase.operations.bulkPut(
+          operations.map(operation => ({ ...operation, scopeKey }))
+        );
+      await offlineDatabase.snapshots.put({
+        scopeKey,
+        savedAt: Date.now(),
+        payload,
+      });
+    }
+  );
 }
 
 export async function clearOfflineScope(scope: OfflineScope) {
   const scopeKey = offlineScopeKey(scope);
-  await offlineDatabase.transaction("rw", offlineDatabase.operations, offlineDatabase.snapshots, offlineDatabase.preferences, offlineDatabase.queryCaches, async () => {
-    await offlineDatabase.operations.where("scopeKey").equals(scopeKey).delete();
-    await offlineDatabase.snapshots.delete(scopeKey);
-    await offlineDatabase.preferences.delete(scopeKey);
-    await offlineDatabase.queryCaches.delete(scopeKey);
-  });
+  await offlineDatabase.transaction(
+    "rw",
+    offlineDatabase.operations,
+    offlineDatabase.snapshots,
+    offlineDatabase.preferences,
+    offlineDatabase.queryCaches,
+    async () => {
+      await offlineDatabase.operations
+        .where("scopeKey")
+        .equals(scopeKey)
+        .delete();
+      await offlineDatabase.snapshots.delete(scopeKey);
+      await offlineDatabase.preferences.delete(scopeKey);
+      await offlineDatabase.queryCaches.delete(scopeKey);
+    }
+  );
 }

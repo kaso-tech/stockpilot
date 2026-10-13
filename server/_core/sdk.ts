@@ -7,7 +7,10 @@ import { SignJWT, jwtVerify } from "jose";
 import type { User } from "../../drizzle/schema";
 import * as db from "../db";
 import { ENV } from "./env";
-import type { GetUserInfoWithJwtRequest, GetUserInfoWithJwtResponse } from "./types/manusTypes";
+import type {
+  GetUserInfoWithJwtRequest,
+  GetUserInfoWithJwtResponse,
+} from "./types/manusTypes";
 // Utility function
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.length > 0;
@@ -67,7 +70,8 @@ class SDKServer {
 
   private getSessionSecret() {
     const secret = ENV.cookieSecret;
-    if (!secret || (ENV.isProduction && secret.length < 32)) throw new Error("Session secret is not configured securely.");
+    if (!secret || (ENV.isProduction && secret.length < 32))
+      throw new Error("Session secret is not configured securely.");
     return new TextEncoder().encode(secret);
   }
 
@@ -111,9 +115,12 @@ class SDKServer {
       .sign(secretKey);
   }
 
-  async verifySession(
-    cookieValue: string | undefined | null
-  ): Promise<{ openId: string; appId: string; name: string; sessionId?: string } | null> {
+  async verifySession(cookieValue: string | undefined | null): Promise<{
+    openId: string;
+    appId: string;
+    name: string;
+    sessionId?: string;
+  } | null> {
     if (!cookieValue) {
       console.warn("[Auth] Missing session cookie");
       return null;
@@ -128,7 +135,11 @@ class SDKServer {
 
       // appId n'est exigé que si l'application en déclare un (hébergement Manus) :
       // il empêche alors la réutilisation d'un jeton d'une autre application.
-      if (!isNonEmptyString(openId) || !isNonEmptyString(name) || (ENV.appId && appId !== ENV.appId)) {
+      if (
+        !isNonEmptyString(openId) ||
+        !isNonEmptyString(name) ||
+        (ENV.appId && appId !== ENV.appId)
+      ) {
         console.warn("[Auth] Session payload missing required fields");
         return null;
       }
@@ -217,12 +228,20 @@ class SDKServer {
       throw ForbiddenError("Untracked session");
     }
     const trackedSession = await db.getUserSessionById(session.sessionId);
-    if (!trackedSession || trackedSession.userId !== user.id || trackedSession.revokedAt || trackedSession.expiresAt <= new Date()) {
+    if (
+      !trackedSession ||
+      trackedSession.userId !== user.id ||
+      trackedSession.revokedAt ||
+      trackedSession.expiresAt <= new Date()
+    ) {
       throw ForbiddenError("Session revoked or expired");
     }
     // Activité enregistrée au plus toutes les 5 minutes (P2) au lieu de deux
     // écritures en base à chaque requête.
-    if (signedInAt.getTime() - trackedSession.lastSeenAt.getTime() >= ACTIVITY_WRITE_INTERVAL_MS) {
+    if (
+      signedInAt.getTime() - trackedSession.lastSeenAt.getTime() >=
+      ACTIVITY_WRITE_INTERVAL_MS
+    ) {
       await db.recordUserActivity(session.sessionId, user.id, signedInAt);
     }
 

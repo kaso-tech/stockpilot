@@ -12,64 +12,254 @@ import { commerceRouter } from "./commerce";
 const mockedGetDb = vi.mocked(getDb);
 
 function adminContext(): TrpcContext {
-  return { user: { id: 1, openId: "settings-admin", name: "Admin", email: "admin@example.test", phone: null, loginMethod: "manus", role: "admin", active: true, companyId: 1, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }, req: { protocol: "https", headers: {} } as TrpcContext["req"], res: { clearCookie: () => undefined } as unknown as TrpcContext["res"] };
+  return {
+    user: {
+      id: 1,
+      openId: "settings-admin",
+      name: "Admin",
+      email: "admin@example.test",
+      phone: null,
+      loginMethod: "manus",
+      role: "admin",
+      active: true,
+      companyId: 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastSignedIn: new Date(),
+    },
+    req: { protocol: "https", headers: {} } as TrpcContext["req"],
+    res: { clearCookie: () => undefined } as unknown as TrpcContext["res"],
+  };
 }
 
 describe("commerce.settings.save", () => {
   const inserts: Array<{ table: unknown; values: unknown }> = [];
   beforeEach(() => {
     inserts.length = 0;
-    const db: any = { select: () => ({ from: () => ({ where: () => ({ limit: async () => [] }), limit: async () => [] }) }), insert: (table: unknown) => ({ values: async (values: unknown) => { inserts.push({ table, values }); return [{ insertId: 1 }]; } }) };
+    const db: any = {
+      select: () => ({
+        from: () => ({
+          where: () => ({ limit: async () => [] }),
+          limit: async () => [],
+        }),
+      }),
+      insert: (table: unknown) => ({
+        values: async (values: unknown) => {
+          inserts.push({ table, values });
+          return [{ insertId: 1 }];
+        },
+      }),
+    };
     mockedGetDb.mockResolvedValue(db);
   });
-  it.each(["USD", "EUR", "XOF"] as const)("enregistre %s comme devise de référence", async currency => {
-    const caller = commerceRouter.createCaller(adminContext());
-    await expect(caller.settings.save({ defaultSalesAgentId: null, defaultCashierId: null, requireSalesAgent: false, requireCashier: false, currency })).resolves.toEqual({ success: true });
-    expect(inserts.find(item => item.table === saleSettings)?.values).toMatchObject({ currency, updatedByUserId: 1 });
-    expect(inserts.find(item => item.table === auditLogs)?.values).toMatchObject({ action: "Paramètres mis à jour" });
-  });
+  it.each(["USD", "EUR", "XOF"] as const)(
+    "enregistre %s comme devise de référence",
+    async currency => {
+      const caller = commerceRouter.createCaller(adminContext());
+      await expect(
+        caller.settings.save({
+          defaultSalesAgentId: null,
+          defaultCashierId: null,
+          requireSalesAgent: false,
+          requireCashier: false,
+          currency,
+        })
+      ).resolves.toEqual({ success: true });
+      expect(
+        inserts.find(item => item.table === saleSettings)?.values
+      ).toMatchObject({ currency, updatedByUserId: 1 });
+      expect(
+        inserts.find(item => item.table === auditLogs)?.values
+      ).toMatchObject({ action: "Paramètres mis à jour" });
+    }
+  );
   it("enregistre l’identité de l’entreprise destinée aux factures", async () => {
     const caller = commerceRouter.createCaller(adminContext());
-    await caller.settings.save({ defaultSalesAgentId: null, defaultCashierId: null, requireSalesAgent: false, requireCashier: false, currency: "XOF", companyName: "Bati Pro", companyLogoUrl: "/manus-storage/company/logo.png", companyAgreementLabel: "Bon pour accord signé", companySignatureAlignment: "center", companyAddress: "Ouagadougou, Koulouba", companyPhone: "+226 70 00 00 00", companyEmail: "contact@batipro.test", companyFooter: "NIF : BF-TEST" });
-    expect(inserts.find(item => item.table === saleSettings)?.values).toMatchObject({ companyName: "Bati Pro", companyLogoUrl: "/manus-storage/company/logo.png", companyAgreementLabel: "Bon pour accord signé", companySignatureAlignment: "center", companyAddress: "Ouagadougou, Koulouba", companyPhone: "+226 70 00 00 00", companyEmail: "contact@batipro.test", companyFooter: "NIF : BF-TEST" });
+    await caller.settings.save({
+      defaultSalesAgentId: null,
+      defaultCashierId: null,
+      requireSalesAgent: false,
+      requireCashier: false,
+      currency: "XOF",
+      companyName: "Bati Pro",
+      companyLogoUrl: "/manus-storage/company/logo.png",
+      companyAgreementLabel: "Bon pour accord signé",
+      companySignatureAlignment: "center",
+      companyAddress: "Ouagadougou, Koulouba",
+      companyPhone: "+226 70 00 00 00",
+      companyEmail: "contact@batipro.test",
+      companyFooter: "NIF : BF-TEST",
+    });
+    expect(
+      inserts.find(item => item.table === saleSettings)?.values
+    ).toMatchObject({
+      companyName: "Bati Pro",
+      companyLogoUrl: "/manus-storage/company/logo.png",
+      companyAgreementLabel: "Bon pour accord signé",
+      companySignatureAlignment: "center",
+      companyAddress: "Ouagadougou, Koulouba",
+      companyPhone: "+226 70 00 00 00",
+      companyEmail: "contact@batipro.test",
+      companyFooter: "NIF : BF-TEST",
+    });
   });
   it("enregistre les réglages POS et la présentation ticket", async () => {
     const caller = commerceRouter.createCaller(adminContext());
-    await caller.settings.save({ defaultSalesAgentId: null, defaultCashierId: null, requireSalesAgent: true, requireCashier: false, currency: "XOF", ticketHeader: "Bienvenue chez Bati Pro", ticketFooter: "Merci et à bientôt", ticketWidthMm: "58" });
-    expect(inserts.find(item => item.table === saleSettings)?.values).toMatchObject({ requireSalesAgent: true, ticketHeader: "Bienvenue chez Bati Pro", ticketFooter: "Merci et à bientôt", ticketWidthMm: "58" });
+    await caller.settings.save({
+      defaultSalesAgentId: null,
+      defaultCashierId: null,
+      requireSalesAgent: true,
+      requireCashier: false,
+      currency: "XOF",
+      ticketHeader: "Bienvenue chez Bati Pro",
+      ticketFooter: "Merci et à bientôt",
+      ticketWidthMm: "58",
+    });
+    expect(
+      inserts.find(item => item.table === saleSettings)?.values
+    ).toMatchObject({
+      requireSalesAgent: true,
+      ticketHeader: "Bienvenue chez Bati Pro",
+      ticketFooter: "Merci et à bientôt",
+      ticketWidthMm: "58",
+    });
   });
   it("enregistre les paramètres d’imprimante indépendamment de l’identité", async () => {
     const caller = commerceRouter.createCaller(adminContext());
-    await caller.settings.save({ defaultSalesAgentId: null, defaultCashierId: null, requireSalesAgent: false, requireCashier: false, currency: "XOF", ticketHeader: "Ticket StockPilot", ticketFooter: "Merci", ticketWidthMm: "80", printerName: "Caisse principale", printerType: "thermal" });
-    expect(inserts.find(item => item.table === saleSettings)?.values).toMatchObject({ ticketHeader: "Ticket StockPilot", ticketFooter: "Merci", ticketWidthMm: "80", printerName: "Caisse principale", printerType: "thermal" });
+    await caller.settings.save({
+      defaultSalesAgentId: null,
+      defaultCashierId: null,
+      requireSalesAgent: false,
+      requireCashier: false,
+      currency: "XOF",
+      ticketHeader: "Ticket StockPilot",
+      ticketFooter: "Merci",
+      ticketWidthMm: "80",
+      printerName: "Caisse principale",
+      printerType: "thermal",
+    });
+    expect(
+      inserts.find(item => item.table === saleSettings)?.values
+    ).toMatchObject({
+      ticketHeader: "Ticket StockPilot",
+      ticketFooter: "Merci",
+      ticketWidthMm: "80",
+      printerName: "Caisse principale",
+      printerType: "thermal",
+    });
   });
   it("enregistre une couleur principale hexadécimale pour l’application", async () => {
     const caller = commerceRouter.createCaller(adminContext());
-    await caller.settings.save({ defaultSalesAgentId: null, defaultCashierId: null, requireSalesAgent: false, requireCashier: false, currency: "XOF", primaryColor: "#6D28D9" });
-    expect(inserts.find(item => item.table === saleSettings)?.values).toMatchObject({ primaryColor: "#6D28D9" });
+    await caller.settings.save({
+      defaultSalesAgentId: null,
+      defaultCashierId: null,
+      requireSalesAgent: false,
+      requireCashier: false,
+      currency: "XOF",
+      primaryColor: "#6D28D9",
+    });
+    expect(
+      inserts.find(item => item.table === saleSettings)?.values
+    ).toMatchObject({ primaryColor: "#6D28D9" });
   });
   it("enregistre l’activation indépendante des moyens de paiement", async () => {
     const caller = commerceRouter.createCaller(adminContext());
-    await caller.settings.save({ defaultSalesAgentId: null, defaultCashierId: null, requireSalesAgent: false, requireCashier: false, currency: "XOF", paymentCashEnabled: true, paymentMobileMoneyEnabled: false, paymentCardEnabled: true, paymentBankTransferEnabled: false, paymentCreditEnabled: false });
-    expect(inserts.find(item => item.table === saleSettings)?.values).toMatchObject({ paymentCashEnabled: true, paymentMobileMoneyEnabled: false, paymentCardEnabled: true, paymentBankTransferEnabled: false, paymentCreditEnabled: false });
+    await caller.settings.save({
+      defaultSalesAgentId: null,
+      defaultCashierId: null,
+      requireSalesAgent: false,
+      requireCashier: false,
+      currency: "XOF",
+      paymentCashEnabled: true,
+      paymentMobileMoneyEnabled: false,
+      paymentCardEnabled: true,
+      paymentBankTransferEnabled: false,
+      paymentCreditEnabled: false,
+    });
+    expect(
+      inserts.find(item => item.table === saleSettings)?.values
+    ).toMatchObject({
+      paymentCashEnabled: true,
+      paymentMobileMoneyEnabled: false,
+      paymentCardEnabled: true,
+      paymentBankTransferEnabled: false,
+      paymentCreditEnabled: false,
+    });
   });
   it("persiste individuellement toutes les permissions sensibles vendeur", async () => {
     const caller = commerceRouter.createCaller(adminContext());
-    await caller.settings.save({ defaultSalesAgentId: null, defaultCashierId: null, requireSalesAgent: false, requireCashier: false, currency: "XOF", sellerCanOverridePrice: true, sellerCanSellBelowPrice: true, sellerMaxDiscountPercent: 15, sellerCanCancelInvoice: true, sellerCanRefund: true, sellerCanCorrectStock: true, sellerCanEditPurchasePrice: true });
-    expect(inserts.find(item => item.table === saleSettings)?.values).toMatchObject({ sellerCanOverridePrice: true, sellerCanSellBelowPrice: true, sellerMaxDiscountPercent: 15, sellerCanCancelInvoice: true, sellerCanRefund: true, sellerCanCorrectStock: true, sellerCanEditPurchasePrice: true });
+    await caller.settings.save({
+      defaultSalesAgentId: null,
+      defaultCashierId: null,
+      requireSalesAgent: false,
+      requireCashier: false,
+      currency: "XOF",
+      sellerCanOverridePrice: true,
+      sellerCanSellBelowPrice: true,
+      sellerMaxDiscountPercent: 15,
+      sellerCanCancelInvoice: true,
+      sellerCanRefund: true,
+      sellerCanCorrectStock: true,
+      sellerCanEditPurchasePrice: true,
+    });
+    expect(
+      inserts.find(item => item.table === saleSettings)?.values
+    ).toMatchObject({
+      sellerCanOverridePrice: true,
+      sellerCanSellBelowPrice: true,
+      sellerMaxDiscountPercent: 15,
+      sellerCanCancelInvoice: true,
+      sellerCanRefund: true,
+      sellerCanCorrectStock: true,
+      sellerCanEditPurchasePrice: true,
+    });
   });
   it("envoie et persiste un logo d’entreprise valide", async () => {
-    vi.mocked(storagePut).mockResolvedValue({ key: "company/logo.png", url: "/manus-storage/company/logo.png" });
+    vi.mocked(storagePut).mockResolvedValue({
+      key: "company/logo.png",
+      url: "/manus-storage/company/logo.png",
+    });
     const caller = commerceRouter.createCaller(adminContext());
-    await expect(caller.settings.uploadLogo({ dataUrl: "data:image/png;base64,iVBORw0KGgo=", filename: "logo.png" })).resolves.toEqual({ url: "/manus-storage/company/logo.png" });
-    expect(storagePut).toHaveBeenCalledWith(expect.stringContaining("company/1/logo.png"), expect.any(Buffer), "image/png");
-    expect(inserts.find(item => item.table === saleSettings)?.values).toMatchObject({ companyLogoUrl: "/manus-storage/company/logo.png", updatedByUserId: 1 });
+    await expect(
+      caller.settings.uploadLogo({
+        dataUrl: "data:image/png;base64,iVBORw0KGgo=",
+        filename: "logo.png",
+      })
+    ).resolves.toEqual({ url: "/manus-storage/company/logo.png" });
+    expect(storagePut).toHaveBeenCalledWith(
+      expect.stringContaining("company/1/logo.png"),
+      expect.any(Buffer),
+      "image/png"
+    );
+    expect(
+      inserts.find(item => item.table === saleSettings)?.values
+    ).toMatchObject({
+      companyLogoUrl: "/manus-storage/company/logo.png",
+      updatedByUserId: 1,
+    });
   });
   it("envoie et persiste une signature ou un cachet valide", async () => {
-    vi.mocked(storagePut).mockResolvedValue({ key: "company/signature.png", url: "/manus-storage/company/signature.png" });
+    vi.mocked(storagePut).mockResolvedValue({
+      key: "company/signature.png",
+      url: "/manus-storage/company/signature.png",
+    });
     const caller = commerceRouter.createCaller(adminContext());
-    await expect(caller.settings.uploadSignature({ dataUrl: "data:image/png;base64,iVBORw0KGgo=", filename: "cachet.png" })).resolves.toEqual({ url: "/manus-storage/company/signature.png" });
-    expect(storagePut).toHaveBeenCalledWith(expect.stringContaining("company/1/signature.png"), expect.any(Buffer), "image/png");
-    expect(inserts.find(item => item.table === saleSettings)?.values).toMatchObject({ companySignatureUrl: "/manus-storage/company/signature.png", updatedByUserId: 1 });
+    await expect(
+      caller.settings.uploadSignature({
+        dataUrl: "data:image/png;base64,iVBORw0KGgo=",
+        filename: "cachet.png",
+      })
+    ).resolves.toEqual({ url: "/manus-storage/company/signature.png" });
+    expect(storagePut).toHaveBeenCalledWith(
+      expect.stringContaining("company/1/signature.png"),
+      expect.any(Buffer),
+      "image/png"
+    );
+    expect(
+      inserts.find(item => item.table === saleSettings)?.values
+    ).toMatchObject({
+      companySignatureUrl: "/manus-storage/company/signature.png",
+      updatedByUserId: 1,
+    });
   });
 });

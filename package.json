@@ -8,11 +8,12 @@
     "build": "vite build && esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc --noEmit",
-    "format": "prettier --write .",
+    "format": "prettier --write \"client/src/**/*.{ts,tsx,css}\" \"server/**/*.ts\" \"shared/**/*.ts\" \"scripts/**/*.{mjs,ts}\" drizzle/schema.ts drizzle/relations.ts vite.config.ts vitest.config.ts vitest.db.config.ts drizzle.config.ts",
     "test": "vitest run",
     "test:db": "vitest run --config vitest.db.config.ts",
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
-    "verify:release": "node scripts/verify-release.mjs"
+    "verify:release": "node scripts/verify-release.mjs",
+    "format:check": "prettier --check \"client/src/**/*.{ts,tsx,css}\" \"server/**/*.ts\" \"shared/**/*.ts\" \"scripts/**/*.{mjs,ts}\" drizzle/schema.ts drizzle/relations.ts vite.config.ts vitest.config.ts vitest.db.config.ts drizzle.config.ts"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.15",

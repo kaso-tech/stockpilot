@@ -1,19 +1,39 @@
 import { describe, expect, it } from "vitest";
-import { assertPaymentMethodsEnabled, settlementResult } from "./transactionRules";
+import {
+  assertPaymentMethodsEnabled,
+  settlementResult,
+} from "./transactionRules";
 
 describe("settlementResult", () => {
   it("valide un règlement intégral avec plusieurs moyens", () => {
-    expect(settlementResult(12500, "full", [5000, 7500])).toEqual({ paidCents: 12500, balanceCents: 0, status: "paid" });
+    expect(settlementResult(12500, "full", [5000, 7500])).toEqual({
+      paidCents: 12500,
+      balanceCents: 0,
+      status: "paid",
+    });
   });
   it("calcule le solde d’un règlement partiel", () => {
-    expect(settlementResult(12500, "partial", [3500])).toEqual({ paidCents: 3500, balanceCents: 9000, status: "partial" });
+    expect(settlementResult(12500, "partial", [3500])).toEqual({
+      paidCents: 3500,
+      balanceCents: 9000,
+      status: "partial",
+    });
   });
   it("rejette un règlement intégral incomplet et un dépassement", () => {
     expect(() => settlementResult(12500, "full", [12000])).toThrow("totalité");
-    expect(() => settlementResult(12500, "partial", [13000])).toThrow("dépasse");
+    expect(() => settlementResult(12500, "partial", [13000])).toThrow(
+      "dépasse"
+    );
   });
   it("rejette un moyen de paiement désactivé dans les réglages", () => {
-    expect(() => assertPaymentMethodsEnabled(["cash", "mobile_money"], { paymentCashEnabled: true, paymentMobileMoneyEnabled: false })).toThrow("désactivé");
-    expect(() => assertPaymentMethodsEnabled(["cash"], { paymentCashEnabled: true })).not.toThrow();
+    expect(() =>
+      assertPaymentMethodsEnabled(["cash", "mobile_money"], {
+        paymentCashEnabled: true,
+        paymentMobileMoneyEnabled: false,
+      })
+    ).toThrow("désactivé");
+    expect(() =>
+      assertPaymentMethodsEnabled(["cash"], { paymentCashEnabled: true })
+    ).not.toThrow();
   });
 });

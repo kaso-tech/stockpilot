@@ -3,17 +3,73 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { dashboardPreferencesForRole, normalizeDashboardPreferences } from "@/lib/dashboardPreferences";
+import {
+  dashboardPreferencesForRole,
+  normalizeDashboardPreferences,
+} from "@/lib/dashboardPreferences";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
-import { Activity, ArrowRight, BellRing, Boxes, CheckCircle2, CircleDollarSign, ClipboardCheck, CreditCard, FilePlus2, ReceiptText, ShoppingCart, Target, TrendingUp, UserPlus, WalletCards } from "lucide-react";
-import { Area, AreaChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  Activity,
+  ArrowRight,
+  BellRing,
+  Boxes,
+  CheckCircle2,
+  CircleDollarSign,
+  ClipboardCheck,
+  CreditCard,
+  FilePlus2,
+  ReceiptText,
+  ShoppingCart,
+  Target,
+  TrendingUp,
+  UserPlus,
+  WalletCards,
+} from "lucide-react";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 
-const tooltipStyle = { background: "#131a26", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", color: "#e2e8f0", fontSize: "12px" };
-const expenseLabels: Record<string, string> = { rent: "Loyer", energy: "Énergie", connection: "Connexion", salary: "Salaire", agent_payments: "Paiements agents", marketing: "Marketing", supplies: "Fournitures", taxes: "Impôts", other: "Autre" };
-const expenseColors: Record<string, string> = { rent: "#2563EB", energy: "#0D9488", connection: "#7C3AED", salary: "#D97706", agent_payments: "#F97316", marketing: "#DB2777", supplies: "#059669", taxes: "#DC2626", other: "#64748B" };
+const tooltipStyle = {
+  background: "#131a26",
+  border: "1px solid rgba(255,255,255,0.1)",
+  borderRadius: "12px",
+  color: "#e2e8f0",
+  fontSize: "12px",
+};
+const expenseLabels: Record<string, string> = {
+  rent: "Loyer",
+  energy: "Énergie",
+  connection: "Connexion",
+  salary: "Salaire",
+  agent_payments: "Paiements agents",
+  marketing: "Marketing",
+  supplies: "Fournitures",
+  taxes: "Impôts",
+  other: "Autre",
+};
+const expenseColors: Record<string, string> = {
+  rent: "#2563EB",
+  energy: "#0D9488",
+  connection: "#7C3AED",
+  salary: "#D97706",
+  agent_payments: "#F97316",
+  marketing: "#DB2777",
+  supplies: "#059669",
+  taxes: "#DC2626",
+  other: "#64748B",
+};
 
 export default function Home() {
   const { user } = useAuth();
@@ -21,45 +77,986 @@ export default function Home() {
   const [, setLocation] = useLocation();
   const { data, isLoading } = trpc.dashboard.get.useQuery();
   const { data: savedPreferences } = trpc.dashboardPreferences.get.useQuery();
-  const { data: onboarding, isLoading: onboardingLoading } = trpc.onboarding.status.useQuery(undefined, { enabled: isAdmin });
-  const onboardingComplete = trpc.onboarding.complete.useMutation({ onSuccess: () => window.location.reload() });
-  const onboardingSkip = trpc.onboarding.skip.useMutation({ onSuccess: () => window.location.reload() });
+  const { data: onboarding, isLoading: onboardingLoading } =
+    trpc.onboarding.status.useQuery(undefined, { enabled: isAdmin });
+  const onboardingComplete = trpc.onboarding.complete.useMutation({
+    onSuccess: () => window.location.reload(),
+  });
+  const onboardingSkip = trpc.onboarding.skip.useMutation({
+    onSuccess: () => window.location.reload(),
+  });
   const role = user?.role === "seller" ? "seller" : "admin";
-  const [preferences, setPreferences] = useState(() => dashboardPreferencesForRole(role));
-  useEffect(() => { try { setPreferences(savedPreferences?.preferencesJson ? normalizeDashboardPreferences(JSON.parse(savedPreferences.preferencesJson), role) : dashboardPreferencesForRole(role)); } catch { setPreferences(dashboardPreferencesForRole(role)); } }, [savedPreferences?.preferencesJson, role]);
+  const [preferences, setPreferences] = useState(() =>
+    dashboardPreferencesForRole(role)
+  );
+  useEffect(() => {
+    try {
+      setPreferences(
+        savedPreferences?.preferencesJson
+          ? normalizeDashboardPreferences(
+              JSON.parse(savedPreferences.preferencesJson),
+              role
+            )
+          : dashboardPreferencesForRole(role)
+      );
+    } catch {
+      setPreferences(dashboardPreferencesForRole(role));
+    }
+  }, [savedPreferences?.preferencesJson, role]);
   const summary = data?.summary;
   const metrics = [
-    { label: "Chiffre d’affaires", value: formatCurrency(summary?.monthlyRevenueCents ?? 0), detail: "Cumul sur le mois", icon: TrendingUp, tone: "cyan" },
-    { label: "Bénéfice net", value: formatCurrency(summary?.monthlyOperatingProfitCents ?? 0), detail: `Marge − dépenses (${formatCurrency(summary?.monthlyExpenseCents ?? 0)}, dont paie ${formatCurrency(summary?.monthlyAgentPaymentCents ?? 0)})`, icon: CircleDollarSign, tone: "emerald" },
-    { label: "Factures émises", value: String(summary?.monthlyInvoiceCount ?? 0), detail: `Panier moyen ${formatCurrency(summary?.averageBasketCents ?? 0)}`, icon: ReceiptText, tone: "violet" },
-    { label: "Valeur de stock", value: formatCurrency(summary?.totalValueCents ?? 0), detail: `${summary?.productCount ?? 0} références actives`, icon: Boxes, tone: "amber" },
+    {
+      label: "Chiffre d’affaires",
+      value: formatCurrency(summary?.monthlyRevenueCents ?? 0),
+      detail: "Cumul sur le mois",
+      icon: TrendingUp,
+      tone: "cyan",
+    },
+    {
+      label: "Bénéfice net",
+      value: formatCurrency(summary?.monthlyOperatingProfitCents ?? 0),
+      detail: `Marge − dépenses (${formatCurrency(summary?.monthlyExpenseCents ?? 0)}, dont paie ${formatCurrency(summary?.monthlyAgentPaymentCents ?? 0)})`,
+      icon: CircleDollarSign,
+      tone: "emerald",
+    },
+    {
+      label: "Factures émises",
+      value: String(summary?.monthlyInvoiceCount ?? 0),
+      detail: `Panier moyen ${formatCurrency(summary?.averageBasketCents ?? 0)}`,
+      icon: ReceiptText,
+      tone: "violet",
+    },
+    {
+      label: "Valeur de stock",
+      value: formatCurrency(summary?.totalValueCents ?? 0),
+      detail: `${summary?.productCount ?? 0} références actives`,
+      icon: Boxes,
+      tone: "amber",
+    },
   ];
   const priorities = [
-    { label: "Stock critique", count: summary?.activeAlerts ?? 0, detail: "référence(s) au seuil", icon: BellRing, path: "/alertes", tone: "amber", currency: false },
-    { label: "Inventaires ouverts", count: summary?.draftInventories ?? 0, detail: "session(s) à finaliser", icon: ClipboardCheck, path: "/inventaires", tone: "violet", currency: false },
-    ...(isAdmin ? [{ label: "Paie à régler", count: summary?.duePayrollCents ?? 0, detail: "solde de la période", icon: WalletCards, path: "/agents", tone: "cyan", currency: true }, { label: "Dépenses du mois", count: summary?.monthlyExpenseCents ?? 0, detail: `dont paie ${formatCurrency(summary?.monthlyAgentPaymentCents ?? 0)}`, icon: WalletCards, path: "/depenses", tone: "amber", currency: true }] : []),
+    {
+      label: "Stock critique",
+      count: summary?.activeAlerts ?? 0,
+      detail: "référence(s) au seuil",
+      icon: BellRing,
+      path: "/alertes",
+      tone: "amber",
+      currency: false,
+    },
+    {
+      label: "Inventaires ouverts",
+      count: summary?.draftInventories ?? 0,
+      detail: "session(s) à finaliser",
+      icon: ClipboardCheck,
+      path: "/inventaires",
+      tone: "violet",
+      currency: false,
+    },
+    ...(isAdmin
+      ? [
+          {
+            label: "Paie à régler",
+            count: summary?.duePayrollCents ?? 0,
+            detail: "solde de la période",
+            icon: WalletCards,
+            path: "/agents",
+            tone: "cyan",
+            currency: true,
+          },
+          {
+            label: "Dépenses du mois",
+            count: summary?.monthlyExpenseCents ?? 0,
+            detail: `dont paie ${formatCurrency(summary?.monthlyAgentPaymentCents ?? 0)}`,
+            icon: WalletCards,
+            path: "/depenses",
+            tone: "amber",
+            currency: true,
+          },
+        ]
+      : []),
   ];
-  const tones: Record<string, string> = { cyan: "bg-cyan-400/10 text-cyan-300 ring-cyan-400/15", emerald: "bg-emerald-400/10 text-emerald-300 ring-emerald-400/15", violet: "bg-violet-400/10 text-violet-300 ring-violet-400/15", amber: "bg-amber-400/10 text-amber-300 ring-amber-400/15" };
+  const tones: Record<string, string> = {
+    cyan: "bg-cyan-400/10 text-cyan-300 ring-cyan-400/15",
+    emerald: "bg-emerald-400/10 text-emerald-300 ring-emerald-400/15",
+    violet: "bg-violet-400/10 text-violet-300 ring-violet-400/15",
+    amber: "bg-amber-400/10 text-amber-300 ring-amber-400/15",
+  };
 
-  return <div className="mx-auto max-w-[1500px] space-y-6">
-    {isAdmin && !onboardingLoading && onboarding && !onboarding.completed && <section className="onboarding-hero overflow-hidden rounded-2xl border border-blue-400/20 bg-[linear-gradient(115deg,rgba(37,99,235,0.16),rgba(20,27,40,0.95)_45%,rgba(20,27,40,1))] shadow-lg shadow-blue-950/10"><div className="flex flex-col gap-5 p-5 sm:p-6 xl:flex-row xl:items-center xl:justify-between"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-300">Démarrage guidé</p><h2 className="mt-2 text-xl font-semibold tracking-tight text-white">Préparez votre espace pour la première vente</h2><p className="mt-1 text-sm text-slate-400">Renseignez les trois éléments essentiels. Votre progression est mémorisée automatiquement.</p></div><div className="grid gap-2 sm:grid-cols-3 xl:min-w-[650px]">{[{ key: "product", label: "Premier produit", detail: "Ajoutez une référence", icon: Boxes, path: "/produits?nouveau=1" }, { key: "customer", label: "Premier client", detail: "Créez une fiche client", icon: UserPlus, path: "/clients?nouveau=1" }, { key: "paymentMethod", label: "Encaissement", detail: "Activez un moyen", icon: CreditCard, path: "/parametres/pos" }].map(step => { const done = onboarding.steps[step.key as keyof typeof onboarding.steps]; const Icon = step.icon; return <button key={step.key} onClick={() => done ? undefined : setLocation(step.path)} className={`onboarding-step group flex items-center gap-3 rounded-xl border px-3 py-3 text-left transition ${done ? "is-complete border-emerald-400/20 bg-emerald-400/[0.08]" : "border-white/[0.08] bg-white/[0.035] hover:border-blue-400/35 hover:bg-white/[0.06]"}`}><span className={`grid h-9 w-9 place-items-center rounded-lg ${done ? "bg-emerald-400/15 text-emerald-300" : "bg-blue-500/10 text-blue-500"}`}>{done ? <CheckCircle2 className="h-5 w-5" /> : <Icon className="h-5 w-5" />}</span><span className="min-w-0"><span className="block text-sm font-medium text-slate-100">{step.label}</span><span className="block text-xs text-slate-400">{done ? "Terminé" : step.detail}</span></span></button>; })}</div></div><div className="flex flex-col-reverse gap-2 border-t border-white/[0.08] px-5 py-3 sm:flex-row sm:justify-end sm:px-6">{onboarding.steps.product && onboarding.steps.customer && onboarding.steps.paymentMethod && <Button onClick={() => onboardingComplete.mutate()} disabled={onboardingComplete.isPending || onboardingSkip.isPending} className="bg-emerald-400 text-slate-950 hover:bg-emerald-300">{onboardingComplete.isPending ? "Finalisation…" : "Terminer la configuration"}</Button>}<Button variant="ghost" onClick={() => { if (window.confirm("Ignorer définitivement l’assistant de démarrage pour cette entreprise ?")) onboardingSkip.mutate(); }} disabled={onboardingComplete.isPending || onboardingSkip.isPending} className="text-slate-400 hover:text-white">{onboardingSkip.isPending ? "Ignoré…" : "Ignorer définitivement"}</Button></div></section>}
-    {preferences.hero && <section className="flex justify-end"><div className="flex flex-wrap gap-2"><Button onClick={() => setLocation("/pos")} className="quick-action quick-action-sale h-11 rounded-xl bg-[#007B8B] px-4 text-white shadow-lg shadow-[#007B8B]/25 hover:bg-[#006b79]"><ShoppingCart className="mr-2 h-4 w-4" />Vente Rapide</Button><Button onClick={() => setLocation("/factures/nouvelle")} variant="outline" className="quick-action quick-action-invoice h-11 rounded-xl border-violet-400/35 bg-violet-400/10 px-4 text-violet-200 shadow-lg shadow-violet-950/15 hover:bg-violet-400/20 hover:text-violet-100"><FilePlus2 className="mr-2 h-4 w-4" />Nouvelle Facture</Button><Button onClick={() => setLocation("/clients?nouveau=1")} variant="outline" className="quick-action quick-action-client h-11 rounded-xl border-emerald-400/35 bg-emerald-400/10 px-4 text-emerald-200 shadow-lg shadow-emerald-950/15 hover:bg-emerald-400/20 hover:text-emerald-100"><UserPlus className="mr-2 h-4 w-4" />Nouveau Client</Button></div></section>}
-    {preferences.hero && <section className="commercial-hero overflow-hidden rounded-2xl border border-primary/20 bg-[radial-gradient(ellipse_at_10%_0%,color-mix(in_srgb,var(--primary)_18%,transparent),transparent_43%),linear-gradient(105deg,#141d2a,#101722)]"><div className="grid gap-6 p-6 md:grid-cols-[1.35fr_1fr] md:p-7"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Performance du mois</p>{isLoading ? <Skeleton className="mt-4 h-11 w-48 bg-white/10" /> : <p className="mt-3 text-4xl font-semibold tracking-tight text-white sm:text-5xl">{formatCurrency(summary?.monthlyRevenueCents ?? 0)}</p>}<p className="mt-2 text-sm text-slate-400">Chiffre d’affaires facturé depuis le début du mois.</p><Button onClick={() => setLocation("/factures")} variant="ghost" className="mt-4 -ml-3 text-primary">Voir les factures <ArrowRight className="ml-2 h-4 w-4" /></Button></div><div className="grid grid-cols-2 gap-3 self-end"><MiniStat label="Aujourd’hui" value={formatCurrency(summary?.todayRevenueCents ?? 0)} /><MiniStat label="Marge du mois" value={formatCurrency(summary?.monthlyMarginCents ?? 0)} accent /></div></div></section>}
-    {preferences.metrics && <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{metrics.map(metric => <MetricCard key={metric.label} metric={metric} loading={isLoading} colorClass={tones[metric.tone]} />)}</section>}
-    {isAdmin && (preferences.expenses || preferences.budget) && <section className={`grid gap-6 ${preferences.expenses && preferences.budget ? "xl:grid-cols-[minmax(0,1fr)_360px]" : ""}`}>{preferences.expenses && <ExpenseChart breakdown={summary?.expenseBreakdown ?? []} total={summary?.monthlyExpenseCents ?? 0} loading={isLoading} />}{preferences.budget && <BudgetPanel budget={summary?.expenseBudget} loading={isLoading} />}</section>}
-    {(preferences.salesTrend || preferences.priorities) && <section className={`grid gap-6 ${preferences.salesTrend && preferences.priorities ? "xl:grid-cols-[minmax(0,1fr)_360px]" : ""}`}>{preferences.salesTrend && <SalesTrend data={data?.salesTrend ?? []} />}{preferences.priorities && <PriorityList priorities={priorities} tones={tones} onNavigate={setLocation} />}</section>}
-    {preferences.unpaidInvoices && <OutstandingInvoices invoices={data?.unpaidInvoices ?? []} onNavigate={setLocation} />}
-    {(preferences.recentSales || preferences.lowStock) && <section className={`grid gap-6 ${preferences.recentSales && preferences.lowStock ? "xl:grid-cols-[minmax(0,1fr)_360px]" : ""}`}>{preferences.recentSales && <RecentSales sales={data?.recentSales ?? []} onNavigate={setLocation} />}{preferences.lowStock && <LowStock products={data?.lowStock ?? []} onNavigate={setLocation} />}</section>}
-  </div>;
+  return (
+    <div className="mx-auto max-w-[1500px] space-y-6">
+      {isAdmin && !onboardingLoading && onboarding && !onboarding.completed && (
+        <section className="onboarding-hero overflow-hidden rounded-2xl border border-blue-400/20 bg-[linear-gradient(115deg,rgba(37,99,235,0.16),rgba(20,27,40,0.95)_45%,rgba(20,27,40,1))] shadow-lg shadow-blue-950/10">
+          <div className="flex flex-col gap-5 p-5 sm:p-6 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-300">
+                Démarrage guidé
+              </p>
+              <h2 className="mt-2 text-xl font-semibold tracking-tight text-white">
+                Préparez votre espace pour la première vente
+              </h2>
+              <p className="mt-1 text-sm text-slate-400">
+                Renseignez les trois éléments essentiels. Votre progression est
+                mémorisée automatiquement.
+              </p>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-3 xl:min-w-[650px]">
+              {[
+                {
+                  key: "product",
+                  label: "Premier produit",
+                  detail: "Ajoutez une référence",
+                  icon: Boxes,
+                  path: "/produits?nouveau=1",
+                },
+                {
+                  key: "customer",
+                  label: "Premier client",
+                  detail: "Créez une fiche client",
+                  icon: UserPlus,
+                  path: "/clients?nouveau=1",
+                },
+                {
+                  key: "paymentMethod",
+                  label: "Encaissement",
+                  detail: "Activez un moyen",
+                  icon: CreditCard,
+                  path: "/parametres/pos",
+                },
+              ].map(step => {
+                const done =
+                  onboarding.steps[step.key as keyof typeof onboarding.steps];
+                const Icon = step.icon;
+                return (
+                  <button
+                    key={step.key}
+                    onClick={() => (done ? undefined : setLocation(step.path))}
+                    className={`onboarding-step group flex items-center gap-3 rounded-xl border px-3 py-3 text-left transition ${done ? "is-complete border-emerald-400/20 bg-emerald-400/[0.08]" : "border-white/[0.08] bg-white/[0.035] hover:border-blue-400/35 hover:bg-white/[0.06]"}`}
+                  >
+                    <span
+                      className={`grid h-9 w-9 place-items-center rounded-lg ${done ? "bg-emerald-400/15 text-emerald-300" : "bg-blue-500/10 text-blue-500"}`}
+                    >
+                      {done ? (
+                        <CheckCircle2 className="h-5 w-5" />
+                      ) : (
+                        <Icon className="h-5 w-5" />
+                      )}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium text-slate-100">
+                        {step.label}
+                      </span>
+                      <span className="block text-xs text-slate-400">
+                        {done ? "Terminé" : step.detail}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="flex flex-col-reverse gap-2 border-t border-white/[0.08] px-5 py-3 sm:flex-row sm:justify-end sm:px-6">
+            {onboarding.steps.product &&
+              onboarding.steps.customer &&
+              onboarding.steps.paymentMethod && (
+                <Button
+                  onClick={() => onboardingComplete.mutate()}
+                  disabled={
+                    onboardingComplete.isPending || onboardingSkip.isPending
+                  }
+                  className="bg-emerald-400 text-slate-950 hover:bg-emerald-300"
+                >
+                  {onboardingComplete.isPending
+                    ? "Finalisation…"
+                    : "Terminer la configuration"}
+                </Button>
+              )}
+            <Button
+              variant="ghost"
+              onClick={() => {
+                if (
+                  window.confirm(
+                    "Ignorer définitivement l’assistant de démarrage pour cette entreprise ?"
+                  )
+                )
+                  onboardingSkip.mutate();
+              }}
+              disabled={
+                onboardingComplete.isPending || onboardingSkip.isPending
+              }
+              className="text-slate-400 hover:text-white"
+            >
+              {onboardingSkip.isPending ? "Ignoré…" : "Ignorer définitivement"}
+            </Button>
+          </div>
+        </section>
+      )}
+      {preferences.hero && (
+        <section className="flex justify-end">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={() => setLocation("/pos")}
+              className="quick-action quick-action-sale h-11 rounded-xl bg-[#007B8B] px-4 text-white shadow-lg shadow-[#007B8B]/25 hover:bg-[#006b79]"
+            >
+              <ShoppingCart className="mr-2 h-4 w-4" />
+              Vente Rapide
+            </Button>
+            <Button
+              onClick={() => setLocation("/factures/nouvelle")}
+              variant="outline"
+              className="quick-action quick-action-invoice h-11 rounded-xl border-violet-400/35 bg-violet-400/10 px-4 text-violet-200 shadow-lg shadow-violet-950/15 hover:bg-violet-400/20 hover:text-violet-100"
+            >
+              <FilePlus2 className="mr-2 h-4 w-4" />
+              Nouvelle Facture
+            </Button>
+            <Button
+              onClick={() => setLocation("/clients?nouveau=1")}
+              variant="outline"
+              className="quick-action quick-action-client h-11 rounded-xl border-emerald-400/35 bg-emerald-400/10 px-4 text-emerald-200 shadow-lg shadow-emerald-950/15 hover:bg-emerald-400/20 hover:text-emerald-100"
+            >
+              <UserPlus className="mr-2 h-4 w-4" />
+              Nouveau Client
+            </Button>
+          </div>
+        </section>
+      )}
+      {preferences.hero && (
+        <section className="commercial-hero overflow-hidden rounded-2xl border border-primary/20 bg-[radial-gradient(ellipse_at_10%_0%,color-mix(in_srgb,var(--primary)_18%,transparent),transparent_43%),linear-gradient(105deg,#141d2a,#101722)]">
+          <div className="grid gap-6 p-6 md:grid-cols-[1.35fr_1fr] md:p-7">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+                Performance du mois
+              </p>
+              {isLoading ? (
+                <Skeleton className="mt-4 h-11 w-48 bg-white/10" />
+              ) : (
+                <p className="mt-3 text-4xl font-semibold tracking-tight text-white sm:text-5xl">
+                  {formatCurrency(summary?.monthlyRevenueCents ?? 0)}
+                </p>
+              )}
+              <p className="mt-2 text-sm text-slate-400">
+                Chiffre d’affaires facturé depuis le début du mois.
+              </p>
+              <Button
+                onClick={() => setLocation("/factures")}
+                variant="ghost"
+                className="mt-4 -ml-3 text-primary"
+              >
+                Voir les factures <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
+            <div className="grid grid-cols-2 gap-3 self-end">
+              <MiniStat
+                label="Aujourd’hui"
+                value={formatCurrency(summary?.todayRevenueCents ?? 0)}
+              />
+              <MiniStat
+                label="Marge du mois"
+                value={formatCurrency(summary?.monthlyMarginCents ?? 0)}
+                accent
+              />
+            </div>
+          </div>
+        </section>
+      )}
+      {preferences.metrics && (
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {metrics.map(metric => (
+            <MetricCard
+              key={metric.label}
+              metric={metric}
+              loading={isLoading}
+              colorClass={tones[metric.tone]}
+            />
+          ))}
+        </section>
+      )}
+      {isAdmin && (preferences.expenses || preferences.budget) && (
+        <section
+          className={`grid gap-6 ${preferences.expenses && preferences.budget ? "xl:grid-cols-[minmax(0,1fr)_360px]" : ""}`}
+        >
+          {preferences.expenses && (
+            <ExpenseChart
+              breakdown={summary?.expenseBreakdown ?? []}
+              total={summary?.monthlyExpenseCents ?? 0}
+              loading={isLoading}
+            />
+          )}
+          {preferences.budget && (
+            <BudgetPanel budget={summary?.expenseBudget} loading={isLoading} />
+          )}
+        </section>
+      )}
+      {(preferences.salesTrend || preferences.priorities) && (
+        <section
+          className={`grid gap-6 ${preferences.salesTrend && preferences.priorities ? "xl:grid-cols-[minmax(0,1fr)_360px]" : ""}`}
+        >
+          {preferences.salesTrend && (
+            <SalesTrend data={data?.salesTrend ?? []} />
+          )}
+          {preferences.priorities && (
+            <PriorityList
+              priorities={priorities}
+              tones={tones}
+              onNavigate={setLocation}
+            />
+          )}
+        </section>
+      )}
+      {preferences.unpaidInvoices && (
+        <OutstandingInvoices
+          invoices={data?.unpaidInvoices ?? []}
+          onNavigate={setLocation}
+        />
+      )}
+      {(preferences.recentSales || preferences.lowStock) && (
+        <section
+          className={`grid gap-6 ${preferences.recentSales && preferences.lowStock ? "xl:grid-cols-[minmax(0,1fr)_360px]" : ""}`}
+        >
+          {preferences.recentSales && (
+            <RecentSales
+              sales={data?.recentSales ?? []}
+              onNavigate={setLocation}
+            />
+          )}
+          {preferences.lowStock && (
+            <LowStock
+              products={data?.lowStock ?? []}
+              onNavigate={setLocation}
+            />
+          )}
+        </section>
+      )}
+    </div>
+  );
 }
 
-function MiniStat({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) { return <div className="rounded-xl border border-white/[0.08] bg-black/10 p-4"><p className="text-xs text-slate-400">{label}</p><p className={`mt-2 text-lg font-semibold ${accent ? "text-emerald-300" : "text-white"}`}>{value}</p></div>; }
-function MetricCard({ metric, loading, colorClass }: { metric: { label: string; value: string; detail: string; icon: typeof TrendingUp }; loading: boolean; colorClass: string }) { const Icon = metric.icon; return <Card className="border-white/[0.07] bg-[#111722] shadow-none"><CardContent className="p-5"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-medium text-slate-400">{metric.label}</p>{loading ? <Skeleton className="mt-3 h-8 w-24 bg-white/10" /> : <p className="mt-2 text-2xl font-semibold tracking-tight text-white">{metric.value}</p>}</div><span className={`grid h-10 w-10 place-items-center rounded-xl ring-1 ${colorClass}`}><Icon className="h-5 w-5" /></span></div><p className="mt-4 text-xs text-slate-500">{metric.detail}</p></CardContent></Card>; }
-function ExpenseChart({ breakdown, total, loading }: { breakdown: Array<{ category: string; amountCents: number }>; total: number; loading: boolean }) { return <Card className="border-white/[0.07] bg-[#111722] shadow-none"><CardContent className="p-0"><div className="flex items-center justify-between border-b border-white/[0.07] px-5 py-5 sm:px-6"><div><p className="text-sm font-semibold text-white">Répartition des dépenses</p><p className="mt-1 text-xs text-slate-500">Charges d’exploitation et paiements agents du mois</p></div><Badge className="border border-amber-400/15 bg-amber-400/10 text-amber-300">Mois en cours</Badge></div>{loading ? <div className="h-[300px] p-6"><Skeleton className="h-full w-full bg-white/10" /></div> : breakdown.length ? <div className="grid gap-5 p-5 lg:grid-cols-[320px_minmax(0,1fr)] lg:items-center"><div className="relative h-[260px]"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={breakdown} dataKey="amountCents" nameKey="category" cx="50%" cy="50%" innerRadius={68} outerRadius={100} paddingAngle={3} stroke="none">{breakdown.map(item => <Cell key={item.category} fill={expenseColors[item.category] ?? "#64748B"} />)}</Pie><Tooltip contentStyle={tooltipStyle} formatter={value => formatCurrency(Number(value))} labelFormatter={label => expenseLabels[String(label)] ?? String(label)} /></PieChart></ResponsiveContainer><div className="pointer-events-none absolute inset-0 grid place-items-center text-center"><div><p className="text-[10px] uppercase tracking-[0.12em] text-slate-500">Total</p><p className="mt-1 text-lg font-semibold text-white">{formatCurrency(total)}</p></div></div></div><div className="grid gap-2 sm:grid-cols-2">{breakdown.map(item => <div key={item.category} className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.07] bg-white/[0.025] px-3 py-2.5"><span className="flex min-w-0 items-center gap-2 text-sm text-slate-300"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: expenseColors[item.category] ?? "#64748B" }} />{expenseLabels[item.category] ?? item.category}</span><span className="shrink-0 text-right"><span className="block text-sm font-semibold text-white">{formatCurrency(item.amountCents)}</span><span className="text-[10px] text-slate-500">{total ? Math.round((item.amountCents / total) * 100) : 0}%</span></span></div>)}</div></div> : <EmptyState icon={WalletCards} title="Aucune dépense ce mois-ci" detail="Les catégories apparaîtront ici après l’enregistrement de charges." />}</CardContent></Card>; }
-function BudgetPanel({ budget, loading }: { budget?: { configured: boolean; budgetCents: number; spentCents: number; remainingCents: number; percentUsed: number; warningPercent: number; warningReached: boolean; exceeded: boolean }; loading: boolean }) { if (loading) return <Card className="border-white/[0.07] bg-[#111722]"><CardContent className="min-h-[260px] p-5"><Skeleton className="h-full w-full bg-white/10" /></CardContent></Card>; const configured = budget?.configured ?? false; const percent = budget?.percentUsed ?? 0; const warning = budget?.warningReached ?? false; const exceeded = budget?.exceeded ?? false; return <Card className="border-white/[0.07] bg-[#111722]"><CardContent className="p-5"><div className="flex items-start justify-between"><div><p className="text-sm font-semibold text-white">Budget dépenses</p><p className="mt-1 text-xs text-slate-500">Suivi du mois en cours</p></div><span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary"><Target className="h-5 w-5" /></span></div>{configured ? <div className="mt-6"><p className="text-3xl font-semibold text-white">{formatCurrency(budget!.budgetCents)}</p><p className={`mt-2 text-sm ${exceeded ? "text-rose-300" : warning ? "text-amber-300" : "text-slate-400"}`}>{exceeded ? `Dépassement de ${formatCurrency(Math.abs(budget!.remainingCents))}` : warning ? `Seuil d’alerte (${budget!.warningPercent} %) atteint` : `${formatCurrency(budget!.remainingCents)} restant`}</p><div className="mt-5 h-2 overflow-hidden rounded-full bg-white/[0.07]"><div className={`h-full rounded-full ${exceeded ? "bg-rose-400" : warning ? "bg-amber-400" : "bg-primary"}`} style={{ width: `${Math.min(percent, 100)}%` }} /></div><div className="mt-3 flex justify-between text-xs"><span className="text-slate-500">{formatCurrency(budget!.spentCents)} consommés</span><span className="font-semibold text-slate-300">{percent}%</span></div></div> : <div className="mt-8 text-center"><Target className="mx-auto h-7 w-7 text-slate-600" /><p className="mt-3 text-sm font-medium text-slate-300">Budget non défini</p></div>}</CardContent></Card>; }
-function SalesTrend({ data }: { data: Array<{ day: string; revenueCents: number }> }) { return <Card className="overflow-hidden border-white/[0.07] bg-[#111722] shadow-none"><CardContent className="p-0"><div className="border-b border-white/[0.07] px-5 py-5"><p className="text-sm font-semibold text-white">Dynamique des ventes</p><p className="mt-1 text-xs text-slate-500">Chiffre d’affaires facturé sur les sept derniers jours</p></div><div className="h-[290px] p-4 sm:p-6">{data.some(item => item.revenueCents) ? <ResponsiveContainer width="100%" height="100%"><AreaChart data={data}><defs><linearGradient id="sales-revenue" x1="0" x2="0" y1="0" y2="1"><stop offset="5%" stopColor="var(--primary)" stopOpacity={0.38} /><stop offset="95%" stopColor="var(--primary)" stopOpacity={0} /></linearGradient></defs><CartesianGrid vertical={false} stroke="rgba(255,255,255,0.07)" /><XAxis dataKey="day" tickFormatter={value => new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "short" }).format(new Date(value))} tick={{ fill: "#64748b", fontSize: 11 }} axisLine={false} tickLine={false} /><YAxis tickFormatter={value => formatCurrency(Number(value))} tick={{ fill: "#64748b", fontSize: 10 }} axisLine={false} tickLine={false} width={72} /><Tooltip contentStyle={tooltipStyle} labelFormatter={value => formatDate(String(value))} formatter={value => formatCurrency(Number(value))} /><Area type="monotone" dataKey="revenueCents" name="CA" stroke="var(--primary)" strokeWidth={2.5} fill="url(#sales-revenue)" /></AreaChart></ResponsiveContainer> : <EmptyState icon={Activity} title="Ventes en attente de signal" detail="Créez une première facture pour visualiser la tendance." />}</div></CardContent></Card>; }
-function PriorityList({ priorities, tones, onNavigate }: { priorities: Array<{ label: string; count: number; detail: string; icon: any; path: string; tone: string; currency: boolean }>; tones: Record<string, string>; onNavigate: (path: string) => void }) { return <Card className="border-white/[0.07] bg-[#111722]"><CardContent className="p-0"><div className="border-b border-white/[0.07] px-5 py-5"><p className="text-sm font-semibold text-white">Priorités opérationnelles</p></div><div className="divide-y divide-white/[0.06]">{priorities.map(priority => { const Icon = priority.icon; return <button key={priority.label} onClick={() => onNavigate(priority.path)} className="flex w-full items-center gap-3 px-5 py-4 text-left hover:bg-white/[0.025]"><span className={`grid h-9 w-9 place-items-center rounded-xl ${tones[priority.tone]}`}><Icon className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block text-sm font-medium text-slate-200">{priority.label}</span><span className="block text-xs text-slate-500">{priority.detail}</span></span><span className="text-sm font-semibold text-white">{priority.currency ? formatCurrency(priority.count) : priority.count}</span></button>; })}</div></CardContent></Card>; }
-function RecentSales({ sales, onNavigate }: { sales: Array<{ id: number; invoiceNumber: string; customerName: string; totalCents: number; netProfitCents: number; createdAt: Date | string; customerType: string }>; onNavigate: (path: string) => void }) { return <Card className="border-white/[0.07] bg-[#111722]"><CardContent className="p-0"><div className="flex justify-between border-b border-white/[0.07] px-5 py-5"><p className="text-sm font-semibold text-white">Dernières factures</p><Button variant="ghost" onClick={() => onNavigate("/factures")} className="text-primary">Ouvrir le registre</Button></div>{sales.length ? <div className="divide-y divide-white/[0.06]">{sales.map(sale => <button key={sale.id} onClick={() => onNavigate("/factures")} className="flex w-full items-center justify-between gap-3 px-5 py-3 text-left hover:bg-white/[0.025]"><span><span className="block text-sm font-medium text-slate-200">{sale.invoiceNumber}</span><span className="block text-xs text-slate-500">{sale.customerName} · {formatDate(sale.createdAt)}</span></span><span className="text-right"><span className="block text-sm font-semibold text-white">{formatCurrency(sale.totalCents)}</span><span className="text-xs text-emerald-300">{formatCurrency(sale.netProfitCents)}</span></span></button>)}</div> : <EmptyState icon={ReceiptText} title="Aucune facture ce mois-ci" detail="Les dernières transactions apparaîtront ici." />}</CardContent></Card>; }
-function OutstandingInvoices({ invoices, onNavigate }: { invoices: Array<{ id: number; invoiceNumber: string; customerName: string; totalCents: number; balanceCents: number; status: string; createdAt: Date | string }>; onNavigate: (path: string) => void }) { return <Card className="border-white/[0.07] bg-[#111722]"><CardContent className="p-0"><div className="flex items-center justify-between border-b border-white/[0.07] px-5 py-5"><div><p className="text-sm font-semibold text-white">Factures à encaisser</p><p className="mt-1 text-xs text-slate-500">Soldes en attente de règlement</p></div><Button variant="ghost" onClick={() => onNavigate("/factures")} className="text-primary">Voir tout</Button></div>{invoices.length ? <div className="grid divide-y divide-white/[0.06] md:grid-cols-2 md:divide-x md:divide-y-0">{invoices.map(invoice => <button key={invoice.id} onClick={() => onNavigate(`/factures?facture=${invoice.id}`)} className="flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-white/[0.025]"><span><span className="block text-sm font-medium text-slate-200">{invoice.invoiceNumber}</span><span className="block text-xs text-slate-500">{invoice.customerName} · {formatDate(invoice.createdAt)}</span></span><span className="text-right"><span className="block text-sm font-semibold text-amber-300">{formatCurrency(invoice.balanceCents)}</span><span className="text-[11px] text-slate-500">{invoice.status === "partial" ? "Solde partiel" : "À encaisser"}</span></span></button>)}</div> : <EmptyState icon={ReceiptText} title="Aucune facture impayée" detail="Les soldes à encaisser apparaîtront ici." />}</CardContent></Card>; }
-function LowStock({ products, onNavigate }: { products: Array<{ id: number; name: string; reference: string; quantity: number; unit: string; minimumQuantity: number }>; onNavigate: (path: string) => void }) { return <Card className="border-amber-400/15 bg-[#111722]"><CardContent className="p-0"><div className="flex items-center justify-between border-b border-white/[0.07] px-5 py-5"><div><p className="text-sm font-semibold text-white">Disponibilité critique</p><p className="mt-1 text-xs text-slate-500">Réapprovisionnez avant une rupture.</p></div><Badge className="border-0 bg-amber-400/10 text-amber-300">{products.length} alerte{products.length > 1 ? "s" : ""}</Badge></div>{products.length ? <div className="divide-y divide-white/[0.06]">{products.map(product => <button key={product.id} onClick={() => onNavigate("/mouvements")} className="flex w-full justify-between gap-3 px-5 py-4 text-left hover:bg-amber-400/[0.035]"><span><span className="block text-sm font-medium text-slate-200">{product.name}</span><span className="mt-1 flex items-center gap-1 text-xs text-primary">Réapprovisionner <ArrowRight className="h-3 w-3" /></span></span><span className="text-right text-sm font-semibold text-amber-300">{product.quantity} {product.unit}<span className="block text-[11px] font-normal text-slate-500">Seuil {product.minimumQuantity}</span></span></button>)}</div> : <EmptyState icon={BellRing} title="Aucune alerte active" detail="Les seuils critiques sont sous contrôle." />}</CardContent></Card>; }
-function EmptyState({ icon: Icon, title, detail }: { icon: any; title: string; detail: string }) { return <div className="grid min-h-[180px] place-items-center px-6 text-center"><div><Icon className="mx-auto h-7 w-7 text-slate-600" /><p className="mt-3 text-sm font-medium text-slate-300">{title}</p><p className="mt-1 text-xs text-slate-500">{detail}</p></div></div>; }
+function MiniStat({
+  label,
+  value,
+  accent = false,
+}: {
+  label: string;
+  value: string;
+  accent?: boolean;
+}) {
+  return (
+    <div className="rounded-xl border border-white/[0.08] bg-black/10 p-4">
+      <p className="text-xs text-slate-400">{label}</p>
+      <p
+        className={`mt-2 text-lg font-semibold ${accent ? "text-emerald-300" : "text-white"}`}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+function MetricCard({
+  metric,
+  loading,
+  colorClass,
+}: {
+  metric: {
+    label: string;
+    value: string;
+    detail: string;
+    icon: typeof TrendingUp;
+  };
+  loading: boolean;
+  colorClass: string;
+}) {
+  const Icon = metric.icon;
+  return (
+    <Card className="border-white/[0.07] bg-[#111722] shadow-none">
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-medium text-slate-400">{metric.label}</p>
+            {loading ? (
+              <Skeleton className="mt-3 h-8 w-24 bg-white/10" />
+            ) : (
+              <p className="mt-2 text-2xl font-semibold tracking-tight text-white">
+                {metric.value}
+              </p>
+            )}
+          </div>
+          <span
+            className={`grid h-10 w-10 place-items-center rounded-xl ring-1 ${colorClass}`}
+          >
+            <Icon className="h-5 w-5" />
+          </span>
+        </div>
+        <p className="mt-4 text-xs text-slate-500">{metric.detail}</p>
+      </CardContent>
+    </Card>
+  );
+}
+function ExpenseChart({
+  breakdown,
+  total,
+  loading,
+}: {
+  breakdown: Array<{ category: string; amountCents: number }>;
+  total: number;
+  loading: boolean;
+}) {
+  return (
+    <Card className="border-white/[0.07] bg-[#111722] shadow-none">
+      <CardContent className="p-0">
+        <div className="flex items-center justify-between border-b border-white/[0.07] px-5 py-5 sm:px-6">
+          <div>
+            <p className="text-sm font-semibold text-white">
+              Répartition des dépenses
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Charges d’exploitation et paiements agents du mois
+            </p>
+          </div>
+          <Badge className="border border-amber-400/15 bg-amber-400/10 text-amber-300">
+            Mois en cours
+          </Badge>
+        </div>
+        {loading ? (
+          <div className="h-[300px] p-6">
+            <Skeleton className="h-full w-full bg-white/10" />
+          </div>
+        ) : breakdown.length ? (
+          <div className="grid gap-5 p-5 lg:grid-cols-[320px_minmax(0,1fr)] lg:items-center">
+            <div className="relative h-[260px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={breakdown}
+                    dataKey="amountCents"
+                    nameKey="category"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={68}
+                    outerRadius={100}
+                    paddingAngle={3}
+                    stroke="none"
+                  >
+                    {breakdown.map(item => (
+                      <Cell
+                        key={item.category}
+                        fill={expenseColors[item.category] ?? "#64748B"}
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={tooltipStyle}
+                    formatter={value => formatCurrency(Number(value))}
+                    labelFormatter={label =>
+                      expenseLabels[String(label)] ?? String(label)
+                    }
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="pointer-events-none absolute inset-0 grid place-items-center text-center">
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.12em] text-slate-500">
+                    Total
+                  </p>
+                  <p className="mt-1 text-lg font-semibold text-white">
+                    {formatCurrency(total)}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {breakdown.map(item => (
+                <div
+                  key={item.category}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.07] bg-white/[0.025] px-3 py-2.5"
+                >
+                  <span className="flex min-w-0 items-center gap-2 text-sm text-slate-300">
+                    <span
+                      className="h-2.5 w-2.5 shrink-0 rounded-full"
+                      style={{
+                        backgroundColor:
+                          expenseColors[item.category] ?? "#64748B",
+                      }}
+                    />
+                    {expenseLabels[item.category] ?? item.category}
+                  </span>
+                  <span className="shrink-0 text-right">
+                    <span className="block text-sm font-semibold text-white">
+                      {formatCurrency(item.amountCents)}
+                    </span>
+                    <span className="text-[10px] text-slate-500">
+                      {total ? Math.round((item.amountCents / total) * 100) : 0}
+                      %
+                    </span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <EmptyState
+            icon={WalletCards}
+            title="Aucune dépense ce mois-ci"
+            detail="Les catégories apparaîtront ici après l’enregistrement de charges."
+          />
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+function BudgetPanel({
+  budget,
+  loading,
+}: {
+  budget?: {
+    configured: boolean;
+    budgetCents: number;
+    spentCents: number;
+    remainingCents: number;
+    percentUsed: number;
+    warningPercent: number;
+    warningReached: boolean;
+    exceeded: boolean;
+  };
+  loading: boolean;
+}) {
+  if (loading)
+    return (
+      <Card className="border-white/[0.07] bg-[#111722]">
+        <CardContent className="min-h-[260px] p-5">
+          <Skeleton className="h-full w-full bg-white/10" />
+        </CardContent>
+      </Card>
+    );
+  const configured = budget?.configured ?? false;
+  const percent = budget?.percentUsed ?? 0;
+  const warning = budget?.warningReached ?? false;
+  const exceeded = budget?.exceeded ?? false;
+  return (
+    <Card className="border-white/[0.07] bg-[#111722]">
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-sm font-semibold text-white">Budget dépenses</p>
+            <p className="mt-1 text-xs text-slate-500">
+              Suivi du mois en cours
+            </p>
+          </div>
+          <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary">
+            <Target className="h-5 w-5" />
+          </span>
+        </div>
+        {configured ? (
+          <div className="mt-6">
+            <p className="text-3xl font-semibold text-white">
+              {formatCurrency(budget!.budgetCents)}
+            </p>
+            <p
+              className={`mt-2 text-sm ${exceeded ? "text-rose-300" : warning ? "text-amber-300" : "text-slate-400"}`}
+            >
+              {exceeded
+                ? `Dépassement de ${formatCurrency(Math.abs(budget!.remainingCents))}`
+                : warning
+                  ? `Seuil d’alerte (${budget!.warningPercent} %) atteint`
+                  : `${formatCurrency(budget!.remainingCents)} restant`}
+            </p>
+            <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/[0.07]">
+              <div
+                className={`h-full rounded-full ${exceeded ? "bg-rose-400" : warning ? "bg-amber-400" : "bg-primary"}`}
+                style={{ width: `${Math.min(percent, 100)}%` }}
+              />
+            </div>
+            <div className="mt-3 flex justify-between text-xs">
+              <span className="text-slate-500">
+                {formatCurrency(budget!.spentCents)} consommés
+              </span>
+              <span className="font-semibold text-slate-300">{percent}%</span>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-8 text-center">
+            <Target className="mx-auto h-7 w-7 text-slate-600" />
+            <p className="mt-3 text-sm font-medium text-slate-300">
+              Budget non défini
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+function SalesTrend({
+  data,
+}: {
+  data: Array<{ day: string; revenueCents: number }>;
+}) {
+  return (
+    <Card className="overflow-hidden border-white/[0.07] bg-[#111722] shadow-none">
+      <CardContent className="p-0">
+        <div className="border-b border-white/[0.07] px-5 py-5">
+          <p className="text-sm font-semibold text-white">
+            Dynamique des ventes
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            Chiffre d’affaires facturé sur les sept derniers jours
+          </p>
+        </div>
+        <div className="h-[290px] p-4 sm:p-6">
+          {data.some(item => item.revenueCents) ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={data}>
+                <defs>
+                  <linearGradient
+                    id="sales-revenue"
+                    x1="0"
+                    x2="0"
+                    y1="0"
+                    y2="1"
+                  >
+                    <stop
+                      offset="5%"
+                      stopColor="var(--primary)"
+                      stopOpacity={0.38}
+                    />
+                    <stop
+                      offset="95%"
+                      stopColor="var(--primary)"
+                      stopOpacity={0}
+                    />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid
+                  vertical={false}
+                  stroke="rgba(255,255,255,0.07)"
+                />
+                <XAxis
+                  dataKey="day"
+                  tickFormatter={value =>
+                    new Intl.DateTimeFormat("fr-FR", {
+                      day: "2-digit",
+                      month: "short",
+                    }).format(new Date(value))
+                  }
+                  tick={{ fill: "#64748b", fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  tickFormatter={value => formatCurrency(Number(value))}
+                  tick={{ fill: "#64748b", fontSize: 10 }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={72}
+                />
+                <Tooltip
+                  contentStyle={tooltipStyle}
+                  labelFormatter={value => formatDate(String(value))}
+                  formatter={value => formatCurrency(Number(value))}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="revenueCents"
+                  name="CA"
+                  stroke="var(--primary)"
+                  strokeWidth={2.5}
+                  fill="url(#sales-revenue)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <EmptyState
+              icon={Activity}
+              title="Ventes en attente de signal"
+              detail="Créez une première facture pour visualiser la tendance."
+            />
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+function PriorityList({
+  priorities,
+  tones,
+  onNavigate,
+}: {
+  priorities: Array<{
+    label: string;
+    count: number;
+    detail: string;
+    icon: any;
+    path: string;
+    tone: string;
+    currency: boolean;
+  }>;
+  tones: Record<string, string>;
+  onNavigate: (path: string) => void;
+}) {
+  return (
+    <Card className="border-white/[0.07] bg-[#111722]">
+      <CardContent className="p-0">
+        <div className="border-b border-white/[0.07] px-5 py-5">
+          <p className="text-sm font-semibold text-white">
+            Priorités opérationnelles
+          </p>
+        </div>
+        <div className="divide-y divide-white/[0.06]">
+          {priorities.map(priority => {
+            const Icon = priority.icon;
+            return (
+              <button
+                key={priority.label}
+                onClick={() => onNavigate(priority.path)}
+                className="flex w-full items-center gap-3 px-5 py-4 text-left hover:bg-white/[0.025]"
+              >
+                <span
+                  className={`grid h-9 w-9 place-items-center rounded-xl ${tones[priority.tone]}`}
+                >
+                  <Icon className="h-4 w-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium text-slate-200">
+                    {priority.label}
+                  </span>
+                  <span className="block text-xs text-slate-500">
+                    {priority.detail}
+                  </span>
+                </span>
+                <span className="text-sm font-semibold text-white">
+                  {priority.currency
+                    ? formatCurrency(priority.count)
+                    : priority.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+function RecentSales({
+  sales,
+  onNavigate,
+}: {
+  sales: Array<{
+    id: number;
+    invoiceNumber: string;
+    customerName: string;
+    totalCents: number;
+    netProfitCents: number;
+    createdAt: Date | string;
+    customerType: string;
+  }>;
+  onNavigate: (path: string) => void;
+}) {
+  return (
+    <Card className="border-white/[0.07] bg-[#111722]">
+      <CardContent className="p-0">
+        <div className="flex justify-between border-b border-white/[0.07] px-5 py-5">
+          <p className="text-sm font-semibold text-white">Dernières factures</p>
+          <Button
+            variant="ghost"
+            onClick={() => onNavigate("/factures")}
+            className="text-primary"
+          >
+            Ouvrir le registre
+          </Button>
+        </div>
+        {sales.length ? (
+          <div className="divide-y divide-white/[0.06]">
+            {sales.map(sale => (
+              <button
+                key={sale.id}
+                onClick={() => onNavigate("/factures")}
+                className="flex w-full items-center justify-between gap-3 px-5 py-3 text-left hover:bg-white/[0.025]"
+              >
+                <span>
+                  <span className="block text-sm font-medium text-slate-200">
+                    {sale.invoiceNumber}
+                  </span>
+                  <span className="block text-xs text-slate-500">
+                    {sale.customerName} · {formatDate(sale.createdAt)}
+                  </span>
+                </span>
+                <span className="text-right">
+                  <span className="block text-sm font-semibold text-white">
+                    {formatCurrency(sale.totalCents)}
+                  </span>
+                  <span className="text-xs text-emerald-300">
+                    {formatCurrency(sale.netProfitCents)}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            icon={ReceiptText}
+            title="Aucune facture ce mois-ci"
+            detail="Les dernières transactions apparaîtront ici."
+          />
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+function OutstandingInvoices({
+  invoices,
+  onNavigate,
+}: {
+  invoices: Array<{
+    id: number;
+    invoiceNumber: string;
+    customerName: string;
+    totalCents: number;
+    balanceCents: number;
+    status: string;
+    createdAt: Date | string;
+  }>;
+  onNavigate: (path: string) => void;
+}) {
+  return (
+    <Card className="border-white/[0.07] bg-[#111722]">
+      <CardContent className="p-0">
+        <div className="flex items-center justify-between border-b border-white/[0.07] px-5 py-5">
+          <div>
+            <p className="text-sm font-semibold text-white">
+              Factures à encaisser
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Soldes en attente de règlement
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            onClick={() => onNavigate("/factures")}
+            className="text-primary"
+          >
+            Voir tout
+          </Button>
+        </div>
+        {invoices.length ? (
+          <div className="grid divide-y divide-white/[0.06] md:grid-cols-2 md:divide-x md:divide-y-0">
+            {invoices.map(invoice => (
+              <button
+                key={invoice.id}
+                onClick={() => onNavigate(`/factures?facture=${invoice.id}`)}
+                className="flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-white/[0.025]"
+              >
+                <span>
+                  <span className="block text-sm font-medium text-slate-200">
+                    {invoice.invoiceNumber}
+                  </span>
+                  <span className="block text-xs text-slate-500">
+                    {invoice.customerName} · {formatDate(invoice.createdAt)}
+                  </span>
+                </span>
+                <span className="text-right">
+                  <span className="block text-sm font-semibold text-amber-300">
+                    {formatCurrency(invoice.balanceCents)}
+                  </span>
+                  <span className="text-[11px] text-slate-500">
+                    {invoice.status === "partial"
+                      ? "Solde partiel"
+                      : "À encaisser"}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            icon={ReceiptText}
+            title="Aucune facture impayée"
+            detail="Les soldes à encaisser apparaîtront ici."
+          />
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+function LowStock({
+  products,
+  onNavigate,
+}: {
+  products: Array<{
+    id: number;
+    name: string;
+    reference: string;
+    quantity: number;
+    unit: string;
+    minimumQuantity: number;
+  }>;
+  onNavigate: (path: string) => void;
+}) {
+  return (
+    <Card className="border-amber-400/15 bg-[#111722]">
+      <CardContent className="p-0">
+        <div className="flex items-center justify-between border-b border-white/[0.07] px-5 py-5">
+          <div>
+            <p className="text-sm font-semibold text-white">
+              Disponibilité critique
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Réapprovisionnez avant une rupture.
+            </p>
+          </div>
+          <Badge className="border-0 bg-amber-400/10 text-amber-300">
+            {products.length} alerte{products.length > 1 ? "s" : ""}
+          </Badge>
+        </div>
+        {products.length ? (
+          <div className="divide-y divide-white/[0.06]">
+            {products.map(product => (
+              <button
+                key={product.id}
+                onClick={() => onNavigate("/mouvements")}
+                className="flex w-full justify-between gap-3 px-5 py-4 text-left hover:bg-amber-400/[0.035]"
+              >
+                <span>
+                  <span className="block text-sm font-medium text-slate-200">
+                    {product.name}
+                  </span>
+                  <span className="mt-1 flex items-center gap-1 text-xs text-primary">
+                    Réapprovisionner <ArrowRight className="h-3 w-3" />
+                  </span>
+                </span>
+                <span className="text-right text-sm font-semibold text-amber-300">
+                  {product.quantity} {product.unit}
+                  <span className="block text-[11px] font-normal text-slate-500">
+                    Seuil {product.minimumQuantity}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            icon={BellRing}
+            title="Aucune alerte active"
+            detail="Les seuils critiques sont sous contrôle."
+          />
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+function EmptyState({
+  icon: Icon,
+  title,
+  detail,
+}: {
+  icon: any;
+  title: string;
+  detail: string;
+}) {
+  return (
+    <div className="grid min-h-[180px] place-items-center px-6 text-center">
+      <div>
+        <Icon className="mx-auto h-7 w-7 text-slate-600" />
+        <p className="mt-3 text-sm font-medium text-slate-300">{title}</p>
+        <p className="mt-1 text-xs text-slate-500">{detail}</p>
+      </div>
+    </div>
+  );
+}

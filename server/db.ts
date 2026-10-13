@@ -12,7 +12,7 @@ import {
 } from "../drizzle/schema";
 import { companyScope } from "./companyScope";
 
-let _db: MySql2Database & { $client: Pool } | null = null;
+let _db: (MySql2Database & { $client: Pool }) | null = null;
 
 /**
  * Pool MySQL partagé (P5). Taille réglable par DB_POOL_SIZE ; connexions maintenues
@@ -21,10 +21,20 @@ let _db: MySql2Database & { $client: Pool } | null = null;
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      const pool = mysql.createPool({ uri: process.env.DATABASE_URL, connectionLimit: Number(process.env.DB_POOL_SIZE) || 10, waitForConnections: true, enableKeepAlive: true, keepAliveInitialDelay: 10_000, connectTimeout: 10_000 });
+      const pool = mysql.createPool({
+        uri: process.env.DATABASE_URL,
+        connectionLimit: Number(process.env.DB_POOL_SIZE) || 10,
+        waitForConnections: true,
+        enableKeepAlive: true,
+        keepAliveInitialDelay: 10_000,
+        connectTimeout: 10_000,
+      });
       _db = drizzle(pool);
     } catch (error) {
-      console.error("[Database] Configuration de connexion invalide :", error instanceof Error ? error.message : error);
+      console.error(
+        "[Database] Configuration de connexion invalide :",
+        error instanceof Error ? error.message : error
+      );
       _db = null;
     }
   }
@@ -41,49 +51,104 @@ async function requireDb() {
 export async function pingDatabase() {
   const db = await getDb();
   if (!db) return false;
-  try { await db.execute(sql`SELECT 1`); return true; } catch { return false; }
+  try {
+    await db.execute(sql`SELECT 1`);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function getUserByOpenId(openId: string) {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+  const result = await db
+    .select()
+    .from(users)
+    .where(eq(users.openId, openId))
+    .limit(1);
   return result[0];
 }
 
 export async function getUserSessionById(sessionId: string) {
   const db = await getDb();
   if (!db) return undefined;
-  return (await db.select().from(userSessions).where(eq(userSessions.id, sessionId)).limit(1))[0];
+  return (
+    await db
+      .select()
+      .from(userSessions)
+      .where(eq(userSessions.id, sessionId))
+      .limit(1)
+  )[0];
 }
 
-export async function recordUserActivity(sessionId: string, userId: number, at = new Date()) {
+export async function recordUserActivity(
+  sessionId: string,
+  userId: number,
+  at = new Date()
+) {
   const db = await getDb();
   if (!db) return;
   await Promise.all([
-    db.update(userSessions).set({ lastSeenAt: at }).where(eq(userSessions.id, sessionId)),
+    db
+      .update(userSessions)
+      .set({ lastSeenAt: at })
+      .where(eq(userSessions.id, sessionId)),
     db.update(users).set({ lastSignedIn: at }).where(eq(users.id, userId)), // tenant-scope-ok: utilisateur authentifié
   ]);
 }
 
 export async function listProducts(companyId: number | null) {
   const db = await requireDb();
-  const rows = await db.select().from(products).where(companyScope(products.companyId, companyId)).orderBy(products.name);
+  const rows = await db
+    .select()
+    .from(products)
+    .where(companyScope(products.companyId, companyId))
+    .orderBy(products.name);
   // Seuls les paliers des produits de l'entreprise sont chargés (P3), puis indexés par produit.
-  const tiers = rows.length ? await db.select().from(productPriceTiers).where(inArray(productPriceTiers.productId, rows.map(product => product.id))) : [];
+  const tiers = rows.length
+    ? await db
+        .select()
+        .from(productPriceTiers)
+        .where(
+          inArray(
+            productPriceTiers.productId,
+            rows.map(product => product.id)
+          )
+        )
+    : [];
   const tiersByProduct = new Map<number, typeof tiers>();
-  for (const tier of tiers) tiersByProduct.set(tier.productId, [...(tiersByProduct.get(tier.productId) ?? []), tier]);
+  for (const tier of tiers)
+    tiersByProduct.set(tier.productId, [
+      ...(tiersByProduct.get(tier.productId) ?? []),
+      tier,
+    ]);
   return rows.map(product => {
-    const productTiers = (tiersByProduct.get(product.id) ?? []).sort((left, right) => left.minQuantity - right.minQuantity);
-    const retailPriceTiers = productTiers.filter(tier => tier.customerType === "retail");
-    const wholesalePriceTiers = productTiers.filter(tier => tier.customerType === "wholesale");
-    return { ...product, priceTiers: retailPriceTiers, retailPriceTiers, wholesalePriceTiers };
+    const productTiers = (tiersByProduct.get(product.id) ?? []).sort(
+      (left, right) => left.minQuantity - right.minQuantity
+    );
+    const retailPriceTiers = productTiers.filter(
+      tier => tier.customerType === "retail"
+    );
+    const wholesalePriceTiers = productTiers.filter(
+      tier => tier.customerType === "wholesale"
+    );
+    return {
+      ...product,
+      priceTiers: retailPriceTiers,
+      retailPriceTiers,
+      wholesalePriceTiers,
+    };
   });
 }
 
 export async function listSuppliers(companyId: number | null) {
   const db = await requireDb();
-  return db.select().from(suppliers).where(companyScope(suppliers.companyId, companyId)).orderBy(suppliers.name);
+  return db
+    .select()
+    .from(suppliers)
+    .where(companyScope(suppliers.companyId, companyId))
+    .orderBy(suppliers.name);
 }
 
 export async function listMovements(companyId: number | null, limit = 100) {

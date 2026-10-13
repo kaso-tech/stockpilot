@@ -40,7 +40,8 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const { problems, warnings } = validateEnvironment();
   warnings.forEach(warning => console.warn(`[Config] ${warning}`));
-  if (problems.length) throw new Error(`Configuration invalide :\n- ${problems.join("\n- ")}`);
+  if (problems.length)
+    throw new Error(`Configuration invalide :\n- ${problems.join("\n- ")}`);
   const isProduction = process.env.NODE_ENV === "production";
   const app = express();
   const server = createServer(app);
@@ -56,7 +57,11 @@ async function startServer() {
   // Sonde de santé pour l'hébergeur et la supervision (P10).
   app.get("/api/health", async (_req, res) => {
     const database = await pingDatabase();
-    res.status(database ? 200 : 503).json({ ok: database, database, uptimeSeconds: Math.round(process.uptime()) });
+    res.status(database ? 200 : 503).json({
+      ok: database,
+      database,
+      uptimeSeconds: Math.round(process.uptime()),
+    });
   });
   // tRPC API
   app.use(
@@ -69,7 +74,18 @@ async function startServer() {
       onError({ error, path, type }) {
         if (error.code !== "INTERNAL_SERVER_ERROR") return;
         const correlationId = randomUUID();
-        console.error(JSON.stringify({ level: "error", event: "trpc_error", correlationId, path, type, message: error.message, cause: error.cause instanceof Error ? error.cause.message : undefined }));
+        console.error(
+          JSON.stringify({
+            level: "error",
+            event: "trpc_error",
+            correlationId,
+            path,
+            type,
+            message: error.message,
+            cause:
+              error.cause instanceof Error ? error.cause.message : undefined,
+          })
+        );
       },
     })
   );
@@ -83,7 +99,9 @@ async function startServer() {
 
   const preferredPort = parseInt(process.env.PORT || "3000");
   // En production, un port occupé est une erreur de déploiement : pas de bascule silencieuse (P6).
-  const port = isProduction ? preferredPort : await findAvailablePort(preferredPort);
+  const port = isProduction
+    ? preferredPort
+    : await findAvailablePort(preferredPort);
 
   if (port !== preferredPort) {
     console.log(`Port ${preferredPort} is busy, using port ${port} instead`);

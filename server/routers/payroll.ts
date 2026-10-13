@@ -1,7 +1,14 @@
 import { and, desc, eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { z } from "zod";
-import { agentPayments, agents, remunerationProfiles, saleCommissions, sales, users } from "../../drizzle/schema";
+import {
+  agentPayments,
+  agents,
+  remunerationProfiles,
+  saleCommissions,
+  sales,
+  users,
+} from "../../drizzle/schema";
 import { fixedRemunerationCents } from "../commerceRules";
 import { getDb } from "../db";
 import { adminProcedure, router } from "../_core/trpc";
@@ -12,18 +19,214 @@ import { MAX_CENTS } from "../numericLimits";
 import { safeFileUrl } from "../inputRules";
 import { companyTimezone, monthKey } from "../companyTime";
 
-async function dbOrThrow() { const db = await getDb(); if (!db) throw new Error("Base de données indisponible."); return db; }
-export const payrollPaymentInput = z.object({ beneficiaryType: z.enum(["user", "agent"]), beneficiaryId: z.number().int().positive(), amountCents: z.number().int().positive().max(MAX_CENTS), periodLabel: z.string().regex(/^\d{4}-\d{2}$/).optional(), note: z.string().trim().max(1000).nullable(), receiptUrl: safeFileUrl.nullable().optional(), receiptName: z.string().trim().max(180).nullable().optional(), receiptMimeType: z.string().trim().max(80).nullable().optional() });
+async function dbOrThrow() {
+  const db = await getDb();
+  if (!db) throw new Error("Base de données indisponible.");
+  return db;
+}
+export const payrollPaymentInput = z.object({
+  beneficiaryType: z.enum(["user", "agent"]),
+  beneficiaryId: z.number().int().positive(),
+  amountCents: z.number().int().positive().max(MAX_CENTS),
+  periodLabel: z
+    .string()
+    .regex(/^\d{4}-\d{2}$/)
+    .optional(),
+  note: z.string().trim().max(1000).nullable(),
+  receiptUrl: safeFileUrl.nullable().optional(),
+  receiptName: z.string().trim().max(180).nullable().optional(),
+  receiptMimeType: z.string().trim().max(80).nullable().optional(),
+});
 
 export const payrollRouter = router({
-  overview: adminProcedure.input(z.object({ periodLabel: z.string().regex(/^\d{4}-\d{2}$/).optional() }).optional()).query(async ({ ctx, input }) => {
-    const db = await dbOrThrow(); const timezone = await companyTimezone(db, ctx.user.companyId); const periodLabel = input?.periodLabel ?? monthKey(new Date(), timezone);
-    const [agentRows, userRows, profiles, commissions, payments] = await Promise.all([db.select().from(agents).where(companyScope(agents.companyId, ctx.user.companyId)).orderBy(agents.name), db.select({ id: users.id, name: users.name, email: users.email, role: users.role }).from(users).where(companyScope(users.companyId, ctx.user.companyId)).orderBy(users.name), db.select().from(remunerationProfiles).where(companyScope(remunerationProfiles.companyId, ctx.user.companyId)), db.select().from(saleCommissions).innerJoin(sales, eq(saleCommissions.saleId, sales.id)).where(companyScope(sales.companyId, ctx.user.companyId)).orderBy(desc(saleCommissions.createdAt)), db.select().from(agentPayments).where(companyScope(agentPayments.companyId, ctx.user.companyId)).orderBy(desc(agentPayments.paidAt))]);
-    const scopedCommissions = commissions.map(row => row.saleCommissions);
-    const beneficiaries = [...userRows.filter(user => user.role === "seller").map(user => ({ beneficiaryType: "user" as const, beneficiaryId: user.id })), ...agentRows.map(agent => ({ beneficiaryType: "agent" as const, beneficiaryId: agent.id }))];
-    const balances = beneficiaries.map(beneficiary => { const profile = profiles.find(item => item.beneficiaryType === beneficiary.beneficiaryType && item.beneficiaryId === beneficiary.beneficiaryId); const commissionCents = scopedCommissions.filter(item => item.beneficiaryType === beneficiary.beneficiaryType && item.beneficiaryId === beneficiary.beneficiaryId && monthKey(item.createdAt, timezone) === periodLabel).reduce((sum, item) => sum + item.commissionCents, 0); const fixedCents = profile ? fixedRemunerationCents(profile.remunerationMode, profile.fixedMonthlyCents) : 0; const paidCents = payments.filter(item => item.beneficiaryType === beneficiary.beneficiaryType && item.beneficiaryId === beneficiary.beneficiaryId && item.periodLabel === periodLabel).reduce((sum, item) => sum + item.amountCents, 0); return { ...beneficiary, fixedCents, commissionCents, paidCents, dueCents: fixedCents + commissionCents - paidCents }; });
-    return { periodLabel, agents: agentRows, users: userRows.filter(user => user.role === "seller"), profiles, commissions: scopedCommissions, payments, balances };
-  }),
-  uploadReceipt: adminProcedure.input(z.object({ dataUrl: z.string().min(30).max(7_000_000), filename: z.string().trim().min(1).max(180) })).mutation(async ({ ctx, input }) => { const match = input.dataUrl.match(/^data:(application\/pdf|image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/); if (!match) throw new TRPCError({ code: "BAD_REQUEST", message: "Le reçu doit être un PDF, PNG, JPEG ou WEBP." }); const mimeType = match[1]; const buffer = Buffer.from(match[2], "base64"); if (buffer.byteLength > 5 * 1024 * 1024) throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "Le reçu ne doit pas dépasser 5 Mo." }); const extension = mimeType === "application/pdf" ? "pdf" : mimeType === "image/jpeg" ? "jpg" : mimeType.split("/")[1]; const { url } = await storagePut(`company/${ctx.user.companyId ?? "legacy"}/payroll/${randomUUID()}.${extension}`, buffer, mimeType); return { url, filename: input.filename, mimeType }; }),
-  pay: adminProcedure.input(payrollPaymentInput).mutation(async ({ ctx, input }) => { const db = await dbOrThrow(); const beneficiary = input.beneficiaryType === "user" ? (await db.select({ id: users.id }).from(users).where(and(eq(users.id, input.beneficiaryId), companyScope(users.companyId, ctx.user.companyId))).limit(1))[0] : (await db.select({ id: agents.id }).from(agents).where(and(eq(agents.id, input.beneficiaryId), companyScope(agents.companyId, ctx.user.companyId))).limit(1))[0]; if (!beneficiary) throw new TRPCError({ code: "NOT_FOUND", message: "Bénéficiaire introuvable." }); const result = await db.insert(agentPayments).values({ ...input, companyId: ctx.user.companyId, periodLabel: input.periodLabel ?? monthKey(new Date(), await companyTimezone(db, ctx.user.companyId)), createdByUserId: ctx.user.id }); return { id: Number(result[0].insertId) }; }),
+  overview: adminProcedure
+    .input(
+      z
+        .object({
+          periodLabel: z
+            .string()
+            .regex(/^\d{4}-\d{2}$/)
+            .optional(),
+        })
+        .optional()
+    )
+    .query(async ({ ctx, input }) => {
+      const db = await dbOrThrow();
+      const timezone = await companyTimezone(db, ctx.user.companyId);
+      const periodLabel = input?.periodLabel ?? monthKey(new Date(), timezone);
+      const [agentRows, userRows, profiles, commissions, payments] =
+        await Promise.all([
+          db
+            .select()
+            .from(agents)
+            .where(companyScope(agents.companyId, ctx.user.companyId))
+            .orderBy(agents.name),
+          db
+            .select({
+              id: users.id,
+              name: users.name,
+              email: users.email,
+              role: users.role,
+            })
+            .from(users)
+            .where(companyScope(users.companyId, ctx.user.companyId))
+            .orderBy(users.name),
+          db
+            .select()
+            .from(remunerationProfiles)
+            .where(
+              companyScope(remunerationProfiles.companyId, ctx.user.companyId)
+            ),
+          db
+            .select()
+            .from(saleCommissions)
+            .innerJoin(sales, eq(saleCommissions.saleId, sales.id))
+            .where(companyScope(sales.companyId, ctx.user.companyId))
+            .orderBy(desc(saleCommissions.createdAt)),
+          db
+            .select()
+            .from(agentPayments)
+            .where(companyScope(agentPayments.companyId, ctx.user.companyId))
+            .orderBy(desc(agentPayments.paidAt)),
+        ]);
+      const scopedCommissions = commissions.map(row => row.saleCommissions);
+      const beneficiaries = [
+        ...userRows
+          .filter(user => user.role === "seller")
+          .map(user => ({
+            beneficiaryType: "user" as const,
+            beneficiaryId: user.id,
+          })),
+        ...agentRows.map(agent => ({
+          beneficiaryType: "agent" as const,
+          beneficiaryId: agent.id,
+        })),
+      ];
+      const balances = beneficiaries.map(beneficiary => {
+        const profile = profiles.find(
+          item =>
+            item.beneficiaryType === beneficiary.beneficiaryType &&
+            item.beneficiaryId === beneficiary.beneficiaryId
+        );
+        const commissionCents = scopedCommissions
+          .filter(
+            item =>
+              item.beneficiaryType === beneficiary.beneficiaryType &&
+              item.beneficiaryId === beneficiary.beneficiaryId &&
+              monthKey(item.createdAt, timezone) === periodLabel
+          )
+          .reduce((sum, item) => sum + item.commissionCents, 0);
+        const fixedCents = profile
+          ? fixedRemunerationCents(
+              profile.remunerationMode,
+              profile.fixedMonthlyCents
+            )
+          : 0;
+        const paidCents = payments
+          .filter(
+            item =>
+              item.beneficiaryType === beneficiary.beneficiaryType &&
+              item.beneficiaryId === beneficiary.beneficiaryId &&
+              item.periodLabel === periodLabel
+          )
+          .reduce((sum, item) => sum + item.amountCents, 0);
+        return {
+          ...beneficiary,
+          fixedCents,
+          commissionCents,
+          paidCents,
+          dueCents: fixedCents + commissionCents - paidCents,
+        };
+      });
+      return {
+        periodLabel,
+        agents: agentRows,
+        users: userRows.filter(user => user.role === "seller"),
+        profiles,
+        commissions: scopedCommissions,
+        payments,
+        balances,
+      };
+    }),
+  uploadReceipt: adminProcedure
+    .input(
+      z.object({
+        dataUrl: z.string().min(30).max(7_000_000),
+        filename: z.string().trim().min(1).max(180),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const match = input.dataUrl.match(
+        /^data:(application\/pdf|image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/
+      );
+      if (!match)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Le reçu doit être un PDF, PNG, JPEG ou WEBP.",
+        });
+      const mimeType = match[1];
+      const buffer = Buffer.from(match[2], "base64");
+      if (buffer.byteLength > 5 * 1024 * 1024)
+        throw new TRPCError({
+          code: "PAYLOAD_TOO_LARGE",
+          message: "Le reçu ne doit pas dépasser 5 Mo.",
+        });
+      const extension =
+        mimeType === "application/pdf"
+          ? "pdf"
+          : mimeType === "image/jpeg"
+            ? "jpg"
+            : mimeType.split("/")[1];
+      const { url } = await storagePut(
+        `company/${ctx.user.companyId ?? "legacy"}/payroll/${randomUUID()}.${extension}`,
+        buffer,
+        mimeType
+      );
+      return { url, filename: input.filename, mimeType };
+    }),
+  pay: adminProcedure
+    .input(payrollPaymentInput)
+    .mutation(async ({ ctx, input }) => {
+      const db = await dbOrThrow();
+      const beneficiary =
+        input.beneficiaryType === "user"
+          ? (
+              await db
+                .select({ id: users.id })
+                .from(users)
+                .where(
+                  and(
+                    eq(users.id, input.beneficiaryId),
+                    companyScope(users.companyId, ctx.user.companyId)
+                  )
+                )
+                .limit(1)
+            )[0]
+          : (
+              await db
+                .select({ id: agents.id })
+                .from(agents)
+                .where(
+                  and(
+                    eq(agents.id, input.beneficiaryId),
+                    companyScope(agents.companyId, ctx.user.companyId)
+                  )
+                )
+                .limit(1)
+            )[0];
+      if (!beneficiary)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Bénéficiaire introuvable.",
+        });
+      const result = await db.insert(agentPayments).values({
+        ...input,
+        companyId: ctx.user.companyId,
+        periodLabel:
+          input.periodLabel ??
+          monthKey(new Date(), await companyTimezone(db, ctx.user.companyId)),
+        createdByUserId: ctx.user.id,
+      });
+      return { id: Number(result[0].insertId) };
+    }),
 });

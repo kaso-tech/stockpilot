@@ -56,7 +56,7 @@ function writeToLogFile(source: LogSource, entries: unknown[]) {
   const logPath = path.join(LOG_DIR, `${source}.log`);
 
   // Format entries with timestamps
-  const lines = entries.map((entry) => {
+  const lines = entries.map(entry => {
     const ts = new Date().toISOString();
     return `[${ts}] ${JSON.stringify(entry)}`;
   });
@@ -100,8 +100,15 @@ function vitePluginManusDebugCollector(): Plugin {
     configureServer(server: ViteDevServer) {
       // Le script vit hors de publicDir pour ne jamais être copié dans le build de production.
       server.middlewares.use("/__manus__/debug-collector.js", (_req, res) => {
-        res.writeHead(200, { "Content-Type": "application/javascript; charset=utf-8" });
-        res.end(fs.readFileSync(path.join(PROJECT_ROOT, "client", "dev", "debug-collector.js"), "utf-8"));
+        res.writeHead(200, {
+          "Content-Type": "application/javascript; charset=utf-8",
+        });
+        res.end(
+          fs.readFileSync(
+            path.join(PROJECT_ROOT, "client", "dev", "debug-collector.js"),
+            "utf-8"
+          )
+        );
       });
       // POST /__manus__/logs: Browser sends logs (written directly to files)
       server.middlewares.use("/__manus__/logs", (req, res, next) => {
@@ -137,7 +144,7 @@ function vitePluginManusDebugCollector(): Plugin {
         }
 
         let body = "";
-        req.on("data", (chunk) => {
+        req.on("data", chunk => {
           body += chunk.toString();
         });
 
@@ -161,8 +168,22 @@ function analyticsPlugin(mode: string): Plugin {
   return {
     name: "stockpilot-analytics",
     transformIndexHtml(html) {
-      if (!env.VITE_ANALYTICS_ENDPOINT || !env.VITE_ANALYTICS_WEBSITE_ID) return html;
-      return { html, tags: [{ tag: "script", attrs: { defer: true, src: `${env.VITE_ANALYTICS_ENDPOINT.replace(/\/+$/, "")}/umami`, "data-website-id": env.VITE_ANALYTICS_WEBSITE_ID }, injectTo: "body" }] };
+      if (!env.VITE_ANALYTICS_ENDPOINT || !env.VITE_ANALYTICS_WEBSITE_ID)
+        return html;
+      return {
+        html,
+        tags: [
+          {
+            tag: "script",
+            attrs: {
+              defer: true,
+              src: `${env.VITE_ANALYTICS_ENDPOINT.replace(/\/+$/, "")}/umami`,
+              "data-website-id": env.VITE_ANALYTICS_WEBSITE_ID,
+            },
+            injectTo: "body",
+          },
+        ],
+      };
     },
   };
 }

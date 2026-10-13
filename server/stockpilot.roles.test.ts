@@ -27,24 +27,28 @@ describe("contrôle des rôles StockPilot", () => {
   it("interdit à un opérateur de créer un produit", async () => {
     const caller = appRouter.createCaller(createOperatorContext());
 
-    await expect(caller.products.create({
-      reference: "TEST-001",
-      name: "Article de test",
-      description: null,
-      retailPriceCents: 0,
-      wholesalePriceCents: 0,
-      category: "Test",
-      unit: "unité",
-      purchasePriceCents: 100,
-      quantity: 0,
-      minimumQuantity: 0,
-      supplierId: null,
-    })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(
+      caller.products.create({
+        reference: "TEST-001",
+        name: "Article de test",
+        description: null,
+        retailPriceCents: 0,
+        wholesalePriceCents: 0,
+        category: "Test",
+        unit: "unité",
+        purchasePriceCents: 100,
+        quantity: 0,
+        minimumQuantity: 0,
+        supplierId: null,
+      })
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
   it("interdit à un opérateur d’accéder au journal d’audit", async () => {
     const caller = appRouter.createCaller(createOperatorContext());
 
-    await expect(caller.audit.list()).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(caller.audit.list()).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
   });
 });

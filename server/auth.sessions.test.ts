@@ -11,7 +11,21 @@ const otherSessionId = "22222222-2222-4222-8222-222222222222";
 
 function authenticatedContext() {
   return {
-    user: { id: 7, openId: "session-user", name: "Utilisateur", email: "user@example.test", phone: null, loginMethod: "password", role: "seller", active: true, companyId: 1, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date(), sessionId: currentSessionId },
+    user: {
+      id: 7,
+      openId: "session-user",
+      name: "Utilisateur",
+      email: "user@example.test",
+      phone: null,
+      loginMethod: "password",
+      role: "seller",
+      active: true,
+      companyId: 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastSignedIn: new Date(),
+      sessionId: currentSessionId,
+    },
     req: { protocol: "https", headers: {} },
     res: { clearCookie: vi.fn() },
   } as never;
@@ -20,9 +34,36 @@ function authenticatedContext() {
 describe("auth.sessions", () => {
   const updates: Array<{ values: Record<string, unknown>; id: string }> = [];
   const sessions = [
-    { id: currentSessionId, userId: 7, deviceLabel: "Ordinateur Windows", userAgent: null, createdAt: new Date("2026-08-20"), lastSeenAt: new Date("2026-08-23"), expiresAt: new Date("2026-09-22"), revokedAt: null },
-    { id: otherSessionId, userId: 7, deviceLabel: "Appareil Android", userAgent: null, createdAt: new Date("2026-08-21"), lastSeenAt: new Date("2026-08-22"), expiresAt: new Date("2026-09-22"), revokedAt: null },
-    { id: "33333333-3333-4333-8333-333333333333", userId: 7, deviceLabel: "Ordinateur Mac", userAgent: null, createdAt: new Date("2026-08-19"), lastSeenAt: new Date("2026-08-20"), expiresAt: new Date("2026-09-22"), revokedAt: new Date("2026-08-21") },
+    {
+      id: currentSessionId,
+      userId: 7,
+      deviceLabel: "Ordinateur Windows",
+      userAgent: null,
+      createdAt: new Date("2026-08-20"),
+      lastSeenAt: new Date("2026-08-23"),
+      expiresAt: new Date("2026-09-22"),
+      revokedAt: null,
+    },
+    {
+      id: otherSessionId,
+      userId: 7,
+      deviceLabel: "Appareil Android",
+      userAgent: null,
+      createdAt: new Date("2026-08-21"),
+      lastSeenAt: new Date("2026-08-22"),
+      expiresAt: new Date("2026-09-22"),
+      revokedAt: null,
+    },
+    {
+      id: "33333333-3333-4333-8333-333333333333",
+      userId: 7,
+      deviceLabel: "Ordinateur Mac",
+      userAgent: null,
+      createdAt: new Date("2026-08-19"),
+      lastSeenAt: new Date("2026-08-20"),
+      expiresAt: new Date("2026-09-22"),
+      revokedAt: new Date("2026-08-21"),
+    },
   ];
 
   beforeEach(() => {
@@ -31,11 +72,25 @@ describe("auth.sessions", () => {
     vi.setSystemTime(new Date("2026-08-24T12:00:00Z"));
     updates.length = 0;
     const db: any = {
-      select: () => ({ from: (table: unknown) => {
-        const rows = table === userSessions ? sessions : [];
-        return { where: () => Object.assign(Promise.resolve(rows), { orderBy: async () => rows, limit: async () => rows }) };
-      } }),
-      update: () => ({ set: (values: Record<string, unknown>) => ({ where: async () => { updates.push({ values, id: otherSessionId }); } }) }),
+      select: () => ({
+        from: (table: unknown) => {
+          const rows = table === userSessions ? sessions : [];
+          return {
+            where: () =>
+              Object.assign(Promise.resolve(rows), {
+                orderBy: async () => rows,
+                limit: async () => rows,
+              }),
+          };
+        },
+      }),
+      update: () => ({
+        set: (values: Record<string, unknown>) => ({
+          where: async () => {
+            updates.push({ values, id: otherSessionId });
+          },
+        }),
+      }),
     };
     mockedGetDb.mockResolvedValue(db);
   });
@@ -45,15 +100,29 @@ describe("auth.sessions", () => {
   });
 
   it("liste les sessions actives et identifie la session courante", async () => {
-    const result = await appRouter.createCaller(authenticatedContext()).auth.sessions.list();
+    const result = await appRouter
+      .createCaller(authenticatedContext())
+      .auth.sessions.list();
     expect(result).toHaveLength(2);
-    expect(result.find(session => session.id === currentSessionId)?.isCurrent).toBe(true);
-    expect(result.find(session => session.id === otherSessionId)?.isCurrent).toBe(false);
+    expect(
+      result.find(session => session.id === currentSessionId)?.isCurrent
+    ).toBe(true);
+    expect(
+      result.find(session => session.id === otherSessionId)?.isCurrent
+    ).toBe(false);
   });
 
   it("révoque une autre session sans fermer la session courante", async () => {
-    await expect(appRouter.createCaller(authenticatedContext()).auth.sessions.revoke({ sessionId: otherSessionId })).resolves.toEqual({ success: true });
+    await expect(
+      appRouter
+        .createCaller(authenticatedContext())
+        .auth.sessions.revoke({ sessionId: otherSessionId })
+    ).resolves.toEqual({ success: true });
     expect(updates).toHaveLength(1);
-    await expect(appRouter.createCaller(authenticatedContext()).auth.sessions.revoke({ sessionId: currentSessionId })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(
+      appRouter
+        .createCaller(authenticatedContext())
+        .auth.sessions.revoke({ sessionId: currentSessionId })
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 });

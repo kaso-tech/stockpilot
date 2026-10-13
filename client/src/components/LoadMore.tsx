@@ -8,7 +8,28 @@ export function usePagedLimit(step = 100) {
 }
 
 /** Affiché uniquement quand la page reçue est pleine : il peut rester des lignes à charger. */
-export function LoadMore({ shown, limit, onMore, loading = false }: { shown: number; limit: number; onMore: () => void; loading?: boolean }) {
+export function LoadMore({
+  shown,
+  limit,
+  onMore,
+  loading = false,
+}: {
+  shown: number;
+  limit: number;
+  onMore: () => void;
+  loading?: boolean;
+}) {
   if (shown < limit) return null;
-  return <div className="flex justify-center pt-2"><Button type="button" variant="outline" onClick={onMore} disabled={loading}>{loading ? "Chargement…" : "Charger plus"}</Button></div>;
+  return (
+    <div className="flex justify-center pt-2">
+      <Button
+        type="button"
+        variant="outline"
+        onClick={onMore}
+        disabled={loading}
+      >
+        {loading ? "Chargement…" : "Charger plus"}
+      </Button>
+    </div>
+  );
 }

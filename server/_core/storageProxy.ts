@@ -8,7 +8,10 @@ import { sdk } from "./sdk";
  */
 const PRIVATE_KEY = /^company\/([^/]+)\/(backups|expenses|payroll)\//;
 
-export async function canReadStorageKey(key: string, authenticate: () => Promise<{ companyId: number | null; role: string }>) {
+export async function canReadStorageKey(
+  key: string,
+  authenticate: () => Promise<{ companyId: number | null; role: string }>
+) {
   const match = key.match(PRIVATE_KEY);
   if (!match) return true;
   try {
@@ -28,7 +31,10 @@ export function registerStorageProxy(app: Express) {
       return;
     }
 
-    if (key.includes("..") || !(await canReadStorageKey(key, () => sdk.authenticateRequest(req)))) {
+    if (
+      key.includes("..") ||
+      !(await canReadStorageKey(key, () => sdk.authenticateRequest(req)))
+    ) {
       res.status(404).send("Not found");
       return;
     }
@@ -41,7 +47,7 @@ export function registerStorageProxy(app: Express) {
     try {
       const forgeUrl = new URL(
         "v1/storage/presign/get",
-        ENV.forgeApiUrl.replace(/\/+$/, "") + "/",
+        ENV.forgeApiUrl.replace(/\/+$/, "") + "/"
       );
       forgeUrl.searchParams.set("path", key);
 
@@ -51,7 +57,9 @@ export function registerStorageProxy(app: Express) {
 
       if (!forgeResp.ok) {
         const body = await forgeResp.text().catch(() => "");
-        console.error(`[StorageProxy] forge error: ${forgeResp.status} ${body}`);
+        console.error(
+          `[StorageProxy] forge error: ${forgeResp.status} ${body}`
+        );
         res.status(502).send("Storage backend error");
         return;
       }
