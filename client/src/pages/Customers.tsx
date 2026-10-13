@@ -1,21 +1,66 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
-import { ArrowUpRight, Building2, Edit3, Mail, MapPin, Phone, Plus, Search, Trash2, UsersRound } from "lucide-react";
+import {
+  ArrowUpRight,
+  Building2,
+  Edit3,
+  Plus,
+  Search,
+  Trash2,
+  UsersRound,
+} from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 
-type CustomerForm = { name: string; type: "ordinary" | "wholesale"; email: string; phone: string; address: string; taxNumber: string; notes: string };
-const emptyCustomer: CustomerForm = { name: "", type: "ordinary", email: "", phone: "", address: "", taxNumber: "", notes: "" };
+type CustomerForm = {
+  name: string;
+  type: "ordinary" | "wholesale";
+  email: string;
+  phone: string;
+  address: string;
+  taxNumber: string;
+  notes: string;
+};
+const emptyCustomer: CustomerForm = {
+  name: "",
+  type: "ordinary",
+  email: "",
+  phone: "",
+  address: "",
+  taxNumber: "",
+  notes: "",
+};
 
 export default function Customers() {
   const { user } = useAuth();
@@ -26,29 +71,403 @@ export default function Customers() {
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<CustomerForm>(emptyCustomer);
-  const [deleteTarget, setDeleteTarget] = useState<typeof customers[number] | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<
+    (typeof customers)[number] | null
+  >(null);
   const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState<"all" | "ordinary" | "wholesale">("all");
-  const refresh = () => { utils.commerce.customers.list.invalidate(); utils.dashboard.get.invalidate(); };
-  const create = trpc.commerce.customers.create.useMutation({ onSuccess: () => { refresh(); toast.success("Client créé."); close(); }, onError: error => toast.error(error.message) });
-  const update = trpc.commerce.customers.update.useMutation({ onSuccess: () => { refresh(); toast.success("Client mis à jour."); close(); }, onError: error => toast.error(error.message) });
-  const remove = trpc.commerce.customers.remove.useMutation({ onSuccess: () => { refresh(); setDeleteTarget(null); toast.success("Client supprimé."); }, onError: error => toast.error(error.message) });
-  const reset = () => { setEditingId(null); setForm(emptyCustomer); };
-  const close = () => { setOpen(false); reset(); };
-  useEffect(() => { if (new URLSearchParams(window.location.search).get("nouveau") === "1") { reset(); setOpen(true); window.history.replaceState({}, "", "/clients"); } }, []);
-  const edit = (customer: typeof customers[number]) => { setEditingId(customer.id); setForm({ name: customer.name, type: customer.type, email: customer.email || "", phone: customer.phone || "", address: customer.address || "", taxNumber: customer.taxNumber || "", notes: customer.notes || "" }); setOpen(true); };
-  const save = () => { if (!form.name.trim()) return toast.error("Le nom du client est requis."); const data = { name: form.name.trim(), otherReference: null, type: form.type, email: form.email.trim() || null, phone: form.phone.trim() || null, address: form.address.trim() || null, taxNumber: form.taxNumber.trim() || null, notes: form.notes.trim() || null }; if (editingId) update.mutate({ id: editingId, ...data }); else create.mutate(data); };
-  const visible = useMemo(() => customers.filter(customer => { const needle = search.toLowerCase().trim(); const searchable = [customer.name, customer.email, customer.phone, customer.taxNumber, customer.address].filter(Boolean).join(" ").toLowerCase(); return (!needle || searchable.includes(needle)) && (typeFilter === "all" || customer.type === typeFilter); }).sort((a, b) => a.name.localeCompare(b.name)), [customers, search, typeFilter]);
+  const [typeFilter, setTypeFilter] = useState<
+    "all" | "ordinary" | "wholesale"
+  >("all");
+  const refresh = () => {
+    utils.commerce.customers.list.invalidate();
+    utils.dashboard.get.invalidate();
+  };
+  const create = trpc.commerce.customers.create.useMutation({
+    onSuccess: () => {
+      refresh();
+      toast.success("Client créé.");
+      close();
+    },
+    onError: error => toast.error(error.message),
+  });
+  const update = trpc.commerce.customers.update.useMutation({
+    onSuccess: () => {
+      refresh();
+      toast.success("Client mis à jour.");
+      close();
+    },
+    onError: error => toast.error(error.message),
+  });
+  const remove = trpc.commerce.customers.remove.useMutation({
+    onSuccess: () => {
+      refresh();
+      setDeleteTarget(null);
+      toast.success("Client supprimé.");
+    },
+    onError: error => toast.error(error.message),
+  });
+  const reset = () => {
+    setEditingId(null);
+    setForm(emptyCustomer);
+  };
+  const close = () => {
+    setOpen(false);
+    reset();
+  };
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("nouveau") === "1") {
+      reset();
+      setOpen(true);
+      window.history.replaceState({}, "", "/clients");
+    }
+  }, []);
+  const edit = (customer: (typeof customers)[number]) => {
+    setEditingId(customer.id);
+    setForm({
+      name: customer.name,
+      type: customer.type,
+      email: customer.email || "",
+      phone: customer.phone || "",
+      address: customer.address || "",
+      taxNumber: customer.taxNumber || "",
+      notes: customer.notes || "",
+    });
+    setOpen(true);
+  };
+  const save = () => {
+    if (!form.name.trim()) return toast.error("Le nom du client est requis.");
+    const data = {
+      name: form.name.trim(),
+      otherReference: null,
+      type: form.type,
+      email: form.email.trim() || null,
+      phone: form.phone.trim() || null,
+      address: form.address.trim() || null,
+      taxNumber: form.taxNumber.trim() || null,
+      notes: form.notes.trim() || null,
+    };
+    if (editingId) update.mutate({ id: editingId, ...data });
+    else create.mutate(data);
+  };
+  const visible = useMemo(
+    () =>
+      customers
+        .filter(customer => {
+          const needle = search.toLowerCase().trim();
+          const searchable = [
+            customer.name,
+            customer.email,
+            customer.phone,
+            customer.taxNumber,
+            customer.address,
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
+          return (
+            (!needle || searchable.includes(needle)) &&
+            (typeFilter === "all" || customer.type === typeFilter)
+          );
+        })
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [customers, search, typeFilter]
+  );
 
-  return <div className="mx-auto max-w-[1300px] space-y-6">
-    <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">Ventes</p><h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">Clients & tarifs</h1></div>{canManage && <Button onClick={() => { reset(); setOpen(true); }} className="bg-primary text-primary-foreground hover:bg-primary/90"><Plus className="mr-2 h-4 w-4" />Nouveau client</Button>}</header>
-    <div className="grid gap-3 rounded-2xl border border-white/[0.07] bg-[#111722] p-4 md:grid-cols-[minmax(0,1fr)_170px]"><div className="relative"><Search className="absolute left-3 top-3 h-4 w-4 text-slate-500" /><Input value={search} onChange={event => setSearch(event.target.value)} placeholder="Rechercher nom, téléphone ou fiscal" className="border-white/10 bg-white/[0.03] pl-9" /></div><Select value={typeFilter} onValueChange={value => setTypeFilter(value as typeof typeFilter)}><SelectTrigger className="border-white/10 bg-white/[0.03]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Tous les types</SelectItem><SelectItem value="ordinary">Détail</SelectItem><SelectItem value="wholesale">Grossistes</SelectItem></SelectContent></Select></div>
-    <p className="text-sm text-slate-500">{visible.length} client{visible.length > 1 ? "s" : ""} affiché{visible.length > 1 ? "s" : ""}</p>
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{visible.length ? visible.map(customer => <Card key={customer.id} role="button" tabIndex={0} onClick={() => setLocation(`/clients/${customer.id}`)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setLocation(`/clients/${customer.id}`); } }} className="cursor-pointer border-white/[0.07] bg-[#111722] shadow-none transition hover:border-primary/40 hover:bg-primary/[0.04]"><CardContent className="flex min-h-24 items-center gap-3 p-4"><span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${customer.type === "wholesale" ? "bg-violet-400/10 text-violet-300" : "bg-primary/10 text-primary"}`}>{customer.type === "wholesale" ? <Building2 className="h-5 w-5" /> : <UsersRound className="h-5 w-5" />}</span><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><p className="truncate font-semibold text-white">{customer.name}</p><Badge className={`shrink-0 border-0 text-[10px] ${customer.type === "wholesale" ? "bg-violet-400/10 text-violet-200" : "bg-primary/10 text-primary"}`}>{customer.type === "wholesale" ? "Gros" : "Détail"}</Badge></div><p className="mt-1 truncate text-xs text-slate-400">{customer.phone || customer.email || customer.address || "Coordonnées à compléter"}</p><p className="mt-2 text-[11px] text-slate-500">{customer.taxNumber ? `Fiscal : ${customer.taxNumber}` : "Fiche client"}</p></div><div className="flex shrink-0 items-center gap-1">{canManage && <><Button size="icon" variant="ghost" aria-label={`Modifier ${customer.name}`} onClick={event => { event.stopPropagation(); edit(customer); }} className="h-8 w-8 text-slate-400 hover:text-primary"><Edit3 className="h-4 w-4" /></Button><Button size="icon" variant="ghost" aria-label={`Supprimer ${customer.name}`} onClick={event => { event.stopPropagation(); setDeleteTarget(customer); }} className="h-8 w-8 text-rose-300"><Trash2 className="h-4 w-4" /></Button></>}<ArrowUpRight className="h-4 w-4 text-slate-500" /></div></CardContent></Card>) : <Card className="col-span-full border-dashed border-white/10 bg-[#111722]"><CardContent className="py-16 text-center text-slate-500">Aucun client ne correspond à ces critères.</CardContent></Card>}</div>
-    <CustomerDialog open={open} onOpenChange={value => !value && close()} form={form} setForm={setForm} editing={Boolean(editingId)} pending={create.isPending || update.isPending} onSave={save} />
-    <AlertDialog open={Boolean(deleteTarget)} onOpenChange={value => !value && setDeleteTarget(null)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Supprimer ce client ?</AlertDialogTitle><AlertDialogDescription>Cette action est irréversible. Les clients ayant déjà des factures ne peuvent pas être supprimés afin de préserver l’historique.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Annuler</AlertDialogCancel><AlertDialogAction onClick={() => deleteTarget && remove.mutate({ id: deleteTarget.id })} className="bg-rose-600 text-white hover:bg-rose-700">Supprimer</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
-  </div>;
+  return (
+    <div className="mx-auto max-w-[1300px] space-y-6">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
+            Ventes
+          </p>
+          <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">
+            Clients & tarifs
+          </h1>
+        </div>
+        {canManage && (
+          <Button
+            onClick={() => {
+              reset();
+              setOpen(true);
+            }}
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Nouveau client
+          </Button>
+        )}
+      </header>
+      <div className="grid gap-3 rounded-2xl border border-white/[0.07] bg-[#111722] p-4 md:grid-cols-[minmax(0,1fr)_170px]">
+        <div className="relative">
+          <Search className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
+          <Input
+            value={search}
+            onChange={event => setSearch(event.target.value)}
+            placeholder="Rechercher nom, téléphone ou fiscal"
+            className="border-white/10 bg-white/[0.03] pl-9"
+          />
+        </div>
+        <Select
+          value={typeFilter}
+          onValueChange={value => setTypeFilter(value as typeof typeFilter)}
+        >
+          <SelectTrigger className="border-white/10 bg-white/[0.03]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous les types</SelectItem>
+            <SelectItem value="ordinary">Détail</SelectItem>
+            <SelectItem value="wholesale">Grossistes</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <p className="text-sm text-slate-500">
+        {visible.length} client{visible.length > 1 ? "s" : ""} affiché
+        {visible.length > 1 ? "s" : ""}
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {visible.length ? (
+          visible.map(customer => (
+            <Card
+              key={customer.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => setLocation(`/clients/${customer.id}`)}
+              onKeyDown={event => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  setLocation(`/clients/${customer.id}`);
+                }
+              }}
+              className="cursor-pointer border-white/[0.07] bg-[#111722] shadow-none transition hover:border-primary/40 hover:bg-primary/[0.04]"
+            >
+              <CardContent className="flex min-h-24 items-center gap-3 p-4">
+                <span
+                  className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${customer.type === "wholesale" ? "bg-violet-400/10 text-violet-300" : "bg-primary/10 text-primary"}`}
+                >
+                  {customer.type === "wholesale" ? (
+                    <Building2 className="h-5 w-5" />
+                  ) : (
+                    <UsersRound className="h-5 w-5" />
+                  )}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="truncate font-semibold text-white">
+                      {customer.name}
+                    </p>
+                    <Badge
+                      className={`shrink-0 border-0 text-[10px] ${customer.type === "wholesale" ? "bg-violet-400/10 text-violet-200" : "bg-primary/10 text-primary"}`}
+                    >
+                      {customer.type === "wholesale" ? "Gros" : "Détail"}
+                    </Badge>
+                  </div>
+                  <p className="mt-1 truncate text-xs text-slate-400">
+                    {customer.phone ||
+                      customer.email ||
+                      customer.address ||
+                      "Coordonnées à compléter"}
+                  </p>
+                  <p className="mt-2 text-[11px] text-slate-500">
+                    {customer.taxNumber
+                      ? `Fiscal : ${customer.taxNumber}`
+                      : "Fiche client"}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  {canManage && (
+                    <>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        aria-label={`Modifier ${customer.name}`}
+                        onClick={event => {
+                          event.stopPropagation();
+                          edit(customer);
+                        }}
+                        className="h-8 w-8 text-slate-400 hover:text-primary"
+                      >
+                        <Edit3 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        aria-label={`Supprimer ${customer.name}`}
+                        onClick={event => {
+                          event.stopPropagation();
+                          setDeleteTarget(customer);
+                        }}
+                        className="h-8 w-8 text-rose-300"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </>
+                  )}
+                  <ArrowUpRight className="h-4 w-4 text-slate-500" />
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          <Card className="col-span-full border-dashed border-white/10 bg-[#111722]">
+            <CardContent className="py-16 text-center text-slate-500">
+              Aucun client ne correspond à ces critères.
+            </CardContent>
+          </Card>
+        )}
+      </div>
+      <CustomerDialog
+        open={open}
+        onOpenChange={value => !value && close()}
+        form={form}
+        setForm={setForm}
+        editing={Boolean(editingId)}
+        pending={create.isPending || update.isPending}
+        onSave={save}
+      />
+      <AlertDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={value => !value && setDeleteTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer ce client ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible. Les clients ayant déjà des factures
+              ne peuvent pas être supprimés afin de préserver l’historique.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() =>
+                deleteTarget && remove.mutate({ id: deleteTarget.id })
+              }
+              className="bg-rose-600 text-white hover:bg-rose-700"
+            >
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
 }
 
-function CustomerDialog({ open, onOpenChange, form, setForm, editing, pending, onSave }: { open: boolean; onOpenChange: (value: boolean) => void; form: CustomerForm; setForm: (value: CustomerForm) => void; editing: boolean; pending: boolean; onSave: () => void }) { return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-h-[90vh] overflow-y-auto border-white/10 bg-[#141b27] text-slate-100"><DialogHeader><DialogTitle>{editing ? "Modifier le client" : "Nouveau client"}</DialogTitle></DialogHeader><div className="grid gap-4"><Field label="Nom *"><Input value={form.name} onChange={event => setForm({ ...form, name: event.target.value })} /></Field><Field label="Type"><Select value={form.type} onValueChange={value => setForm({ ...form, type: value as CustomerForm["type"] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ordinary">Ordinaire · prix détail</SelectItem><SelectItem value="wholesale">Grossiste · prix gros</SelectItem></SelectContent></Select></Field><Field label="Adresse"><Input value={form.address} onChange={event => setForm({ ...form, address: event.target.value })} /></Field><Field label="Email"><Input type="email" value={form.email} onChange={event => setForm({ ...form, email: event.target.value })} /></Field><Field label="Téléphone"><Input value={form.phone} onChange={event => setForm({ ...form, phone: event.target.value })} /></Field><Field label="Numéro fiscal"><Input value={form.taxNumber} onChange={event => setForm({ ...form, taxNumber: event.target.value })} /></Field><Field label="Notes"><Textarea value={form.notes} onChange={event => setForm({ ...form, notes: event.target.value })} placeholder="Informations complémentaires" /></Field></div><DialogFooter><Button variant="ghost" onClick={() => onOpenChange(false)}>Annuler</Button><Button onClick={onSave} disabled={pending} className="bg-primary text-primary-foreground hover:bg-primary/90">{editing ? "Enregistrer" : "Créer"}</Button></DialogFooter></DialogContent></Dialog>; }
-function Field({ label, children }: { label: string; children: ReactNode }) { return <div className="space-y-2"><Label className="text-xs text-slate-300">{label}</Label>{children}</div>; }
+function CustomerDialog({
+  open,
+  onOpenChange,
+  form,
+  setForm,
+  editing,
+  pending,
+  onSave,
+}: {
+  open: boolean;
+  onOpenChange: (value: boolean) => void;
+  form: CustomerForm;
+  setForm: (value: CustomerForm) => void;
+  editing: boolean;
+  pending: boolean;
+  onSave: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto border-white/10 bg-[#141b27] text-slate-100">
+        <DialogHeader>
+          <DialogTitle>
+            {editing ? "Modifier le client" : "Nouveau client"}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-4">
+          <Field label="Nom *">
+            <Input
+              value={form.name}
+              onChange={event => setForm({ ...form, name: event.target.value })}
+            />
+          </Field>
+          <Field label="Type">
+            <Select
+              value={form.type}
+              onValueChange={value =>
+                setForm({ ...form, type: value as CustomerForm["type"] })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ordinary">
+                  Ordinaire · prix détail
+                </SelectItem>
+                <SelectItem value="wholesale">Grossiste · prix gros</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Adresse">
+            <Input
+              value={form.address}
+              onChange={event =>
+                setForm({ ...form, address: event.target.value })
+              }
+            />
+          </Field>
+          <Field label="Email">
+            <Input
+              type="email"
+              value={form.email}
+              onChange={event =>
+                setForm({ ...form, email: event.target.value })
+              }
+            />
+          </Field>
+          <Field label="Téléphone">
+            <Input
+              value={form.phone}
+              onChange={event =>
+                setForm({ ...form, phone: event.target.value })
+              }
+            />
+          </Field>
+          <Field label="Numéro fiscal">
+            <Input
+              value={form.taxNumber}
+              onChange={event =>
+                setForm({ ...form, taxNumber: event.target.value })
+              }
+            />
+          </Field>
+          <Field label="Notes">
+            <Textarea
+              value={form.notes}
+              onChange={event =>
+                setForm({ ...form, notes: event.target.value })
+              }
+              placeholder="Informations complémentaires"
+            />
+          </Field>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            Annuler
+          </Button>
+          <Button
+            onClick={onSave}
+            disabled={pending}
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            {editing ? "Enregistrer" : "Créer"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="space-y-2">
+      <Label className="text-xs text-slate-300">{label}</Label>
+      {children}
+    </div>
+  );
+}

@@ -33,3 +33,11 @@ pnpm-lock.yaml
 # OS files
 .DS_Store
 Thumbs.db
+
+# Migrations et instantanés générés par drizzle-kit
+drizzle/*.sql
+drizzle/meta/
+
+# Documentation rédigée à la main
+*.md
+docs/

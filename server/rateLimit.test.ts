@@ -14,4 +14,10 @@ describe("limiteur de débit d’authentification", () => {
     expect(consumeRateLimit("ip:test", 1, 1_000, 10)).toBe(true);
     expect(consumeRateLimit("ip:test", 1, 1_000, 1_011)).toBe(true);
   });
+
+  it("ne bloque pas les nouveaux clients quand la table est saturée", () => {
+    for (let index = 0; index < 10_000; index += 1)
+      consumeRateLimit(`flood:${index}`, 1, 60_000, 10);
+    expect(consumeRateLimit("ip:legitime", 5, 60_000, 20)).toBe(true);
+  });
 });

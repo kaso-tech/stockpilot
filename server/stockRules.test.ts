@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { isBelowMinimum, resultingStock, signedMovementQuantity } from "./stockRules";
+import {
+  isBelowMinimum,
+  resultingStock,
+  signedMovementQuantity,
+} from "./stockRules";
 
 describe("règles métier des stocks", () => {
   it("normalise les entrées et sorties avec le bon signe", () => {

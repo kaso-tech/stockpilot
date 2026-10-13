@@ -4,7 +4,6 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
 
 permissions:
   contents: read
@@ -12,7 +11,20 @@ permissions:
 jobs:
   quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: stockpilot
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,13 +39,23 @@ jobs:
           cache: pnpm
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Format
+        run: pnpm format:check
       - name: Typecheck
         run: pnpm check
       - name: Tests
         run: pnpm test
+      - name: Apply migrations on MySQL
+        env:
+          DATABASE_URL: mysql://root:root@127.0.0.1:3306/stockpilot
+        run: pnpm exec drizzle-kit migrate
+      - name: Database integration tests
+        env:
+          TEST_DATABASE_URL: mysql://root:root@127.0.0.1:3306/stockpilot
+        run: pnpm test:db
       - name: Tenant scope audit
-        run: node scripts/audit-tenant-scope.mjs
-      - name: Migration artifact check
-        run: test -s drizzle/0041_nosy_goblin_queen.sql
+        run: node scripts/audit-tenant-scope.mjs --strict
+      - name: Migration journal check
+        run: node scripts/check-migrations.mjs
       - name: Production build
         run: pnpm build

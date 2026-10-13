@@ -1,9 +1,8 @@
-import { jsxLocPlugin } from "@builder.io/vite-plugin-jsx-loc";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import fs from "node:fs";
 import path from "node:path";
-import { defineConfig, type Plugin, type ViteDevServer } from "vite";
+import { defineConfig, loadEnv, type Plugin, type ViteDevServer } from "vite";
 import { vitePluginManusRuntime } from "vite-plugin-manus-runtime";
 import { VitePWA } from "vite-plugin-pwa";
 
@@ -57,7 +56,7 @@ function writeToLogFile(source: LogSource, entries: unknown[]) {
   const logPath = path.join(LOG_DIR, `${source}.log`);
 
   // Format entries with timestamps
-  const lines = entries.map((entry) => {
+  const lines = entries.map(entry => {
     const ts = new Date().toISOString();
     return `[${ts}] ${JSON.stringify(entry)}`;
   });
@@ -99,6 +98,18 @@ function vitePluginManusDebugCollector(): Plugin {
     },
 
     configureServer(server: ViteDevServer) {
+      // Le script vit hors de publicDir pour ne jamais être copié dans le build de production.
+      server.middlewares.use("/__manus__/debug-collector.js", (_req, res) => {
+        res.writeHead(200, {
+          "Content-Type": "application/javascript; charset=utf-8",
+        });
+        res.end(
+          fs.readFileSync(
+            path.join(PROJECT_ROOT, "client", "dev", "debug-collector.js"),
+            "utf-8"
+          )
+        );
+      });
       // POST /__manus__/logs: Browser sends logs (written directly to files)
       server.middlewares.use("/__manus__/logs", (req, res, next) => {
         if (req.method !== "POST") {
@@ -133,7 +144,7 @@ function vitePluginManusDebugCollector(): Plugin {
         }
 
         let body = "";
-        req.on("data", (chunk) => {
+        req.on("data", chunk => {
           body += chunk.toString();
         });
 
@@ -151,10 +162,36 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
-const plugins = [
+/** Script d'analytics injecté seulement si son URL est configurée (sinon requête 404 en production). */
+function analyticsPlugin(mode: string): Plugin {
+  const env = loadEnv(mode, PROJECT_ROOT, "VITE_ANALYTICS_");
+  return {
+    name: "stockpilot-analytics",
+    transformIndexHtml(html) {
+      if (!env.VITE_ANALYTICS_ENDPOINT || !env.VITE_ANALYTICS_WEBSITE_ID)
+        return html;
+      return {
+        html,
+        tags: [
+          {
+            tag: "script",
+            attrs: {
+              defer: true,
+              src: `${env.VITE_ANALYTICS_ENDPOINT.replace(/\/+$/, "")}/umami`,
+              "data-website-id": env.VITE_ANALYTICS_WEBSITE_ID,
+            },
+            injectTo: "body",
+          },
+        ],
+      };
+    },
+  };
+}
+
+const createPlugins = (isBuild: boolean, mode: string) => [
+  analyticsPlugin(mode),
   react(),
   tailwindcss(),
-  jsxLocPlugin(),
   vitePluginManusRuntime(),
   vitePluginManusDebugCollector(),
   VitePWA({
@@ -175,6 +212,8 @@ const plugins = [
       clientsClaim: true,
       skipWaiting: true,
       navigateFallback: "/index.html",
+      // Les routes serveur (API, OAuth Google Drive, fichiers stockés) ne doivent jamais être servies par la coquille PWA.
+      navigateFallbackDenylist: [/^\/api\//, /^\/manus-storage\//],
       cleanupOutdatedCaches: true,
       maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
     },
@@ -182,8 +221,8 @@ const plugins = [
   }),
 ];
 
-export default defineConfig({
-  plugins,
+export default defineConfig(({ command, mode }) => ({
+  plugins: createPlugins(command === "build", mode),
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "client", "src"),
@@ -214,4 +253,4 @@ export default defineConfig({
       deny: ["**/.*"],
     },
   },
-});
+}));

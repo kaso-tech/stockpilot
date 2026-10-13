@@ -309,6 +309,20 @@
       "when": 1787580114279,
       "tag": "0043_peaceful_thor",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "5",
+      "when": 1791847555786,
+      "tag": "0044_tenant_scoped_uniques",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "5",
+      "when": 1791848630833,
+      "tag": "0045_sequences_timezone_credit_notes",
+      "breakpoints": true
     }
   ]
 }

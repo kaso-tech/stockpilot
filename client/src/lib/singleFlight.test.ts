@@ -6,8 +6,14 @@ describe("createSingleFlight", () => {
     const run = createSingleFlight<number>();
     let executions = 0;
     let release!: () => void;
-    const gate = new Promise<void>(resolve => { release = resolve; });
-    const task = async () => { executions += 1; await gate; return 42; };
+    const gate = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    const task = async () => {
+      executions += 1;
+      await gate;
+      return 42;
+    };
     const first = run(task);
     const second = run(task);
     release();

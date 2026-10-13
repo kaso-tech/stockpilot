@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { recommendedRestockQuantity, restockEstimateCents } from "../client/src/lib/replenishmentRules";
+import {
+  recommendedRestockQuantity,
+  restockEstimateCents,
+} from "../client/src/lib/replenishmentRules";
 
 describe("liste d’achats fournisseur", () => {
   it("propose une quantité qui fait sortir le produit du seuil d’alerte", () => {
