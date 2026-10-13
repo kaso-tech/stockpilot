@@ -1,4 +1,5 @@
 import { Input } from "@/components/ui/input";
+import { discountCents } from "@shared/pricing";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -27,12 +28,15 @@ export function calculateDiscount(
   discount: DiscountForm
 ) {
   const payload = discountPayload(discount);
-  if (payload.type === "percent")
-    return Math.min(
-      subtotalCents,
-      Math.round((subtotalCents * payload.value) / 10000)
+  try {
+    return discountCents(
+      Math.max(0, subtotalCents),
+      payload.type,
+      payload.value
     );
-  return Math.min(subtotalCents, payload.value);
+  } catch {
+    return 0;
+  }
 }
 
 export function DiscountEditor({

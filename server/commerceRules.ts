@@ -1,3 +1,4 @@
+import { selectQuantityTier, type QuantityPriceTier } from "@shared/pricing";
 export type CustomerType = "ordinary" | "wholesale";
 export type RemunerationMode = "fixed" | "commission" | "fixed_plus_commission";
 export type CommissionBasis = "revenue" | "net_profit";
@@ -13,12 +14,9 @@ export function priceForCustomer(
 export function priceForQuantityTier(
   basePriceCents: number,
   quantity: number,
-  tiers: Array<{ minQuantity: number; unitPriceCents: number }>
+  tiers: QuantityPriceTier[]
 ) {
-  const applicable = tiers
-    .filter(tier => tier.minQuantity <= quantity)
-    .sort((left, right) => right.minQuantity - left.minQuantity)[0];
-  return applicable?.unitPriceCents ?? basePriceCents;
+  return selectQuantityTier(basePriceCents, quantity, tiers).unitPriceCents;
 }
 
 export function commissionCents({

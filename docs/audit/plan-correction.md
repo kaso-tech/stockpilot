@@ -16,7 +16,7 @@ Règles d'exécution :
 | 5 | Sauvegardes complètes, restauration validée, stockage, Drive | E14, E15, S6, B2, B3, B4, B5 | ✅ Fait (B2 partiel) |
 | 6 | Code mort et dépendances (mise à jour + retrait) | §4, §2.5, H5 | ✅ Fait |
 | 7 | Corrections fonctionnelles (tableau de bord, fuseau horaire, pagination, inventaire, numérotation, remboursements) | E4–E8, E10, E12, E18 | ✅ Fait |
-| 8 | Performance et qualité (lazy loading, écritures par requête, requêtes non bornées, CI) | P1–P6, P10–P11, E22–E24 | 🔄 En cours |
+| 8 | Performance et qualité (lazy loading, écritures par requête, requêtes non bornées, CI) | P1–P7, P9–P11, E22–E24 | ✅ Fait |
 | 9 | Fonctionnalités manquantes (feuille de route, nécessite arbitrages produit) | §6 | ⏳ À planifier avec le métier |
 
 Le détail des modifications de chaque lot est consigné dans la section « Journal » ci-dessous au fil de l'eau.
@@ -135,3 +135,25 @@ Migration **`0045_sequences_timezone_credit_notes`** : table `documentSequences`
 - Tests : `server/test/lot7.functional.db.test.ts` (6 scénarios), `server/companyTime.test.ts`.
 
 **Restent à arbitrer (lot 9)** : remboursements partiels ligne à ligne et avoirs partiels (nécessitent un écran de sélection des articles).
+
+### Lot 8 — Performance et qualité
+
+- **P1** : chaque page est chargée à la demande (`React.lazy`) ; bundle initial **1,83 Mo → 630 Ko** (2,04 Mo avant l'audit). Le service worker précache tous les fragments : le mode hors connexion est inchangé.
+- **P2** : l'activité de session (`lastSeenAt`, `lastSignedIn`) n'est écrite qu'une fois toutes les 5 minutes au lieu de deux écritures par requête.
+- **P3** : paliers de prix chargés pour les seuls produits de l'entreprise et indexés par produit ; suppression des requêtes N+1 sur la fiche produit ; profils de rémunération lus par clé.
+- **P5** : pool MySQL configuré (`DB_POOL_SIZE`, keep-alive, délai de connexion) ; les lectures échouent explicitement si la base est indisponible au lieu de renvoyer une liste vide.
+- **P6** : plus de bascule silencieuse de port en production.
+- **P7** : code formaté avec Prettier (commit séparé, purement mécanique) et contrôlé en CI (`pnpm format:check`).
+- **P9** : règles de prix (paliers, remises) mutualisées dans `shared/pricing.ts`, utilisées par le client et le serveur.
+- **P10** : `GET /api/health` (état de la base), journalisation JSON des erreurs serveur tRPC avec identifiant de corrélation.
+- **P11** : validation de l'environnement au démarrage (secret de session, format des clés, avertissement si les sauvegardes ne sont pas chiffrées) et arrêt propre sur `SIGTERM`.
+- **E22** : tests d'intégration MySQL en CI (depuis le lot 1). **E23** : CI sur toutes les PR, contrôle de formatage, typage des fichiers de test (`tsconfig.json` ne les exclut plus). **E24** : `audit-tenant-scope.mjs` détecte désormais les lectures, mises à jour et suppressions sans filtre d'entreprise et les insertions sans `companyId` ; il est **bloquant** en CI (`--strict`), les exceptions doivent être justifiées par un commentaire `tenant-scope-ok`.
+
+**Découvertes pendant le lot (corrigées)**
+- `/manus-storage/*` servait tous les fichiers **sans authentification** : sauvegardes réservées aux administrateurs de l'entreprise, justificatifs de dépenses/paie aux membres de l'entreprise ; logos et signatures restent publics.
+- Hors hébergement Manus (sans `VITE_APP_ID`), **aucune session n'était valide** : la vérification exigeait un `appId` non vide. L'`appId` n'est plus exigé que s'il est configuré.
+- Vérification de bout en bout sur le serveur de production compilé (MySQL réel) : santé, en-têtes, refus CSRF (415), fichiers privés (404), inscription → connexion → tableau de bord → déconnexion, 5 pages ouvertes dans Chromium sans erreur console.
+
+**Non traités dans ce lot (justification)**
+- **P8** (catégories et unités stockées en texte dans les produits) : passer à des clés étrangères impose de reprendre les écrans produits, l'import CSV et les sauvegardes ; proposé au lot 9.
+- **P12** (couplage à la plateforme Manus : stockage Forge, tâches planifiées) : choix d'hébergement ; à traiter si l'application quitte Manus (le stockage S3 serait alors la cible naturelle, cf. B2).
