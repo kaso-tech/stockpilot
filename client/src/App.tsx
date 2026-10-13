@@ -9,6 +9,7 @@ import { PreferencesProvider } from "./contexts/PreferencesContext";
 import { OfflineProvider } from "./contexts/OfflineContext";
 import { ActiveWarehouseProvider } from "./contexts/ActiveWarehouseContext";
 import { OfflineQueryCacheBridge } from "./components/OfflineQueryCacheBridge";
+import { PwaUpdateNotice } from "./components/PwaUpdateNotice";
 import Alerts from "./pages/Alerts";
 import Agents from "./pages/Agents";
 import AgentDetail from "./pages/AgentDetail";
@@ -136,7 +137,7 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider defaultTheme="dark" switchable>
         <TooltipProvider>
-          <PreferencesProvider><ActiveWarehouseProvider><OfflineProvider><OfflineQueryCacheBridge /><Toaster richColors closeButton position="top-right" /><Router /></OfflineProvider></ActiveWarehouseProvider></PreferencesProvider>
+          <PreferencesProvider><ActiveWarehouseProvider><OfflineProvider><OfflineQueryCacheBridge /><Toaster richColors closeButton position="top-right" /><PwaUpdateNotice /><Router /></OfflineProvider></ActiveWarehouseProvider></PreferencesProvider>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

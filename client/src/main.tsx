@@ -1,24 +1,25 @@
 import { trpc } from "@/lib/trpc";
 import { COOKIE_NAME, UNAUTHED_ERR_MSG } from '@shared/const';
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import { registerSW } from "virtual:pwa-register";
 import App from "./App";
 import { requestPersistentOfflineStorage } from "./lib/offlineStore";
+import { announcePwaUpdateAvailable, createOfflineFirstQueryClient, shouldRegisterServiceWorker } from "./lib/offlineRuntime";
 import "./index.css";
 
-const queryClient = new QueryClient();
+const queryClient = createOfflineFirstQueryClient();
 void requestPersistentOfflineStorage();
 
-// Apply service-worker updates immediately so an installed PWA receives the
-// internal email/password authentication flow without stale client bundles.
-if ("serviceWorker" in navigator) {
+// Une mise à jour ne peut jamais interrompre une saisie en cours : elle est
+// proposée dans l’interface puis appliquée uniquement sur action explicite.
+if ("serviceWorker" in navigator && shouldRegisterServiceWorker(import.meta.env.PROD, import.meta.env.VITE_ENABLE_PWA_DEV === "true")) {
   const updateSW = registerSW({
-    immediate: true,
+    immediate: false,
     onNeedRefresh() {
-      void updateSW(true);
+      announcePwaUpdateAvailable(() => updateSW(true));
     },
   });
 }

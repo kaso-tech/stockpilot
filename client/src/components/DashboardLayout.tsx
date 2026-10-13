@@ -94,6 +94,7 @@ const menuSections: MenuSection[] = [
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { loading, user } = useAuth();
+  const utils = trpc.useUtils();
   const [publicLocation, setPublicLocation] = useLocation();
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [companyName, setCompanyName] = useState("");
@@ -103,9 +104,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [emailToCheck, setEmailToCheck] = useState("");
-  const returnToDashboard = () => window.location.replace("/");
+  const returnToDashboard = async () => { await utils.auth.me.invalidate(); setPublicLocation("/"); };
   const passwordLogin = trpc.auth.passwordLogin.useMutation({ onSuccess: returnToDashboard });
-  const registerCompany = trpc.auth.registerCompany.useMutation({ onSuccess: () => window.location.replace("/parametres/identite") });
+  const registerCompany = trpc.auth.registerCompany.useMutation({ onSuccess: async () => { await utils.auth.me.invalidate(); setPublicLocation("/parametres/identite"); } });
   const emailLooksValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   useEffect(() => { const timer = window.setTimeout(() => setEmailToCheck(email.trim().toLowerCase()), 500); return () => window.clearTimeout(timer); }, [email]);
   const emailAvailability = trpc.auth.emailAvailability.useQuery({ email: emailToCheck || "invalide@example.test" }, { enabled: authMode === "register" && emailLooksValid && emailToCheck === email.trim().toLowerCase() });

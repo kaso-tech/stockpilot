@@ -13,7 +13,7 @@ Ce document est la référence opérationnelle avant toute ouverture commerciale
 | Continuité | Partiellement validée | Sauvegarde 6 h, 30 archives, RPO 6 h, RTO cible 8 h. [4] | Exécuter et consigner une restauration témoin sur recette. |
 | Offline | Encadré | Cache séparé entreprise-utilisateur-entrepôt ; stock local estimé. [5] | Ne pas promettre un usage autonome multi-jours sans test terrain, quota et chiffrement local. |
 | Qualité | Contrôle technique validé | Tests, build, audit, artefacts de migrations et routes sensibles contrôlés. [1] | Conserver une recette manuelle par version majeure. |
-| Paiement SaaS | Reporté | Aucun paiement réel ni webhook activé. [6] | Choix prestataire, pays, devises, fiscalité, remboursement et support requis. |
+| Paiement SaaS | En pause SANDBOX | Le verrou PayIn est fermé : aucun checkout, paiement ou abonnement ne peut être créé. [6] | Validation API SANDBOX, webhook/réconciliation, choix prestataire, pays, devises, fiscalité, remboursement et support requis. |
 | Conformité | À valider | Pages d’information existantes à adapter à la juridiction ciblée. [7] [8] [9] | Revue par un professionnel compétent avant allégation de conformité. |
 
 ## 2. Décisions et informations à obtenir avant une ouverture large
@@ -24,7 +24,7 @@ L’exploitant doit désigner un responsable opérationnel, un contact incident 
 |---|---|---|---|
 | Juridictions et cadre de protection des données | Propriétaire et conseil compétent | À confirmer | Aucune promesse de conformité locale. |
 | Politique de rétention par catégorie de données | Propriétaire et responsable données | À confirmer | Conservation limitée aux règles techniques existantes ; aucune purge automatique nouvelle. |
-| Prestataire de paiement, devises et remboursements | Propriétaire | Reporté | Aucun encaissement SaaS réel. |
+| Prestataire de paiement, devises et remboursements | Propriétaire | En pause SANDBOX | Aucun encaissement SaaS réel ni de test tant que le verrou technique reste fermé. |
 | Revue de sécurité indépendante | Responsable technique et prestataire retenu | À planifier | Pilotage restreint et suivi renforcé. |
 | Restauration témoin de recette | Responsable exploitation | À exécuter | Ne pas déclarer le RTO atteint en conditions réelles. |
 

@@ -19,10 +19,11 @@ function authenticatedContext() {
 
 describe("auth.sessions", () => {
   const updates: Array<{ values: Record<string, unknown>; id: string }> = [];
+  const activeSessionExpiry = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30);
   const sessions = [
-    { id: currentSessionId, userId: 7, deviceLabel: "Ordinateur Windows", userAgent: null, createdAt: new Date("2026-08-20"), lastSeenAt: new Date("2026-08-23"), expiresAt: new Date("2026-09-22"), revokedAt: null },
-    { id: otherSessionId, userId: 7, deviceLabel: "Appareil Android", userAgent: null, createdAt: new Date("2026-08-21"), lastSeenAt: new Date("2026-08-22"), expiresAt: new Date("2026-09-22"), revokedAt: null },
-    { id: "33333333-3333-4333-8333-333333333333", userId: 7, deviceLabel: "Ordinateur Mac", userAgent: null, createdAt: new Date("2026-08-19"), lastSeenAt: new Date("2026-08-20"), expiresAt: new Date("2026-09-22"), revokedAt: new Date("2026-08-21") },
+    { id: currentSessionId, userId: 7, deviceLabel: "Ordinateur Windows", userAgent: null, createdAt: new Date("2026-08-20"), lastSeenAt: new Date("2026-08-23"), expiresAt: activeSessionExpiry, revokedAt: null },
+    { id: otherSessionId, userId: 7, deviceLabel: "Appareil Android", userAgent: null, createdAt: new Date("2026-08-21"), lastSeenAt: new Date("2026-08-22"), expiresAt: activeSessionExpiry, revokedAt: null },
+    { id: "33333333-3333-4333-8333-333333333333", userId: 7, deviceLabel: "Ordinateur Mac", userAgent: null, createdAt: new Date("2026-08-19"), lastSeenAt: new Date("2026-08-20"), expiresAt: activeSessionExpiry, revokedAt: new Date("2026-08-21") },
   ];
 
   beforeEach(() => {

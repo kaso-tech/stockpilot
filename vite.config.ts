@@ -80,7 +80,7 @@ function vitePluginManusDebugCollector(): Plugin {
     name: "manus-debug-collector",
 
     transformIndexHtml(html) {
-      if (process.env.NODE_ENV === "production") {
+      if (process.env.NODE_ENV === "production" || process.env.MANUS_DEBUG_COLLECTOR !== "true") {
         return html;
       }
       return {
@@ -158,7 +158,7 @@ const plugins = [
   vitePluginManusRuntime(),
   vitePluginManusDebugCollector(),
   VitePWA({
-    registerType: "autoUpdate",
+    registerType: "prompt",
     injectRegister: false,
     manifest: {
       name: "StockPilot Pro",
@@ -172,13 +172,11 @@ const plugins = [
       background_color: "#09111d",
     },
     workbox: {
-      clientsClaim: true,
-      skipWaiting: true,
       navigateFallback: "/index.html",
       cleanupOutdatedCaches: true,
       maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
     },
-    devOptions: { enabled: true },
+    devOptions: { enabled: process.env.VITE_ENABLE_PWA_DEV === "true" },
   }),
 ];
 

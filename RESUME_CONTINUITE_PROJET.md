@@ -361,3 +361,12 @@ L’endpoint ne crée pas de paiement et n’active aucun abonnement ; même un 
 L’offre historique a été convertie, après confirmation explicite, en **Test** à **1 000 XOF**, en modalité **mensuelle** et avec **un jour d’essai**. La migration `0076_same_blackheart.sql` ajoute un prix général aux offres et étend les modalités à `monthly`, `annual` et `lifetime`, sans supprimer la compatibilité du champ mensuel historique. La console plateforme permet maintenant de créer une offre avec un prix en FCFA, une modalité et une période d’essai. Les montants, la devise XOF et les trois modalités sont contrôlés côté serveur.
 
 L’espace propriétaire `/abonnement` et l’intention PayIn tenant-scopée sont préparés : le checkout est réservé au propriétaire, une référence unique est créée côté serveur et l’activation reste liée à une notification signée et à la réconciliation. Toutefois, le fournisseur retourne un refus d’authentification lors du test de création PayIn SANDBOX. Un verrou explicite empêche donc toute ouverture de checkout tant qu’une clé SANDBOX reconnue, liée au bon projet et autorisée pour « Créer un paiement entrant », n’a pas été validée. Aucun paiement, abonnement ou changement de souscription n’a été déclenché par ces essais.
+
+
+## Mise à jour — stabilité offline et pause YengaPay (13 octobre 2026)
+
+Le collecteur de diagnostic de prévisualisation, dont le rythme de rapport était de deux secondes, est désormais désactivé par défaut. Il ne peut être réactivé qu’en développement avec `MANUS_DEBUG_COLLECTOR=true`. Le client React Query applique une politique offline-first : aucune revalidation lors d’un changement de fenêtre ou d’un retour réseau, aucun polling global, cache conservé une journée et nouvelles requêtes traitées en mode compatible offline.
+
+La PWA ne force plus l’activation d’un service worker ni un rechargement automatique. Une version disponible est annoncée à l’utilisateur, qui peut choisir de l’appliquer après avoir terminé ses saisies. La navigation après connexion, inscription et finalisation de l’assistant de démarrage utilise désormais des invalidations tRPC ciblées et le routeur SPA plutôt qu’un rechargement de document.
+
+YengaPay demeure en **pause SANDBOX** : `YENGAPAY_PAYIN_ENABLED` est requis et reste désactivé ; l’écran d’abonnement interdit toute création de checkout tant que le verrou est fermé. Ne pas modifier ce statut, relancer la sonde PayIn ni activer un paiement sans la validation technique et l’accord explicite prévus au lot I.

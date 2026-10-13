@@ -1000,3 +1000,14 @@
 - [x] Lot J : consolider les procédures internes de sécurité, continuité, incident et support à partir des contrôles réellement disponibles dans l’application.
 - [x] Lot J : ajouter un parcours de vérification de préparation commerciale sans promettre de conformité juridique ni de risque nul.
 - [x] Lot J : exécuter les contrôles de release finaux et documenter les décisions requises avant d’activer les paiements ou une ouverture commerciale large.
+
+
+## Correctif prioritaire — stabilité hors connexion et intégration en pause (13 octobre 2026)
+
+- [x] Maintenir YengaPay SANDBOX désactivé : aucun checkout, paiement, abonnement ou appel PayIn ne sera déclenché pendant ce correctif.
+- [x] Supprimer la télémétrie de prévisualisation à cadence de 2 s et empêcher toute actualisation automatique non sollicitée de l’interface.
+- [x] Rendre les mises à jour PWA explicites et différées afin qu’elles ne rechargent jamais une session active sans action de l’utilisateur.
+- [x] Stabiliser le cache React Query par portée entreprise-utilisateur-entrepôt, sans purge ni réhydratation quand la portée métier est inchangée.
+- [x] Désactiver les revalidations réseau automatiques incompatibles avec l’usage hors connexion, tout en conservant la synchronisation déclenchée par retour réseau ou action utilisateur.
+- [x] Ajouter des tests unitaires des politiques de cache et de mise à jour PWA, puis exécuter typage, tests, build et vérification de release.
+- [x] Documenter honnêtement la mise en pause YengaPay et le correctif offline, puis créer un checkpoint de validation.

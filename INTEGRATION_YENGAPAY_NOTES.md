@@ -18,6 +18,12 @@ Les chemins HTTP détaillés et les exemples de corps des notifications ne sont 
 
 > **Décision de sécurité :** l’intégration restera en environnement de test tant que les identifiants dédiés, la documentation de signature, les pays/devises, les conditions commerciales et la fiscalité ne sont pas confirmés par le propriétaire.
 
+## Mise en pause opérationnelle — 13 octobre 2026
+
+À la demande du propriétaire, l’intégration PayIn YengaPay reste **explicitement en pause**. Le verrou serveur `YENGAPAY_PAYIN_ENABLED` demeure désactivé par défaut et l’espace propriétaire affiche désormais cet état : aucun bouton ne déclenche de création d’intention, de checkout, de paiement ou d’abonnement. Les secrets SANDBOX existants ne sont ni lus, ni modifiés, ni exposés dans le cadre de cette pause.
+
+La reprise nécessitera une validation API SANDBOX réussie, un schéma webhook confirmé, les tests de réconciliation idempotente et une décision explicite distincte avant toute activation du verrou. Aucune capacité de production n’est concernée.
+
 ## Référence
 
 [1]: https://yengapay.com/ "YengaPay — passerelle de paiement Mobile Money"

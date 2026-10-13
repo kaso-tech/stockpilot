@@ -1,6 +1,7 @@
 import { useActiveWarehouse } from "@/contexts/ActiveWarehouseContext";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { persistOfflineQueryCache, restoreOfflineQueryCache } from "@/lib/offlineCache";
+import { shouldClearOfflineQueryMemory } from "@/lib/offlineRuntime";
 import { offlineScopeKey, type OfflineScope } from "@/lib/offlineStore";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef } from "react";
@@ -16,12 +17,13 @@ export function OfflineQueryCacheBridge() {
     return user && typeof companyId === "number" && Number.isInteger(companyId) && companyId > 0 && typeof activeWarehouseId === "number" && Number.isInteger(activeWarehouseId) && activeWarehouseId > 0
       ? { companyId, userId: user.id, warehouseId: activeWarehouseId }
       : null;
-  }, [activeWarehouseId, user]);
+  }, [activeWarehouseId, user?.companyId, user?.id]);
 
   useEffect(() => {
     let active = true;
     const scopeKey = scope ? offlineScopeKey(scope) : null;
-    const shouldClearMemory = previousScopeKeyRef.current !== null && previousScopeKeyRef.current !== scopeKey;
+    const previousScopeKey = previousScopeKeyRef.current;
+    const shouldClearMemory = shouldClearOfflineQueryMemory(previousScopeKey, scopeKey);
     previousScopeKeyRef.current = scopeKey;
     if (shouldClearMemory) queryClient.clear();
     if (!scope) return () => { active = false; };
@@ -30,9 +32,9 @@ export function OfflineQueryCacheBridge() {
     return () => {
       active = false;
       unsubscribe();
-      queryClient.clear();
+      if (previousScopeKeyRef.current !== scopeKey) queryClient.clear();
     };
-  }, [queryClient, scope]);
+  }, [queryClient, scope?.companyId, scope?.userId, scope?.warehouseId]);
 
   return null;
 }

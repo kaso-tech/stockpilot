@@ -21,11 +21,13 @@ export default function Home() {
   const isAdmin = user?.role === "admin";
   const { activeWarehouseId, activeWarehouse } = useActiveWarehouse();
   const [, setLocation] = useLocation();
+  const utils = trpc.useUtils();
   const { data, isLoading } = trpc.dashboard.get.useQuery(isAdmin && activeWarehouseId ? { warehouseId: activeWarehouseId } : undefined);
   const { data: savedPreferences } = trpc.dashboardPreferences.get.useQuery();
   const { data: onboarding, isLoading: onboardingLoading } = trpc.onboarding.status.useQuery(undefined, { enabled: isAdmin });
-  const onboardingComplete = trpc.onboarding.complete.useMutation({ onSuccess: () => window.location.reload() });
-  const onboardingSkip = trpc.onboarding.skip.useMutation({ onSuccess: () => window.location.reload() });
+  const refreshOnboarding = async () => { await Promise.all([utils.onboarding.status.invalidate(), utils.dashboard.get.invalidate()]); };
+  const onboardingComplete = trpc.onboarding.complete.useMutation({ onSuccess: refreshOnboarding });
+  const onboardingSkip = trpc.onboarding.skip.useMutation({ onSuccess: refreshOnboarding });
   const role = user?.role === "seller" ? "seller" : "admin";
   const [preferences, setPreferences] = useState(() => dashboardPreferencesForRole(role));
   useEffect(() => { try { setPreferences(savedPreferences?.preferencesJson ? normalizeDashboardPreferences(JSON.parse(savedPreferences.preferencesJson), role) : dashboardPreferencesForRole(role)); } catch { setPreferences(dashboardPreferencesForRole(role)); } }, [savedPreferences?.preferencesJson, role]);

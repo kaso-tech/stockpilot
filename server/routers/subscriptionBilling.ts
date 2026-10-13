@@ -63,7 +63,12 @@ export const subscriptionBillingRouter = router({
       db.select({ id: subscriptionPlans.id, code: subscriptionPlans.code, name: subscriptionPlans.name, description: subscriptionPlans.description, priceCents: subscriptionPlans.priceCents, currency: subscriptionPlans.currency, billingInterval: subscriptionPlans.billingInterval, trialDays: subscriptionPlans.trialDays }).from(subscriptionPlans).where(eq(subscriptionPlans.active, true)).orderBy(subscriptionPlans.sortOrder, subscriptionPlans.name),
       db.select().from(saasPaymentIntents).where(eq(saasPaymentIntents.companyId, ctx.user.companyId)).orderBy(desc(saasPaymentIntents.createdAt)).limit(8),
     ]);
-    return { subscription: subscription[0] ?? null, plans, intents: intents.map(publicIntent) };
+    return {
+      subscription: subscription[0] ?? null,
+      plans,
+      intents: intents.map(publicIntent),
+      checkoutEnabled: isYengaPaySandboxPayInEnabled(),
+    };
   }),
 
   createCheckout: protectedProcedure.input(checkoutInput).mutation(async ({ ctx, input }) => {
