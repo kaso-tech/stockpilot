@@ -17,7 +17,7 @@ Règles d'exécution :
 | 6 | Code mort et dépendances (mise à jour + retrait) | §4, §2.5, H5 | ✅ Fait |
 | 7 | Corrections fonctionnelles (tableau de bord, fuseau horaire, pagination, inventaire, numérotation, remboursements) | E4–E8, E10, E12, E18 | ✅ Fait |
 | 8 | Performance et qualité (lazy loading, écritures par requête, requêtes non bornées, CI) | P1–P7, P9–P11, E22–E24 | ✅ Fait |
-| 9 | Fonctionnalités manquantes (feuille de route, nécessite arbitrages produit) | §6, P8, B2, P12 | 🔄 En cours |
+| 9 | Fonctionnalités manquantes (feuille de route, nécessite arbitrages produit) | §6, P8, B2, P12 | ✅ Fait (paiement en ligne : prestataire à choisir) |
 
 Le détail des modifications de chaque lot est consigné dans la section « Journal » ci-dessous au fil de l'eau.
 
@@ -278,3 +278,14 @@ Ces évolutions ne corrigent pas un défaut : elles ajoutent des capacités et e
 - **Paramètres › Abonnement et données** : offre, consommation, fin d'essai ; **export de toutes les données** en JSON lisible (sans empreintes de mots de passe) ; **suppression définitive de l'entreprise** après saisie de son nom (toutes les tables, sessions, jetons, réglages, compteurs, archives et fichiers stockés quand le pilote le permet).
 - Paiement en ligne : non branché (aucun prestataire choisi) ; le modèle d'abonnement (plan, échéance, statut) est prêt à recevoir les notifications d'un prestataire (Stripe, CinetPay, PayDunya…).
 - Tests : `server/test/lot9.saas.db.test.ts` (5 scénarios).
+
+### Lot 9.11 — Tests de bout en bout
+
+- Playwright (`@playwright/test`, `playwright.config.ts`, dossier `e2e/`) sur le **serveur de production compilé** et une base MySQL dédiée recréée et migrée à chaque campagne (`scripts/e2e-prepare-db.mjs`, refuse toute base dont le nom ne contient pas « e2e »).
+- Scénarios : inscription → bandeau de vérification → déconnexion → reconnexion ; mauvais mot de passe puis « mot de passe oublié » ; **ouverture des 27 pages principales sans erreur JavaScript** ; **vente au comptoir complète** (recherche produit, panier, choix des intervenants, encaissement en espèces, stock décrémenté).
+- Défaut révélé et corrigé : deux zones `<main>` imbriquées (accessibilité) ; la page n'en compte plus qu'une.
+- CI : installation de Chromium, `pnpm test:e2e` après le build, rapport Playwright conservé 7 jours en cas d'échec.
+
+## Bilan du lot 9
+
+Les onze sous-lots sont livrés. Seul reste hors périmètre le **branchement d'un prestataire de paiement en ligne** pour les abonnements, qui suppose de choisir un prestataire et d'ouvrir un compte marchand ; le modèle (plan, échéance, statut, suspension) est prêt à le recevoir.

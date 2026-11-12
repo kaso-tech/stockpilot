@@ -998,7 +998,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
             />
           </div>
         </header>
-        <main
+        <div
           key={currency}
           className="min-h-screen bg-[radial-gradient(circle_at_80%_-5%,rgba(34,211,238,0.05),transparent_24%),linear-gradient(rgba(255,255,255,0.012)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.012)_1px,transparent_1px)] bg-[size:auto,44px_44px,44px_44px] p-4 sm:p-6 lg:p-8"
         >
@@ -1019,7 +1019,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           )}
           {user && !user.emailVerifiedAt && <EmailVerificationBanner />}
           {children}
-        </main>
+        </div>
       </SidebarInset>
     </>
   );

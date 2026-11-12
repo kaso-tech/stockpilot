@@ -23,6 +23,6 @@ export default defineConfig({
       "shared/**/*.test.ts",
     ],
     // Les tests *.db.test.ts exigent MySQL : voir vitest.db.config.ts et `pnpm test:db`.
-    exclude: ["**/node_modules/**", "server/**/*.db.test.ts"],
+    exclude: ["**/node_modules/**", "server/**/*.db.test.ts", "e2e/**"],
   },
 });

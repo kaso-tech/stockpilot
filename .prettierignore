@@ -41,3 +41,6 @@ drizzle/meta/
 # Documentation rédigée à la main
 *.md
 docs/
+
+playwright-report/
+test-results/
