@@ -622,6 +622,8 @@ export const inventorySessions = mysqlTable("inventorySessions", {
   id: int("id").autoincrement().primaryKey(),
   companyId: int("companyId"),
   name: varchar("name", { length: 160 }).notNull(),
+  /** Dépôt inventorié (9.7) ; NULL pour les inventaires antérieurs (dépôt par défaut). */
+  warehouseId: int("warehouseId"),
   status: mysqlEnum("status", ["draft", "validated"])
     .notNull()
     .default("draft"),
@@ -657,6 +659,9 @@ export const stockMovements = mysqlTable(
     previousQuantity: int("previousQuantity").notNull(),
     resultingQuantity: int("resultingQuantity").notNull(),
     reason: varchar("reason", { length: 255 }).notNull(),
+    /** Dépôt concerné (9.7) et coût unitaire d'entrée retenu pour le coût moyen pondéré. */
+    warehouseId: int("warehouseId"),
+    unitCostCents: int("unitCostCents"),
     createdByUserId: int("createdByUserId").notNull(),
     occurredAt: timestamp("occurredAt").defaultNow().notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -883,6 +888,61 @@ export const cashClosures = mysqlTable(
     unique("cash_closures_company_day_unique").on(
       table.companyId,
       table.businessDay
+    ),
+  ]
+);
+
+/** Dépôts / magasins d'une entreprise (9.7). Un dépôt par défaut reçoit ventes et réceptions. */
+export const warehouses = mysqlTable(
+  "warehouses",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    companyId: int("companyId"),
+    name: varchar("name", { length: 120 }).notNull(),
+    isDefault: boolean("isDefault").notNull().default(false),
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [
+    unique("warehouses_company_name_unique").on(table.companyId, table.name),
+  ]
+);
+
+/** Stock d'un produit dans un dépôt ; `products.quantity` en reste la somme. */
+export const productStocks = mysqlTable(
+  "productStocks",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    productId: int("productId").notNull(),
+    warehouseId: int("warehouseId").notNull(),
+    quantity: int("quantity").notNull().default(0),
+  },
+  table => [
+    unique("product_stocks_product_warehouse_unique").on(
+      table.productId,
+      table.warehouseId
+    ),
+  ]
+);
+
+/** Lots reçus avec date de péremption ; consommés en premier expiré, premier sorti (FEFO). */
+export const stockLots = mysqlTable(
+  "stockLots",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    companyId: int("companyId"),
+    productId: int("productId").notNull(),
+    warehouseId: int("warehouseId").notNull(),
+    lotNumber: varchar("lotNumber", { length: 80 }).notNull(),
+    expiryDate: varchar("expiryDate", { length: 10 }),
+    quantity: int("quantity").notNull(),
+    receivedAt: timestamp("receivedAt").defaultNow().notNull(),
+  },
+  table => [
+    index("stock_lots_product_idx").on(table.productId, table.warehouseId),
+    index("stock_lots_company_expiry_idx").on(
+      table.companyId,
+      table.expiryDate
     ),
   ]
 );

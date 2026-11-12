@@ -258,3 +258,13 @@ Ces évolutions ne corrigent pas un défaut : elles ajoutent des capacités et e
 - Droits : `accounting.export` (administrateur, gérant, comptable) et `cash.close` (administrateur, gérant, vendeur).
 - Client : page **Caisse & comptabilité** (menu « Finance »).
 - Tests : `server/test/lot9.accounting.db.test.ts` (4 scénarios).
+
+### Lot 9.7 — Dépôts, lots et péremption, coût moyen pondéré
+
+- Migrations **`0052_warehouses_lots_valuation`** (tables `warehouses`, `productStocks`, `stockLots` ; `stockMovements.warehouseId` et `unitCostCents` ; création d'un **dépôt principal par entreprise qui reprend tout le stock existant**) et **`0053_inventory_warehouse`**.
+- `StockLedger` (point de passage unique des mouvements depuis le lot 3) gère désormais : le stock **par dépôt** (verrouillé, refus de sortir plus que le stock du dépôt), `products.quantity` restant le total ; le **coût moyen unitaire pondéré** mis à jour à chaque réception au prix d'achat de la ligne du bon ; les **lots** reçus avec date de péremption, consommés en **premier expiré, premier sorti** (les lots suivis partent avant le stock initial non suivi) ; les **transferts** entre dépôts (les lots suivent la marchandise, le total ne change pas).
+- Ventes, retours et corrections utilisent le dépôt par défaut ; réception, correction manuelle et inventaire peuvent viser un autre dépôt. L'inventaire compare au stock du dépôt inventorié.
+- Routeur `warehouses` : liste, création, dépôt par défaut, désactivation (impossible s'il reste du stock), stock par dépôt, transfert, lots périmés ou à péremption proche.
+- Sauvegardes : dépôts, stocks par dépôt, lots, retours, avoirs et clôtures de caisse inclus et validés ; une archive antérieure n'efface plus les tables qu'elle ne contient pas (le stock restauré est replacé dans le dépôt par défaut).
+- Client : page **Dépôts** (dépôts, transferts, lots à surveiller, stock par dépôt), lot et péremption à la réception d'un bon de commande avec choix du dépôt, choix du dépôt à la création d'un inventaire, bandeau des lots à surveiller sur la page Alertes.
+- Tests : `server/test/lot9.warehouses.db.test.ts` (6 scénarios).

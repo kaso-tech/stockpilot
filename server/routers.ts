@@ -21,6 +21,7 @@ import {
   inventorySessions,
   productCategories,
   productUnits,
+  productStocks,
   products,
   productPriceTiers,
   remunerationProfiles,
@@ -77,6 +78,7 @@ import { transactionsRouter } from "./routers/transactions";
 import { expensesRouter } from "./routers/expenses";
 import { documentsRouter } from "./routers/documents";
 import { accountingRouter } from "./routers/accounting";
+import { warehousesRouter } from "./routers/warehouses";
 import {
   agentPaymentExpenseRows,
   budgetComparison,
@@ -102,7 +104,7 @@ import { conflictOr } from "./dbErrors";
 import { ROLE_LABELS, ROLES } from "@shared/permissions";
 import { appUrl, sendMail } from "./mailer";
 import { consumeToken, issueToken } from "./authTokens";
-import { lockProducts } from "./stockLedger";
+import { defaultWarehouseId, lockProducts } from "./stockLedger";
 import { nextDocumentNumber } from "./documentNumbers";
 import { companyTimezone, dayKey, lastDayKeys, monthKey } from "./companyTime";
 
@@ -397,6 +399,7 @@ export const appRouter = router({
   expenses: expensesRouter,
   documents: documentsRouter,
   accounting: accountingRouter,
+  warehouses: warehousesRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(async ({ ctx }) => {
@@ -1305,6 +1308,11 @@ export const appRouter = router({
               companyId: ctx.user.companyId,
             });
             const id = Number(result[0].insertId);
+            await tx.insert(productStocks).values({
+              productId: id,
+              warehouseId: await defaultWarehouseId(tx, ctx.user.companyId),
+              quantity: productData.quantity,
+            });
             const tiers = [
               ...retailTiers.map(tier => ({
                 ...tier,
@@ -2424,10 +2432,18 @@ export const appRouter = router({
               z.object({
                 id: z.number().int().positive(),
                 quantity: z.number().int().positive().max(MAX_QUANTITY),
+                /** Lot reçu et date de péremption (facultatifs). */
+                lotNumber: z.string().trim().min(1).max(80).optional(),
+                expiryDate: z
+                  .string()
+                  .regex(/^\d{4}-\d{2}-\d{2}$/)
+                  .optional(),
               })
             )
             .min(1)
             .max(100),
+          /** Dépôt de réception ; à défaut, le dépôt par défaut. */
+          warehouseId: z.number().int().positive().optional(),
         })
       )
       .mutation(async ({ ctx, input }) => {
@@ -2549,12 +2565,22 @@ export const appRouter = router({
                 message:
                   "Ce bon a été modifié. Actualisez la page avant de poursuivre.",
               });
+            const line = input.lines.find(value => value.id === item.id);
             await ledger.apply(item.productId, {
               type: "entry",
               quantity: receivedNow,
               supplierId: order.supplierId,
               reason: `Réception partielle du bon ${order.orderNumber}`,
               createdByUserId: ctx.user.id,
+              warehouseId: input.warehouseId,
+              // Coût moyen pondéré (9.7) : prix d'achat de la ligne du bon.
+              unitCostCents: item.purchasePriceCents,
+              lot: line?.lotNumber
+                ? {
+                    lotNumber: line.lotNumber,
+                    expiryDate: line.expiryDate ?? null,
+                  }
+                : null,
             });
           }
           const complete = items.every(
@@ -2616,6 +2642,7 @@ export const appRouter = router({
               "La quantité doit être différente de zéro."
             ),
           reason: z.string().trim().min(3).max(255),
+          warehouseId: z.number().int().positive().optional(),
         })
       )
       .mutation(async ({ ctx, input }) => {
@@ -2680,6 +2707,7 @@ export const appRouter = router({
               reason: input.reason,
               supplierId: input.supplierId,
               createdByUserId: ctx.user.id,
+              warehouseId: input.warehouseId,
             }
           );
           await tx.insert(auditLogs).values({

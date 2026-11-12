@@ -365,6 +365,20 @@
       "when": 1794502168401,
       "tag": "0051_cash_closures",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "5",
+      "when": 1794502463288,
+      "tag": "0052_warehouses_lots_valuation",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "5",
+      "when": 1794502639024,
+      "tag": "0053_inventory_warehouse",
+      "breakpoints": true
     }
   ]
 }

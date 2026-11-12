@@ -1,18 +1,68 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import {
   auditLogs,
   inventoryItems,
   inventorySessions,
+  productStocks,
   products,
+  warehouses,
 } from "../../drizzle/schema";
 import { getDb } from "../db";
 import { protectedProcedure, router, permissionProcedure } from "../_core/trpc";
 import { inventoryDifference } from "../inventoryRules";
-import { lockProducts } from "../stockLedger";
+import { defaultWarehouseId, lockProducts } from "../stockLedger";
 import { MAX_QUANTITY } from "../numericLimits";
 import { companyScope } from "../companyScope";
+
+async function resolveWarehouse(
+  db: any,
+  companyId: number | null,
+  warehouseId?: number
+) {
+  if (!warehouseId) return defaultWarehouseId(db, companyId);
+  const row = (
+    await db
+      .select({ id: warehouses.id })
+      .from(warehouses)
+      .where(
+        and(
+          eq(warehouses.id, warehouseId),
+          eq(warehouses.active, true),
+          companyScope(warehouses.companyId, companyId)
+        )
+      )
+      .limit(1)
+  )[0];
+  if (!row)
+    throw new TRPCError({ code: "NOT_FOUND", message: "Dépôt introuvable." });
+  return row.id as number;
+}
+
+/** Quantités d'un dépôt pour une liste de produits (les produits du dépôt sont déjà vérifiés). */
+async function warehouseStocks(
+  db: any,
+  warehouseId: number,
+  productIds: number[]
+) {
+  if (!productIds.length) return new Map<number, number>();
+  const rows = await db
+    .select()
+    .from(productStocks)
+    .where(
+      and(
+        eq(productStocks.warehouseId, warehouseId),
+        inArray(productStocks.productId, productIds)
+      )
+    );
+  return new Map<number, number>(
+    rows.map((row: { productId: number; quantity: number }) => [
+      row.productId,
+      row.quantity,
+    ])
+  );
+}
 
 async function dbOrThrow() {
   const db = await getDb();
@@ -68,17 +118,34 @@ export const inventoryRouter = router({
       return { session, items };
     }),
   create: permissionProcedure("inventory.manage")
-    .input(z.object({ name: z.string().trim().min(2).max(160) }))
+    .input(
+      z.object({
+        name: z.string().trim().min(2).max(160),
+        /** Dépôt inventorié ; à défaut, le dépôt par défaut (9.7). */
+        warehouseId: z.number().int().positive().optional(),
+      })
+    )
     .mutation(async ({ ctx, input }) => {
       const db = await dbOrThrow();
+      const warehouseId = await resolveWarehouse(
+        db,
+        ctx.user.companyId,
+        input.warehouseId
+      );
       const productRows = await db
         .select()
         .from(products)
         .where(companyScope(products.companyId, ctx.user.companyId))
         .orderBy(products.name);
+      const stocks = await warehouseStocks(
+        db,
+        warehouseId,
+        productRows.map(product => product.id)
+      );
       const result = await db.insert(inventorySessions).values({
         name: input.name,
         companyId: ctx.user.companyId,
+        warehouseId,
         createdByUserId: ctx.user.id,
       });
       const id = Number(result[0].insertId);
@@ -87,7 +154,7 @@ export const inventoryRouter = router({
           productRows.map(product => ({
             inventorySessionId: id,
             productId: product.id,
-            expectedQuantity: product.quantity,
+            expectedQuantity: stocks.get(product.id) ?? 0,
           }))
         );
       await db.insert(auditLogs).values({
@@ -115,6 +182,7 @@ export const inventoryRouter = router({
             id: inventoryItems.id,
             productId: inventoryItems.productId,
             status: inventorySessions.status,
+            warehouseId: inventorySessions.warehouseId,
           })
           .from(inventoryItems)
           .innerJoin(
@@ -162,7 +230,11 @@ export const inventoryRouter = router({
         .update(inventoryItems)
         .set({
           countedQuantity: input.countedQuantity,
-          expectedQuantity: product.quantity,
+          expectedQuantity: item.warehouseId
+            ? ((
+                await warehouseStocks(db, item.warehouseId, [item.productId])
+              ).get(item.productId) ?? 0)
+            : product.quantity,
         })
         .where(eq(inventoryItems.id, input.itemId));
       return { success: true };
@@ -213,6 +285,7 @@ export const inventoryRouter = router({
               quantity: difference,
               reason: `Inventaire ${session.name}`,
               createdByUserId: ctx.user.id,
+              warehouseId: session.warehouseId,
             });
         }
         await tx

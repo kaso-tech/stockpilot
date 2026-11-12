@@ -28,9 +28,16 @@ import {
   suppliers,
   userDashboardPreferences,
   users,
+  cashClosures,
+  productStocks,
+  saleReturnItems,
+  saleReturns,
+  stockLots,
+  warehouses,
 } from "../drizzle/schema";
 import { and, desc, eq, getTableColumns, inArray } from "drizzle-orm";
 import { companyScope } from "./companyScope";
+import { defaultWarehouseId } from "./stockLedger";
 import { getDb } from "./db";
 import { openBuffer, parseKey, sealBuffer } from "./secretBox";
 import { storageDelete, storageGetSignedUrl, storagePut } from "./storage";
@@ -84,7 +91,16 @@ const snapshotSources: SnapshotSource[] = [
   { name: "suppliers", table: suppliers, kind: "company" },
   { name: "productCategories", table: productCategories, kind: "company" },
   { name: "productUnits", table: productUnits, kind: "company" },
+  { name: "warehouses", table: warehouses, kind: "company" },
   { name: "products", table: products, kind: "company" },
+  {
+    name: "productStocks",
+    table: productStocks,
+    kind: "child",
+    parent: "products",
+    foreignKey: "productId",
+  },
+  { name: "stockLots", table: stockLots, kind: "company" },
   {
     name: "productPriceTiers",
     table: productPriceTiers,
@@ -143,6 +159,15 @@ const snapshotSources: SnapshotSource[] = [
   },
   { name: "stockMovements", table: stockMovements, kind: "company" },
   { name: "stockAlerts", table: stockAlerts, kind: "company" },
+  { name: "saleReturns", table: saleReturns, kind: "company" },
+  {
+    name: "saleReturnItems",
+    table: saleReturnItems,
+    kind: "child",
+    parent: "saleReturns",
+    foreignKey: "returnId",
+  },
+  { name: "cashClosures", table: cashClosures, kind: "company" },
   { name: "auditLogs", table: auditLogs, kind: "company" },
 ];
 const sourcesByName = new Map(
@@ -192,6 +217,16 @@ const references: Array<{
   { table: "sales", column: "salesAgentId", target: "agents", nullable: true },
   { table: "sales", column: "cashierId", target: "agents", nullable: true },
   { table: "saleItems", column: "productId", target: "products" },
+  { table: "productStocks", column: "warehouseId", target: "warehouses" },
+  { table: "stockLots", column: "productId", target: "products" },
+  { table: "stockLots", column: "warehouseId", target: "warehouses" },
+  { table: "saleReturns", column: "saleId", target: "sales" },
+  {
+    table: "inventorySessions",
+    column: "warehouseId",
+    target: "warehouses",
+    nullable: true,
+  },
   {
     table: "products",
     column: "categoryId",
@@ -714,9 +749,15 @@ export function parseBackupPayload(dataUrl: string): BackupPayload {
 }
 
 /** Tables remplacées par la restauration : toutes en version 2, uniquement celles de l'époque en version 1. */
+/**
+ * Tables remplacées : celles présentes dans l'archive (une archive antérieure à
+ * l'ajout d'une table ne l'efface pas). Version 1 : uniquement ses 17 tables.
+ */
 function restoredSources(payload: BackupPayload) {
-  return snapshotSources.filter(
-    source => payload.schemaVersion === 2 || VERSION_1_TABLES.has(source.name)
+  return snapshotSources.filter(source =>
+    payload.schemaVersion === 1
+      ? VERSION_1_TABLES.has(source.name)
+      : source.name in payload.tables
   );
 }
 
@@ -764,6 +805,28 @@ export async function restoreBackupPayload(
         await tx
           .insert(source.table)
           .values(rows.slice(index, index + 500) as any);
+    }
+    // Archive antérieure aux dépôts (9.7) : le stock restauré est replacé dans le
+    // dépôt par défaut et les lots, devenus incohérents, sont retirés.
+    if (!tables.productStocks && tables.products) {
+      const productIds = tables.products.map(row => row.id as number);
+      if (productIds.length)
+        await tx
+          .delete(productStocks)
+          .where(inArray(productStocks.productId, productIds));
+      if (!tables.stockLots)
+        await tx
+          .delete(stockLots)
+          .where(companyScope(stockLots.companyId, scopedCompanyId));
+      const warehouseId = await defaultWarehouseId(tx, scopedCompanyId);
+      for (let index = 0; index < tables.products.length; index += 500)
+        await tx.insert(productStocks).values(
+          tables.products.slice(index, index + 500).map(row => ({
+            productId: row.id as number,
+            warehouseId,
+            quantity: row.quantity as number,
+          }))
+        );
     }
   });
   const restoredCount = Object.values(tables).reduce(

@@ -27,6 +27,8 @@ export default function Inventories() {
   );
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
+  const [warehouseId, setWarehouseId] = useState("");
+  const { data: warehouses = [] } = trpc.warehouses.list.useQuery();
   const create = trpc.inventory.create.useMutation({
     onSuccess: result => {
       utils.inventory.list.invalidate();
@@ -228,6 +230,23 @@ export default function Inventories() {
             onChange={event => setName(event.target.value)}
             placeholder="Ex. Inventaire mensuel – Août"
           />
+          {warehouses.filter(item => item.active).length > 1 && (
+            <select
+              aria-label="Dépôt inventorié"
+              value={warehouseId}
+              onChange={event => setWarehouseId(event.target.value)}
+              className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+            >
+              <option value="">Dépôt par défaut</option>
+              {warehouses
+                .filter(item => item.active)
+                .map(item => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+            </select>
+          )}
           <DialogFooter>
             <Button variant="ghost" onClick={() => setOpen(false)}>
               Annuler
@@ -237,7 +256,12 @@ export default function Inventories() {
                 if (!name.trim()) toast.error("Donnez un nom à l’inventaire.");
                 else
                   create.mutate(
-                    { name: name.trim() },
+                    {
+                      name: name.trim(),
+                      warehouseId: warehouseId
+                        ? Number(warehouseId)
+                        : undefined,
+                    },
                     { onError: error => toast.error(error.message) }
                   );
               }}

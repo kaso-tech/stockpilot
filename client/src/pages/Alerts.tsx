@@ -24,7 +24,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 
 export default function Alerts() {
   const [, setLocation] = useLocation();
@@ -67,6 +67,9 @@ export default function Alerts() {
     popup.focus();
     popup.print();
   };
+  const { data: expiringLots = [] } = trpc.warehouses.expiringLots.useQuery({
+    days: 30,
+  });
   return (
     <div className="mx-auto max-w-[1200px] space-y-6">
       <header>
@@ -81,6 +84,22 @@ export default function Alerts() {
           sous son seuil personnalisé.
         </p>
       </header>
+      {expiringLots.length > 0 && (
+        <Link
+          href="/depots"
+          className="block rounded-xl border border-rose-400/20 bg-rose-400/[0.06] px-4 py-3 text-sm text-rose-100 hover:bg-rose-400/[0.1]"
+        >
+          {expiringLots.length} lot(s) périmé(s) ou à péremption sous 30 jours :{" "}
+          {expiringLots
+            .slice(0, 3)
+            .map(
+              lot =>
+                `${lot.productName} (lot ${lot.lotNumber}, ${lot.expiryDate})`
+            )
+            .join(", ")}
+          {expiringLots.length > 3 ? "…" : ""} — voir les dépôts →
+        </Link>
+      )}
       <Card className="border-amber-400/15 bg-gradient-to-r from-amber-400/[0.08] to-transparent shadow-none">
         <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">

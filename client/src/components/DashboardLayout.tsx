@@ -71,6 +71,7 @@ import {
   Truck,
   TriangleAlert,
   UserRound,
+  Warehouse,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useEffect, useState } from "react";
@@ -112,6 +113,12 @@ const menuItems: MenuItem[] = [
     label: "Inventaires",
     path: "/inventaires",
     anyOf: ["inventory.manage"],
+  },
+  {
+    icon: Warehouse,
+    label: "Dépôts",
+    path: "/depots",
+    anyOf: ["inventory.manage", "catalog.manage"],
   },
   {
     icon: Truck,

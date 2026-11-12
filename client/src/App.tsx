@@ -9,6 +9,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { PreferencesProvider } from "./contexts/PreferencesContext";
 import { OfflineProvider } from "./contexts/OfflineContext";
 
+const Warehouses = lazy(() => import("./pages/Warehouses"));
 const Accounting = lazy(() => import("./pages/Accounting"));
 const SettingsUsers = lazy(() => import("./pages/SettingsUsers"));
 const ForgotPassword = lazy(() =>
@@ -137,6 +138,7 @@ function DashboardRouter() {
           <Route path={"/parametres/securite"} component={SettingsSecurity} />
           <Route path={"/parametres/utilisateurs"} component={SettingsUsers} />
           <Route path={"/comptabilite"} component={Accounting} />
+          <Route path={"/depots"} component={Warehouses} />
           <Route path={"/parametres/historique"} component={SettingsHistory} />
           <Route path={"/sauvegardes"} component={Backups} />
           <Route path={"/depenses"} component={Expenses} />

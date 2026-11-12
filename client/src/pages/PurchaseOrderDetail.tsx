@@ -515,7 +515,9 @@ export default function PurchaseOrderDetail() {
         open={receiveOpen}
         pending={receive.isPending}
         onOpenChange={setReceiveOpen}
-        onConfirm={lines => receive.mutate({ id: order.id, lines })}
+        onConfirm={(lines, warehouseId) =>
+          receive.mutate({ id: order.id, lines, warehouseId })
+        }
       />
       <CancelDialog
         order={order}
@@ -637,9 +639,26 @@ function ReceiptDialog({
   open: boolean;
   pending: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (lines: Array<{ id: number; quantity: number }>) => void;
+  onConfirm: (
+    lines: Array<{
+      id: number;
+      quantity: number;
+      lotNumber?: string;
+      expiryDate?: string;
+    }>,
+    warehouseId?: number
+  ) => void;
 }) {
   const [quantities, setQuantities] = useState<Record<number, number>>({});
+  // Lot et péremption facultatifs par ligne, dépôt de réception (9.7).
+  const [lots, setLots] = useState<
+    Record<number, { lotNumber: string; expiryDate: string }>
+  >({});
+  const [warehouseId, setWarehouseId] = useState("");
+  const { data: warehouses = [] } = trpc.warehouses.list.useQuery(undefined, {
+    enabled: open,
+  });
+  const activeWarehouses = warehouses.filter(item => item.active);
   useEffect(() => {
     if (open)
       setQuantities(
@@ -661,6 +680,10 @@ function ReceiptDialog({
           quantities[line.id] ?? 0
         )
       ),
+      lotNumber: lots[line.id]?.lotNumber.trim() || undefined,
+      expiryDate: lots[line.id]?.lotNumber.trim()
+        ? lots[line.id]?.expiryDate || undefined
+        : undefined,
     }))
     .filter(line => line.quantity > 0);
   return (
@@ -700,9 +723,61 @@ function ReceiptDialog({
                   }
                   className="h-9 w-full border-white/10 bg-[#0e141f] text-right sm:w-24"
                 />
+                {remaining > 0 && (
+                  <div className="grid gap-2 sm:col-span-2 sm:grid-cols-2">
+                    <Input
+                      placeholder="N° de lot (facultatif)"
+                      value={lots[line.id]?.lotNumber ?? ""}
+                      onChange={event =>
+                        setLots(current => ({
+                          ...current,
+                          [line.id]: {
+                            lotNumber: event.target.value,
+                            expiryDate: current[line.id]?.expiryDate ?? "",
+                          },
+                        }))
+                      }
+                      className="h-9 border-white/10 bg-[#0e141f]"
+                    />
+                    <Input
+                      type="date"
+                      aria-label="Date de péremption"
+                      value={lots[line.id]?.expiryDate ?? ""}
+                      onChange={event =>
+                        setLots(current => ({
+                          ...current,
+                          [line.id]: {
+                            lotNumber: current[line.id]?.lotNumber ?? "",
+                            expiryDate: event.target.value,
+                          },
+                        }))
+                      }
+                      className="h-9 border-white/10 bg-[#0e141f]"
+                    />
+                  </div>
+                )}
               </div>
             );
           })}
+          {activeWarehouses.length > 1 && (
+            <label className="block text-sm">
+              <span className="mb-1 block text-xs text-slate-400">
+                Dépôt de réception
+              </span>
+              <select
+                value={warehouseId}
+                onChange={event => setWarehouseId(event.target.value)}
+                className="h-10 w-full rounded-md border border-white/10 bg-[#0e141f] px-3 text-sm"
+              >
+                <option value="">Dépôt par défaut</option>
+                {activeWarehouses.map(item => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
@@ -710,7 +785,9 @@ function ReceiptDialog({
           </Button>
           <Button
             disabled={!lines.length || pending}
-            onClick={() => onConfirm(lines)}
+            onClick={() =>
+              onConfirm(lines, warehouseId ? Number(warehouseId) : undefined)
+            }
             className="bg-primary text-primary-foreground hover:bg-primary/90"
           >
             <PackageCheck className="mr-2 h-4 w-4" />
