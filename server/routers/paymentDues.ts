@@ -9,7 +9,7 @@ import { buildPaymentDueForecast, paymentDueForecastMonths } from "../paymentDue
 import { isPaymentDueReceiptKeyInScope } from "../paymentReceiptRules";
 import { getDefaultWarehouse, getScopedWarehouse } from "../warehouseStock";
 import { storagePut } from "../storage";
-import { adminProcedure, protectedProcedure, router } from "../_core/trpc";
+import { permissionProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 
 const expenseCategories = ["rent", "energy", "connection", "salary", "marketing", "supplies", "taxes", "other"] as const;
@@ -101,14 +101,14 @@ function scheduleValues(input: z.infer<typeof scheduleInput>, companyId: number,
 }
 
 export const paymentDuesRouter = router({
-  forecast: adminProcedure.input(z.object({ warehouseId: z.number().int().positive().optional(), fromYearMonth: z.string().regex(/^\d{4}-\d{2}$/).optional(), months: z.number().int().min(1).max(12).default(6) }).optional()).query(async ({ ctx, input }) => {
+  forecast: permissionProcedure("payroll.manage").input(z.object({ warehouseId: z.number().int().positive().optional(), fromYearMonth: z.string().regex(/^\d{4}-\d{2}$/).optional(), months: z.number().int().min(1).max(12).default(6) }).optional()).query(async ({ ctx, input }) => {
     const db = await dbOrThrow(); const fromYearMonth = input?.fromYearMonth ?? new Date().toISOString().slice(0, 7); const months = input?.months ?? 6;
     if (input?.warehouseId) await getScopedWarehouse(db, ctx.user.companyId, input.warehouseId, { requireActive: true });
     const periodKeys = paymentDueForecastMonths(fromYearMonth, months); const start = new Date(`${periodKeys[0]}-01T00:00:00.000Z`); const [lastYear, lastMonth] = periodKeys.at(-1)!.split("-").map(Number); const end = new Date(Date.UTC(lastYear, lastMonth, 1));
     const rows = await db.select({ dueAt: paymentDueOccurrences.dueAt, amountCents: paymentDueOccurrences.amountCents, paidCents: paymentDueOccurrences.paidCents, status: paymentDueOccurrences.status, scheduleType: paymentDueSchedules.scheduleType }).from(paymentDueOccurrences).innerJoin(paymentDueSchedules, eq(paymentDueOccurrences.scheduleId, paymentDueSchedules.id)).where(and(companyScope(paymentDueOccurrences.companyId, ctx.user.companyId), gte(paymentDueOccurrences.dueAt, start), lt(paymentDueOccurrences.dueAt, end), ...(input?.warehouseId ? [eq(paymentDueOccurrences.warehouseId, input.warehouseId)] : [])));
     const monthsData = buildPaymentDueForecast(rows, fromYearMonth, months); return { fromYearMonth, months: monthsData, totalCommittedCents: monthsData.reduce((total, month) => total + month.expenseCommittedCents + month.salaryCommittedCents, 0), totalOutstandingCents: monthsData.reduce((total, month) => total + month.outstandingCents, 0) };
   }),
-  list: adminProcedure.input(z.object({ warehouseId: z.number().int().positive().optional(), status: z.enum(occurrenceStatuses).optional() }).optional()).query(async ({ ctx, input }) => {
+  list: permissionProcedure("payroll.manage").input(z.object({ warehouseId: z.number().int().positive().optional(), status: z.enum(occurrenceStatuses).optional() }).optional()).query(async ({ ctx, input }) => {
     const db = await dbOrThrow();
     if (input?.warehouseId) await getScopedWarehouse(db, ctx.user.companyId, input.warehouseId, { requireActive: true });
     const conditions = [companyScope(paymentDueOccurrences.companyId, ctx.user.companyId)];
@@ -119,12 +119,12 @@ export const paymentDuesRouter = router({
     return rows.map(row => ({ ...row.occurrence, title: row.schedule.title, scheduleType: row.schedule.scheduleType, recurrence: row.schedule.recurrence, dueDay: row.schedule.dueDay, expenseCategory: row.schedule.expenseCategory, beneficiaryType: row.schedule.beneficiaryType, beneficiaryId: row.schedule.beneficiaryId, beneficiaryGroupId: row.schedule.beneficiaryGroupId, templateId: row.schedule.templateId, responsibleUserId: row.schedule.responsibleUserId, warehouseName: row.warehouseName, computedStatus: resolvePaymentDueStatus({ dueAt: row.occurrence.dueAt, amountCents: row.occurrence.amountCents, paidCents: row.occurrence.paidCents, cancelled: row.occurrence.status === "cancelled" }, now) }));
   }),
   schedules: router({
-    list: adminProcedure.input(z.object({ warehouseId: z.number().int().positive().optional() }).optional()).query(async ({ ctx, input }) => {
+    list: permissionProcedure("payroll.manage").input(z.object({ warehouseId: z.number().int().positive().optional() }).optional()).query(async ({ ctx, input }) => {
       const db = await dbOrThrow();
       if (input?.warehouseId) await getScopedWarehouse(db, ctx.user.companyId, input.warehouseId, { requireActive: true });
       return db.select({ schedule: paymentDueSchedules, warehouseName: warehouses.name, responsibleName: users.name }).from(paymentDueSchedules).leftJoin(warehouses, eq(paymentDueSchedules.warehouseId, warehouses.id)).leftJoin(users, eq(paymentDueSchedules.responsibleUserId, users.id)).where(input?.warehouseId ? and(companyScope(paymentDueSchedules.companyId, ctx.user.companyId), eq(paymentDueSchedules.warehouseId, input.warehouseId)) : companyScope(paymentDueSchedules.companyId, ctx.user.companyId)).orderBy(desc(paymentDueSchedules.updatedAt));
     }),
-    save: adminProcedure.input(scheduleInput).mutation(async ({ ctx, input }) => {
+    save: permissionProcedure("payroll.manage").input(scheduleInput).mutation(async ({ ctx, input }) => {
       const db = await dbOrThrow();
       const warehouse = await assertScheduleReferences(db, ctx.user.companyId, input);
       const values = scheduleValues(input, ctx.user.companyId!, warehouse.id);
@@ -151,7 +151,7 @@ export const paymentDuesRouter = router({
       await db.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Échéancier créé", entityType: "Échéance", entityId: String(id), detail: `Échéancier « ${input.title} » créé.` });
       return { id, created: 1 };
     }),
-    setStatus: adminProcedure.input(z.object({ id: z.number().int().positive(), status: z.enum(["active", "paused", "archived"]) })).mutation(async ({ ctx, input }) => {
+    setStatus: permissionProcedure("payroll.manage").input(z.object({ id: z.number().int().positive(), status: z.enum(["active", "paused", "archived"]) })).mutation(async ({ ctx, input }) => {
       const db = await dbOrThrow();
       const current = (await db.select({ id: paymentDueSchedules.id }).from(paymentDueSchedules).where(and(eq(paymentDueSchedules.id, input.id), companyScope(paymentDueSchedules.companyId, ctx.user.companyId))).limit(1))[0];
       if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Échéancier introuvable." });
@@ -161,7 +161,7 @@ export const paymentDuesRouter = router({
     }),
   }),
   templates: router({
-    list: adminProcedure.input(z.object({ scheduleType: z.enum(["expense", "salary"]).optional(), warehouseId: z.number().int().positive().optional(), includeInactive: z.boolean().optional() }).optional()).query(async ({ ctx, input }) => {
+    list: permissionProcedure("payroll.manage").input(z.object({ scheduleType: z.enum(["expense", "salary"]).optional(), warehouseId: z.number().int().positive().optional(), includeInactive: z.boolean().optional() }).optional()).query(async ({ ctx, input }) => {
       const db = await dbOrThrow();
       if (input?.warehouseId) await getScopedWarehouse(db, ctx.user.companyId, input.warehouseId, { requireActive: true });
       const conditions = [companyScope(paymentDueTemplates.companyId, ctx.user.companyId), ...(input?.includeInactive ? [] : [eq(paymentDueTemplates.active, true)])];
@@ -169,56 +169,56 @@ export const paymentDuesRouter = router({
       if (input?.warehouseId) conditions.push(eq(paymentDueTemplates.warehouseId, input.warehouseId));
       return db.select().from(paymentDueTemplates).where(and(...conditions)).orderBy(paymentDueTemplates.name);
     }),
-    save: adminProcedure.input(z.object({ name: z.string().trim().min(2).max(120), scheduleType: z.enum(["expense", "salary"]), expenseCategory: z.enum(expenseCategories).nullable().optional(), amountCents: z.number().int().positive(), recurrence: z.enum(["once", "monthly"]), dueDay: z.number().int().min(1).max(31).nullable().optional(), reminderDays: z.array(z.number().int().min(0).max(90)).max(8).default([7, 3, 1]), warehouseId: z.number().int().positive().optional(), responsibleUserId: z.number().int().positive().nullable().optional() }).superRefine((input, validation) => { if (input.scheduleType === "expense" && !input.expenseCategory) validation.addIssue({ code: z.ZodIssueCode.custom, message: "Une catégorie est requise pour un modèle de dépense." }); if (input.recurrence === "monthly" && !input.dueDay) validation.addIssue({ code: z.ZodIssueCode.custom, message: "Le jour du mois est requis." }); })).mutation(async ({ ctx, input }) => {
+    save: permissionProcedure("payroll.manage").input(z.object({ name: z.string().trim().min(2).max(120), scheduleType: z.enum(["expense", "salary"]), expenseCategory: z.enum(expenseCategories).nullable().optional(), amountCents: z.number().int().positive(), recurrence: z.enum(["once", "monthly"]), dueDay: z.number().int().min(1).max(31).nullable().optional(), reminderDays: z.array(z.number().int().min(0).max(90)).max(8).default([7, 3, 1]), warehouseId: z.number().int().positive().optional(), responsibleUserId: z.number().int().positive().nullable().optional() }).superRefine((input, validation) => { if (input.scheduleType === "expense" && !input.expenseCategory) validation.addIssue({ code: z.ZodIssueCode.custom, message: "Une catégorie est requise pour un modèle de dépense." }); if (input.recurrence === "monthly" && !input.dueDay) validation.addIssue({ code: z.ZodIssueCode.custom, message: "Le jour du mois est requis." }); })).mutation(async ({ ctx, input }) => {
       const db = await dbOrThrow(); const warehouse = input.warehouseId ? await getScopedWarehouse(db, ctx.user.companyId, input.warehouseId, { requireActive: true }) : await getDefaultWarehouse(db, ctx.user.companyId);
       const result = await db.insert(paymentDueTemplates).values({ companyId: ctx.user.companyId!, warehouseId: warehouse.id, name: input.name, scheduleType: input.scheduleType, expenseCategory: input.scheduleType === "expense" ? input.expenseCategory ?? "other" : null, amountCents: input.amountCents, recurrence: input.recurrence, dueDay: input.recurrence === "monthly" ? input.dueDay : null, reminderDaysJson: JSON.stringify(normalizeReminderDays(input.reminderDays)), responsibleUserId: input.responsibleUserId ?? null, createdByUserId: ctx.user.id });
       const id = Number(result[0].insertId); await db.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Modèle d’échéance créé", entityType: "Modèle échéance", entityId: String(id), detail: `Modèle « ${input.name} » créé.` }); return { id };
     }),
-    update: adminProcedure.input(z.object({ id: z.number().int().positive(), name: z.string().trim().min(2).max(120), scheduleType: z.enum(["expense", "salary"]), expenseCategory: z.enum(expenseCategories).nullable().optional(), amountCents: z.number().int().positive(), recurrence: z.enum(["once", "monthly"]), dueDay: z.number().int().min(1).max(31).nullable().optional(), reminderDays: z.array(z.number().int().min(0).max(90)).max(8).default([7, 3, 1]), warehouseId: z.number().int().positive().optional(), responsibleUserId: z.number().int().positive().nullable().optional() }).superRefine((input, validation) => { if (input.scheduleType === "expense" && !input.expenseCategory) validation.addIssue({ code: z.ZodIssueCode.custom, message: "Une catégorie est requise pour un modèle de dépense." }); if (input.recurrence === "monthly" && !input.dueDay) validation.addIssue({ code: z.ZodIssueCode.custom, message: "Le jour du mois est requis." }); })).mutation(async ({ ctx, input }) => {
+    update: permissionProcedure("payroll.manage").input(z.object({ id: z.number().int().positive(), name: z.string().trim().min(2).max(120), scheduleType: z.enum(["expense", "salary"]), expenseCategory: z.enum(expenseCategories).nullable().optional(), amountCents: z.number().int().positive(), recurrence: z.enum(["once", "monthly"]), dueDay: z.number().int().min(1).max(31).nullable().optional(), reminderDays: z.array(z.number().int().min(0).max(90)).max(8).default([7, 3, 1]), warehouseId: z.number().int().positive().optional(), responsibleUserId: z.number().int().positive().nullable().optional() }).superRefine((input, validation) => { if (input.scheduleType === "expense" && !input.expenseCategory) validation.addIssue({ code: z.ZodIssueCode.custom, message: "Une catégorie est requise pour un modèle de dépense." }); if (input.recurrence === "monthly" && !input.dueDay) validation.addIssue({ code: z.ZodIssueCode.custom, message: "Le jour du mois est requis." }); })).mutation(async ({ ctx, input }) => {
       const db = await dbOrThrow(); const existing = (await db.select({ id: paymentDueTemplates.id }).from(paymentDueTemplates).where(and(eq(paymentDueTemplates.id, input.id), companyScope(paymentDueTemplates.companyId, ctx.user.companyId))).limit(1))[0]; if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Modèle introuvable." });
       const warehouse = input.warehouseId ? await getScopedWarehouse(db, ctx.user.companyId, input.warehouseId, { requireActive: true }) : await getDefaultWarehouse(db, ctx.user.companyId);
       await db.update(paymentDueTemplates).set({ warehouseId: warehouse.id, name: input.name, scheduleType: input.scheduleType, expenseCategory: input.scheduleType === "expense" ? input.expenseCategory ?? "other" : null, amountCents: input.amountCents, recurrence: input.recurrence, dueDay: input.recurrence === "monthly" ? input.dueDay : null, reminderDaysJson: JSON.stringify(normalizeReminderDays(input.reminderDays)), responsibleUserId: input.responsibleUserId ?? null }).where(eq(paymentDueTemplates.id, existing.id));
       await db.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Modèle d’échéance modifié", entityType: "Modèle échéance", entityId: String(existing.id), detail: `Modèle « ${input.name} » mis à jour.` }); return { success: true };
     }),
-    setActive: adminProcedure.input(z.object({ id: z.number().int().positive(), active: z.boolean() })).mutation(async ({ ctx, input }) => {
+    setActive: permissionProcedure("payroll.manage").input(z.object({ id: z.number().int().positive(), active: z.boolean() })).mutation(async ({ ctx, input }) => {
       const db = await dbOrThrow(); const existing = (await db.select({ id: paymentDueTemplates.id, name: paymentDueTemplates.name }).from(paymentDueTemplates).where(and(eq(paymentDueTemplates.id, input.id), companyScope(paymentDueTemplates.companyId, ctx.user.companyId))).limit(1))[0]; if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Modèle introuvable." });
       await db.update(paymentDueTemplates).set({ active: input.active }).where(eq(paymentDueTemplates.id, existing.id)); await db.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: input.active ? "Modèle d’échéance réactivé" : "Modèle d’échéance archivé", entityType: "Modèle échéance", entityId: String(existing.id), detail: `Modèle « ${existing.name} » ${input.active ? "réactivé" : "archivé"}.` }); return { success: true };
     }),
   }),
   groups: router({
-    list: adminProcedure.input(z.object({ warehouseId: z.number().int().positive().optional() }).optional()).query(async ({ ctx, input }) => {
+    list: permissionProcedure("payroll.manage").input(z.object({ warehouseId: z.number().int().positive().optional() }).optional()).query(async ({ ctx, input }) => {
       const db = await dbOrThrow(); if (input?.warehouseId) await getScopedWarehouse(db, ctx.user.companyId, input.warehouseId, { requireActive: true });
       const rows = await db.select({ group: paymentDueBeneficiaryGroups, member: paymentDueBeneficiaryGroupMembers }).from(paymentDueBeneficiaryGroups).leftJoin(paymentDueBeneficiaryGroupMembers, eq(paymentDueBeneficiaryGroupMembers.groupId, paymentDueBeneficiaryGroups.id)).where(input?.warehouseId ? and(companyScope(paymentDueBeneficiaryGroups.companyId, ctx.user.companyId), eq(paymentDueBeneficiaryGroups.warehouseId, input.warehouseId)) : companyScope(paymentDueBeneficiaryGroups.companyId, ctx.user.companyId)).orderBy(paymentDueBeneficiaryGroups.name);
       const grouped = new Map<number, { id: number; name: string; warehouseId: number | null; active: boolean; members: Array<{ beneficiaryType: "user" | "agent"; beneficiaryId: number }> }>();
       for (const row of rows) { const entry = grouped.get(row.group.id) ?? { id: row.group.id, name: row.group.name, warehouseId: row.group.warehouseId, active: row.group.active, members: [] }; if (row.member) entry.members.push({ beneficiaryType: row.member.beneficiaryType, beneficiaryId: row.member.beneficiaryId }); grouped.set(row.group.id, entry); }
       return Array.from(grouped.values());
     }),
-    save: adminProcedure.input(z.object({ name: z.string().trim().min(2).max(120), warehouseId: z.number().int().positive().optional(), members: z.array(z.object({ beneficiaryType: z.enum(["user", "agent"]), beneficiaryId: z.number().int().positive() })).min(1).max(100) })).mutation(async ({ ctx, input }) => {
+    save: permissionProcedure("payroll.manage").input(z.object({ name: z.string().trim().min(2).max(120), warehouseId: z.number().int().positive().optional(), members: z.array(z.object({ beneficiaryType: z.enum(["user", "agent"]), beneficiaryId: z.number().int().positive() })).min(1).max(100) })).mutation(async ({ ctx, input }) => {
       const db = await dbOrThrow(); const warehouse = input.warehouseId ? await getScopedWarehouse(db, ctx.user.companyId, input.warehouseId, { requireActive: true }) : await getDefaultWarehouse(db, ctx.user.companyId);
       const uniqueMembers = input.members.filter((member, index, values) => values.findIndex(value => value.beneficiaryType === member.beneficiaryType && value.beneficiaryId === member.beneficiaryId) === index);
       for (const member of uniqueMembers) { const source = member.beneficiaryType === "agent" ? (await db.select({ id: agents.id }).from(agents).where(and(eq(agents.id, member.beneficiaryId), companyScope(agents.companyId, ctx.user.companyId), eq(agents.active, true))).limit(1))[0] : (await db.select({ id: users.id }).from(users).where(and(eq(users.id, member.beneficiaryId), companyScope(users.companyId, ctx.user.companyId), eq(users.active, true))).limit(1))[0]; if (!source) throw new TRPCError({ code: "BAD_REQUEST", message: "Un membre ne fait pas partie des bénéficiaires actifs de cette entreprise." }); }
       return db.transaction(async tx => { const result = await tx.insert(paymentDueBeneficiaryGroups).values({ companyId: ctx.user.companyId!, warehouseId: warehouse.id, name: input.name, createdByUserId: ctx.user.id }); const id = Number(result[0].insertId); await tx.insert(paymentDueBeneficiaryGroupMembers).values(uniqueMembers.map(member => ({ companyId: ctx.user.companyId!, groupId: id, ...member }))); await tx.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Groupe d’échéance créé", entityType: "Groupe échéance", entityId: String(id), detail: `Groupe « ${input.name} » créé avec ${uniqueMembers.length} membre(s).` }); return { id }; });
     }),
-    update: adminProcedure.input(z.object({ id: z.number().int().positive(), name: z.string().trim().min(2).max(120), warehouseId: z.number().int().positive().optional(), members: z.array(z.object({ beneficiaryType: z.enum(["user", "agent"]), beneficiaryId: z.number().int().positive() })).min(1).max(100) })).mutation(async ({ ctx, input }) => {
+    update: permissionProcedure("payroll.manage").input(z.object({ id: z.number().int().positive(), name: z.string().trim().min(2).max(120), warehouseId: z.number().int().positive().optional(), members: z.array(z.object({ beneficiaryType: z.enum(["user", "agent"]), beneficiaryId: z.number().int().positive() })).min(1).max(100) })).mutation(async ({ ctx, input }) => {
       const db = await dbOrThrow(); const existing = (await db.select({ id: paymentDueBeneficiaryGroups.id }).from(paymentDueBeneficiaryGroups).where(and(eq(paymentDueBeneficiaryGroups.id, input.id), companyScope(paymentDueBeneficiaryGroups.companyId, ctx.user.companyId))).limit(1))[0]; if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Groupe introuvable." });
       const warehouse = input.warehouseId ? await getScopedWarehouse(db, ctx.user.companyId, input.warehouseId, { requireActive: true }) : await getDefaultWarehouse(db, ctx.user.companyId); const uniqueMembers = input.members.filter((member, index, values) => values.findIndex(value => value.beneficiaryType === member.beneficiaryType && value.beneficiaryId === member.beneficiaryId) === index);
       for (const member of uniqueMembers) { const source = member.beneficiaryType === "agent" ? (await db.select({ id: agents.id }).from(agents).where(and(eq(agents.id, member.beneficiaryId), companyScope(agents.companyId, ctx.user.companyId), eq(agents.active, true))).limit(1))[0] : (await db.select({ id: users.id }).from(users).where(and(eq(users.id, member.beneficiaryId), companyScope(users.companyId, ctx.user.companyId), eq(users.active, true))).limit(1))[0]; if (!source) throw new TRPCError({ code: "BAD_REQUEST", message: "Un membre ne fait pas partie des bénéficiaires actifs de cette entreprise." }); }
       await db.transaction(async tx => { await tx.update(paymentDueBeneficiaryGroups).set({ warehouseId: warehouse.id, name: input.name }).where(eq(paymentDueBeneficiaryGroups.id, existing.id)); await tx.delete(paymentDueBeneficiaryGroupMembers).where(and(eq(paymentDueBeneficiaryGroupMembers.groupId, existing.id), companyScope(paymentDueBeneficiaryGroupMembers.companyId, ctx.user.companyId))); await tx.insert(paymentDueBeneficiaryGroupMembers).values(uniqueMembers.map(member => ({ companyId: ctx.user.companyId!, groupId: existing.id, ...member }))); });
       await db.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Groupe d’échéance modifié", entityType: "Groupe échéance", entityId: String(existing.id), detail: `Groupe « ${input.name} » mis à jour avec ${uniqueMembers.length} membre(s).` }); return { success: true };
     }),
-    setActive: adminProcedure.input(z.object({ id: z.number().int().positive(), active: z.boolean() })).mutation(async ({ ctx, input }) => {
+    setActive: permissionProcedure("payroll.manage").input(z.object({ id: z.number().int().positive(), active: z.boolean() })).mutation(async ({ ctx, input }) => {
       const db = await dbOrThrow(); const existing = (await db.select({ id: paymentDueBeneficiaryGroups.id, name: paymentDueBeneficiaryGroups.name }).from(paymentDueBeneficiaryGroups).where(and(eq(paymentDueBeneficiaryGroups.id, input.id), companyScope(paymentDueBeneficiaryGroups.companyId, ctx.user.companyId))).limit(1))[0]; if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Groupe introuvable." });
       await db.update(paymentDueBeneficiaryGroups).set({ active: input.active }).where(eq(paymentDueBeneficiaryGroups.id, existing.id)); await db.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: input.active ? "Groupe d’échéance réactivé" : "Groupe d’échéance archivé", entityType: "Groupe échéance", entityId: String(existing.id), detail: `Groupe « ${existing.name} » ${input.active ? "réactivé" : "archivé"}.` }); return { success: true };
     }),
   }),
-  uploadSettlementReceipt: adminProcedure.input(z.object({ occurrenceId: z.number().int().positive(), dataUrl: z.string().min(30).max(7_000_000), filename: z.string().trim().min(1).max(180) })).mutation(async ({ ctx, input }) => {
+  uploadSettlementReceipt: permissionProcedure("payroll.manage").input(z.object({ occurrenceId: z.number().int().positive(), dataUrl: z.string().min(30).max(7_000_000), filename: z.string().trim().min(1).max(180) })).mutation(async ({ ctx, input }) => {
     const db = await dbOrThrow(); const occurrence = (await db.select({ id: paymentDueOccurrences.id }).from(paymentDueOccurrences).where(and(eq(paymentDueOccurrences.id, input.occurrenceId), companyScope(paymentDueOccurrences.companyId, ctx.user.companyId))).limit(1))[0]; if (!occurrence) throw new TRPCError({ code: "NOT_FOUND", message: "Échéance introuvable." });
     const match = input.dataUrl.match(/^data:(application\/pdf|image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/); if (!match) throw new TRPCError({ code: "BAD_REQUEST", message: "Le justificatif doit être un PDF, PNG, JPEG ou WEBP." });
     const mimeType = match[1]; const buffer = Buffer.from(match[2], "base64"); if (buffer.byteLength > 5 * 1024 * 1024) throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "Le justificatif ne doit pas dépasser 5 Mo." });
     const extension = mimeType === "application/pdf" ? "pdf" : mimeType === "image/jpeg" ? "jpg" : mimeType.split("/")[1]; const attachment = await storagePut(`company/${ctx.user.companyId}/payment-due-settlements/${input.occurrenceId}/${randomUUID()}.${extension}`, buffer, mimeType);
     return { key: attachment.key, filename: input.filename, mimeType };
   }),
-  settle: adminProcedure.input(paymentDueSettlementInput).mutation(async ({ ctx, input }) => {
+  settle: permissionProcedure("payroll.manage").input(paymentDueSettlementInput).mutation(async ({ ctx, input }) => {
     const db = await dbOrThrow();
     return db.transaction(async tx => {
       const row = (await tx.select({ occurrence: paymentDueOccurrences, schedule: paymentDueSchedules }).from(paymentDueOccurrences).innerJoin(paymentDueSchedules, eq(paymentDueOccurrences.scheduleId, paymentDueSchedules.id)).where(and(eq(paymentDueOccurrences.id, input.occurrenceId), companyScope(paymentDueOccurrences.companyId, ctx.user.companyId))).limit(1))[0];
@@ -253,7 +253,7 @@ export const paymentDuesRouter = router({
       return { success: true, expenseId, agentPaymentId, status, paidCents };
     });
   }),
-  notifications: protectedProcedure.query(async ({ ctx }) => {
+  notifications: permissionProcedure("finance.notifications").query(async ({ ctx }) => {
     const db = await dbOrThrow();
     if (ctx.user.companyId === null) return [];
     let allowedWarehouseIds: number[] | null = null;

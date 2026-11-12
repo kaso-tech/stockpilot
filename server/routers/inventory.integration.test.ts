@@ -30,7 +30,7 @@ describe("inventory.validate", () => {
     const tx: any = {
       select: () => ({ from: (table: unknown) => {
         const rows = table === inventorySessions ? [session] : table === inventoryItems ? [item] : table === products ? [product] : table === warehouses ? [{ id: 99, companyId: 1, name: "Entrepôt principal", code: "PRINCIPAL", active: true, isDefault: true }] : table === warehouseStocks ? [warehouseStock] : [];
-        const chainableRows = Object.assign(rows, { limit: async () => rows });
+        const chainableRows = Object.assign(rows, { limit: () => Object.assign(Promise.resolve(rows), { for: async () => rows }), orderBy: () => Object.assign(Promise.resolve(rows), { for: async () => rows }), for: async () => rows });
         return { where: () => chainableRows, limit: async () => rows };
       }}),
       update: (table: unknown) => ({ set: (values: unknown) => ({ where: async () => { updates.push({ table, values }); if (table === warehouseStocks) warehouseStock.quantity -= 2; return [{ affectedRows: 1 }]; } }) }),

@@ -12,7 +12,7 @@ describe("filterSettingsSections", () => {
   it("retourne tous les liens quand la recherche correspond au nom de section", () => {
     const result = filterSettingsSections("sécurité et traçabilité");
     expect(result).toHaveLength(1);
-    expect(result[0]?.links.map(link => link.label)).toEqual(["Sécurité du compte", "Historique des paramètres"]);
+    expect(result[0]?.links.map(link => link.label)).toEqual(["Utilisateurs et rôles", "Sécurité du compte", "Historique des paramètres"]);
   });
 
   it("retourne le lien Impression et imprimante", () => {

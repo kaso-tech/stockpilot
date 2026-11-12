@@ -8,7 +8,7 @@ import { appRouter } from "./routers";
 
 const mockedGetDb = vi.mocked(getDb);
 function context(): TrpcContext { return { user: { id: 1, openId: "admin-order", name: "Admin", email: "admin@example.test", phone: null, loginMethod: "password", role: "admin", active: true, companyId: 1, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }, req: { protocol: "https", headers: {} } as TrpcContext["req"], res: { clearCookie: () => undefined } as TrpcContext["res"] }; }
-function chain(values: unknown[]) { return Object.assign(values, { then: (resolve: (value: unknown[]) => unknown) => resolve([...values]), limit: async () => values, orderBy: async () => values }); }
+function chain(values: unknown[]) { return Object.assign(values, { then: (resolve: (value: unknown[]) => unknown) => resolve([...values]), limit: () => Object.assign(Promise.resolve(values), { for: async () => values }), orderBy: async () => values }); }
 function mockDatabase(rows: Map<unknown, unknown[]>) {
   const from = (table: unknown) => ({ where: () => chain(rows.get(table) ?? []), limit: async () => rows.get(table) ?? [], orderBy: async () => rows.get(table) ?? [], then: (resolve: (value: unknown[]) => unknown) => resolve([...(rows.get(table) ?? [])]) });
   const select = () => ({ from });
@@ -51,8 +51,8 @@ describe("purchaseOrders transitions", () => {
   beforeEach(() => {
     productUpdates = [];
     stockRows = [];
-    const warehouseStockRow = { id: 1, companyId: 1, warehouseId: 5, productId: 12, quantity: 3 };
-    const tableRows = new Map<unknown, unknown[]>([[purchaseOrders, [order]], [purchaseOrderItems, [item]], [products, [{ id: 12, companyId: 1, name: "Produit A", quantity: 3 }]], [users, [{ id: 1, companyId: 1 }]], [warehouses, [{ id: 5, companyId: 1, code: "PRINCIPAL", name: "Entrepôt principal", active: true, isDefault: true }]], [warehouseStocks, [warehouseStockRow]]]);
+    const warehouseStockRow = { id: 1, companyId: 1, warehouseId: 5, productId: 12, quantity: 3, averageCostCents: 9000 };
+    const tableRows = new Map<unknown, unknown[]>([[purchaseOrders, [order]], [purchaseOrderItems, [item]], [products, [{ id: 12, companyId: 1, name: "Produit A", quantity: 3, purchasePriceCents: 9000 }]], [users, [{ id: 1, companyId: 1 }]], [warehouses, [{ id: 5, companyId: 1, code: "PRINCIPAL", name: "Entrepôt principal", active: true, isDefault: true }]], [warehouseStocks, [warehouseStockRow]]]);
     const update = (table: unknown) => ({ set: (values: unknown) => ({ where: async () => { if (table === products) productUpdates.push(values); return [{ affectedRows: 1 }]; } }) });
     const insert = (table: unknown) => ({ values: (values: unknown) => { if (table === stockMovements) stockRows.push(values); return table === warehouseStocks ? { onDuplicateKeyUpdate: async () => { warehouseStockRow.quantity += 2; return []; } } : []; } });
     const select = () => ({ from: (table: unknown) => ({ where: () => chain(tableRows.get(table) ?? []), then: (resolve: (value: unknown[]) => unknown) => resolve([...(tableRows.get(table) ?? [])]), limit: async () => tableRows.get(table) ?? [] }) });
@@ -71,7 +71,7 @@ describe("purchaseOrders transitions", () => {
   it("réceptionne partiellement le bon et crée l’entrée de stock correspondante", async () => {
     const result = await appRouter.createCaller(context()).purchaseOrders.receive({ id: 9, lines: [{ id: 1, quantity: 2 }] });
     expect(result).toEqual({ success: true, alreadyReceived: false, status: "sent", complete: false });
-    expect(productUpdates).toContainEqual({ quantity: 5 });
+    expect(productUpdates).toContainEqual({ quantity: 5, purchasePriceCents: 9000 });
     expect(stockRows).toContainEqual(expect.objectContaining({ companyId: 1, productId: 12, warehouseId: 5, supplierId: 4, type: "entry", quantity: 2, previousQuantity: 3, resultingQuantity: 5 }));
   });
   it("annule le bon avec un motif explicite", async () => {

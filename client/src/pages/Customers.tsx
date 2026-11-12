@@ -1,3 +1,4 @@
+import { can } from "@shared/permissions";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -20,7 +21,7 @@ const emptyCustomer: CustomerForm = { name: "", type: "ordinary", email: "", pho
 export default function Customers() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
-  const canManage = user?.role === "admin" || user?.role === "seller";
+  const canManage = can(user?.role, "customers.manage");
   const utils = trpc.useUtils();
   const { data: customers = [] } = trpc.commerce.customers.list.useQuery();
   const [open, setOpen] = useState(false);

@@ -1,4 +1,5 @@
 import { BarcodeCameraDialog } from "@/components/BarcodeCameraDialog";
+import { computeVatBreakdown, vatRatesLabel } from "@shared/pricing";
 import { DocumentVatRateSelector } from "@/components/DocumentVatRateSelector";
 import {
   calculateDiscount,
@@ -236,9 +237,16 @@ export default function InvoiceCreate({
   const vatRateBasisPoints = applyVat
     ? (selectedPresetRate ?? settings?.vatRateBasisPoints ?? 0)
     : 0;
-  const vatCents = Math.round(
-    (taxableSubtotalCents * vatRateBasisPoints) / 10000
+  const vatBreakdown = computeVatBreakdown(
+    lines.map(line => ({
+      netCents: line.totalCents,
+      vatRateBasisPoints: applyVat
+        ? (line.product.vatRateBasisPoints ?? vatRateBasisPoints)
+        : 0,
+    })),
+    invoiceDiscountCents
   );
+  const vatCents = vatBreakdown.vatCents;
   const deliveryFeeCents = Math.max(
     0,
     deliveryEnabled ? Math.round((Number(deliveryFeeInput) || 0) * 100) : 0
@@ -415,6 +423,9 @@ export default function InvoiceCreate({
       quantity: item.quantity,
       manualUnitPriceCents: item.manualUnitPriceCents ?? null,
       discount: discountPayload(item.discount),
+      vatRateBasisPoints: applyVat
+        ? (products.find(product => product.id === item.productId)?.vatRateBasisPoints ?? vatRateBasisPoints)
+        : 0,
     })),
   });
   const ensure = () => {
@@ -815,7 +826,7 @@ export default function InvoiceCreate({
               )}
               {vatCents > 0 && (
                 <div className="flex justify-between">
-                  <span>TVA ({(vatRateBasisPoints / 100).toFixed(2)} %)</span>
+                  <span>TVA ({vatRatesLabel(vatBreakdown.byRate.filter(rate => rate.vatCents > 0).map(rate => rate.vatRateBasisPoints)) || `${(vatRateBasisPoints / 100).toFixed(2)} %`})</span>
                   <span>{formatCurrency(vatCents)}</span>
                 </div>
               )}

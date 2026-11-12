@@ -1,9 +1,9 @@
 import { and, desc, eq, inArray, or } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { auditLogs, stockMovements, stockTransferItems, stockTransfers, warehouses } from "../../drizzle/schema";
+import { auditLogs, stockLots, stockMovements, stockTransferItems, stockTransfers, warehouses } from "../../drizzle/schema";
 import { getDb } from "../db";
-import { adminProcedure, protectedProcedure, router } from "../_core/trpc";
+import { adminProcedure, permissionProcedure, protectedProcedure, router } from "../_core/trpc";
 import { companyScope } from "../companyScope";
 import { creditWarehouseStock, debitWarehouseStock, getScopedProduct, getScopedWarehouse, transferNumber } from "../warehouseStock";
 import { assertSellerWarehouseAccess } from "../sellerWarehouseAccess";
@@ -35,6 +35,17 @@ async function audit(tx: any, companyId: number | null, actorUserId: number, act
 
 function affectedRows(result: unknown) {
   return Number((result as Array<{ affectedRows?: number }>)[0]?.affectedRows ?? 0);
+}
+
+
+/** Les allocations sont sauvegardées à l'expédition : pas de lot créé ni stock crédité en transit. */
+async function restoreTransferredLots(tx: any, companyId: number, warehouseId: number, productId: number, lotsJson: string | null, maximum: number) {
+  if (!lotsJson) return; // Transfert historique sans traçabilité disponible.
+  let lots: unknown;
+  try { lots = JSON.parse(lotsJson); } catch { throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Les lots de ce transfert sont invalides." }); }
+  const validated = z.array(z.object({ lotNumber: z.string().min(1).max(80), expiryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(), quantity: z.number().int().positive(), unitCostCents: z.number().int().min(0) })).max(10000).safeParse(lots);
+  if (!validated.success || validated.data.reduce((sum, lot) => sum + lot.quantity, 0) > maximum) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Les quantités de lots du transfert sont incohérentes." });
+  for (const lot of validated.data) await tx.insert(stockLots).values({ ...lot, companyId, warehouseId, productId });
 }
 
 export const stockTransfersRouter = router({
@@ -71,7 +82,7 @@ export const stockTransfersRouter = router({
     return { ...transfer, sourceWarehouse, destinationWarehouse, items };
   }),
 
-  create: protectedProcedure.input(z.object({
+  create: permissionProcedure("stock.adjust").input(z.object({
     sourceWarehouseId: z.number().int().positive(),
     destinationWarehouseId: z.number().int().positive(),
     notes: z.string().trim().max(2000).nullable().optional(),
@@ -99,7 +110,7 @@ export const stockTransfersRouter = router({
     return { success: true, ...created };
   }),
 
-  dispatch: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+  dispatch: permissionProcedure("stock.adjust").input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
     const db = await dbOrThrow();
     return db.transaction(async tx => {
       const transfer = await findTransfer(tx, ctx.user.companyId, input.id);
@@ -115,6 +126,7 @@ export const stockTransfersRouter = router({
       for (const item of items) {
         const product = await getScopedProduct(tx, ctx.user.companyId, item.productId);
         const movement = await debitWarehouseStock(tx, ctx.user.companyId, sourceWarehouse.id, product.id, item.quantity);
+        await tx.update(stockTransferItems).set({ lotsJson: JSON.stringify(movement.lotAllocations), unitCostCents: movement.unitCostCents || product.purchasePriceCents }).where(and(eq(stockTransferItems.id, item.id), eq(stockTransferItems.stockTransferId, transfer.id)));
         await tx.insert(stockMovements).values({ companyId: ctx.user.companyId, productId: product.id, warehouseId: sourceWarehouse.id, type: "exit", quantity: -item.quantity, previousQuantity: movement.previousQuantity, resultingQuantity: movement.resultingQuantity, reason: `Expédition transfert ${transfer.transferNumber} vers ${destinationWarehouse.code}`, createdByUserId: ctx.user.id });
       }
       await audit(tx, ctx.user.companyId, ctx.user.id, "Expédition", transfer.id, `${transfer.transferNumber} expédié de ${sourceWarehouse.name} vers ${destinationWarehouse.name}.`);
@@ -122,7 +134,7 @@ export const stockTransfersRouter = router({
     });
   }),
 
-  receive: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+  receive: permissionProcedure("stock.adjust").input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
     const db = await dbOrThrow();
     return db.transaction(async tx => {
       const transfer = await findTransfer(tx, ctx.user.companyId, input.id);
@@ -137,7 +149,8 @@ export const stockTransfersRouter = router({
       if (!affectedRows(lock)) throw new TRPCError({ code: "CONFLICT", message: "Ce transfert a été modifié. Actualisez la page avant de poursuivre." });
       for (const item of items) {
         const product = await getScopedProduct(tx, ctx.user.companyId, item.productId);
-        const movement = await creditWarehouseStock(tx, ctx.user.companyId, destinationWarehouse.id, product.id, item.quantity);
+        const movement = await creditWarehouseStock(tx, ctx.user.companyId, destinationWarehouse.id, product.id, item.quantity, item.unitCostCents || product.purchasePriceCents);
+        await restoreTransferredLots(tx, ctx.user.companyId!, destinationWarehouse.id, product.id, item.lotsJson, item.quantity);
         await tx.insert(stockMovements).values({ companyId: ctx.user.companyId, productId: product.id, warehouseId: destinationWarehouse.id, type: "entry", quantity: item.quantity, previousQuantity: movement.previousQuantity, resultingQuantity: movement.resultingQuantity, reason: `Réception transfert ${transfer.transferNumber} depuis ${sourceWarehouse.code}`, createdByUserId: ctx.user.id });
       }
       await audit(tx, ctx.user.companyId, ctx.user.id, "Réception", transfer.id, `${transfer.transferNumber} réceptionné dans ${destinationWarehouse.name}.`);
@@ -145,7 +158,7 @@ export const stockTransfersRouter = router({
     });
   }),
 
-  cancel: protectedProcedure.input(z.object({ id: z.number().int().positive(), reason: z.string().trim().min(3).max(2000) })).mutation(async ({ ctx, input }) => {
+  cancel: permissionProcedure("stock.adjust").input(z.object({ id: z.number().int().positive(), reason: z.string().trim().min(3).max(2000) })).mutation(async ({ ctx, input }) => {
     const db = await dbOrThrow();
     return db.transaction(async tx => {
       const transfer = await findTransfer(tx, ctx.user.companyId, input.id);
@@ -159,7 +172,8 @@ export const stockTransfersRouter = router({
         const items = await transferLines(tx, transfer.id);
         for (const item of items) {
           const product = await getScopedProduct(tx, ctx.user.companyId, item.productId);
-          const movement = await creditWarehouseStock(tx, ctx.user.companyId, sourceWarehouse.id, product.id, item.quantity);
+          const movement = await creditWarehouseStock(tx, ctx.user.companyId, sourceWarehouse.id, product.id, item.quantity, item.unitCostCents || product.purchasePriceCents);
+          await restoreTransferredLots(tx, ctx.user.companyId!, sourceWarehouse.id, product.id, item.lotsJson, item.quantity);
           await tx.insert(stockMovements).values({ companyId: ctx.user.companyId, productId: product.id, warehouseId: sourceWarehouse.id, type: "entry", quantity: item.quantity, previousQuantity: movement.previousQuantity, resultingQuantity: movement.resultingQuantity, reason: `Annulation transfert ${transfer.transferNumber}`, createdByUserId: ctx.user.id });
         }
       }

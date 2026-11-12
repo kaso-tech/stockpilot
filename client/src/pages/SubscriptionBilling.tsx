@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
-import { CheckCircle2, CircleAlert, CreditCard, ExternalLink, Loader2, ReceiptText, ShieldCheck } from "lucide-react";
+import { CheckCircle2, CircleAlert, CreditCard, Download, ExternalLink, Loader2, ReceiptText, ShieldCheck, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -27,6 +27,26 @@ export default function SubscriptionBilling() {
       setRequestKey(null);
       toast.error(error.message);
     },
+  });
+  const exportTenant = trpc.subscriptionBilling.exportTenantData.useMutation({
+    onSuccess: payload => {
+      const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `stockpilot-export-${payload.companyId}-${payload.exportedAt.slice(0, 10)}.json`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      toast.success("Export JSON prêt. Les identifiants et secrets ont été exclus.");
+    },
+    onError: error => toast.error(error.message),
+  });
+  const [deletionPreview, setDeletionPreview] = useState<{ totalRecords: number; counts: Record<string, number>; deletionEnabled: false; blockers: string[] } | null>(null);
+  const previewDeletion = trpc.subscriptionBilling.previewTenantDeletion.useMutation({
+    onSuccess: preview => {
+      setDeletionPreview(preview);
+      toast.message("Simulation terminée : aucune donnée n’a été supprimée.");
+    },
+    onError: error => toast.error(error.message),
   });
 
   const startCheckout = (planId: number) => {
@@ -56,5 +76,16 @@ export default function SubscriptionBilling() {
     <section className="grid gap-5 md:grid-cols-2">{billing.data?.plans.map(plan => <Card key={plan.id} className="border-border bg-card text-card-foreground shadow-sm"><CardHeader><CardTitle className="flex items-center justify-between gap-3"><span>{plan.name}</span><Badge className="bg-primary text-primary-foreground hover:bg-primary">{formatXof(plan.priceCents)} · {plan.billingInterval === "monthly" ? "mois" : plan.billingInterval === "annual" ? "an" : "à vie"}</Badge></CardTitle><CardDescription>{plan.description || "Offre d’abonnement StockPilot."}</CardDescription></CardHeader><CardContent className="space-y-5"><div className="rounded-xl bg-muted/60 px-4 py-3 text-sm"><p className="font-medium">Essai de {plan.trialDays} jour{plan.trialDays > 1 ? "s" : ""}</p><p className="mt-1 text-muted-foreground">Le paiement est traité sur la page sécurisée du prestataire.</p></div><Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90" disabled={!checkoutEnabled || checkout.isPending || Boolean(activeIntent) || plan.billingInterval !== "monthly"} onClick={() => startCheckout(plan.id)}>{checkout.isPending && requestKey ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ExternalLink className="mr-2 h-4 w-4" />}{!checkoutEnabled ? "Intégration en pause" : checkout.isPending ? "Ouverture sécurisée…" : activeIntent ? "Paiement en attente" : plan.billingInterval !== "monthly" ? "Paiement à configurer" : "Payer avec YengaPay"}</Button></CardContent></Card>)}</section>
 
     <section className="rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground"><div className="flex gap-3"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /><p>La redirection de retour ne suffit pas à valider le paiement. StockPilot attend une notification signée et rapproche l’intention avant toute mise à jour de l’abonnement.</p></div></section>
+
+    <section className="grid gap-5 md:grid-cols-2" aria-label="Données de l’entreprise">
+      <Card className="border-border bg-card text-card-foreground">
+        <CardHeader><CardTitle className="text-base">Exporter mes données</CardTitle><CardDescription>Prépare un export JSON limité à votre entreprise. Les empreintes, identifiants de connexion et jetons sont retirés.</CardDescription></CardHeader>
+        <CardContent><Button className="min-h-11 w-full" variant="outline" disabled={exportTenant.isPending} onClick={() => exportTenant.mutate()}>{exportTenant.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}Télécharger l’export JSON</Button></CardContent>
+      </Card>
+      <Card className="border-amber-600/30 bg-card text-card-foreground">
+        <CardHeader><CardTitle className="text-base">Simulation de suppression</CardTitle><CardDescription>L’effacement réel reste désactivé tant que la conservation légale et la possibilité de restauration ne sont pas confirmées.</CardDescription></CardHeader>
+        <CardContent className="space-y-3"><Button className="min-h-11 w-full border-amber-700 text-amber-900 hover:bg-amber-50 dark:border-amber-400 dark:text-amber-200 dark:hover:bg-amber-950" variant="outline" disabled={previewDeletion.isPending} onClick={() => previewDeletion.mutate()}>{previewDeletion.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}Prévisualiser — sans suppression</Button>{deletionPreview && <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm" role="status"><p className="font-medium text-foreground">Simulation uniquement · {deletionPreview.totalRecords} enregistrements comptabilisés</p><p className="mt-1 text-muted-foreground">La suppression réelle n’est pas disponible. À vérifier :</p><ul className="mt-1 list-inside list-disc text-muted-foreground">{deletionPreview.blockers.map(item => <li key={item}>{item}</li>)}</ul></div>}</CardContent>
+      </Card>
+    </section>
   </div>;
 }

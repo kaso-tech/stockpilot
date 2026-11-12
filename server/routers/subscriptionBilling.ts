@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { auditLogs, companies, companySubscriptions, saasPaymentIntents, subscriptionPlans } from "../../drizzle/schema";
 import { getDb } from "../db";
+import { exportCompanyData, previewCompanyDeletion } from "../backups";
 import { getYengaPaySandboxConfig, isYengaPaySandboxPayInEnabled } from "../yengaPayConfig";
 import { protectedProcedure, router } from "../_core/trpc";
 
@@ -69,6 +70,18 @@ export const subscriptionBillingRouter = router({
       intents: intents.map(publicIntent),
       checkoutEnabled: isYengaPaySandboxPayInEnabled(),
     };
+  }),
+
+  exportTenantData: protectedProcedure.mutation(async ({ ctx }) => {
+    const db = await dbOrThrow();
+    await requireCompanyOwner(db, ctx.user.companyId, ctx.user.id);
+    return exportCompanyData(ctx.user.companyId);
+  }),
+
+  previewTenantDeletion: protectedProcedure.mutation(async ({ ctx }) => {
+    const db = await dbOrThrow();
+    await requireCompanyOwner(db, ctx.user.companyId, ctx.user.id);
+    return previewCompanyDeletion(ctx.user.companyId);
   }),
 
   createCheckout: protectedProcedure.input(checkoutInput).mutation(async ({ ctx, input }) => {

@@ -1,4 +1,6 @@
+import { can } from "@shared/permissions";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { vatRatesLabel } from "@shared/pricing";
 import { CheckoutSheet } from "@/components/CheckoutSheet";
 import {
   AlertDialog,
@@ -24,6 +26,7 @@ import { documentParticipantNames, documentParticipantOptionLabel, matchesDocume
 import { invoiceEmailMessage, invoiceEmailSubject } from "@/lib/invoiceShare";
 import { downloadCommercialDocumentsCsv } from "@/lib/documentCsv";
 import { trpc } from "@/lib/trpc";
+import { DocumentSendMenu } from "@/components/DocumentSendMenu";
 import { useActiveWarehouse } from "@/contexts/ActiveWarehouseContext";
 import {
   Download,
@@ -72,7 +75,7 @@ export default function Invoices() {
   const [periodFilter, setPeriodFilter] = useState<"all" | "today" | "week" | "month">("all");
   const utils = trpc.useUtils();
   const { data: transactions = [], isLoading } =
-    trpc.transactions.list.useQuery(user?.role === "admin" && activeWarehouseId ? { warehouseId: activeWarehouseId } : undefined);
+    trpc.transactions.list.useQuery(activeWarehouseId ? { warehouseId: activeWarehouseId } : undefined);
   const { data: detail } = trpc.commerce.sales.detail.useQuery(
     { id: selectedId ?? 0 },
     { enabled: Boolean(selectedId) }
@@ -116,7 +119,7 @@ export default function Invoices() {
     return matchesSearch && matchesStatus && matchesAgent && matchesPeriod;
   }), [agentFilter, invoices, periodFilter, search, statusFilter]);
   const canRefund =
-    user?.role === "admin" || Boolean(identity?.sellerCanRefund);
+    can(user?.role, "sales.refund") && (user?.role !== "seller" || Boolean(identity?.sellerCanRefund));
   const exportFilteredInvoices = () => { downloadCommercialDocumentsCsv("factures-filtrees.csv", filteredInvoices.map(invoice => ({ reference: invoice.invoiceNumber, date: invoice.createdAt, client: invoice.customerName || "Client comptoir", statut: invoiceStatusMeta[invoice.status][0], agent: documentParticipantNames(invoice, documentParticipants), totalCents: invoice.totalCents, encaisseCents: invoice.amountPaidCents }))); toast.success(`${filteredInvoices.length} facture(s) exportée(s) au format CSV.`); };
 
   useEffect(() => {
@@ -388,10 +391,7 @@ export default function Invoices() {
                   <Printer className="mr-2 h-4 w-4" />
                   Imprimer
                 </Button>
-                <Button variant="outline" onClick={emailPdf}>
-                  <Mail className="mr-2 h-4 w-4" />
-                  E-mail + PDF
-                </Button>
+                <DocumentSendMenu documentLabel="Facture" documentNumber={detail.sale.invoiceNumber} total={formatCurrency(detail.sale.totalCents)} customerName={detail.customer?.name} customerPhone={detail.customer?.phone} customerEmail={detail.customer?.email} documentId={detail.sale.id} documentKind="sale" getPdfFile={() => createInvoicePdf(detail, identity)} />
                 <Button
                   variant="outline"
                   className="sm:col-span-3"
@@ -610,7 +610,7 @@ export function InvoiceDocument({
         {vatCents > 0 && (
           <div className="row">
             <span>
-              TVA ({((detail.sale.vatRateBasisPoints || 0) / 100).toFixed(2)} %)
+              TVA ({invoiceVatLabel(detail)})
             </span>
             <span>{formatCurrency(vatCents)}</span>
           </div>
@@ -722,7 +722,7 @@ export function createInvoicePdf(
   }
   if (detail.sale.vatCents > 0) {
     doc.text(
-      `TVA (${((detail.sale.vatRateBasisPoints || 0) / 100).toFixed(2)} %) : ${formatCurrency(detail.sale.vatCents)}`,
+      `TVA (${invoiceVatLabel(detail)}) : ${formatCurrency(detail.sale.vatCents)}`,
       552,
       y,
       { align: "right" }
@@ -747,6 +747,14 @@ export function createInvoicePdf(
     type: "application/pdf",
   });
 }
+/** Taux de ligne appliqués, avec repli historique pour les ventes antérieures. */
+function invoiceVatLabel(detail: any) {
+  const lineRates = (detail.items ?? [])
+    .filter((item: any) => (item.vatCents ?? 0) > 0)
+    .map((item: any) => Number(item.vatRateBasisPoints));
+  return vatRatesLabel(lineRates.length ? lineRates : [Number(detail.sale.vatRateBasisPoints || 0)]);
+}
+
 export function downloadFile(file: File) {
   const url = URL.createObjectURL(file);
   const link = document.createElement("a");

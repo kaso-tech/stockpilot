@@ -32,4 +32,47 @@ describe("archives de sauvegarde StockPilot", () => {
       tables: { saleItems: [{ id: 1, saleId: 999 }] },
     }))).toThrow("vente absente");
   });
+
+  it("accepte les références catalogue présentes dans le snapshot", () => {
+    const payload = parseBackupPayload(asDataUrl({
+      schemaVersion: 1,
+      exportedAt: "2026-08-21T00:00:00.000Z",
+      source: "StockPilot",
+      companyId: 12,
+      tables: {
+        productCategories: [{ id: 7, companyId: 12, name: "Boissons" }],
+        productUnits: [{ id: 8, companyId: 12, name: "Bouteille" }],
+        products: [{ id: 1, companyId: 12, categoryId: 7, unitId: 8, category: "Boissons", unit: "Bouteille" }],
+      },
+    }));
+    expect(payload.tables.products).toHaveLength(1);
+  });
+
+  it("garde les archives historiques sans références catalogue", () => {
+    const payload = parseBackupPayload(asDataUrl({
+      schemaVersion: 1,
+      exportedAt: "2026-08-21T00:00:00.000Z",
+      source: "StockPilot",
+      companyId: 12,
+      tables: { products: [{ id: 1, companyId: 12, category: "Boissons", unit: "Bouteille" }] },
+    }));
+    expect(payload.tables.products).toHaveLength(1);
+  });
+
+  it("refuse les IDs catégorie/unité orphelins dans une archive", () => {
+    const payload = {
+      schemaVersion: 1,
+      exportedAt: "2026-08-21T00:00:00.000Z",
+      source: "StockPilot",
+      companyId: 12,
+      tables: {
+        productCategories: [{ id: 7, companyId: 12, name: "Boissons" }],
+        productUnits: [{ id: 8, companyId: 12, name: "Bouteille" }],
+        products: [{ id: 1, companyId: 12, categoryId: 99, unitId: 8 }],
+      },
+    };
+    expect(() => parseBackupPayload(asDataUrl(payload))).toThrow("catégorie absente");
+    payload.tables.products[0] = { id: 1, companyId: 12, categoryId: 7, unitId: 99 };
+    expect(() => parseBackupPayload(asDataUrl(payload))).toThrow("unité absente");
+  });
 });

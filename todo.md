@@ -1011,3 +1011,29 @@
 - [x] Désactiver les revalidations réseau automatiques incompatibles avec l’usage hors connexion, tout en conservant la synchronisation déclenchée par retour réseau ou action utilisateur.
 - [x] Ajouter des tests unitaires des politiques de cache et de mise à jour PWA, puis exécuter typage, tests, build et vérification de release.
 - [x] Documenter honnêtement la mise en pause YengaPay et le correctif offline, puis créer un checkpoint de validation.
+
+
+## Intégration GitHub novembre 2026 — autorisée le 12 novembre
+
+Source figée : github/november, ef4ac6d793228475c3ce64653f96134af95328f1 (kaso-tech/stockpilot, ccr-1f2b32f0-8cxy1l). Préserver le socle abc48e5e et les données ; merge/rebase exploratoires annulés. Sauvegarde : backup/pre-github-integration-2026-11-12. Correctif préalable de pnpm/lockfile : checkpoint 4cc686f9.
+
+- [x] Vérifier les références, préserver main et corriger installation figée, sélection pnpm et audit production.
+- [x] Intégrer 9.10 stockage S3 optionnel en conservant Manus et les permissions fichiers.
+- [x] Intégrer 9.1 récupération sécurisée et vérification e-mail facultative.
+- [x] Intégrer 9.9 envoi de documents par e-mail serveur, partage actuel et repli offline conservés.
+- [x] Intégrer 9.2 retours partiels et avoirs numérotés, isolation tenant/entrepôt et idempotence.
+- [x] Intégrer 9.6 TVA par produit avec ventilation commune et respect des permissions/offline.
+- [x] Intégrer 9.4 catégories et unités par identifiant, historiques conservés.
+- [x] Intégrer 9.3 rôles fins sans perdre les permissions par entrepôt.
+- [x] Intégrer 9.5 exports comptables et clôtures tenant-entrepôt.
+- [x] Intégrer 9.7 lots/péremption et CMUP sur les stocks et transferts existants.
+- [x] Intégrer 9.8 consommation/limites/export sur les offres actuelles (Test conservée ; YengaPay en pause).
+- [x] Intégrer 9.11 tests E2E sur build production, API simulée et aucun accès à la base métier.
+- [x] Générer/revoir/appliquer les migrations incrémentales après 0076 sans suppression de données.
+- [x] Valider intégralement typage/tests/build/install figé/audit/release/recette offline et documenter les limites réelles.
+- [x] Mettre à jour continuité, checkpoint final et livrer l’archive sans secrets.
+
+
+### Preuves et limites de l’intégration de novembre
+
+Recette : 129 fichiers / 332 tests, build PWA, installation figée, audit production et release verts ; 5 tests Playwright sur build production, API simulée et aucune base métier. Les migrations 0077/0078 sont appliquées. La recette E2E de ce portage n’insère donc aucun compte ni transaction de test dans la base attachée. Les chemins e-mail réels et S3 optionnels restent soumis à configuration ; YengaPay reste en pause. Voir `NOTE_INTEGRATION_NOVEMBRE_2026.md`.

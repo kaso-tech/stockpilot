@@ -1,14 +1,15 @@
-import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { auditLogs, products, sellerCredentials, sellerWarehouseAssignments, stockTransfers, userWarehousePreferences, users, warehouseReorderThresholds, warehouseStockAlerts, warehouseStocks, warehouses } from "../../drizzle/schema";
+import { auditLogs, products, sellerCredentials, sellerWarehouseAssignments, stockLots, stockTransfers, userWarehousePreferences, users, warehouseReorderThresholds, warehouseStockAlerts, warehouseStocks, warehouses } from "../../drizzle/schema";
 import { getDb } from "../db";
-import { adminProcedure, protectedProcedure, router } from "../_core/trpc";
+import { adminProcedure, permissionProcedure, protectedProcedure, router } from "../_core/trpc";
 import { companyScope } from "../companyScope";
 import { getScopedWarehouse } from "../warehouseStock";
 import { resolveActiveWarehouse } from "../activeWarehouseRules";
 import { assignedWarehouseIds, assertSellerWarehouseAccess } from "../sellerWarehouseAccess";
 import { warehouseAlertNotificationId, warehouseAlertNotificationTitle } from "../warehouseNotificationRules";
+import { assertSubscriptionQuota } from "../subscriptionQuotas";
 
 const warehouseInput = z.object({
   name: z.string().trim().min(2).max(160),
@@ -97,6 +98,34 @@ export const warehousesRouter = router({
     return { warehouse, products: rows };
   }),
 
+  lots: protectedProcedure.input(z.object({ warehouseId: z.number().int().positive(), productId: z.number().int().positive().optional() })).query(async ({ ctx, input }) => {
+    const db = await dbOrThrow();
+    const warehouse = await assertSellerWarehouseAccess(db, ctx.user, input.warehouseId, { permission: "view_stock" });
+    const productScope = input.productId ? eq(stockLots.productId, input.productId) : sql`1 = 1`;
+    if (input.productId) {
+      const product = (await db.select({ id: products.id }).from(products).where(and(companyScope(products.companyId, ctx.user.companyId), eq(products.id, input.productId))).limit(1))[0];
+      if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Produit introuvable." });
+    }
+    return db.select({ id: stockLots.id, productId: stockLots.productId, productName: products.name, reference: products.reference, unit: products.unit, lotNumber: stockLots.lotNumber, expiryDate: stockLots.expiryDate, quantity: stockLots.quantity, unitCostCents: stockLots.unitCostCents, receivedAt: stockLots.receivedAt })
+      .from(stockLots).innerJoin(products, eq(products.id, stockLots.productId))
+      .where(and(companyScope(stockLots.companyId, ctx.user.companyId), companyScope(products.companyId, ctx.user.companyId), eq(stockLots.warehouseId, warehouse.id), gt(stockLots.quantity, 0), productScope))
+      .orderBy(sql`${stockLots.expiryDate} IS NULL`, asc(stockLots.expiryDate), asc(stockLots.receivedAt)).limit(500);
+  }),
+
+  expiringLots: protectedProcedure.input(z.object({ days: z.number().int().min(0).max(365).default(30) }).optional()).query(async ({ ctx, input }) => {
+    const db = await dbOrThrow();
+    if (ctx.user.companyId === null) return [];
+    const assignedIds = await assignedWarehouseIds(db, ctx.user);
+    const today = new Date().toISOString().slice(0, 10);
+    const limit = new Date(Date.now() + (input?.days ?? 30) * 86_400_000).toISOString().slice(0, 10);
+    const warehouseScope = assignedIds === null ? sql`1 = 1` : assignedIds.length ? inArray(stockLots.warehouseId, assignedIds) : sql`1 = 0`;
+    const rows = await db.select({ id: stockLots.id, lotNumber: stockLots.lotNumber, expiryDate: stockLots.expiryDate, quantity: stockLots.quantity, warehouseId: stockLots.warehouseId, warehouseName: warehouses.name, productId: products.id, productName: products.name, reference: products.reference, unit: products.unit })
+      .from(stockLots).innerJoin(products, eq(products.id, stockLots.productId)).innerJoin(warehouses, eq(warehouses.id, stockLots.warehouseId))
+      .where(and(companyScope(stockLots.companyId, ctx.user.companyId), companyScope(products.companyId, ctx.user.companyId), companyScope(warehouses.companyId, ctx.user.companyId), warehouseScope, gt(stockLots.quantity, 0), isNotNull(stockLots.expiryDate), lte(stockLots.expiryDate, limit)))
+      .orderBy(asc(stockLots.expiryDate), asc(warehouses.name)).limit(200);
+    return rows.map(row => ({ ...row, expired: (row.expiryDate ?? "") < today }));
+  }),
+
   managerAlerts: protectedProcedure.query(async ({ ctx }) => {
     const db = await dbOrThrow();
     if (ctx.user.companyId === null) return [];
@@ -120,7 +149,7 @@ export const warehousesRouter = router({
     }));
   }),
 
-  acknowledgeAlert: protectedProcedure.input(z.object({ alertId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+  acknowledgeAlert: permissionProcedure("stock.adjust").input(z.object({ alertId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
     const db = await dbOrThrow();
     if (ctx.user.companyId === null) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Aucune entreprise active n’est associée à ce compte." });
     await db.transaction(async tx => {
@@ -147,7 +176,7 @@ export const warehousesRouter = router({
       const canAcknowledge = ctx.user.role === "admin" || Boolean((await db.select({ id: sellerWarehouseAssignments.id }).from(sellerWarehouseAssignments).where(and(companyScope(sellerWarehouseAssignments.companyId, ctx.user.companyId), eq(sellerWarehouseAssignments.sellerUserId, ctx.user.id), eq(sellerWarehouseAssignments.warehouseId, warehouse.id), eq(sellerWarehouseAssignments.warehouseRole, "manager"))).limit(1))[0]);
       return productsWithStock.map(product => ({ ...product, threshold: thresholds.find(item => item.productId === product.productId)?.threshold ?? 0, alert: alerts.find(item => item.productId === product.productId) ?? null, canAcknowledge }));
     }),
-    set: protectedProcedure.input(z.object({ warehouseId: z.number().int().positive(), productId: z.number().int().positive(), threshold: z.number().int().min(0).max(1_000_000) })).mutation(async ({ ctx, input }) => {
+    set: permissionProcedure("stock.adjust").input(z.object({ warehouseId: z.number().int().positive(), productId: z.number().int().positive(), threshold: z.number().int().min(0).max(1_000_000) })).mutation(async ({ ctx, input }) => {
       const db = await dbOrThrow();
       await db.transaction(async tx => {
         const warehouse = await assertSellerWarehouseAccess(tx, ctx.user, input.warehouseId, { requireActive: true, permission: "manage_thresholds" });
@@ -199,6 +228,7 @@ export const warehousesRouter = router({
     const db = await dbOrThrow();
     try {
       const id = await db.transaction(async tx => {
+        await assertSubscriptionQuota(tx, ctx.user.companyId, "warehouses");
         const existing = await tx.select({ id: warehouses.id }).from(warehouses).where(companyScope(warehouses.companyId, ctx.user.companyId)).limit(1);
         const shouldBeDefault = input.isDefault || existing.length === 0;
         if (shouldBeDefault) await tx.update(warehouses).set({ isDefault: false }).where(companyScope(warehouses.companyId, ctx.user.companyId));

@@ -1,3 +1,4 @@
+import { can } from "@shared/permissions";
 import { Restricted } from "./AuditLog";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useActiveWarehouse } from "@/contexts/ActiveWarehouseContext";
@@ -41,7 +42,7 @@ function statusMeta(status: Exclude<DueStatus, "all">) {
 
 export default function PaymentDues() {
   const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const isAdmin = can(user?.role, "expenses.manage");
   const { activeWarehouseId, activeWarehouse } = useActiveWarehouse();
   const utils = trpc.useUtils();
   const warehouseInput = activeWarehouseId ? { warehouseId: activeWarehouseId } : undefined;

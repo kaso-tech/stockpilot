@@ -1,3 +1,4 @@
+import { can } from "@shared/permissions";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -32,7 +33,7 @@ export default function SupplierDetail() {
   const [, setLocation] = useLocation();
   const supplierId = Number(params?.id);
   const { user } = useAuth();
-  const canManage = user?.role === "admin";
+  const canManage = can(user?.role, "catalog.manage");
   const utils = trpc.useUtils();
   const { data: suppliers = [], isLoading } = trpc.suppliers.list.useQuery();
   const { data: products = [] } = trpc.products.list.useQuery();

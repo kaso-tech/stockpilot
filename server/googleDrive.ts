@@ -2,7 +2,7 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypt
 import { and, eq } from "drizzle-orm";
 import { backupArchives, backupSettings } from "../drizzle/schema";
 import { getDb } from "./db";
-import { storageGetSignedUrl } from "./storage";
+import { storageRead } from "./storage";
 import { companyScope } from "./companyScope";
 
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
@@ -40,7 +40,7 @@ export async function syncArchiveToGoogleDrive(archiveId: number, companyId: num
   if (!settings || !archive?.storageKey || !settings.googleDriveRefreshTokenEncrypted) return null;
   const accessToken = await currentAccessToken(settings, scopedCompanyId); let folderId = settings.googleDriveFolderId;
   if (!folderId) { folderId = (await createDriveFolder(accessToken)).id; await db.update(backupSettings).set({ googleDriveFolderId: folderId }).where(and(eq(backupSettings.id, settings.id), companyScope(backupSettings.companyId, scopedCompanyId))); }
-  const signedUrl = await storageGetSignedUrl(archive.storageKey); const source = await fetch(signedUrl); if (!source.ok) throw new Error("Impossible de lire l’archive locale avant la copie Drive."); const content = Buffer.from(await source.arrayBuffer());
+  const content = await storageRead(archive.storageKey);
   const uploaded = await multipartUpload(accessToken, { name: archive.filename, parents: [folderId], mimeType: "application/json" }, content, "application/json");
   await db.update(backupArchives).set({ googleDriveFileId: uploaded.id, googleDriveUrl: uploaded.webViewLink ?? `https://drive.google.com/open?id=${uploaded.id}` }).where(and(eq(backupArchives.id, archive.id), companyScope(backupArchives.companyId, scopedCompanyId)));
   return uploaded;

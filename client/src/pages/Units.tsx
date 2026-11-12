@@ -1,3 +1,4 @@
+import { can } from "@shared/permissions";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,7 +13,7 @@ import { Restricted } from "./AuditLog";
 
 type Unit = { id: number; name: string };
 export default function Units() {
-  const { user } = useAuth(); const isAdmin = user?.role === "admin"; const utils = trpc.useUtils(); const { data: units = [], isLoading } = trpc.units.list.useQuery(undefined, { enabled: isAdmin }); const [open, setOpen] = useState(false); const [editing, setEditing] = useState<Unit | null>(null); const [name, setName] = useState("");
+  const { user } = useAuth(); const isAdmin = can(user?.role, "catalog.manage"); const utils = trpc.useUtils(); const { data: units = [], isLoading } = trpc.units.list.useQuery(undefined, { enabled: isAdmin }); const [open, setOpen] = useState(false); const [editing, setEditing] = useState<Unit | null>(null); const [name, setName] = useState("");
   const refresh = () => { utils.units.list.invalidate(); utils.products.list.invalidate(); }; const close = () => { setOpen(false); setEditing(null); setName(""); };
   const create = trpc.units.create.useMutation({ onSuccess: () => { refresh(); close(); toast.success("Unité créée."); }, onError: error => toast.error(error.message) }); const update = trpc.units.update.useMutation({ onSuccess: () => { refresh(); close(); toast.success("Unité renommée et produits mis à jour."); }, onError: error => toast.error(error.message) }); const remove = trpc.units.remove.useMutation({ onSuccess: () => { refresh(); toast.success("Unité supprimée."); }, onError: error => toast.error(error.message) });
   const save = () => { const clean = name.trim(); if (!/^[A-Za-zÀ-ÖØ-öø-ÿ0-9\s'-]+$/.test(clean)) return toast.error("Caractères non autorisés"); if (!clean) return toast.error("Saisissez une unité de mesure."); if (editing) update.mutate({ id: editing.id, name: clean }); else create.mutate({ name: clean }); };

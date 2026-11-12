@@ -31,7 +31,7 @@ describe("commerce.sales.create", () => {
     const tx: any = {
       select: () => ({ from: (table: unknown) => {
         const rows = table === customers ? [customer] : table === products ? [product] : table === productPriceTiers ? tiers : table === warehouses ? [{ id: 99, companyId: 1, name: "Entrepôt principal", code: "PRINCIPAL", active: true, isDefault: true }] : table === sellerWarehouseAssignments ? [{ id: 1, companyId: 1, sellerUserId: 7, warehouseId: 99, warehouseRole: "seller" }] : table === warehouseStocks ? [warehouseStock] : table === stockAlerts ? [] : table === remunerationProfiles ? [profile] : [];
-        const chainableRows = Object.assign(rows, { limit: async () => rows });
+        const chainableRows = Object.assign(rows, { limit: () => Object.assign(Promise.resolve(rows), { for: async () => rows }), orderBy: () => Object.assign(Promise.resolve(rows), { for: async () => rows }), for: async () => rows });
         return { where: () => chainableRows, limit: async () => rows };
       }}),
       insert: (table: unknown) => ({ values: (values: unknown) => { inserted.push({ table, values }); return table === warehouseStocks ? { onDuplicateKeyUpdate: async () => [] } : table === sales ? [{ insertId: 501 }] : [{ insertId: 1 }]; } }),

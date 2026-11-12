@@ -2,7 +2,46 @@
 // Uploads via Forge Server presigned URL to S3 (PUT direct).
 // Downloads return /manus-storage/{key} paths served via 307 redirect.
 
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { ENV } from "./_core/env";
+
+export type StorageDriverName = "s3" | "forge";
+
+export function storageDriver(): StorageDriverName {
+  return process.env.S3_BUCKET ? "s3" : "forge";
+}
+
+/** Indique si le pilote actif permet de supprimer réellement un objet. */
+export function storageSupportsDelete(): boolean {
+  return storageDriver() === "s3";
+}
+
+let s3Client: S3Client | null = null;
+
+function s3(): S3Client {
+  if (!s3Client) {
+    s3Client = new S3Client({
+      region: process.env.S3_REGION || "us-east-1",
+      ...(process.env.S3_ENDPOINT
+        ? { endpoint: process.env.S3_ENDPOINT, forcePathStyle: true }
+        : {}),
+      // Le SDK lit les identifiants depuis l'environnement ou le rôle de l'hôte.
+    });
+  }
+  return s3Client;
+}
+
+function bucket(): string {
+  const name = process.env.S3_BUCKET;
+  if (!name) throw new Error("S3_BUCKET n'est pas configuré.");
+  return name;
+}
 
 function getForgeConfig() {
   const forgeUrl = ENV.forgeApiUrl;
@@ -10,7 +49,7 @@ function getForgeConfig() {
 
   if (!forgeUrl || !forgeKey) {
     throw new Error(
-      "Storage config missing: set BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY",
+      "Stockage non configuré : définissez S3_BUCKET ou BUILT_IN_FORGE_API_URL et BUILT_IN_FORGE_API_KEY.",
     );
   }
 
@@ -18,7 +57,11 @@ function getForgeConfig() {
 }
 
 function normalizeKey(relKey: string): string {
-  return relKey.replace(/^\/+/, "");
+  const key = relKey.replace(/^\/+/, "");
+  if (!key || key.split("/").some(part => !part || part === "." || part === "..")) {
+    throw new Error("Clé de stockage invalide.");
+  }
+  return key;
 }
 
 function appendHashSuffix(relKey: string): string {
@@ -33,39 +76,37 @@ export async function storagePut(
   data: Buffer | Uint8Array | string,
   contentType = "application/octet-stream",
 ): Promise<{ key: string; url: string }> {
-  const { forgeUrl, forgeKey } = getForgeConfig();
   const key = appendHashSuffix(normalizeKey(relKey));
-
-  // 1. Get presigned PUT URL from Forge
-  const presignUrl = new URL("v1/storage/presign/put", forgeUrl + "/");
-  presignUrl.searchParams.set("path", key);
-
-  const presignResp = await fetch(presignUrl, {
-    headers: { Authorization: `Bearer ${forgeKey}` },
-  });
-
-  if (!presignResp.ok) {
-    const msg = await presignResp.text().catch(() => presignResp.statusText);
-    throw new Error(`Storage presign failed (${presignResp.status}): ${msg}`);
-  }
-
-  const { url: s3Url } = (await presignResp.json()) as { url: string };
-  if (!s3Url) throw new Error("Forge returned empty presign URL");
-
-  // 2. PUT file directly to S3
-  const blob =
-    typeof data === "string"
-      ? new Blob([data], { type: contentType })
-      : new Blob([data as any], { type: contentType });
-
-  const uploadResp = await fetch(s3Url, {
-    method: "PUT",
-    headers: { "Content-Type": contentType },
-    body: blob,
-  });
-
-  if (!uploadResp.ok) {
-    throw new Error(`Storage upload to S3 failed (${uploadResp.status})`);
+  const body = typeof data === "string" ? Buffer.from(data) : data;
+  if (storageDriver() === "s3") {
+    await s3().send(
+      new PutObjectCommand({
+        Bucket: bucket(),
+        Key: key,
+        Body: body,
+        ContentType: contentType,
+      }),
+    );
+  } else {
+    const { forgeUrl, forgeKey } = getForgeConfig();
+    const presignUrl = new URL("v1/storage/presign/put", forgeUrl + "/");
+    presignUrl.searchParams.set("path", key);
+    const presignResp = await fetch(presignUrl, {
+      headers: { Authorization: `Bearer ${forgeKey}` },
+    });
+    if (!presignResp.ok) {
+      throw new Error(`Forge storage request failed (${presignResp.status}).`);
+    }
+    const { url: s3Url } = (await presignResp.json()) as { url?: string };
+    if (!s3Url) throw new Error("Forge returned an empty storage URL.");
+    const uploadResp = await fetch(s3Url, {
+      method: "PUT",
+      headers: { "Content-Type": contentType },
+      body: new Blob([body as BlobPart], { type: contentType }),
+    });
+    if (!uploadResp.ok) {
+      throw new Error(`Storage upload failed (${uploadResp.status}).`);
+    }
   }
 
   return { key, url: `/manus-storage/${key}` };
@@ -77,21 +118,42 @@ export async function storageGet(relKey: string): Promise<{ key: string; url: st
 }
 
 export async function storageGetSignedUrl(relKey: string): Promise<string> {
-  const { forgeUrl, forgeKey } = getForgeConfig();
   const key = normalizeKey(relKey);
-
+  if (storageDriver() === "s3") {
+    return getSignedUrl(
+      s3(),
+      new GetObjectCommand({ Bucket: bucket(), Key: key }),
+      { expiresIn: 300 },
+    );
+  }
+  const { forgeUrl, forgeKey } = getForgeConfig();
   const getUrl = new URL("v1/storage/presign/get", forgeUrl + "/");
   getUrl.searchParams.set("path", key);
-
   const resp = await fetch(getUrl, {
     headers: { Authorization: `Bearer ${forgeKey}` },
   });
-
   if (!resp.ok) {
-    const msg = await resp.text().catch(() => resp.statusText);
-    throw new Error(`Storage signed URL failed (${resp.status}): ${msg}`);
+    throw new Error(`Forge storage request failed (${resp.status}).`);
   }
-
-  const { url } = (await resp.json()) as { url: string };
+  const { url } = (await resp.json()) as { url?: string };
+  if (!url) throw new Error("Forge returned an empty storage URL.");
   return url;
+}
+
+/** Lecture serveur des octets (ex. copie Google Drive). */
+export async function storageRead(relKey: string): Promise<Buffer> {
+  const response = await fetch(await storageGetSignedUrl(relKey));
+  if (!response.ok) {
+    throw new Error(`Lecture du fichier stocké impossible (${response.status}).`);
+  }
+  return Buffer.from(await response.arrayBuffer());
+}
+
+/** Forge ne fournit pas d'API de suppression : false conserve l'objet distant. */
+export async function storageDelete(relKey: string): Promise<boolean> {
+  if (!storageSupportsDelete()) return false;
+  await s3().send(
+    new DeleteObjectCommand({ Bucket: bucket(), Key: normalizeKey(relKey) }),
+  );
+  return true;
 }

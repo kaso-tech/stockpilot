@@ -4,68 +4,81 @@ import DashboardLayout from "@/components/DashboardLayout";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { lazy, Suspense } from "react";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { PreferencesProvider } from "./contexts/PreferencesContext";
 import { OfflineProvider } from "./contexts/OfflineContext";
 import { ActiveWarehouseProvider } from "./contexts/ActiveWarehouseContext";
 import { OfflineQueryCacheBridge } from "./components/OfflineQueryCacheBridge";
 import { PwaUpdateNotice } from "./components/PwaUpdateNotice";
-import Alerts from "./pages/Alerts";
-import Agents from "./pages/Agents";
-import AgentDetail from "./pages/AgentDetail";
-import Customers from "./pages/Customers";
-import CustomerDetail from "./pages/CustomerDetail";
-import Home from "./pages/Home";
-import Invoices from "./pages/Invoices";
-import InvoiceDetail from "./pages/InvoiceDetail";
-import InvoiceCreate from "./pages/InvoiceCreate";
-import Quotes from "./pages/Quotes";
-import Inventories from "./pages/Inventories";
-import Movements from "./pages/Movements";
-import PointOfSale from "./pages/PointOfSale";
-import Products from "./pages/Products";
-import ProductDetail from "./pages/ProductDetail";
-import Suppliers from "./pages/Suppliers";
-import SupplierDetail from "./pages/SupplierDetail";
-import PurchaseOrderDetail from "./pages/PurchaseOrderDetail";
-import PurchaseOrders from "./pages/PurchaseOrders";
-import AuditLog from "./pages/AuditLog";
-import SettingsIndex from "./pages/SettingsIndex";
-import SettingsAppearance from "./pages/SettingsAppearance";
-import SettingsCurrency from "./pages/SettingsCurrency";
-import SettingsIdentity from "./pages/SettingsIdentity";
-import SettingsFiscal from "./pages/SettingsFiscal";
-import Backups from "./pages/Backups";
-import Expenses from "./pages/Expenses";
-import Categories from "./pages/Categories";
-import Units from "./pages/Units";
-import SettingsPos from "./pages/SettingsPos";
-import SettingsPosSection from "./pages/SettingsPosSection";
-import SettingsPrinting from "./pages/SettingsPrinting";
-import SettingsHistory from "./pages/SettingsHistory";
-import SettingsDashboard from "./pages/SettingsDashboard";
-import SettingsSecurity from "./pages/SettingsSecurity";
-import DataExchange from "./pages/DataExchange";
-import SyncJournal from "./pages/SyncJournal";
-import Tickets from "./pages/Tickets";
-import TermsOfUse from "./pages/TermsOfUse";
-import PrivacyPolicy from "./pages/PrivacyPolicy";
-import Help from "./pages/Help";
-import SecurityPolicy from "./pages/SecurityPolicy";
-import ContactUs from "./pages/ContactUs";
-import SupportRequests from "./pages/SupportRequests";
-import Warehouses from "./pages/Warehouses";
-import StockTransfers from "./pages/StockTransfers";
-import WarehouseComparison from "./pages/WarehouseComparison";
-import Pricing from "./pages/Pricing";
-import PlatformAdmin from "./pages/PlatformAdmin";
-import PaymentDues from "./pages/PaymentDues";
-import SubscriptionBilling from "./pages/SubscriptionBilling";
+import { RoleRouteBoundary } from "./components/RoleRouteBoundary";
+// Keep route shells and global providers eager, but load each feature page on
+// demand. vite-plugin-pwa precaches the generated chunks for offline navigation.
+const Alerts = lazy(() => import("./pages/Alerts"));
+const Agents = lazy(() => import("./pages/Agents"));
+const AgentDetail = lazy(() => import("./pages/AgentDetail"));
+const Customers = lazy(() => import("./pages/Customers"));
+const CustomerDetail = lazy(() => import("./pages/CustomerDetail"));
+const Home = lazy(() => import("./pages/Home"));
+const Invoices = lazy(() => import("./pages/Invoices"));
+const InvoiceDetail = lazy(() => import("./pages/InvoiceDetail"));
+const InvoiceCreate = lazy(() => import("./pages/InvoiceCreate"));
+const Quotes = lazy(() => import("./pages/Quotes"));
+const Inventories = lazy(() => import("./pages/Inventories"));
+const Movements = lazy(() => import("./pages/Movements"));
+const PointOfSale = lazy(() => import("./pages/PointOfSale"));
+const Products = lazy(() => import("./pages/Products"));
+const ProductDetail = lazy(() => import("./pages/ProductDetail"));
+const Suppliers = lazy(() => import("./pages/Suppliers"));
+const SupplierDetail = lazy(() => import("./pages/SupplierDetail"));
+const PurchaseOrderDetail = lazy(() => import("./pages/PurchaseOrderDetail"));
+const PurchaseOrders = lazy(() => import("./pages/PurchaseOrders"));
+const AuditLog = lazy(() => import("./pages/AuditLog"));
+const SettingsIndex = lazy(() => import("./pages/SettingsIndex"));
+const SettingsAppearance = lazy(() => import("./pages/SettingsAppearance"));
+const SettingsCurrency = lazy(() => import("./pages/SettingsCurrency"));
+const SettingsIdentity = lazy(() => import("./pages/SettingsIdentity"));
+const SettingsFiscal = lazy(() => import("./pages/SettingsFiscal"));
+const Backups = lazy(() => import("./pages/Backups"));
+const Expenses = lazy(() => import("./pages/Expenses"));
+const Categories = lazy(() => import("./pages/Categories"));
+const Units = lazy(() => import("./pages/Units"));
+const SettingsPos = lazy(() => import("./pages/SettingsPos"));
+const SettingsPosSection = lazy(() => import("./pages/SettingsPosSection"));
+const SettingsPrinting = lazy(() => import("./pages/SettingsPrinting"));
+const SettingsHistory = lazy(() => import("./pages/SettingsHistory"));
+const SettingsDashboard = lazy(() => import("./pages/SettingsDashboard"));
+const SettingsSecurity = lazy(() => import("./pages/SettingsSecurity"));
+const DataExchange = lazy(() => import("./pages/DataExchange"));
+const SyncJournal = lazy(() => import("./pages/SyncJournal"));
+const Tickets = lazy(() => import("./pages/Tickets"));
+const TermsOfUse = lazy(() => import("./pages/TermsOfUse"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+const Help = lazy(() => import("./pages/Help"));
+const SecurityPolicy = lazy(() => import("./pages/SecurityPolicy"));
+const ContactUs = lazy(() => import("./pages/ContactUs"));
+const SupportRequests = lazy(() => import("./pages/SupportRequests"));
+const Warehouses = lazy(() => import("./pages/Warehouses"));
+const StockTransfers = lazy(() => import("./pages/StockTransfers"));
+const WarehouseComparison = lazy(() => import("./pages/WarehouseComparison"));
+const Pricing = lazy(() => import("./pages/Pricing"));
+const PlatformAdmin = lazy(() => import("./pages/PlatformAdmin"));
+const PaymentDues = lazy(() => import("./pages/PaymentDues"));
+const SubscriptionBilling = lazy(() => import("./pages/SubscriptionBilling"));
+const ForgotPassword = lazy(() => import("./pages/AccountRecovery").then(module => ({ default: module.ForgotPassword })));
+const ResetPassword = lazy(() => import("./pages/AccountRecovery").then(module => ({ default: module.ResetPassword })));
+const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
+const SettingsUsers = lazy(() => import("./pages/SettingsUsers"));
+const Accounting = lazy(() => import("./pages/Accounting"));
+
+function PageFallback() {
+  return <div className="grid min-h-[40vh] place-items-center text-sm text-muted-foreground" role="status">Chargement…</div>;
+}
 
 function DashboardRouter() {
   return (
     <DashboardLayout>
-      <Switch>
+      <RoleRouteBoundary><Suspense fallback={<PageFallback />}><Switch>
         <Route path={"/"} component={Home} />
         <Route path={"/pilotage-entrepots"} component={WarehouseComparison} />
         <Route path={"/pos"} component={PointOfSale} />
@@ -94,10 +107,12 @@ function DashboardRouter() {
         <Route path={"/parametres/pos"} component={SettingsPos} />
         <Route path={"/parametres/tableau-de-bord"} component={SettingsDashboard} />
         <Route path={"/parametres/securite"} component={SettingsSecurity} />
+        <Route path={"/parametres/utilisateurs"} component={SettingsUsers} />
         <Route path={"/parametres/historique"} component={SettingsHistory} />
         <Route path={"/sauvegardes"} component={Backups} />
         <Route path={"/depenses"} component={Expenses} />
         <Route path={"/echeances"} component={PaymentDues} />
+        <Route path={"/comptabilite"} component={Accounting} />
         <Route path={"/produits/:id"} component={ProductDetail} />
         <Route path={"/produits"} component={Products} />
         <Route path={"/entrepots"} component={Warehouses} />
@@ -116,7 +131,7 @@ function DashboardRouter() {
         <Route path={"/donnees"} component={DataExchange} />
         <Route path={"/404"} component={NotFound} />
         <Route component={NotFound} />
-      </Switch>
+      </Switch></Suspense></RoleRouteBoundary>
     </DashboardLayout>
   );
 }
@@ -124,7 +139,7 @@ function DashboardRouter() {
 const PlatformOverviewPage = () => <PlatformAdmin />;
 
 function Router() {
-  return <Switch><Route path="/plateforme/entreprises" component={() => <PlatformAdmin page="companies" />} /><Route path="/plateforme/support" component={() => <PlatformAdmin page="support" />} /><Route path="/plateforme/operateurs" component={() => <PlatformAdmin page="operators" />} /><Route path="/plateforme/abonnements" component={() => <PlatformAdmin page="subscriptions" />} /><Route path="/plateforme/audit" component={() => <PlatformAdmin page="audit" />} /><Route path="/plateforme" component={PlatformOverviewPage} /><Route path="/tarifs" component={Pricing} /><Route path="/aide" component={Help} /><Route path="/conditions-utilisation" component={TermsOfUse} /><Route path="/politique-confidentialite" component={PrivacyPolicy} /><Route path="/politique-securite" component={SecurityPolicy} /><Route path="/contactez-nous" component={ContactUs} /><Route path="/support" component={SupportRequests} /><Route component={DashboardRouter} /></Switch>;
+  return <Suspense fallback={<PageFallback />}><Switch><Route path="/verifier-email" component={VerifyEmail} /><Route path="/mot-de-passe-oublie" component={ForgotPassword} /><Route path="/reinitialiser-mot-de-passe" component={ResetPassword} /><Route path="/plateforme/entreprises" component={() => <PlatformAdmin page="companies" />} /><Route path="/plateforme/support" component={() => <PlatformAdmin page="support" />} /><Route path="/plateforme/operateurs" component={() => <PlatformAdmin page="operators" />} /><Route path="/plateforme/abonnements" component={() => <PlatformAdmin page="subscriptions" />} /><Route path="/plateforme/audit" component={() => <PlatformAdmin page="audit" />} /><Route path="/plateforme" component={PlatformOverviewPage} /><Route path="/tarifs" component={Pricing} /><Route path="/aide" component={Help} /><Route path="/conditions-utilisation" component={TermsOfUse} /><Route path="/politique-confidentialite" component={PrivacyPolicy} /><Route path="/politique-securite" component={SecurityPolicy} /><Route path="/contactez-nous" component={ContactUs} /><Route path="/support" component={SupportRequests} /><Route component={DashboardRouter} /></Switch></Suspense>;
 }
 
 // NOTE: About Theme

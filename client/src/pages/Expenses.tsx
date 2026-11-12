@@ -1,3 +1,4 @@
+import { can } from "@shared/permissions";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,7 +23,7 @@ const blankForm = (): ExpenseForm => ({ category: "other", description: "", amou
 const categoryLabel = (category: string) => categories.find(item => item.value === category)?.label ?? "Autre";
 
 export default function Expenses() {
-  const { user } = useAuth(); const isAdmin = user?.role === "admin"; const { activeWarehouseId, activeWarehouse } = useActiveWarehouse(); const utils = trpc.useUtils(); const monthKey = new Date().toISOString().slice(0, 7);
+  const { user } = useAuth(); const isAdmin = can(user?.role, "expenses.manage"); const { activeWarehouseId, activeWarehouse } = useActiveWarehouse(); const utils = trpc.useUtils(); const monthKey = new Date().toISOString().slice(0, 7);
   const warehouseInput = activeWarehouseId ? { warehouseId: activeWarehouseId } : undefined;
   const { data: expenses, isLoading } = trpc.expenses.list.useQuery(warehouseInput, { enabled: isAdmin }); const { data: budget } = trpc.expenses.budget.get.useQuery({ yearMonth: monthKey, ...warehouseInput }, { enabled: isAdmin });
   const { data: paymentDues = [] } = trpc.paymentDues.list.useQuery(warehouseInput, { enabled: isAdmin });

@@ -1,8 +1,9 @@
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { products, saleItems, sales, warehouseReorderThresholds, warehouseStockAlerts, warehouseStocks, warehouses } from "../drizzle/schema";
+import { products, saleItems, sales, stockLots, warehouseReorderThresholds, warehouseStockAlerts, warehouseStocks, warehouses } from "../drizzle/schema";
 import { companyScope } from "./companyScope";
 import { classifyWarehouseAlertUrgency, normalizeCoverageDays } from "./warehouseAlertUrgency";
+import { allocateFefo, weightedAverageCost } from "./lotRules";
 
 type DbTransaction = any;
 
@@ -56,6 +57,22 @@ export async function syncWarehouseStockAlert(tx: DbTransaction, companyId: numb
 
 /** Débite le stock avec une clause conditionnelle pour bloquer les sorties concurrentes insuffisantes. */
 export async function debitWarehouseStock(tx: DbTransaction, companyId: number | null, warehouseId: number, productId: number, quantity: number) {
+  const lots = await tx.select().from(stockLots).where(and(companyScope(stockLots.companyId, companyId), eq(stockLots.warehouseId, warehouseId), eq(stockLots.productId, productId), gte(stockLots.quantity, 1))).orderBy(sql`${stockLots.expiryDate} IS NULL`, sql`${stockLots.expiryDate} ASC`, stockLots.receivedAt).for("update");
+  const sourceStock = (await tx.select().from(warehouseStocks).where(and(companyScope(warehouseStocks.companyId, companyId), eq(warehouseStocks.warehouseId, warehouseId), eq(warehouseStocks.productId, productId))).limit(1))[0];
+  const trackedQuantity = lots.reduce((sum: number, lot: { quantity: number }) => sum + lot.quantity, 0);
+  const trackedToConsume = Math.min(quantity, trackedQuantity);
+  const lotAllocations: Array<{ lotNumber: string; expiryDate: string | null; quantity: number; unitCostCents: number }> = [];
+  if (trackedToConsume > 0) {
+    const allocations = allocateFefo(lots, trackedToConsume);
+    for (const allocation of allocations) {
+      const lot = lots.find((candidate: { id: number }) => candidate.id === allocation.lotId);
+      if (!lot) continue;
+      lotAllocations.push({ lotNumber: lot.lotNumber, expiryDate: lot.expiryDate, quantity: allocation.quantity, unitCostCents: lot.unitCostCents });
+      const changed = await tx.update(stockLots).set({ quantity: lot.quantity - allocation.quantity }).where(and(eq(stockLots.id, lot.id), companyScope(stockLots.companyId, companyId), gte(stockLots.quantity, allocation.quantity)));
+      const lotAffected = Number((changed as Array<{ affectedRows?: number }>)[0]?.affectedRows ?? 0);
+      if (!lotAffected) throw new TRPCError({ code: "CONFLICT", message: "Un lot a changé pendant la sortie. Réessayez." });
+    }
+  }
   const result = await tx.update(warehouseStocks)
     .set({ quantity: sql`${warehouseStocks.quantity} - ${quantity}` })
     .where(and(companyScope(warehouseStocks.companyId, companyId), eq(warehouseStocks.warehouseId, warehouseId), eq(warehouseStocks.productId, productId), gte(warehouseStocks.quantity, quantity)));
@@ -63,13 +80,16 @@ export async function debitWarehouseStock(tx: DbTransaction, companyId: number |
   if (!affected) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Stock insuffisant dans l’entrepôt source." });
   const resultingQuantity = await warehouseStockQuantity(tx, companyId, warehouseId, productId);
   await syncWarehouseStockAlert(tx, companyId, warehouseId, productId, resultingQuantity);
-  return { previousQuantity: resultingQuantity + quantity, resultingQuantity };
+  return { previousQuantity: resultingQuantity + quantity, resultingQuantity, lotAllocations, unitCostCents: Number(sourceStock?.averageCostCents ?? 0) };
 }
 
 /** Crédit atomiquement une ligne de stock, en la créant au besoin. */
-export async function creditWarehouseStock(tx: DbTransaction, companyId: number | null, warehouseId: number, productId: number, quantity: number) {
-  await tx.insert(warehouseStocks).values({ companyId, warehouseId, productId, quantity })
-    .onDuplicateKeyUpdate({ set: { quantity: sql`${warehouseStocks.quantity} + ${quantity}` } });
+export async function creditWarehouseStock(tx: DbTransaction, companyId: number | null, warehouseId: number, productId: number, quantity: number, unitCostCents?: number) {
+  await tx.select({ id: products.id }).from(products).where(and(eq(products.id, productId), companyScope(products.companyId, companyId))).limit(1).for("update");
+  const current = (await tx.select({ quantity: warehouseStocks.quantity, averageCostCents: warehouseStocks.averageCostCents }).from(warehouseStocks).where(and(companyScope(warehouseStocks.companyId, companyId), eq(warehouseStocks.warehouseId, warehouseId), eq(warehouseStocks.productId, productId))).limit(1))[0];
+  const averageCostCents = unitCostCents === undefined ? current?.averageCostCents ?? 0 : weightedAverageCost(current?.quantity ?? 0, current?.averageCostCents ?? 0, quantity, unitCostCents);
+  await tx.insert(warehouseStocks).values({ companyId, warehouseId, productId, quantity, averageCostCents })
+    .onDuplicateKeyUpdate({ set: { quantity: sql`${warehouseStocks.quantity} + ${quantity}`, averageCostCents } });
   const resultingQuantity = await warehouseStockQuantity(tx, companyId, warehouseId, productId);
   await syncWarehouseStockAlert(tx, companyId, warehouseId, productId, resultingQuantity);
   return { previousQuantity: resultingQuantity - quantity, resultingQuantity };

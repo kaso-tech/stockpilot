@@ -1,11 +1,11 @@
 # StockPilot Pro — Dossier de continuité
 
-**Date de synthèse :** 24 août 2026  
-**Projet Manus :** StockPilot SaaS  
-**Chemin de travail :** `/home/ubuntu/stockpilot-pro`  
-**Domaine publié :** `https://stockpilot-gpaoheuz.manus.space`  
-**Dernier checkpoint fonctionnel avant la synchronisation GitHub actuelle :** `20eefcc1`  
-**Dernière archive source fournie :** `/home/ubuntu/stockpilot-pro-current.zip`
+**Date de synthèse :** 12 novembre 2026
+**Projet Manus :** StockPilot SaaS
+**Chemin de travail :** `/home/ubuntu/stockpilot-pro`
+**Domaine publié :** `https://stockpilot-gpaoheuz.manus.space`
+**Dernier checkpoint fonctionnel avant cette intégration GitHub :** `abc48e5e`
+**Archive source de cette livraison :** `/home/ubuntu/stockpilot-pro-novembre-2026.zip`
 
 ## 1. Objectif produit
 
@@ -370,3 +370,16 @@ Le collecteur de diagnostic de prévisualisation, dont le rythme de rapport éta
 La PWA ne force plus l’activation d’un service worker ni un rechargement automatique. Une version disponible est annoncée à l’utilisateur, qui peut choisir de l’appliquer après avoir terminé ses saisies. La navigation après connexion, inscription et finalisation de l’assistant de démarrage utilise désormais des invalidations tRPC ciblées et le routeur SPA plutôt qu’un rechargement de document.
 
 YengaPay demeure en **pause SANDBOX** : `YENGAPAY_PAYIN_ENABLED` est requis et reste désactivé ; l’écran d’abonnement interdit toute création de checkout tant que le verrou est fermé. Ne pas modifier ce statut, relancer la sonde PayIn ni activer un paiement sans la validation technique et l’accord explicite prévus au lot I.
+
+
+## Mise à jour — intégration GitHub novembre (12 novembre 2026)
+
+À la demande de l’utilisateur, les nouveautés du commit GitHub `ef4ac6d793228475c3ce64653f96134af95328f1`, branche `ccr-1f2b32f0-8cxy1l` de `kaso-tech/stockpilot`, ont été portées sélectivement sur le socle actuel. Il ne s’agit pas d’un remplacement par l’ancienne branche GitHub `main`. La sauvegarde locale `backup/pre-github-integration-2026-11-12` conserve l’état initial ; les fusions/rebases exploratoires ont été annulées. Le checkpoint `4cc686f9` avait déjà sécurisé l’installation et les dépendances avant portage.
+
+La livraison intègre récupération et vérification e-mail facultative, envoi serveur des PDF, retours partiels/avoirs, TVA par produit, références de catalogue tenant-scopées, cinq rôles métier, caisse/clôtures/exports, lots/péremption et coûts moyens, limites/consommation SaaS et pilote S3 optionnel. Les pages sont chargées à la demande et précachées par la PWA. La notification de mise à jour personnalisée est reportable et exige une confirmation explicite avant rechargement, avec avertissement sur les saisies non enregistrées.
+
+Les migrations `0077_dusty_scream.sql` et `0078_november_compatibility_backfill.sql` sont appliquées à la base attachée ; ne pas les rejouer aveuglément, en particulier la reprise des coûts après de nouvelles opérations. Les noms, quantités et totaux historiques sont conservés. Le dossier `NOTE_INTEGRATION_NOVEMBRE_2026.md` détaille la portée et les précautions.
+
+Validation de livraison : typage vert, 129 fichiers / 332 tests, build PWA avec 121 entrées précachées, audit production/release et installation figée verts, 5 tests navigateur verts sur le build production avec API simulée et aucune base métier. Les tests de navigation et de cache après coupure réseau sont réellement exécutés ; ils ne certifient pas un séjour offline de plusieurs jours sur tout appareil.
+
+YengaPay reste en pause SANDBOX, offre Test inchangée, aucun paiement ni abonnement activé. SMTP et S3 externes ne sont pas configurés/validés par cette livraison. Les liens de compte nécessitent une origine `PUBLIC_APP_URL` HTTPS ; ne pas utiliser le Host fourni par le navigateur. L’envoi e-mail absent reste explicitement indisponible. Ne pas qualifier cette livraison d’ouverture commerciale large ni de clôture des prérequis externes du registre.

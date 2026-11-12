@@ -41,3 +41,9 @@ jobs:
         run: pnpm audit:production
       - name: Production build
         run: pnpm build
+      - name: Install isolated E2E browser
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Browser regression tests (mock API, no business database)
+        run: pnpm test:e2e
+        env:
+          DATABASE_URL: ""

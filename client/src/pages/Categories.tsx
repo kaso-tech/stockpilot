@@ -1,3 +1,4 @@
+import { can } from "@shared/permissions";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,7 +15,7 @@ type Category = { id: number; name: string };
 
 export default function Categories() {
   const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const isAdmin = can(user?.role, "catalog.manage");
   const utils = trpc.useUtils();
   const { data: categories = [], isLoading } = trpc.categories.list.useQuery(undefined, { enabled: isAdmin });
   const [open, setOpen] = useState(false);

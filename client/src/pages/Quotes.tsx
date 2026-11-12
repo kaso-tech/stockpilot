@@ -1,3 +1,4 @@
+import { can } from "@shared/permissions";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,7 +17,7 @@ export default function Quotes() {
   const { activeWarehouseId } = useActiveWarehouse();
   const [, setLocation] = useLocation();
   const { data: transactions = [], isLoading } =
-    trpc.transactions.list.useQuery(user?.role === "admin" && activeWarehouseId ? { warehouseId: activeWarehouseId } : undefined);
+    trpc.transactions.list.useQuery(activeWarehouseId ? { warehouseId: activeWarehouseId } : undefined);
   const { data: documentParticipants = [] } = trpc.commerce.documentParticipants.useQuery();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"all" | "draft" | "paid" | "void">("all");
@@ -33,7 +34,7 @@ export default function Quotes() {
     return matchesSearch && matchesStatus && matchesAgent && matchesPeriod;
   }), [agentId, period, quotes, search, status]);
   const exportFilteredQuotes = () => downloadCommercialDocumentsCsv("devis-filtres.csv", filteredQuotes.map(quote => ({ reference: quote.invoiceNumber, date: quote.createdAt, client: quote.customerName || "Client", statut: quote.status === "paid" ? "Accepté" : quote.status === "void" ? "Retourné / annulé" : "En attente", agent: documentParticipantNames(quote, documentParticipants), totalCents: quote.totalCents, encaisseCents: quote.amountPaidCents })));
-  if (user?.role !== "admin" && user?.role !== "seller")
+  if (!can(user?.role, "sales.view"))
     return (
       <div className="mx-auto max-w-5xl py-16 text-center text-muted-foreground">
         Accès réservé aux utilisateurs autorisés.

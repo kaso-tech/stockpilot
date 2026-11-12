@@ -5,6 +5,7 @@ import type { TrpcContext } from "./context";
 import { and, eq } from "drizzle-orm";
 import { companies } from "../../drizzle/schema";
 import { getDb } from "../db";
+import { can, type Permission } from "@shared/permissions";
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
@@ -51,6 +52,16 @@ const requireActiveCompany = t.middleware(async opts => {
 
 export const protectedProcedure = authenticatedProcedure.use(requireActiveCompany);
 
+/** Applique la matrice d’accès tenant ; les contrôles entrepôt et vendeur restent complémentaires. */
+export const permissionProcedure = (permission: Permission) => protectedProcedure.use(
+  t.middleware(async ({ ctx, next }) => {
+    if (!ctx.user || !can(ctx.user.role, permission)) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Cette action n’est pas autorisée pour votre rôle." });
+    }
+    return next();
+  }),
+);
+
 export const adminProcedure = protectedProcedure.use(
   t.middleware(async opts => {
     const { ctx, next } = opts;
@@ -67,3 +78,15 @@ export const adminProcedure = protectedProcedure.use(
     });
   }),
 );
+
+// Aliases de compatibilité : le code legacy conserve ses routes et reçoit désormais les refus métier.
+export const catalogProcedure = permissionProcedure("catalog.manage");
+export const customerProcedure = permissionProcedure("customers.manage");
+export const purchasingProcedure = permissionProcedure("purchasing.manage");
+export const stockAdjustmentProcedure = permissionProcedure("stock.adjust");
+export const inventoryProcedure = permissionProcedure("inventory.manage");
+export const expensesProcedure = permissionProcedure("expenses.manage");
+export const payrollProcedure = permissionProcedure("payroll.manage");
+export const teamProcedure = permissionProcedure("team.manage");
+export const auditProcedure = permissionProcedure("audit.view");
+export const cashProcedure = permissionProcedure("cash.close");

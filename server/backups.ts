@@ -5,9 +5,9 @@ import {
   paymentDueBeneficiaryGroups, paymentDueOccurrences, paymentDueReminderEvents,
   paymentDueSchedules, paymentDueSettlements, paymentDueTemplates, productCategories,
   productPriceTiers, productUnits, products, purchaseOrderItems, purchaseOrders,
-  remunerationProfiles, saleCommissions, saleItems, salePayments, saleSettings,
+  remunerationProfiles, saleCommissions, saleItems, salePayments, saleSettings, saleReturns, saleReturnItems, documentSequences, cashClosures,
   sales, salesAgentWarehouseAssignments, sellerCredentials, sellerWarehouseAssignments,
-  stockAlerts, stockMovements, stockTransferItems, stockTransfers, suppliers,
+  stockAlerts, stockLots, stockMovements, stockTransferItems, stockTransfers, suppliers,
   supportRequests, userDashboardPreferences, userWarehousePreferences, users,
   vatRatePresets, warehouseReorderThresholds, warehouseStockAlerts, warehouseStocks,
   warehouses,
@@ -15,7 +15,7 @@ import {
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { companyScope } from "./companyScope";
 import { getDb } from "./db";
-import { storageGetSignedUrl, storagePut } from "./storage";
+import { storageDelete, storageGetSignedUrl, storagePut } from "./storage";
 
 type Trigger = "manual" | "scheduled";
 type SnapshotSource = { name: string; table: any };
@@ -26,12 +26,12 @@ const snapshotSources: SnapshotSource[] = [
   { name: "warehouses", table: warehouses }, { name: "sellerWarehouseAssignments", table: sellerWarehouseAssignments },
   { name: "suppliers", table: suppliers }, { name: "productCategories", table: productCategories }, { name: "productUnits", table: productUnits },
   { name: "products", table: products }, { name: "productPriceTiers", table: productPriceTiers },
-  { name: "warehouseStocks", table: warehouseStocks }, { name: "warehouseReorderThresholds", table: warehouseReorderThresholds }, { name: "warehouseStockAlerts", table: warehouseStockAlerts },
+  { name: "warehouseStocks", table: warehouseStocks }, { name: "stockLots", table: stockLots }, { name: "warehouseReorderThresholds", table: warehouseReorderThresholds }, { name: "warehouseStockAlerts", table: warehouseStockAlerts },
   { name: "stockTransfers", table: stockTransfers }, { name: "stockTransferItems", table: stockTransferItems },
   { name: "customers", table: customers }, { name: "agents", table: agents }, { name: "salesAgentWarehouseAssignments", table: salesAgentWarehouseAssignments },
   { name: "remunerationProfiles", table: remunerationProfiles }, { name: "saleSettings", table: saleSettings }, { name: "vatRatePresets", table: vatRatePresets },
   { name: "purchaseOrders", table: purchaseOrders }, { name: "purchaseOrderItems", table: purchaseOrderItems },
-  { name: "sales", table: sales }, { name: "salePayments", table: salePayments }, { name: "saleItems", table: saleItems }, { name: "saleCommissions", table: saleCommissions },
+  { name: "sales", table: sales }, { name: "salePayments", table: salePayments }, { name: "saleItems", table: saleItems }, { name: "saleCommissions", table: saleCommissions }, { name: "saleReturns", table: saleReturns }, { name: "saleReturnItems", table: saleReturnItems }, { name: "documentSequences", table: documentSequences }, { name: "cashClosures", table: cashClosures },
   { name: "expenses", table: expenses }, { name: "expenseBudgets", table: expenseBudgets }, { name: "agentPayments", table: agentPayments },
   { name: "paymentDueTemplates", table: paymentDueTemplates }, { name: "paymentDueBeneficiaryGroups", table: paymentDueBeneficiaryGroups }, { name: "paymentDueBeneficiaryGroupMembers", table: paymentDueBeneficiaryGroupMembers },
   { name: "paymentDueSchedules", table: paymentDueSchedules }, { name: "paymentDueOccurrences", table: paymentDueOccurrences },
@@ -71,13 +71,23 @@ function validateBackupTables(tables: unknown, companyId: number) {
   const ids = (name: string) => new Set(rowsFor(name).map(row => row.id).filter((id): id is number => typeof id === "number" && Number.isInteger(id)));
   const userIds = ids("users");
   const saleIds = ids("sales");
+  const returnIds = ids("saleReturns");
+  const warehouseIds = ids("warehouses");
   const inventoryIds = ids("inventorySessions");
   const productIds = ids("products");
+  const categoryIds = ids("productCategories");
+  const unitIds = ids("productUnits");
   const purchaseOrderIds = ids("purchaseOrders");
   const transferIds = ids("stockTransfers");
   const groupIds = ids("paymentDueBeneficiaryGroups");
   const scheduleIds = ids("paymentDueSchedules");
   const occurrenceIds = ids("paymentDueOccurrences");
+  if (rowsFor("saleReturns").some(row => !saleIds.has(row.saleId as number) || !warehouseIds.has(row.warehouseId as number))) throw new Error("Un retour référence une vente ou un entrepôt absent.");
+  if (rowsFor("saleReturnItems").some(row => !returnIds.has(row.returnId as number))) throw new Error("Une ligne de retour référence un retour absent.");
+  if (rowsFor("stockLots").some(row => !warehouseIds.has(row.warehouseId as number) || !productIds.has(row.productId as number) || !Number.isInteger(row.quantity) || Number(row.quantity) < 0)) throw new Error("Un lot référence un stock invalide.");
+  // Archives antérieures au catalogue par ID ne contiennent pas ces champs.
+  if (rowsFor("products").some(row => row.categoryId != null && (typeof row.categoryId !== "number" || !categoryIds.has(row.categoryId)))) throw new Error("Un produit référence une catégorie absente de la sauvegarde.");
+  if (rowsFor("products").some(row => row.unitId != null && (typeof row.unitId !== "number" || !unitIds.has(row.unitId)))) throw new Error("Un produit référence une unité absente de la sauvegarde.");
   if (rowsFor("sellerCredentials").some(row => typeof row.userId !== "number" || !userIds.has(row.userId))) throw new Error("Une identification vendeur référence un utilisateur absent de la sauvegarde.");
   if (rowsFor("userDashboardPreferences").some(row => typeof row.userId !== "number" || !userIds.has(row.userId))) throw new Error("Une préférence de tableau de bord référence un utilisateur absent de la sauvegarde.");
   if (rowsFor("productPriceTiers").some(row => typeof row.productId !== "number" || !productIds.has(row.productId))) throw new Error("Un palier de prix référence un produit absent de la sauvegarde.");
@@ -123,9 +133,7 @@ export function summarizeBackupPayload(payload: BackupPayload) {
   };
 }
 
-export async function createBackupSnapshot(actorUserId: number | null, trigger: Trigger, companyId: number | null = null) {
-  const scopedCompanyId = requireBackupCompanyId(companyId);
-  const db = await dbOrThrow();
+async function collectCompanySnapshot(db: any, scopedCompanyId: number) {
   const selectCompanyRows = async (table: any) => db.select().from(table).where(companyScope(table.companyId, scopedCompanyId));
   const selectChildren = async (table: any, foreignKey: any, parentIds: number[]) => parentIds.length
     ? db.select().from(table).where(inArray(foreignKey, parentIds))
@@ -164,7 +172,55 @@ export async function createBackupSnapshot(actorUserId: number | null, trigger: 
     saleItems: saleItemRows, saleCommissions: commissionRows, paymentDueBeneficiaryGroupMembers: groupMemberRows,
     paymentDueSettlements: settlementRows, paymentDueReminderEvents: reminderRows, inventoryItems: inventoryItemRows,
   });
+  tables.saleReturnItems = await selectChildren(saleReturnItems, saleReturnItems.returnId, getIds("saleReturns"));
+  return tables;
+}
+
+export async function createBackupSnapshot(actorUserId: number | null, trigger: Trigger, companyId: number | null = null) {
+  const scopedCompanyId = requireBackupCompanyId(companyId);
+  const db = await dbOrThrow();
+  const tables = await collectCompanySnapshot(db, scopedCompanyId);
   return persistSnapshot(db, actorUserId, trigger, scopedCompanyId, tables);
+}
+
+const exportSecretField = /password|hash|token|secret|credential|refresh|session|openid|api.?key/i;
+function redactExportValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(redactExportValue);
+  if (typeof value !== "object" || value === null || value instanceof Date) return value;
+  return Object.fromEntries(Object.entries(value as Record<string, unknown>)
+    .filter(([key]) => !exportSecretField.test(key))
+    .map(([key, child]) => [key, redactExportValue(child)]));
+}
+
+/** Owner-only callers receive tenant rows without credentials, token material or hashes; no archive is persisted. */
+export async function exportCompanyData(companyId: number | null) {
+  const scopedCompanyId = requireBackupCompanyId(companyId);
+  const db = await dbOrThrow();
+  const rawTables = await collectCompanySnapshot(db, scopedCompanyId);
+  const tables = Object.fromEntries(Object.entries(rawTables)
+    .filter(([tableName]) => tableName !== "sellerCredentials")
+    .map(([tableName, rows]) => [tableName, redactExportValue(rows) as unknown[]]));
+  return {
+    schemaVersion: 1 as const,
+    exportedAt: new Date().toISOString(),
+    source: "StockPilot" as const,
+    companyId: scopedCompanyId,
+    tables,
+  };
+}
+
+/** A deletion preview is intentionally non-destructive and does not claim legal/restore readiness. */
+export async function previewCompanyDeletion(companyId: number | null) {
+  const payload = await exportCompanyData(companyId);
+  const counts = Object.fromEntries(Object.entries(payload.tables).map(([name, rows]) => [name, rows.length]));
+  return {
+    companyId: payload.companyId,
+    previewedAt: payload.exportedAt,
+    counts,
+    totalRecords: Object.values(counts).reduce((sum, count) => sum + count, 0),
+    deletionEnabled: false as const,
+    blockers: ["Validation juridique et des délais de conservation non confirmée.", "Vérification d’une sauvegarde restaurable non confirmée."],
+  };
 }
 
 async function persistSnapshot(db: any, actorUserId: number | null, trigger: Trigger, companyId: number, tables: Record<string, unknown[]>) {
@@ -211,6 +267,24 @@ export async function listBackups(limit = 30, companyId: number | null = null) {
   }).from(backupArchives).leftJoin(users, eq(backupArchives.createdByUserId, users.id)).where(companyScope(backupArchives.companyId, scopedCompanyId)).orderBy(desc(backupArchives.createdAt)).limit(limit);
 }
 
+/** Efface archive et objet distant pour un seul tenant, seulement si le pilote le permet. */
+export async function deleteBackupArchive(archiveId: number, companyId: number | null = null) {
+  const scopedCompanyId = requireBackupCompanyId(companyId);
+  const db = await dbOrThrow();
+  const archive = (await db.select().from(backupArchives).where(and(
+    eq(backupArchives.id, archiveId),
+    companyScope(backupArchives.companyId, scopedCompanyId),
+  )).limit(1))[0];
+  if (!archive) throw new Error("Archive introuvable.");
+  if (archive.storageKey && !(await storageDelete(archive.storageKey))) {
+    throw new Error("Ce stockage ne permet pas la suppression définitive des archives.");
+  }
+  await db.delete(backupArchives).where(and(
+    eq(backupArchives.id, archiveId),
+    companyScope(backupArchives.companyId, scopedCompanyId),
+  ));
+}
+
 export async function applyRetentionPolicy<T extends { id: number }>(archives: T[], retentionCount: number, remove: (id: number) => Promise<void>) {
   for (const stale of archives.slice(retentionCount)) await remove(stale.id);
 }
@@ -234,7 +308,20 @@ export async function runBackupWithStatus(actorUserId: number | null, trigger: T
     if (settings) await db.update(backupSettings).set({ lastBackupAt: new Date(), lastBackupStatus: "success", lastBackupError: null }).where(eq(backupSettings.id, settings.id));
     if (settings?.googleDriveRefreshTokenEncrypted) await (await import("./googleDrive")).syncArchiveToGoogleDrive(archive.id, scopedCompanyId);
     const archives = await listBackups(Math.max(retentionCount + 20, 50), scopedCompanyId);
-    await applyRetentionPolicy(archives, retentionCount, async id => { await db.delete(backupArchives).where(and(eq(backupArchives.id, id), companyScope(backupArchives.companyId, scopedCompanyId))); });
+    await applyRetentionPolicy(archives, retentionCount, async id => {
+      const stale = archives.find(item => item.id === id);
+      let objectRemoved = true;
+      if (stale?.storageKey) {
+        try {
+          objectRemoved = await storageDelete(stale.storageKey);
+        } catch {
+          objectRemoved = false;
+        }
+      }
+      if (objectRemoved) {
+        await db.delete(backupArchives).where(and(eq(backupArchives.id, id), companyScope(backupArchives.companyId, scopedCompanyId)));
+      }
+    });
     return archive;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Échec inconnu de la sauvegarde.";

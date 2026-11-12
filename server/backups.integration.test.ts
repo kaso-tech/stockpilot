@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getDbMock, storagePutMock } = vi.hoisted(() => ({ getDbMock: vi.fn(), storagePutMock: vi.fn() }));
+const { getDbMock, storagePutMock, storageDeleteMock } = vi.hoisted(() => ({ getDbMock: vi.fn(), storagePutMock: vi.fn(), storageDeleteMock: vi.fn() }));
 
 vi.mock("./db", () => ({ getDb: getDbMock }));
-vi.mock("./storage", () => ({ storagePut: storagePutMock, storageGetSignedUrl: vi.fn() }));
+vi.mock("./storage", () => ({ storagePut: storagePutMock, storageDelete: storageDeleteMock, storageGetSignedUrl: vi.fn() }));
 
-import { createBackupSnapshot, restoreBackupPayload } from "./backups";
+import { createBackupSnapshot, deleteBackupArchive, restoreBackupPayload } from "./backups";
 
 function archiveDb() {
   const where = vi.fn().mockResolvedValue([]);
@@ -16,6 +16,22 @@ function archiveDb() {
 
 describe("sauvegarde locale intégrée", () => {
   beforeEach(() => { vi.clearAllMocks(); });
+
+  it("ne retire pas les métadonnées si le pilote ne peut pas supprimer l’objet distant", async () => {
+    const where = vi.fn().mockResolvedValue([{ id: 42, companyId: 12, storageKey: "company/12/backups/archive.json" }]);
+    const limit = vi.fn().mockResolvedValue([{ id: 42, companyId: 12, storageKey: "company/12/backups/archive.json" }]);
+    const db = {
+      select: vi.fn(() => ({ from: vi.fn(() => ({ where: vi.fn(() => ({ limit })) })) })),
+      delete: vi.fn(() => ({ where })),
+    };
+    getDbMock.mockResolvedValue(db);
+    storageDeleteMock.mockResolvedValue(false);
+
+    await expect(deleteBackupArchive(42, 12)).rejects.toThrow("ne permet pas la suppression définitive");
+
+    expect(storageDeleteMock).toHaveBeenCalledWith("company/12/backups/archive.json");
+    expect(db.delete).not.toHaveBeenCalled();
+  });
 
   it("crée une archive JSON, la stocke et enregistre ses métadonnées", async () => {
     const db = archiveDb();

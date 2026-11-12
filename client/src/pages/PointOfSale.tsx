@@ -1,4 +1,5 @@
 import { BarcodeCameraDialog } from "@/components/BarcodeCameraDialog";
+import { computeVatBreakdown, vatRatesLabel } from "@shared/pricing";
 import {
   calculateDiscount,
   DiscountEditor,
@@ -225,9 +226,16 @@ export default function PointOfSale() {
   const vatRateBasisPoints = applyVat
     ? (settings.vatRateBasisPoints ?? 0)
     : 0;
-  const vatCents = Math.round(
-    (taxableSubtotalCents * vatRateBasisPoints) / 10000
+  const vatBreakdown = computeVatBreakdown(
+    lines.map(line => ({
+      netCents: line.totalCents,
+      vatRateBasisPoints: applyVat
+        ? (line.product.vatRateBasisPoints ?? vatRateBasisPoints)
+        : 0,
+    })),
+    invoiceDiscountCents
   );
+  const vatCents = vatBreakdown.vatCents;
   const totalCents = taxableSubtotalCents + vatCents;
 
   const add = (productId: number) =>
@@ -320,6 +328,7 @@ export default function PointOfSale() {
         productId: line.productId,
         productName: line.product.name,
         productReference: line.product.reference,
+        vatRateBasisPoints: applyVat ? (line.product.vatRateBasisPoints ?? vatRateBasisPoints) : 0,
         unitPriceCents: line.unitPriceCents,
         lineTotalCents: line.totalCents,
         quantity: line.quantity,
@@ -766,7 +775,7 @@ export default function PointOfSale() {
                   {vatCents > 0 && (
                     <div className="flex items-center justify-between">
                       <span>
-                        TVA ({(vatRateBasisPoints / 100).toFixed(2)} %)
+                        TVA ({vatRatesLabel(vatBreakdown.byRate.filter(rate => rate.vatCents > 0).map(rate => rate.vatRateBasisPoints)) || `${(vatRateBasisPoints / 100).toFixed(2)} %`})
                       </span>
                       <span>{formatCurrency(vatCents)}</span>
                     </div>

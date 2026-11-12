@@ -1,3 +1,4 @@
+import { can } from "@shared/permissions";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,7 +17,7 @@ type MovementType = "entry" | "exit" | "adjustment";
 
 export default function Movements() {
   const { user } = useAuth();
-  const canManage = user?.role === "admin";
+  const canManage = can(user?.role, "stock.adjust");
   const { activeWarehouseId, activeWarehouse, setActiveWarehouseId } = useActiveWarehouse();
   const { data: settings } = trpc.commerce.settings.get.useQuery();
   const canCorrectStock = !canManage && Boolean(settings?.sellerCanCorrectStock);

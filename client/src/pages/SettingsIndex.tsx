@@ -25,6 +25,7 @@ export const settingsSections: SettingsSection[] = [
     { href: "/parametres/tableau-de-bord", icon: LayoutDashboard, label: "Tableau de bord", keywords: "dashboard indicateur widget accueil" },
   ] },
   { id: "security", label: "Sécurité et traçabilité", links: [
+    { href: "/parametres/utilisateurs", icon: UsersRound, label: "Utilisateurs et rôles", keywords: "équipe rôles droits permissions accès" },
     { href: "/parametres/securite", icon: KeyRound, label: "Sécurité du compte", keywords: "sécurité session mot de passe compte" },
     { href: "/parametres/historique", icon: History, label: "Historique des paramètres", keywords: "audit journal historique traçabilité" },
   ] },

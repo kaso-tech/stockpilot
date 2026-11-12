@@ -1,3 +1,4 @@
+import { can } from "@shared/permissions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -24,7 +25,7 @@ export default function ProductDetail() {
   const remove = trpc.products.remove.useMutation({ onSuccess: () => { utils.products.list.invalidate(); toast.success("Produit supprimé."); setLocation("/produits"); }, onError: issue => toast.error(issue.message) });
   const [orderOpen, setOrderOpen] = useState(false);
   const [quantity, setQuantity] = useState("1");
-  const isAdmin = user?.role === "admin";
+  const isAdmin = can(user?.role, "catalog.manage");
   const product = data?.product;
   const lowStock = product ? product.quantity <= product.minimumQuantity : false;
   const suggestedQuantity = product ? Math.max(1, product.minimumQuantity - product.quantity + 1) : 1;
