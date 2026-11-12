@@ -30,18 +30,16 @@ describe.skipIf(!realDbUrl)("Lot 9.2 — retours partiels (MySQL réel)", () => 
   async function paidSale() {
     const admin = appRouter.createCaller(ctx(a.admin));
     const db = await realDb();
-    await db
-      .insert(remunerationProfiles)
-      .values({
-        companyId: a.companyId,
-        beneficiaryType: "user",
-        beneficiaryId: a.admin.id,
-        remunerationMode: "commission",
-        fixedMonthlyCents: 0,
-        commissionBasis: "revenue",
-        rateBasisPoints: 1000,
-        active: true,
-      });
+    await db.insert(remunerationProfiles).values({
+      companyId: a.companyId,
+      beneficiaryType: "user",
+      beneficiaryId: a.admin.id,
+      remunerationMode: "commission",
+      fixedMonthlyCents: 0,
+      commissionBasis: "revenue",
+      rateBasisPoints: 1000,
+      active: true,
+    });
     const p1 = await admin.products.create({
       reference: "ART-A",
       name: "Article A",
@@ -195,14 +193,12 @@ describe.skipIf(!realDbUrl)("Lot 9.2 — retours partiels (MySQL réel)", () => 
     const { sale, detail } = await paidSale();
     const b = await seedTenant("b");
     await expect(
-      appRouter
-        .createCaller(ctx(b.admin))
-        .transactions.returnItems({
-          saleId: sale.id,
-          lines: [
-            { saleItemId: detail.items[0]!.id, quantity: 1, restock: true },
-          ],
-        })
+      appRouter.createCaller(ctx(b.admin)).transactions.returnItems({
+        saleId: sale.id,
+        lines: [
+          { saleItemId: detail.items[0]!.id, quantity: 1, restock: true },
+        ],
+      })
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 });

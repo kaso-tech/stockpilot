@@ -628,16 +628,14 @@ export const transactionsRouter = router({
         });
         const returnId = Number(returnResult[0].insertId);
         for (const line of returned) {
-          await tx
-            .insert(saleReturnItems)
-            .values({
-              returnId,
-              saleItemId: line.item.id,
-              productId: line.item.productId,
-              quantity: line.quantity,
-              restocked: line.restock,
-              refundCents: line.refundCents,
-            });
+          await tx.insert(saleReturnItems).values({
+            returnId,
+            saleItemId: line.item.id,
+            productId: line.item.productId,
+            quantity: line.quantity,
+            restocked: line.restock,
+            refundCents: line.refundCents,
+          });
           await tx
             .update(saleItems)
             .set({
@@ -655,14 +653,12 @@ export const transactionsRouter = router({
             });
         }
         if (refundCents > 0) {
-          await tx
-            .insert(salePayments)
-            .values({
-              saleId: sale.id,
-              method,
-              amountCents: -refundCents,
-              createdByUserId: ctx.user.id,
-            });
+          await tx.insert(salePayments).values({
+            saleId: sale.id,
+            method,
+            amountCents: -refundCents,
+            createdByUserId: ctx.user.id,
+          });
           const share = refundCents / Math.max(1, sale.totalCents);
           const commissions = await tx
             .select()
@@ -684,16 +680,14 @@ export const transactionsRouter = router({
           for (const { row, cents } of Array.from(positives.values())) {
             const reversal = Math.round(cents * share);
             if (reversal > 0)
-              await tx
-                .insert(saleCommissions)
-                .values({
-                  saleId: sale.id,
-                  beneficiaryType: row.beneficiaryType,
-                  beneficiaryId: row.beneficiaryId,
-                  commissionBasis: row.commissionBasis,
-                  rateBasisPoints: row.rateBasisPoints,
-                  commissionCents: -reversal,
-                });
+              await tx.insert(saleCommissions).values({
+                saleId: sale.id,
+                beneficiaryType: row.beneficiaryType,
+                beneficiaryId: row.beneficiaryId,
+                commissionBasis: row.commissionBasis,
+                rateBasisPoints: row.rateBasisPoints,
+                commissionCents: -reversal,
+              });
           }
         }
         const fullyReturned = items.every(
