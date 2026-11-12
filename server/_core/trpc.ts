@@ -1,6 +1,7 @@
 import { NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG } from "@shared/const";
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
+import { can, type Permission } from "@shared/permissions";
 import type { TrpcContext } from "./context";
 
 const t = initTRPC.context<TrpcContext>().create({
@@ -63,3 +64,17 @@ export const adminProcedure = t.procedure.use(
     });
   })
 );
+
+/**
+ * Procédure soumise à un droit de la matrice (9.3). Les restrictions
+ * propres aux vendeurs configurées dans le point de vente restent vérifiées
+ * dans les procédures concernées.
+ */
+export const permissionProcedure = (permission: Permission) =>
+  protectedProcedure.use(
+    t.middleware(async ({ ctx, next }) => {
+      if (!can(ctx.user?.role, permission))
+        throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
+      return next();
+    })
+  );

@@ -1,4 +1,4 @@
-import { useAuth } from "@/_core/hooks/useAuth";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Badge } from "@/components/ui/badge";
 import { BarcodeCameraDialog } from "@/components/BarcodeCameraDialog";
 import { Button } from "@/components/ui/button";
@@ -81,9 +81,9 @@ const emptyProduct: ProductForm = {
 };
 
 export default function Products() {
-  const { user } = useAuth();
+  const { can } = usePermissions();
   const [, setLocation] = useLocation();
-  const canManage = user?.role === "admin";
+  const canManage = can("catalog.manage");
   const utils = trpc.useUtils();
   const { data: products = [], isLoading } = trpc.products.list.useQuery();
   const { data: suppliers = [] } = trpc.suppliers.list.useQuery();

@@ -11,7 +11,7 @@ import {
 } from "../../drizzle/schema";
 import { fixedRemunerationCents } from "../commerceRules";
 import { getDb } from "../db";
-import { adminProcedure, router } from "../_core/trpc";
+import { router, permissionProcedure } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { storagePut } from "../storage";
 import { companyScope } from "../companyScope";
@@ -39,7 +39,7 @@ export const payrollPaymentInput = z.object({
 });
 
 export const payrollRouter = router({
-  overview: adminProcedure
+  overview: permissionProcedure("payroll.manage")
     .input(
       z
         .object({
@@ -92,7 +92,7 @@ export const payrollRouter = router({
       const scopedCommissions = commissions.map(row => row.saleCommissions);
       const beneficiaries = [
         ...userRows
-          .filter(user => user.role === "seller")
+          .filter(user => user.role !== "admin")
           .map(user => ({
             beneficiaryType: "user" as const,
             beneficiaryId: user.id,
@@ -141,14 +141,14 @@ export const payrollRouter = router({
       return {
         periodLabel,
         agents: agentRows,
-        users: userRows.filter(user => user.role === "seller"),
+        users: userRows.filter(user => user.role !== "admin"),
         profiles,
         commissions: scopedCommissions,
         payments,
         balances,
       };
     }),
-  uploadReceipt: adminProcedure
+  uploadReceipt: permissionProcedure("payroll.manage")
     .input(
       z.object({
         dataUrl: z.string().min(30).max(7_000_000),
@@ -184,7 +184,7 @@ export const payrollRouter = router({
       );
       return { url, filename: input.filename, mimeType };
     }),
-  pay: adminProcedure
+  pay: permissionProcedure("payroll.manage")
     .input(payrollPaymentInput)
     .mutation(async ({ ctx, input }) => {
       const db = await dbOrThrow();

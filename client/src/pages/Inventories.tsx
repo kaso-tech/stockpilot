@@ -1,4 +1,4 @@
-import { useAuth } from "@/_core/hooks/useAuth";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -16,8 +16,8 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 export default function Inventories() {
-  const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const { can } = usePermissions();
+  const isAdmin = can("inventory.manage");
   const utils = trpc.useUtils();
   const { data: inventories = [] } = trpc.inventory.list.useQuery();
   const [selectedId, setSelectedId] = useState<number | null>(null);

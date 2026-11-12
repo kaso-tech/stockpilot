@@ -1,4 +1,4 @@
-import { useAuth } from "@/_core/hooks/useAuth";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -153,8 +153,15 @@ export const settingsSections: SettingsSection[] = [
         href: "/parametres/securite",
         icon: KeyRound,
         label: "Sécurité du compte",
-        detail: "Sessions actives et mot de passe administrateur",
+        detail: "Sessions actives et mot de passe",
         keywords: "sécurité session mot de passe compte",
+      },
+      {
+        href: "/parametres/utilisateurs",
+        icon: UsersRound,
+        label: "Utilisateurs et rôles",
+        detail: "Administrateur, gérant, vendeur, comptable ou lecture seule",
+        keywords: "rôle droits permission utilisateur équipe gérant comptable",
       },
       {
         href: "/parametres/historique",
@@ -204,13 +211,13 @@ export function filterSettingsSections(
 }
 
 export default function SettingsIndex() {
-  const { user } = useAuth();
+  const { can } = usePermissions();
   const [query, setQuery] = useState("");
   const filteredSections = useMemo(
     () => filterSettingsSections(query),
     [query]
   );
-  if (user?.role !== "admin")
+  if (!can("settings.manage"))
     return (
       <Restricted
         title="Paramètres"

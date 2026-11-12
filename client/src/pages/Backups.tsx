@@ -1,4 +1,4 @@
-import { useAuth } from "@/_core/hooks/useAuth";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -38,9 +38,9 @@ const frequencyOptions = [
 ];
 
 export default function Backups() {
-  const { user } = useAuth();
+  const { can } = usePermissions();
   const utils = trpc.useUtils();
-  const isAdmin = user?.role === "admin";
+  const isAdmin = can("backups.manage");
   const { data, isLoading } = trpc.backups.get.useQuery(undefined, {
     enabled: isAdmin,
   });

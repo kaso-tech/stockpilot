@@ -1,6 +1,6 @@
 import { ImportExportControls } from "@/components/ImportExportControls";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAuth } from "@/_core/hooks/useAuth";
 import { formatPriceTiers, parsePriceTiers, type CsvRow } from "@/lib/csv";
 import { trpc } from "@/lib/trpc";
 import { FileSpreadsheet, Package, Truck, UsersRound } from "lucide-react";
@@ -9,7 +9,7 @@ const toCents = (value: string | undefined) =>
   Math.round(Number((value || "0").replace(/\s/g, "").replace(",", ".")) * 100);
 
 export default function DataExchange() {
-  const { user } = useAuth();
+  const { can } = usePermissions();
   const utils = trpc.useUtils();
   const { data: products = [] } = trpc.products.list.useQuery();
   const { data: suppliers = [] } = trpc.suppliers.list.useQuery();
@@ -117,7 +117,7 @@ export default function DataExchange() {
     utils.commerce.customers.list.invalidate();
     return { imported, errors };
   };
-  if (user?.role !== "admin")
+  if (!can("catalog.manage"))
     return (
       <div className="mx-auto max-w-3xl py-20 text-center text-slate-400">
         Cette fonctionnalité est réservée aux administrateurs.

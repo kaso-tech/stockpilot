@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { usePermissions } from "@/hooks/usePermissions";
 import { escapeHtml } from "@/lib/html";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,7 +30,6 @@ import {
 import { useMemo, useState } from "react";
 import { useLocation, useRoute } from "wouter";
 import { toast } from "sonner";
-import { useAuth } from "@/_core/hooks/useAuth";
 
 const labels: Record<string, string> = {
   entry: "Entrée",
@@ -40,7 +40,7 @@ const labels: Record<string, string> = {
 export default function ProductDetail() {
   const [, params] = useRoute("/produits/:id");
   const [, setLocation] = useLocation();
-  const { user } = useAuth();
+  const { can } = usePermissions();
   const productId = Number(params?.id);
   const utils = trpc.useUtils();
   const { data, isLoading, error } = trpc.products.detail.useQuery(
@@ -57,7 +57,7 @@ export default function ProductDetail() {
   });
   const [orderOpen, setOrderOpen] = useState(false);
   const [quantity, setQuantity] = useState("1");
-  const isAdmin = user?.role === "admin";
+  const isAdmin = can("catalog.manage");
   const product = data?.product;
   const lowStock = product
     ? product.quantity <= product.minimumQuantity

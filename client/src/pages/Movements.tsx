@@ -1,4 +1,4 @@
-import { useAuth } from "@/_core/hooks/useAuth";
+import { usePermissions } from "@/hooks/usePermissions";
 import { LoadMore, usePagedLimit } from "@/components/LoadMore";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,8 +25,8 @@ import { toast } from "sonner";
 type MovementType = "entry" | "exit" | "adjustment";
 
 export default function Movements() {
-  const { user } = useAuth();
-  const canManage = user?.role === "admin";
+  const { can } = usePermissions();
+  const canManage = can("catalog.manage") || can("inventory.manage");
   const { data: settings } = trpc.commerce.settings.get.useQuery();
   const canCorrectStock =
     !canManage && Boolean(settings?.sellerCanCorrectStock);

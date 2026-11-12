@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, inArray, or } from "drizzle-orm";
+import { and, desc, eq, inArray, ne, or } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import {
@@ -19,7 +19,7 @@ import {
   users,
 } from "../../drizzle/schema";
 import { getDb } from "../db";
-import { adminProcedure, protectedProcedure, router } from "../_core/trpc";
+import { protectedProcedure, router, permissionProcedure } from "../_core/trpc";
 import { hashPassword } from "../passwords";
 import { storagePut } from "../storage";
 import { customerCanBeRemoved } from "../customerRules";
@@ -334,7 +334,7 @@ export const commerceRouter = router({
           },
         };
       }),
-    create: protectedProcedure
+    create: permissionProcedure("customers.manage")
       .input(customerInput)
       .mutation(async ({ ctx, input }) => {
         const db = await dbOrThrow();
@@ -351,7 +351,7 @@ export const commerceRouter = router({
         );
         return { id };
       }),
-    update: protectedProcedure
+    update: permissionProcedure("customers.manage")
       .input(customerInput.extend({ id: z.number().int().positive() }))
       .mutation(async ({ ctx, input }) => {
         const db = await dbOrThrow();
@@ -374,7 +374,7 @@ export const commerceRouter = router({
         );
         return { success: true };
       }),
-    remove: protectedProcedure
+    remove: permissionProcedure("customers.manage")
       .input(z.object({ id: z.number().int().positive() }))
       .mutation(async ({ ctx, input }) => {
         const db = await dbOrThrow();
@@ -437,7 +437,7 @@ export const commerceRouter = router({
         .where(companyScope(agents.companyId, ctx.user.companyId))
         .orderBy(agents.name)
     ),
-    detail: adminProcedure
+    detail: permissionProcedure("team.view")
       .input(
         z.object({
           beneficiaryType: z.enum(["user", "agent"]),
@@ -454,7 +454,7 @@ export const commerceRouter = router({
               .where(
                 and(
                   eq(users.id, input.id),
-                  eq(users.role, "seller"),
+                  ne(users.role, "admin"),
                   companyScope(users.companyId, ctx.user.companyId)
                 )
               )
@@ -632,7 +632,7 @@ export const commerceRouter = router({
           payments: paymentRows.slice(0, 30),
         };
       }),
-    create: adminProcedure
+    create: permissionProcedure("team.manage")
       .input(agentInput.extend({ remuneration: remunerationInput }))
       .mutation(async ({ ctx, input }) => {
         const db = await dbOrThrow();
@@ -656,7 +656,7 @@ export const commerceRouter = router({
         );
         return { id };
       }),
-    update: adminProcedure
+    update: permissionProcedure("team.manage")
       .input(
         agentInput.extend({
           id: z.number().int().positive(),
@@ -714,7 +714,7 @@ export const commerceRouter = router({
         );
         return { success: true };
       }),
-    remove: adminProcedure
+    remove: permissionProcedure("team.manage")
       .input(z.object({ id: z.number().int().positive() }))
       .mutation(async ({ ctx, input }) => {
         const db = await dbOrThrow();
@@ -736,7 +736,7 @@ export const commerceRouter = router({
         );
         return { success: true };
       }),
-    convertToSeller: adminProcedure
+    convertToSeller: permissionProcedure("team.manage")
       .input(
         z.object({
           id: z.number().int().positive(),
@@ -819,7 +819,7 @@ export const commerceRouter = router({
           );
         }
       }),
-    convertSellerToAgent: adminProcedure
+    convertSellerToAgent: permissionProcedure("team.manage")
       .input(
         z.object({
           id: z.number().int().positive(),
@@ -889,7 +889,7 @@ export const commerceRouter = router({
       }),
   }),
   sellers: router({
-    list: adminProcedure.query(async ({ ctx }) => {
+    list: permissionProcedure("team.view").query(async ({ ctx }) => {
       const db = await dbOrThrow();
       return db
         .select({
@@ -898,19 +898,20 @@ export const commerceRouter = router({
           email: users.email,
           phone: users.phone,
           active: users.active,
+          role: users.role,
           username: sellerCredentials.username,
         })
         .from(users)
         .innerJoin(sellerCredentials, eq(sellerCredentials.userId, users.id))
         .where(
           and(
-            eq(users.role, "seller"),
+            ne(users.role, "admin"),
             companyScope(users.companyId, ctx.user.companyId)
           )
         )
         .orderBy(users.name);
     }),
-    create: adminProcedure
+    create: permissionProcedure("team.manage")
       .input(sellerInput)
       .mutation(async ({ ctx, input }) => {
         const db = await dbOrThrow();
@@ -956,7 +957,7 @@ export const commerceRouter = router({
           );
         }
       }),
-    update: adminProcedure
+    update: permissionProcedure("team.manage")
       .input(
         sellerInput.extend({
           id: z.number().int().positive(),
@@ -978,7 +979,7 @@ export const commerceRouter = router({
             )
             .limit(1)
         )[0];
-        if (!seller || seller.role !== "seller")
+        if (!seller || seller.role === "admin")
           throw new TRPCError({
             code: "NOT_FOUND",
             message: "Vendeur introuvable.",
@@ -1063,7 +1064,7 @@ export const commerceRouter = router({
         );
         return { success: true };
       }),
-    remove: adminProcedure
+    remove: permissionProcedure("team.manage")
       .input(z.object({ id: z.number().int().positive() }))
       .mutation(async ({ ctx, input }) => {
         if (ctx.user.id === input.id)
@@ -1114,7 +1115,7 @@ export const commerceRouter = router({
       const db = await dbOrThrow();
       return companySettings(db, ctx.user.companyId);
     }),
-    save: adminProcedure
+    save: permissionProcedure("settings.manage")
       .input(
         z
           .object({
@@ -1275,7 +1276,7 @@ export const commerceRouter = router({
         );
         return { success: true };
       }),
-    uploadLogo: adminProcedure
+    uploadLogo: permissionProcedure("settings.manage")
       .input(
         z.object({
           dataUrl: z.string().min(30).max(4_000_000),
@@ -1332,7 +1333,7 @@ export const commerceRouter = router({
         );
         return { url };
       }),
-    uploadSignature: adminProcedure
+    uploadSignature: permissionProcedure("settings.manage")
       .input(
         z.object({
           dataUrl: z.string().min(30).max(4_000_000),

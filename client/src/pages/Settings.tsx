@@ -1,4 +1,4 @@
-import { useAuth } from "@/_core/hooks/useAuth";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -114,8 +114,8 @@ const roundingOptions: Array<{ value: PriceRounding; label: string }> = [
 ];
 
 export default function Settings({ section }: { section: SettingsSection }) {
-  const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const { can } = usePermissions();
+  const isAdmin = can("settings.manage");
   const { theme, setTheme } = useTheme();
   const {
     currency,

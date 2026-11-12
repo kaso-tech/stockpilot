@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -18,6 +19,7 @@ import { Restricted } from "./AuditLog";
 
 export default function SettingsSecurity() {
   const { user } = useAuth();
+  const { can } = usePermissions();
   const utils = trpc.useUtils();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -59,7 +61,7 @@ export default function SettingsSecurity() {
         description="Connectez-vous pour gérer vos sessions."
       />
     );
-  const isAdmin = user.role === "admin";
+  const isAdmin = can("settings.manage");
   const valid =
     currentPassword.length > 0 &&
     newPassword.length >= 10 &&
@@ -175,7 +177,7 @@ export default function SettingsSecurity() {
           </div>
         </CardContent>
       </Card>
-      {isAdmin && (
+      {
         <Card className="border-border bg-card">
           <CardContent className="p-5 sm:p-6">
             <div className="mb-6 flex items-start gap-3">
@@ -183,7 +185,7 @@ export default function SettingsSecurity() {
                 <KeyRound className="h-5 w-5" />
               </span>
               <div>
-                <h2 className="font-semibold">Mot de passe administrateur</h2>
+                <h2 className="font-semibold">Mon mot de passe</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Le mot de passe est stocké sous forme hachée.
                 </p>
@@ -249,7 +251,7 @@ export default function SettingsSecurity() {
             </div>
           </CardContent>
         </Card>
-      )}
+      }
     </div>
   );
 }

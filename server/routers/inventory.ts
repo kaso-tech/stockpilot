@@ -8,7 +8,7 @@ import {
   products,
 } from "../../drizzle/schema";
 import { getDb } from "../db";
-import { adminProcedure, protectedProcedure, router } from "../_core/trpc";
+import { protectedProcedure, router, permissionProcedure } from "../_core/trpc";
 import { inventoryDifference } from "../inventoryRules";
 import { lockProducts } from "../stockLedger";
 import { MAX_QUANTITY } from "../numericLimits";
@@ -67,7 +67,7 @@ export const inventoryRouter = router({
         .where(eq(inventoryItems.inventorySessionId, session.id));
       return { session, items };
     }),
-  create: adminProcedure
+  create: permissionProcedure("inventory.manage")
     .input(z.object({ name: z.string().trim().min(2).max(160) }))
     .mutation(async ({ ctx, input }) => {
       const db = await dbOrThrow();
@@ -100,7 +100,7 @@ export const inventoryRouter = router({
       });
       return { id };
     }),
-  count: adminProcedure
+  count: permissionProcedure("inventory.manage")
     .input(
       z.object({
         itemId: z.number().int().positive(),
@@ -167,7 +167,7 @@ export const inventoryRouter = router({
         .where(eq(inventoryItems.id, input.itemId));
       return { success: true };
     }),
-  validate: adminProcedure
+  validate: permissionProcedure("inventory.manage")
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
       const db = await dbOrThrow();

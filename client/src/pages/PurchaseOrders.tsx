@@ -1,4 +1,4 @@
-import { useAuth } from "@/_core/hooks/useAuth";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -92,7 +92,7 @@ const statusMeta: Record<Status, { label: string; className: string }> = {
 };
 
 export default function PurchaseOrders() {
-  const { user } = useAuth();
+  const { can } = usePermissions();
   const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
   const { data: orders = [], isLoading } = trpc.purchaseOrders.list.useQuery();
@@ -215,7 +215,7 @@ export default function PurchaseOrders() {
             Bons de commande
           </h1>
         </div>
-        {user?.role === "admin" && (
+        {can("purchasing.manage") && (
           <Button
             onClick={openCreate}
             className="bg-primary text-primary-foreground hover:bg-primary/90"
@@ -312,7 +312,7 @@ export default function PurchaseOrders() {
             search || supplierFilter !== "all" || statusFilter !== "all"
           )}
           onCreate={openCreate}
-          canCreate={user?.role === "admin"}
+          canCreate={can("purchasing.manage")}
         />
       )}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>

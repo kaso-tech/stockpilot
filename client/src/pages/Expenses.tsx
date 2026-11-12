@@ -1,4 +1,4 @@
-import { useAuth } from "@/_core/hooks/useAuth";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -62,8 +62,8 @@ const categoryLabel = (category: string) =>
   categories.find(item => item.value === category)?.label ?? "Autre";
 
 export default function Expenses() {
-  const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const { can } = usePermissions();
+  const isAdmin = can("expenses.manage");
   const utils = trpc.useUtils();
   const monthKey = new Date().toISOString().slice(0, 7);
   const { data: expenses, isLoading } = trpc.expenses.list.useQuery(undefined, {

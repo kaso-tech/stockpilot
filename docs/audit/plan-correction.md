@@ -240,3 +240,12 @@ Ces évolutions ne corrigent pas un défaut : elles ajoutent des capacités et e
 - Renommage et suppression de catégories/unités : par identifiant (repli sur le libellé pour d'éventuelles lignes non reliées) ; le renommage relie au passage les anciennes lignes.
 - Sauvegardes : les références produits → catégories/unités sont validées à la restauration.
 - Tests : `server/test/lot9.catalog.db.test.ts`.
+
+### Lot 9.3 — Rôles fins
+
+- Migration **`0050_extended_roles`** : rôles `admin` (Administrateur), `manager` (Gérant), `seller` (Vendeur), `accountant` (Comptable), `viewer` (Lecture seule).
+- Matrice unique `shared/permissions.ts` (18 droits) appliquée par le serveur via `permissionProcedure(droit)` sur chaque procédure d'écriture ou sensible, et par le client via `usePermissions()` (menus, boutons, pages). Les limites propres aux vendeurs (prix, remises, remboursement, correction de stock) restent réglables dans le point de vente.
+- `users.list` / `users.updateRole` (administrateurs) : impossible de retirer son propre rôle administrateur ni le dernier administrateur de l'entreprise ; les sessions de l'utilisateur concerné sont fermées ; changement tracé dans l'audit. Nouvel écran **Paramètres › Utilisateurs et rôles** avec la matrice des droits.
+- Mots de passe : lecture et écriture unifiées quel que soit le rôle (`findPasswordHash` / `storePasswordHash`) : un vendeur promu administrateur (ou l'inverse) garde son mot de passe ; « Mon mot de passe » est désormais disponible pour tous les rôles.
+- Listes vendeurs et paie : élargies à tous les membres non administrateurs.
+- Tests : `shared/permissions.test.ts`, `server/test/lot9.roles.db.test.ts` (5 scénarios).

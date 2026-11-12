@@ -1,6 +1,12 @@
 import { TRPCError } from "@trpc/server";
 import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
-import { userSessions, users } from "../drizzle/schema";
+import {
+  adminFallbackPasswords,
+  sellerCredentials,
+  userSessions,
+  users,
+} from "../drizzle/schema";
+import { ROLES } from "@shared/permissions";
 import { getDb } from "./db";
 import { hashPassword, verifyPassword } from "./passwords";
 import { consumeRateLimit } from "./rateLimit";
@@ -55,7 +61,7 @@ export async function findLoginAccount(db: DbClient, email: string) {
         and(
           sql`lower(${users.email}) = ${normalized}`,
           eq(users.active, true),
-          inArray(users.role, ["admin", "seller"])
+          inArray(users.role, [...ROLES])
         )
       )
       .limit(1)
@@ -110,4 +116,81 @@ export async function revokeUserSessions(
     (result as unknown as Array<{ affectedRows?: number }>)[0]?.affectedRows ??
       0
   );
+}
+
+type PasswordOwner = {
+  id: number;
+  openId: string;
+  role: string;
+  email: string | null;
+};
+
+/**
+ * Empreinte du mot de passe d'un compte, quel que soit son rôle (9.3) : les
+ * administrateurs historiques l'ont dans `adminFallbackPasswords`, les autres
+ * comptes dans `sellerCredentials`. Un changement de rôle ne fait donc jamais
+ * perdre l'accès.
+ */
+export async function findPasswordHash(db: any, owner: PasswordOwner) {
+  const adminRow = (
+    await db
+      .select()
+      .from(adminFallbackPasswords)
+      .where(eq(adminFallbackPasswords.ownerOpenId, owner.openId))
+      .limit(1)
+  )[0];
+  if (adminRow) return adminRow.passwordHash as string;
+  const credential = (
+    await db
+      .select()
+      .from(sellerCredentials)
+      .where(eq(sellerCredentials.userId, owner.id))
+      .limit(1)
+  )[0];
+  return (credential?.passwordHash as string | undefined) ?? null;
+}
+
+/** Enregistre un nouveau mot de passe là où le compte stocke le sien. */
+export async function storePasswordHash(
+  db: any,
+  owner: PasswordOwner,
+  passwordHash: string,
+  updatedByUserId: number
+) {
+  const adminRow = (
+    await db
+      .select()
+      .from(adminFallbackPasswords)
+      .where(eq(adminFallbackPasswords.ownerOpenId, owner.openId))
+      .limit(1)
+  )[0];
+  if (adminRow) {
+    await db
+      .update(adminFallbackPasswords)
+      .set({ passwordHash, updatedByUserId })
+      .where(eq(adminFallbackPasswords.id, adminRow.id));
+    return;
+  }
+  const credential = (
+    await db
+      .select()
+      .from(sellerCredentials)
+      .where(eq(sellerCredentials.userId, owner.id))
+      .limit(1)
+  )[0];
+  if (credential) {
+    await db
+      .update(sellerCredentials)
+      .set({ passwordHash })
+      .where(eq(sellerCredentials.id, credential.id));
+    return;
+  }
+  if (owner.role === "admin")
+    await db
+      .insert(adminFallbackPasswords)
+      .values({ ownerOpenId: owner.openId, passwordHash, updatedByUserId });
+  else
+    await db
+      .insert(sellerCredentials)
+      .values({ userId: owner.id, username: `user-${owner.id}`, passwordHash });
 }

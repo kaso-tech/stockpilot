@@ -36,7 +36,7 @@ export default function Quotes() {
   );
   const quotes = transactions.filter(item => item.channel === "quote");
   const identity = trpc.commerce.settings.get.useQuery().data;
-  if (user?.role !== "admin" && user?.role !== "seller")
+  if (!user)
     return (
       <div className="mx-auto max-w-5xl py-16 text-center text-muted-foreground">
         Accès réservé aux utilisateurs autorisés.

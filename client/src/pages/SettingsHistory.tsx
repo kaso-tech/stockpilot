@@ -1,4 +1,4 @@
-import { useAuth } from "@/_core/hooks/useAuth";
+import { usePermissions } from "@/hooks/usePermissions";
 import { LoadMore, usePagedLimit } from "@/components/LoadMore";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,8 +9,8 @@ import { Link } from "wouter";
 import { Restricted } from "./AuditLog";
 
 export default function SettingsHistory() {
-  const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const { can } = usePermissions();
+  const isAdmin = can("settings.manage");
   const paging = usePagedLimit(300);
   const {
     data: logs = [],

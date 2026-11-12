@@ -30,7 +30,6 @@ import {
   saleItems,
   saleSettings,
   sales,
-  sellerCredentials,
   stockAlerts,
   stockMovements,
   suppliers,
@@ -50,10 +49,10 @@ import { MAX_CENTS, MAX_QUANTITY } from "./numericLimits";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import {
-  adminProcedure,
   protectedProcedure,
   publicProcedure,
   router,
+  permissionProcedure,
 } from "./_core/trpc";
 import { COOKIE_NAME } from "@shared/const";
 import { commerceRouter } from "./routers/commerce";
@@ -94,9 +93,12 @@ import {
   burnPasswordCheck,
   emailIsTaken,
   findLoginAccount,
+  findPasswordHash,
   revokeUserSessions,
+  storePasswordHash,
 } from "./authSessions";
 import { conflictOr } from "./dbErrors";
+import { ROLE_LABELS, ROLES } from "@shared/permissions";
 import { appUrl, sendMail } from "./mailer";
 import { consumeToken, issueToken } from "./authTokens";
 import { lockProducts } from "./stockLedger";
@@ -433,30 +435,10 @@ export const appRouter = router({
           });
         }
 
-        let passwordValid = false;
-        if (account.role === "admin") {
-          const storedPassword = (
-            await db
-              .select()
-              .from(adminFallbackPasswords)
-              .where(eq(adminFallbackPasswords.ownerOpenId, account.openId))
-              .limit(1)
-          )[0];
-          passwordValid =
-            Boolean(storedPassword) &&
-            (await verifyPassword(input.password, storedPassword.passwordHash));
-        } else {
-          const credential = (
-            await db
-              .select()
-              .from(sellerCredentials)
-              .where(eq(sellerCredentials.userId, account.id))
-              .limit(1)
-          )[0];
-          passwordValid =
-            Boolean(credential) &&
-            (await verifyPassword(input.password, credential.passwordHash));
-        }
+        const storedHash = await findPasswordHash(db, account);
+        const passwordValid =
+          storedHash !== null &&
+          (await verifyPassword(input.password, storedHash));
 
         if (!passwordValid)
           throw new TRPCError({
@@ -643,39 +625,7 @@ export const appRouter = router({
             await tx.select().from(users).where(eq(users.id, id)).limit(1)
           )[0]; // tenant-scope-ok: utilisateur désigné par un jeton à usage unique
           if (!account || !account.active) return null;
-          if (account.role === "admin") {
-            const current = (
-              await tx
-                .select()
-                .from(adminFallbackPasswords)
-                .where(eq(adminFallbackPasswords.ownerOpenId, account.openId))
-                .limit(1)
-            )[0];
-            if (current)
-              await tx
-                .update(adminFallbackPasswords)
-                .set({ passwordHash, updatedByUserId: account.id })
-                .where(eq(adminFallbackPasswords.id, current.id));
-            else
-              await tx.insert(adminFallbackPasswords).values({
-                ownerOpenId: account.openId,
-                passwordHash,
-                updatedByUserId: account.id,
-              });
-          } else {
-            const credential = (
-              await tx
-                .select()
-                .from(sellerCredentials)
-                .where(eq(sellerCredentials.userId, account.id))
-                .limit(1)
-            )[0];
-            if (!credential) return null;
-            await tx
-              .update(sellerCredentials)
-              .set({ passwordHash })
-              .where(eq(sellerCredentials.id, credential.id));
-          }
+          await storePasswordHash(tx, account, passwordHash, account.id);
           // Le lien reçu prouve aussi la maîtrise de l'adresse e-mail.
           await tx
             .update(users)
@@ -806,7 +756,8 @@ export const appRouter = router({
         return { success: true, revokedCount } as const;
       }),
     }),
-    adminFallbackPasswordChange: adminProcedure
+    /** Changement de son propre mot de passe, pour tous les rôles. */
+    adminFallbackPasswordChange: protectedProcedure
       .input(
         z.object({
           currentPassword: z.string().min(1),
@@ -815,33 +766,21 @@ export const appRouter = router({
       )
       .mutation(async ({ ctx, input }) => {
         const db = await requireDb();
-        const override = (
-          await db
-            .select()
-            .from(adminFallbackPasswords)
-            .where(eq(adminFallbackPasswords.ownerOpenId, ctx.user.openId))
-            .limit(1)
-        )[0];
-        const currentValid =
-          Boolean(override) &&
-          (await verifyPassword(input.currentPassword, override!.passwordHash));
-        if (!currentValid)
+        const storedHash = await findPasswordHash(db, ctx.user);
+        if (
+          !storedHash ||
+          !(await verifyPassword(input.currentPassword, storedHash))
+        )
           throw new TRPCError({
             code: "UNAUTHORIZED",
             message: "Le mot de passe actuel est incorrect.",
           });
-        const passwordHash = await hashPassword(input.newPassword);
-        if (override)
-          await db
-            .update(adminFallbackPasswords)
-            .set({ passwordHash, updatedByUserId: ctx.user.id })
-            .where(eq(adminFallbackPasswords.id, override.id));
-        else
-          await db.insert(adminFallbackPasswords).values({
-            ownerOpenId: ctx.user.openId,
-            passwordHash,
-            updatedByUserId: ctx.user.id,
-          });
+        await storePasswordHash(
+          db,
+          ctx.user,
+          await hashPassword(input.newPassword),
+          ctx.user.id
+        );
         await revokeUserSessions(db, ctx.user.id, ctx.user.sessionId);
         return { success: true } as const;
       }),
@@ -1174,47 +1113,49 @@ export const appRouter = router({
         },
       };
     }),
-    complete: adminProcedure.mutation(async ({ ctx }) => {
-      if (ctx.user.companyId === null) return { success: true };
-      const db = await requireDb();
-      const [productRows, customerRows, settings] = await Promise.all([
-        db
-          .select({ id: products.id })
-          .from(products)
-          .where(companyScope(products.companyId, ctx.user.companyId))
-          .limit(1),
-        db
-          .select({ id: customers.id })
-          .from(customers)
-          .where(companyScope(customers.companyId, ctx.user.companyId))
-          .limit(1),
-        db
-          .select()
-          .from(saleSettings)
-          .where(companyScope(saleSettings.companyId, ctx.user.companyId))
-          .limit(1),
-      ]);
-      const activePaymentMethod = Boolean(
-        settings[0] &&
-          (settings[0].paymentCashEnabled ||
-            settings[0].paymentCardEnabled ||
-            settings[0].paymentMobileMoneyEnabled ||
-            settings[0].paymentBankTransferEnabled ||
-            settings[0].paymentCreditEnabled)
-      );
-      if (!productRows.length || !customerRows.length || !activePaymentMethod)
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message:
-            "Terminez les trois étapes de démarrage avant de clôturer l’assistant.",
-        });
-      await db
-        .update(companies)
-        .set({ onboardingCompletedAt: new Date() })
-        .where(eq(companies.id, ctx.user.companyId));
-      return { success: true };
-    }),
-    skip: adminProcedure.mutation(async ({ ctx }) => {
+    complete: permissionProcedure("settings.manage").mutation(
+      async ({ ctx }) => {
+        if (ctx.user.companyId === null) return { success: true };
+        const db = await requireDb();
+        const [productRows, customerRows, settings] = await Promise.all([
+          db
+            .select({ id: products.id })
+            .from(products)
+            .where(companyScope(products.companyId, ctx.user.companyId))
+            .limit(1),
+          db
+            .select({ id: customers.id })
+            .from(customers)
+            .where(companyScope(customers.companyId, ctx.user.companyId))
+            .limit(1),
+          db
+            .select()
+            .from(saleSettings)
+            .where(companyScope(saleSettings.companyId, ctx.user.companyId))
+            .limit(1),
+        ]);
+        const activePaymentMethod = Boolean(
+          settings[0] &&
+            (settings[0].paymentCashEnabled ||
+              settings[0].paymentCardEnabled ||
+              settings[0].paymentMobileMoneyEnabled ||
+              settings[0].paymentBankTransferEnabled ||
+              settings[0].paymentCreditEnabled)
+        );
+        if (!productRows.length || !customerRows.length || !activePaymentMethod)
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message:
+              "Terminez les trois étapes de démarrage avant de clôturer l’assistant.",
+          });
+        await db
+          .update(companies)
+          .set({ onboardingCompletedAt: new Date() })
+          .where(eq(companies.id, ctx.user.companyId));
+        return { success: true };
+      }
+    ),
+    skip: permissionProcedure("settings.manage").mutation(async ({ ctx }) => {
       if (ctx.user.companyId === null) return { success: true };
       const db = await requireDb();
       await db
@@ -1334,7 +1275,7 @@ export const appRouter = router({
           },
         };
       }),
-    create: adminProcedure
+    create: permissionProcedure("catalog.manage")
       .input(productInput)
       .mutation(async ({ ctx, input }) => {
         const db = await requireDb();
@@ -1390,7 +1331,7 @@ export const appRouter = router({
           conflictOr(error, "Cette référence produit existe déjà.");
         }
       }),
-    update: adminProcedure
+    update: permissionProcedure("catalog.manage")
       .input(productInput.safeExtend({ id: z.number().int().positive() }))
       .mutation(async ({ ctx, input }) => {
         const db = await requireDb();
@@ -1479,7 +1420,7 @@ export const appRouter = router({
         );
         return { success: true };
       }),
-    updatePurchasePrice: protectedProcedure
+    updatePurchasePrice: permissionProcedure("catalog.price")
       .input(
         z.object({
           id: z.number().int().positive(),
@@ -1543,7 +1484,7 @@ export const appRouter = router({
         );
         return { success: true };
       }),
-    remove: adminProcedure
+    remove: permissionProcedure("catalog.manage")
       .input(z.object({ id: z.number().int().positive() }))
       .mutation(async ({ ctx, input }) => {
         const db = await requireDb();
@@ -1607,7 +1548,7 @@ export const appRouter = router({
         .where(companyScope(productCategories.companyId, ctx.user.companyId))
         .orderBy(productCategories.name)
     ),
-    create: adminProcedure
+    create: permissionProcedure("catalog.manage")
       .input(categoryInput)
       .mutation(async ({ ctx, input }) => {
         const db = await requireDb();
@@ -1628,7 +1569,7 @@ export const appRouter = router({
           conflictOr(error, "Cette catégorie existe déjà.");
         }
       }),
-    update: adminProcedure
+    update: permissionProcedure("catalog.manage")
       .input(categoryInput.extend({ id: z.number().int().positive() }))
       .mutation(async ({ ctx, input }) => {
         const db = await requireDb();
@@ -1688,7 +1629,7 @@ export const appRouter = router({
           conflictOr(error, "Cette catégorie existe déjà.");
         }
       }),
-    remove: adminProcedure
+    remove: permissionProcedure("catalog.manage")
       .input(z.object({ id: z.number().int().positive() }))
       .mutation(async ({ ctx, input }) => {
         const db = await requireDb();
@@ -1758,26 +1699,28 @@ export const appRouter = router({
         .where(companyScope(productUnits.companyId, ctx.user.companyId))
         .orderBy(productUnits.name)
     ),
-    create: adminProcedure.input(unitInput).mutation(async ({ ctx, input }) => {
-      const db = await requireDb();
-      try {
-        const result = await db
-          .insert(productUnits)
-          .values({ ...input, companyId: ctx.user.companyId });
-        const id = Number(result[0].insertId);
-        await createAudit(
-          ctx.user,
-          "Création",
-          "Unité",
-          id,
-          `Unité ${input.name} créée`
-        );
-        return { id };
-      } catch (error) {
-        conflictOr(error, "Cette unité existe déjà.");
-      }
-    }),
-    update: adminProcedure
+    create: permissionProcedure("catalog.manage")
+      .input(unitInput)
+      .mutation(async ({ ctx, input }) => {
+        const db = await requireDb();
+        try {
+          const result = await db
+            .insert(productUnits)
+            .values({ ...input, companyId: ctx.user.companyId });
+          const id = Number(result[0].insertId);
+          await createAudit(
+            ctx.user,
+            "Création",
+            "Unité",
+            id,
+            `Unité ${input.name} créée`
+          );
+          return { id };
+        } catch (error) {
+          conflictOr(error, "Cette unité existe déjà.");
+        }
+      }),
+    update: permissionProcedure("catalog.manage")
       .input(unitInput.extend({ id: z.number().int().positive() }))
       .mutation(async ({ ctx, input }) => {
         const db = await requireDb();
@@ -1837,7 +1780,7 @@ export const appRouter = router({
           conflictOr(error, "Cette unité existe déjà.");
         }
       }),
-    remove: adminProcedure
+    remove: permissionProcedure("catalog.manage")
       .input(z.object({ id: z.number().int().positive() }))
       .mutation(async ({ ctx, input }) => {
         const db = await requireDb();
@@ -1900,7 +1843,7 @@ export const appRouter = router({
     list: protectedProcedure.query(({ ctx }) =>
       listSuppliers(ctx.user.companyId)
     ),
-    create: adminProcedure
+    create: permissionProcedure("catalog.manage")
       .input(supplierInput)
       .mutation(async ({ ctx, input }) => {
         const db = await requireDb();
@@ -1917,7 +1860,7 @@ export const appRouter = router({
         );
         return { success: true, id: supplierId };
       }),
-    update: adminProcedure
+    update: permissionProcedure("catalog.manage")
       .input(supplierInput.extend({ id: z.number().int().positive() }))
       .mutation(async ({ ctx, input }) => {
         const db = await requireDb();
@@ -1940,7 +1883,7 @@ export const appRouter = router({
         );
         return { success: true };
       }),
-    remove: adminProcedure
+    remove: permissionProcedure("catalog.manage")
       .input(z.object({ id: z.number().int().positive() }))
       .mutation(async ({ ctx, input }) => {
         const db = await requireDb();
@@ -2130,7 +2073,7 @@ export const appRouter = router({
         ]);
         return { ...order, supplier: supplier[0] ?? null, items };
       }),
-    create: adminProcedure
+    create: permissionProcedure("purchasing.manage")
       .input(
         z.object({
           supplierId: z.number().int().positive(),
@@ -2258,7 +2201,7 @@ export const appRouter = router({
           deliveryFeeCents: totals.deliveryFeeCents,
         };
       }),
-    updateDetails: adminProcedure
+    updateDetails: permissionProcedure("purchasing.manage")
       .input(
         z.object({
           id: z.number().int().positive(),
@@ -2322,7 +2265,7 @@ export const appRouter = router({
         );
         return { success: true };
       }),
-    remove: adminProcedure
+    remove: permissionProcedure("purchasing.manage")
       .input(z.object({ id: z.number().int().positive() }))
       .mutation(async ({ ctx, input }) => {
         const db = await requireDb();
@@ -2371,7 +2314,7 @@ export const appRouter = router({
         );
         return { success: true };
       }),
-    markSent: adminProcedure
+    markSent: permissionProcedure("purchasing.manage")
       .input(z.object({ id: z.number().int().positive() }))
       .mutation(async ({ ctx, input }) => {
         const db = await requireDb();
@@ -2417,7 +2360,7 @@ export const appRouter = router({
         }
         return { success: true, status: "sent" as const };
       }),
-    cancel: adminProcedure
+    cancel: permissionProcedure("purchasing.manage")
       .input(
         z.object({
           id: z.number().int().positive(),
@@ -2470,7 +2413,7 @@ export const appRouter = router({
         );
         return { success: true, status: "cancelled" as const };
       }),
-    receive: adminProcedure
+    receive: permissionProcedure("purchasing.manage")
       .input(
         z.object({
           id: z.number().int().positive(),
@@ -2655,7 +2598,7 @@ export const appRouter = router({
       .query(({ ctx, input }) =>
         listMovements(ctx.user.companyId, input?.limit ?? 100)
       ),
-    create: protectedProcedure
+    create: permissionProcedure("stock.adjust")
       .input(
         z.object({
           productId: z.number().int().positive(),
@@ -2750,8 +2693,91 @@ export const appRouter = router({
       }),
   }),
 
+  users: router({
+    list: permissionProcedure("users.manage").query(async ({ ctx }) => {
+      const db = await requireDb();
+      return db
+        .select({
+          id: users.id,
+          name: users.name,
+          email: users.email,
+          role: users.role,
+          active: users.active,
+          lastSignedIn: users.lastSignedIn,
+        })
+        .from(users)
+        .where(companyScope(users.companyId, ctx.user.companyId))
+        .orderBy(users.name);
+    }),
+    updateRole: permissionProcedure("users.manage")
+      .input(z.object({ id: z.number().int().positive(), role: z.enum(ROLES) }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.id === input.id && input.role !== "admin")
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              "Vous ne pouvez pas retirer votre propre rôle administrateur.",
+          });
+        const db = await requireDb();
+        const target = (
+          await db
+            .select()
+            .from(users)
+            .where(
+              and(
+                eq(users.id, input.id),
+                companyScope(users.companyId, ctx.user.companyId)
+              )
+            )
+            .limit(1)
+        )[0];
+        if (!target)
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Utilisateur introuvable dans cette entreprise.",
+          });
+        if (target.role === "admin" && input.role !== "admin") {
+          const admins = await db
+            .select({ id: users.id })
+            .from(users)
+            .where(
+              and(
+                eq(users.role, "admin"),
+                eq(users.active, true),
+                companyScope(users.companyId, ctx.user.companyId)
+              )
+            );
+          if (admins.length <= 1)
+            throw new TRPCError({
+              code: "PRECONDITION_FAILED",
+              message:
+                "L’entreprise doit conserver au moins un administrateur.",
+            });
+        }
+        await db
+          .update(users)
+          .set({ role: input.role })
+          .where(
+            and(
+              eq(users.id, input.id),
+              companyScope(users.companyId, ctx.user.companyId)
+            )
+          );
+        // Les droits changent : les sessions ouvertes sont fermées.
+        await revokeUserSessions(db, input.id);
+        await createAudit(
+          ctx.user,
+          "Rôle modifié",
+          "Utilisateur",
+          input.id,
+          `Rôle de ${target.name || target.email} : ${ROLE_LABELS[target.role]} → ${ROLE_LABELS[input.role]}`
+        );
+        return { success: true } as const;
+      }),
+  }),
+
   audit: router({
-    list: adminProcedure
+    list: permissionProcedure("audit.view")
       .input(
         z
           .object({ limit: z.number().int().min(1).max(2000).optional() })

@@ -1,4 +1,4 @@
-import { useAuth } from "@/_core/hooks/useAuth";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -95,8 +95,8 @@ export default function PurchaseOrderDetail() {
   const orderId = Number(params?.id);
   const returnToOrders =
     new URLSearchParams(window.location.search).get("origine") === "bons";
-  const { user } = useAuth();
-  const canManage = user?.role === "admin";
+  const { can } = usePermissions();
+  const canManage = can("purchasing.manage");
   const utils = trpc.useUtils();
   const sendOrderByEmail = trpc.documents.sendPurchaseOrder.useMutation();
   const { data, isLoading } = trpc.purchaseOrders.get.useQuery(

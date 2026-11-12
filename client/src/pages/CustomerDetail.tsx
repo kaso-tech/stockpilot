@@ -1,4 +1,4 @@
-import { useAuth } from "@/_core/hooks/useAuth";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -69,7 +69,7 @@ type Invoice = {
 export default function CustomerDetail() {
   const [, params] = useRoute("/clients/:id");
   const [, setLocation] = useLocation();
-  const { user } = useAuth();
+  const { can } = usePermissions();
   const customerId = Number(params?.id);
   const { data, isLoading } = trpc.commerce.customers.get.useQuery(
     { id: customerId },
@@ -77,7 +77,7 @@ export default function CustomerDetail() {
   );
   const utils = trpc.useUtils();
   const [editOpen, setEditOpen] = useState(false);
-  const canManage = user?.role === "admin" || user?.role === "seller";
+  const canManage = can("customers.manage");
   const update = trpc.commerce.customers.update.useMutation({
     onSuccess: async () => {
       await Promise.all([

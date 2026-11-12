@@ -9,6 +9,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { PreferencesProvider } from "./contexts/PreferencesContext";
 import { OfflineProvider } from "./contexts/OfflineContext";
 
+const SettingsUsers = lazy(() => import("./pages/SettingsUsers"));
 const ForgotPassword = lazy(() =>
   import("./pages/AccountRecovery").then(module => ({
     default: module.ForgotPassword,
@@ -133,6 +134,7 @@ function DashboardRouter() {
             component={SettingsDashboard}
           />
           <Route path={"/parametres/securite"} component={SettingsSecurity} />
+          <Route path={"/parametres/utilisateurs"} component={SettingsUsers} />
           <Route path={"/parametres/historique"} component={SettingsHistory} />
           <Route path={"/sauvegardes"} component={Backups} />
           <Route path={"/depenses"} component={Expenses} />

@@ -22,7 +22,7 @@ import {
   priceForQuantityTier,
 } from "../commerceRules";
 import { getDb } from "../db";
-import { protectedProcedure, router } from "../_core/trpc";
+import { protectedProcedure, router, permissionProcedure } from "../_core/trpc";
 import {
   assertPaymentMethodsEnabled,
   settlementResult,
@@ -227,7 +227,7 @@ export const transactionsRouter = router({
         : null,
     }));
   }),
-  removeDraft: protectedProcedure
+  removeDraft: permissionProcedure("sales.create")
     .input(z.object({ saleId: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
       const db = await dbOrThrow();
@@ -317,7 +317,7 @@ export const transactionsRouter = router({
       });
       return { success: true };
     }),
-  refund: protectedProcedure
+  refund: permissionProcedure("sales.refund")
     .input(
       z.object({
         saleId: z.number().int().positive(),
@@ -473,7 +473,7 @@ export const transactionsRouter = router({
    * comprises (hors frais de livraison) ; un avoir numéroté est émis, un paiement
    * négatif est enregistré et les commissions sont contrepassées au prorata.
    */
-  returnItems: protectedProcedure
+  returnItems: permissionProcedure("sales.refund")
     .input(
       z.object({
         saleId: z.number().int().positive(),
@@ -728,7 +728,7 @@ export const transactionsRouter = router({
         return { creditNoteNumber, refundCents, fullyReturned };
       });
     }),
-  createDraft: protectedProcedure
+  createDraft: permissionProcedure("sales.create")
     .input(
       z
         .object({
@@ -1079,7 +1079,7 @@ export const transactionsRouter = router({
       });
       return created!;
     }),
-  checkout: protectedProcedure
+  checkout: permissionProcedure("sales.create")
     .input(
       z
         .object({

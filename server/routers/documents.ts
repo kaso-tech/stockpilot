@@ -13,7 +13,7 @@ import { companyScope } from "../companyScope";
 import { getDb } from "../db";
 import { sendMail } from "../mailer";
 import { assertRateLimit } from "../authSessions";
-import { protectedProcedure, router } from "../_core/trpc";
+import { router, permissionProcedure } from "../_core/trpc";
 
 const MAX_PDF_BYTES = 5 * 1024 * 1024;
 const sendInput = z.object({
@@ -80,7 +80,7 @@ async function companyReplyTo(db: any, companyId: number | null) {
  * client se rabat alors sur le partage local.
  */
 export const documentsRouter = router({
-  sendSale: protectedProcedure
+  sendSale: permissionProcedure("sales.create")
     .input(sendInput)
     .mutation(async ({ ctx, input }) => {
       assertRateLimit(
@@ -152,7 +152,7 @@ export const documentsRouter = router({
         });
       return result;
     }),
-  sendPurchaseOrder: protectedProcedure
+  sendPurchaseOrder: permissionProcedure("purchasing.manage")
     .input(sendInput)
     .mutation(async ({ ctx, input }) => {
       assertRateLimit(

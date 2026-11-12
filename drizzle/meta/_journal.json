@@ -351,6 +351,13 @@
       "when": 1794501450198,
       "tag": "0049_catalog_references",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "5",
+      "when": 1794501689488,
+      "tag": "0050_extended_roles",
+      "breakpoints": true
     }
   ]
 }

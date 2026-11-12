@@ -1,4 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -73,7 +74,9 @@ const expenseColors: Record<string, string> = {
 
 export default function Home() {
   const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const { can } = usePermissions();
+  const isAdmin = can("settings.manage");
+  const canSeeFinance = can("expenses.manage");
   const [, setLocation] = useLocation();
   const { data, isLoading } = trpc.dashboard.get.useQuery();
   const { data: savedPreferences } = trpc.dashboardPreferences.get.useQuery();
@@ -371,7 +374,7 @@ export default function Home() {
           ))}
         </section>
       )}
-      {isAdmin && (preferences.expenses || preferences.budget) && (
+      {canSeeFinance && (preferences.expenses || preferences.budget) && (
         <section
           className={`grid gap-6 ${preferences.expenses && preferences.budget ? "xl:grid-cols-[minmax(0,1fr)_360px]" : ""}`}
         >

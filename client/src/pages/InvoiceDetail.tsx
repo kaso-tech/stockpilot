@@ -1,4 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { usePermissions } from "@/hooks/usePermissions";
 import { CheckoutSheet } from "@/components/CheckoutSheet";
 import { ReturnItemsDialog } from "@/components/ReturnItemsDialog";
 import {
@@ -41,6 +42,7 @@ export default function InvoiceDetail() {
   const [, params] = useRoute("/factures/:id");
   const [, setLocation] = useLocation();
   const { user } = useAuth();
+  const { can } = usePermissions();
   const id = Number(params?.id);
   const utils = trpc.useUtils();
   const sendSaleByEmail = trpc.documents.sendSale.useMutation();
@@ -83,7 +85,8 @@ export default function InvoiceDetail() {
     );
   const sale = detail.sale;
   const canRefund =
-    user?.role === "admin" || Boolean(identity?.sellerCanRefund);
+    (can("sales.refund") && user?.role !== "seller") ||
+    (user?.role === "seller" && Boolean(identity?.sellerCanRefund));
   const print = (format: "a4" | "ticket") => {
     const node = document.getElementById("invoice-print");
     if (!node) return;

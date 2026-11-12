@@ -13,7 +13,7 @@ import {
   runBackupWithStatus,
 } from "../backups";
 import { createHeartbeatJob, updateHeartbeatJob } from "../_core/heartbeat";
-import { adminProcedure, router } from "../_core/trpc";
+import { router, permissionProcedure } from "../_core/trpc";
 import { COOKIE_NAME } from "@shared/const";
 import { googleDriveConfigured } from "../googleDrive";
 import { companyScope } from "../companyScope";
@@ -71,7 +71,7 @@ async function getOrCreateSettings(companyId: number | null) {
 }
 
 export const backupRouter = router({
-  get: adminProcedure.query(async ({ ctx }) => {
+  get: permissionProcedure("backups.manage").query(async ({ ctx }) => {
     const settings = await getOrCreateSettings(ctx.user.companyId);
     const archives = await listBackups(30, ctx.user.companyId);
     return {
@@ -92,7 +92,7 @@ export const backupRouter = router({
       archives,
     };
   }),
-  saveConfiguration: adminProcedure
+  saveConfiguration: permissionProcedure("backups.manage")
     .input(configurationInput)
     .mutation(async ({ ctx, input }) => {
       const db = await dbOrThrow();
@@ -164,7 +164,7 @@ export const backupRouter = router({
       });
       return { success: true, nextExecutionAt };
     }),
-  runNow: adminProcedure.mutation(async ({ ctx }) => {
+  runNow: permissionProcedure("backups.manage").mutation(async ({ ctx }) => {
     const settings = await getOrCreateSettings(ctx.user.companyId);
     const archive = await runBackupWithStatus(
       ctx.user.id,
@@ -183,12 +183,12 @@ export const backupRouter = router({
     });
     return archive;
   }),
-  download: adminProcedure
+  download: permissionProcedure("backups.manage")
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => ({
       url: await getBackupDownloadUrl(input.id, ctx.user.companyId),
     })),
-  previewRestore: adminProcedure
+  previewRestore: permissionProcedure("backups.manage")
     .input(z.object({ dataUrl: z.string().min(40).max(30_000_000) }))
     .mutation(async ({ ctx, input }) => {
       const payload = parseBackupPayload(input.dataUrl);
@@ -205,7 +205,7 @@ export const backupRouter = router({
         total: Object.values(counts).reduce((sum, count) => sum + count, 0),
       };
     }),
-  restore: adminProcedure
+  restore: permissionProcedure("backups.manage")
     .input(
       z.object({
         dataUrl: z.string().min(40).max(30_000_000),

@@ -75,28 +75,114 @@ import { Link, useLocation } from "wouter";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
+import { usePermissions } from "@/hooks/usePermissions";
+import type { Permission } from "@shared/permissions";
 
-const menuItems = [
+type MenuItem = {
+  icon: typeof LayoutDashboard;
+  label: string;
+  path: string;
+  /** Droits dont l'un suffit pour voir l'entrée ; absent = tout utilisateur connecté. */
+  anyOf?: Permission[];
+};
+
+const menuItems: MenuItem[] = [
   { icon: LayoutDashboard, label: "Vue d’ensemble", path: "/" },
-  { icon: ShoppingCart, label: "Vente Rapide", path: "/pos" },
+  {
+    icon: ShoppingCart,
+    label: "Vente Rapide",
+    path: "/pos",
+    anyOf: ["sales.create"],
+  },
   { icon: ReceiptText, label: "Factures", path: "/factures" },
   { icon: FileText, label: "Devis", path: "/devis" },
   { icon: UserRound, label: "Clients", path: "/clients" },
   { icon: PackageSearch, label: "Produits", path: "/produits" },
-  { icon: Boxes, label: "Catégories", path: "/categories" },
-  { icon: Ruler, label: "Unités", path: "/unites" },
+  {
+    icon: Boxes,
+    label: "Catégories",
+    path: "/categories",
+    anyOf: ["catalog.manage"],
+  },
+  { icon: Ruler, label: "Unités", path: "/unites", anyOf: ["catalog.manage"] },
   { icon: ArrowLeftRight, label: "Mouvements", path: "/mouvements" },
-  { icon: ClipboardCheck, label: "Inventaires", path: "/inventaires" },
-  { icon: Truck, label: "Fournisseurs", path: "/fournisseurs" },
-  { icon: FileText, label: "Bons de commande", path: "/bons-commande" },
-  { icon: UsersRound, label: "Agents & paie", path: "/agents" },
-  { icon: WalletCards, label: "Dépenses", path: "/depenses" },
-  { icon: Archive, label: "Import & export", path: "/donnees" },
-  { icon: SlidersHorizontal, label: "Paramètres", path: "/parametres" },
-  { icon: DatabaseBackup, label: "Sauvegardes", path: "/sauvegardes" },
-  { icon: TriangleAlert, label: "Alertes", path: "/alertes" },
-  { icon: ClipboardList, label: "Journal", path: "/journal" },
-  { icon: CloudUpload, label: "Synchronisation", path: "/synchronisation" },
+  {
+    icon: ClipboardCheck,
+    label: "Inventaires",
+    path: "/inventaires",
+    anyOf: ["inventory.manage"],
+  },
+  {
+    icon: Truck,
+    label: "Fournisseurs",
+    path: "/fournisseurs",
+    anyOf: ["catalog.manage", "purchasing.manage"],
+  },
+  {
+    icon: FileText,
+    label: "Bons de commande",
+    path: "/bons-commande",
+    anyOf: ["purchasing.manage", "accounting.export"],
+  },
+  {
+    icon: UsersRound,
+    label: "Agents & paie",
+    path: "/agents",
+    anyOf: ["team.view", "payroll.manage"],
+  },
+  {
+    icon: WalletCards,
+    label: "Dépenses",
+    path: "/depenses",
+    anyOf: ["expenses.manage"],
+  },
+  {
+    icon: Archive,
+    label: "Import & export",
+    path: "/donnees",
+    anyOf: ["catalog.manage"],
+  },
+  {
+    icon: SlidersHorizontal,
+    label: "Paramètres",
+    path: "/parametres",
+    anyOf: ["settings.manage"],
+  },
+  {
+    icon: DatabaseBackup,
+    label: "Sauvegardes",
+    path: "/sauvegardes",
+    anyOf: ["backups.manage"],
+  },
+  {
+    icon: TriangleAlert,
+    label: "Alertes",
+    path: "/alertes",
+    anyOf: ["catalog.manage", "purchasing.manage"],
+  },
+  {
+    icon: ClipboardList,
+    label: "Journal",
+    path: "/journal",
+    anyOf: ["audit.view"],
+  },
+  {
+    icon: CloudUpload,
+    label: "Synchronisation",
+    path: "/synchronisation",
+    anyOf: ["sales.create"],
+  },
+];
+
+/** Réglages personnels proposés aux rôles qui n'accèdent pas aux paramètres de l'entreprise. */
+const personalMenuItems: MenuItem[] = [
+  { icon: Settings2, label: "Apparence", path: "/parametres/apparence" },
+  {
+    icon: LayoutDashboard,
+    label: "Mon tableau de bord",
+    path: "/parametres/tableau-de-bord",
+  },
+  { icon: ShieldCheck, label: "Sécurité", path: "/parametres/securite" },
 ];
 
 export default function DashboardLayout({
@@ -628,28 +714,22 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     undefined,
     { enabled: user?.role === "seller" }
   );
-  const sellerMenuItems = [
+  const { can: hasPermission, roleLabel } = usePermissions();
+  const visibleMenuItems = [
     ...menuItems.filter(
       item =>
-        item.path === "/" ||
-        item.path === "/pos" ||
-        item.path === "/factures" ||
-        item.path === "/devis" ||
-        item.path === "/clients" ||
-        item.path === "/mouvements" ||
-        item.path === "/synchronisation" ||
-        (item.path === "/produits" &&
-          sellerPermissions?.sellerCanEditPurchasePrice)
+        (!item.anyOf ||
+          item.anyOf.some(permission => hasPermission(permission))) &&
+        // Un vendeur ne voit les produits que s'il peut modifier le coût d'achat (réglage du point de vente).
+        !(
+          item.path === "/produits" &&
+          user?.role === "seller" &&
+          !sellerPermissions?.sellerCanEditPurchasePrice
+        )
     ),
-    { icon: Settings2, label: "Apparence", path: "/parametres/apparence" },
-    {
-      icon: LayoutDashboard,
-      label: "Mon tableau de bord",
-      path: "/parametres/tableau-de-bord",
-    },
-    { icon: ShieldCheck, label: "Sécurité", path: "/parametres/securite" },
+    ...(hasPermission("settings.manage") ? [] : personalMenuItems),
   ];
-  const visibleMenuItems = user?.role === "admin" ? menuItems : sellerMenuItems;
+
   const activeMenuItem =
     visibleMenuItems.find(
       item =>
@@ -663,7 +743,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         (item.path === "/devis" && location.startsWith("/devis/"))
     ) ?? visibleMenuItems[0];
   const initials = (user?.name || user?.email || "U").slice(0, 2).toUpperCase();
-  const isAdmin = user?.role === "admin";
+  const isAdmin = hasPermission("backups.manage");
   const canRunBackup = Boolean(user);
   const { data: dashboard } = trpc.dashboard.get.useQuery(undefined, {
     enabled: isAdmin,
@@ -853,7 +933,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
               <DropdownMenuSeparator className="bg-white/10" />
               <DropdownMenuItem className="cursor-default focus:bg-transparent">
                 <Badge className="border-0 bg-cyan-400/10 text-cyan-300 hover:bg-cyan-400/10">
-                  {user?.role === "admin" ? "Administrateur" : "Opérateur"}
+                  {roleLabel}
                 </Badge>
               </DropdownMenuItem>
               <DropdownMenuItem

@@ -1,4 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { usePermissions } from "@/hooks/usePermissions";
 import { vatRatesLabel } from "@shared/pricing";
 import { LoadMore, usePagedLimit } from "@/components/LoadMore";
 import { CheckoutSheet } from "@/components/CheckoutSheet";
@@ -55,6 +56,7 @@ type Invoice = {
 
 export default function Invoices() {
   const { user } = useAuth();
+  const { can } = usePermissions();
   const [, setLocation] = useLocation();
   const initial =
     Number(new URLSearchParams(window.location.search).get("facture")) || null;
@@ -109,7 +111,8 @@ export default function Invoices() {
     item => item.channel === "invoice"
   ) as Invoice[];
   const canRefund =
-    user?.role === "admin" || Boolean(identity?.sellerCanRefund);
+    (can("sales.refund") && user?.role !== "seller") ||
+    (user?.role === "seller" && Boolean(identity?.sellerCanRefund));
 
   useEffect(() => {
     if (initial) setPreviewOpen(true);

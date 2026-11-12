@@ -1,4 +1,4 @@
-import { useAuth } from "@/_core/hooks/useAuth";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -36,8 +36,8 @@ const emptySupplier: SupplierForm = {
 
 export default function Suppliers() {
   const [, setLocation] = useLocation();
-  const { user } = useAuth();
-  const canManage = user?.role === "admin";
+  const { can } = usePermissions();
+  const canManage = can("catalog.manage");
   const utils = trpc.useUtils();
   const { data: suppliers = [] } = trpc.suppliers.list.useQuery();
   const { data: movements = [] } = trpc.movements.list.useQuery();

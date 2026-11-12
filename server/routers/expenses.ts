@@ -14,7 +14,7 @@ import {
   expenseTotalCents,
 } from "../expenseRules";
 import { getDb } from "../db";
-import { adminProcedure, router } from "../_core/trpc";
+import { router, permissionProcedure } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { storagePut } from "../storage";
 import { companyScope } from "../companyScope";
@@ -44,7 +44,7 @@ async function dbOrThrow() {
 
 export const expensesRouter = router({
   budget: router({
-    get: adminProcedure
+    get: permissionProcedure("expenses.manage")
       .input(z.object({ yearMonth: z.string().regex(/^\d{4}-\d{2}$/) }))
       .query(async ({ ctx, input }) => {
         const db = await dbOrThrow();
@@ -63,7 +63,7 @@ export const expensesRouter = router({
           )[0] ?? null
         );
       }),
-    save: adminProcedure
+    save: permissionProcedure("expenses.manage")
       .input(
         z.object({
           yearMonth: z.string().regex(/^\d{4}-\d{2}$/),
@@ -116,7 +116,7 @@ export const expensesRouter = router({
         return { success: true };
       }),
   }),
-  report: adminProcedure
+  report: permissionProcedure("expenses.manage")
     .input(z.object({ yearMonth: z.string().regex(/^\d{4}-\d{2}$/) }))
     .query(async ({ ctx, input }) => {
       const db = await dbOrThrow();
@@ -155,7 +155,7 @@ export const expensesRouter = router({
         agentPaymentCount: agentRows.filter(row => inMonth(row.spentAt)).length,
       };
     }),
-  uploadReceipt: adminProcedure
+  uploadReceipt: permissionProcedure("expenses.manage")
     .input(
       z.object({
         dataUrl: z.string().min(30).max(7_000_000),
@@ -191,7 +191,7 @@ export const expensesRouter = router({
       );
       return { url, filename: input.filename, mimeType };
     }),
-  list: adminProcedure.query(async ({ ctx }) => {
+  list: permissionProcedure("expenses.manage").query(async ({ ctx }) => {
     const db = await dbOrThrow();
     return db
       .select()
@@ -199,7 +199,7 @@ export const expensesRouter = router({
       .where(companyScope(expenses.companyId, ctx.user.companyId))
       .orderBy(desc(expenses.spentAt), desc(expenses.id));
   }),
-  create: adminProcedure
+  create: permissionProcedure("expenses.manage")
     .input(expenseInput)
     .mutation(async ({ ctx, input }) => {
       const db = await dbOrThrow();
@@ -219,7 +219,7 @@ export const expensesRouter = router({
       });
       return { id };
     }),
-  update: adminProcedure
+  update: permissionProcedure("expenses.manage")
     .input(expenseInput.extend({ id: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
       const db = await dbOrThrow();
@@ -243,7 +243,7 @@ export const expensesRouter = router({
       });
       return { success: true };
     }),
-  remove: adminProcedure
+  remove: permissionProcedure("expenses.manage")
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
       const db = await dbOrThrow();

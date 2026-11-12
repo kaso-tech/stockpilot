@@ -1,4 +1,4 @@
-import { useAuth } from "@/_core/hooks/useAuth";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -84,9 +84,10 @@ const remunerationPayload = (form: AgentForm) => ({
 });
 
 export default function Agents() {
-  const { user } = useAuth();
+  const { can } = usePermissions();
   const [, setLocation] = useLocation();
-  const isAdmin = user?.role === "admin";
+  const isAdmin = can("team.view") || can("payroll.manage");
+  const canManageTeam = can("team.manage");
   const utils = trpc.useUtils();
   const { data: payroll } = trpc.payroll.overview.useQuery(undefined, {
     enabled: isAdmin,
@@ -301,17 +302,19 @@ export default function Agents() {
             Agents & rémunérations
           </h1>
         </div>
-        <Button
-          onClick={() => {
-            setEditing(null);
-            setForm(blankAgentForm);
-            setOpen(true);
-          }}
-          className="bg-cyan-400 text-slate-950 hover:bg-cyan-300"
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Nouvel agent
-        </Button>
+        {canManageTeam && (
+          <Button
+            onClick={() => {
+              setEditing(null);
+              setForm(blankAgentForm);
+              setOpen(true);
+            }}
+            className="bg-cyan-400 text-slate-950 hover:bg-cyan-300"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Nouvel agent
+          </Button>
+        )}
       </header>
       <section className="grid gap-4 sm:grid-cols-3">
         <Metric
@@ -382,6 +385,7 @@ export default function Agents() {
                 className="h-8 w-8 shrink-0 text-slate-400 hover:text-cyan-300"
                 aria-label={`Modifier ou convertir ${beneficiary.name}`}
                 title="Modifier ou convertir"
+                hidden={!canManageTeam}
                 onClick={() => edit(beneficiary)}
               >
                 <Pencil className="h-4 w-4" />

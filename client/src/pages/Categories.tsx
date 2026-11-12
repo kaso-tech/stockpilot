@@ -1,4 +1,4 @@
-import { useAuth } from "@/_core/hooks/useAuth";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -19,8 +19,8 @@ import { Restricted } from "./AuditLog";
 type Category = { id: number; name: string };
 
 export default function Categories() {
-  const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const { can } = usePermissions();
+  const isAdmin = can("catalog.manage");
   const utils = trpc.useUtils();
   const { data: categories = [], isLoading } = trpc.categories.list.useQuery(
     undefined,

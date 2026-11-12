@@ -1,4 +1,4 @@
-import { useAuth } from "@/_core/hooks/useAuth";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,8 +20,8 @@ import { Restricted } from "./AuditLog";
 type PrinterType = "browser" | "thermal";
 
 export default function SettingsPrinting() {
-  const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const { can } = usePermissions();
+  const isAdmin = can("settings.manage");
   const utils = trpc.useUtils();
   const { data: settings } = trpc.commerce.settings.get.useQuery(undefined, {
     enabled: isAdmin,

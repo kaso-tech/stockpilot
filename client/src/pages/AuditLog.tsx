@@ -1,4 +1,4 @@
-import { useAuth } from "@/_core/hooks/useAuth";
+import { usePermissions } from "@/hooks/usePermissions";
 import { LoadMore, usePagedLimit } from "@/components/LoadMore";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,8 +7,8 @@ import { displayCurrencyLabel, formatDate } from "@/lib/format";
 import { LockKeyhole } from "lucide-react";
 
 export default function AuditLog() {
-  const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const { can } = usePermissions();
+  const isAdmin = can("audit.view");
   const paging = usePagedLimit();
   const {
     data: logs = [],
