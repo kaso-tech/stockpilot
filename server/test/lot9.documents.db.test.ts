@@ -98,14 +98,10 @@ describe.skipIf(!realDbUrl)(
       ).rejects.toMatchObject({ code: "BAD_REQUEST" });
       const invoice = await invoiceFor("client@exemple.test");
       await expect(
-        appRouter
-          .createCaller(ctx(a.admin))
-          .documents.sendSale({
-            ...send(invoice.id),
-            pdfBase64: Buffer.from("<html>" + "x".repeat(200)).toString(
-              "base64"
-            ),
-          })
+        appRouter.createCaller(ctx(a.admin)).documents.sendSale({
+          ...send(invoice.id),
+          pdfBase64: Buffer.from("<html>" + "x".repeat(200)).toString("base64"),
+        })
       ).rejects.toMatchObject({ code: "BAD_REQUEST" });
       const b = await seedTenant("b");
       await expect(

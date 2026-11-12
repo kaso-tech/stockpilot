@@ -210,6 +210,18 @@ async function createAudit(
   });
 }
 
+function netRevenueCents(sale: { totalCents: number; returnedCents: number }) {
+  return sale.totalCents - sale.returnedCents;
+}
+
+function netMarginCents(sale: {
+  netProfitCents: number;
+  returnedCents: number;
+  returnedCostCents: number;
+}) {
+  return sale.netProfitCents - (sale.returnedCents - sale.returnedCostCents);
+}
+
 async function sendVerificationEmail(
   db: any,
   userId: number,
@@ -891,12 +903,13 @@ export const appRouter = router({
       const todaySales = paidSales.filter(
         sale => dayKey(sale.createdAt, timezone) === today
       );
+      // Montants nets des retours partiels (9.2).
       const monthlyRevenueCents = monthlySales.reduce(
-        (sum, sale) => sum + sale.totalCents,
+        (sum, sale) => sum + netRevenueCents(sale),
         0
       );
       const monthlyMarginCents = monthlySales.reduce(
-        (sum, sale) => sum + sale.netProfitCents,
+        (sum, sale) => sum + netMarginCents(sale),
         0
       );
       const agentExpenseRows = agentPaymentExpenseRows(payments);
@@ -966,7 +979,7 @@ export const appRouter = router({
         day,
         revenueCents: paidSales
           .filter(sale => dayKey(sale.createdAt, timezone) === day)
-          .reduce((sum, sale) => sum + sale.totalCents, 0),
+          .reduce((sum, sale) => sum + netRevenueCents(sale), 0),
         invoices: paidSales.filter(
           sale => dayKey(sale.createdAt, timezone) === day
         ).length,
@@ -994,7 +1007,7 @@ export const appRouter = router({
           expenseBudget,
           monthlyInvoiceCount: monthlySales.length,
           todayRevenueCents: todaySales.reduce(
-            (sum, sale) => sum + sale.totalCents,
+            (sum, sale) => sum + netRevenueCents(sale),
             0
           ),
           averageBasketCents: monthlySales.length

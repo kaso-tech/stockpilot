@@ -11,6 +11,8 @@ import {
   saleCommissions,
   saleItems,
   salePayments,
+  saleReturnItems,
+  saleReturns,
   saleSettings,
   sales,
 } from "../../drizzle/schema";
@@ -386,13 +388,17 @@ export const transactionsRouter = router({
           items.map(item => item.productId),
           "Un produit de cette facture est introuvable ; le remboursement ne peut pas être finalisé."
         );
-        for (const item of items)
-          await ledger.apply(item.productId, {
-            type: "entry",
-            quantity: item.quantity,
-            reason: `Remboursement ${sale.invoiceNumber}`,
-            createdByUserId: ctx.user.id,
-          });
+        // Seules les quantités non encore rendues par des retours partiels reviennent en stock.
+        for (const item of items) {
+          const remaining = item.quantity - item.returnedQuantity;
+          if (remaining > 0)
+            await ledger.apply(item.productId, {
+              type: "entry",
+              quantity: remaining,
+              reason: `Remboursement ${sale.invoiceNumber}`,
+              createdByUserId: ctx.user.id,
+            });
+        }
         // Avoir numéroté (E8) : la facture d'origine est conservée et annulée, le
         // remboursement est tracé par un paiement négatif (la caisse reste juste) et
         // les commissions sont contrepassées au lieu d'être effacées (elles ont pu être versées).
@@ -460,6 +466,273 @@ export const transactionsRouter = router({
         });
       });
       return { success: true, creditNoteNumber };
+    }),
+  /**
+   * Retour partiel (9.2) : l'utilisateur choisit les articles et quantités rendus.
+   * Le montant remboursé est calculé au prorata des lignes, remises et TVA
+   * comprises (hors frais de livraison) ; un avoir numéroté est émis, un paiement
+   * négatif est enregistré et les commissions sont contrepassées au prorata.
+   */
+  returnItems: protectedProcedure
+    .input(
+      z.object({
+        saleId: z.number().int().positive(),
+        lines: z
+          .array(
+            z.object({
+              saleItemId: z.number().int().positive(),
+              quantity: z.number().int().positive().max(MAX_QUANTITY),
+              restock: z.boolean().default(true),
+            })
+          )
+          .min(1)
+          .max(MAX_LINE_ITEMS),
+        method: paymentMethod.optional(),
+        reason: z.string().trim().max(500).nullable().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = await dbOrThrow();
+      return db.transaction(async tx => {
+        const sale = (
+          await tx
+            .select()
+            .from(sales)
+            .where(
+              and(
+                eq(sales.id, input.saleId),
+                companyScope(sales.companyId, ctx.user.companyId)
+              )
+            )
+            .limit(1)
+            .for("update")
+        )[0];
+        if (!sale)
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Facture introuvable.",
+          });
+        if (sale.status !== "paid" || sale.channel === "quote")
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message:
+              "Seule une vente intégralement encaissée peut faire l’objet d’un retour partiel.",
+          });
+        if (ctx.user.role === "seller") {
+          const settings = (
+            await tx
+              .select()
+              .from(saleSettings)
+              .where(companyScope(saleSettings.companyId, ctx.user.companyId))
+              .limit(1)
+          )[0];
+          try {
+            assertSellerSensitiveAction(settings, "refund");
+          } catch (error) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message:
+                error instanceof Error ? error.message : "Retour non autorisé.",
+            });
+          }
+        }
+        const items = await tx
+          .select()
+          .from(saleItems)
+          .where(eq(saleItems.saleId, sale.id));
+        const requested = new Map<
+          number,
+          { quantity: number; restock: boolean }
+        >();
+        for (const line of input.lines) {
+          if (requested.has(line.saleItemId))
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message:
+                "Une ligne ne peut apparaître qu’une fois dans un retour.",
+            });
+          requested.set(line.saleItemId, line);
+        }
+        const lineNetTotal = items.reduce(
+          (sum, item) => sum + item.lineTotalCents,
+          0
+        );
+        const refundableBase = Math.max(
+          0,
+          sale.totalCents - sale.deliveryFeeCents
+        );
+        const returned = items
+          .filter(item => requested.has(item.id))
+          .map(item => {
+            const line = requested.get(item.id)!;
+            if (line.quantity > item.quantity - item.returnedQuantity)
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: `La quantité rendue dépasse la quantité vendue restante pour ${item.productName}.`,
+              });
+            const lineShare = Math.round(
+              (item.lineTotalCents * line.quantity) / item.quantity
+            );
+            const refundCents =
+              lineNetTotal > 0
+                ? Math.round((lineShare * refundableBase) / lineNetTotal)
+                : 0;
+            const costCents = Math.round(
+              (item.lineCostCents * line.quantity) / item.quantity
+            );
+            return {
+              item,
+              quantity: line.quantity,
+              restock: line.restock,
+              refundCents,
+              costCents,
+            };
+          });
+        if (returned.length !== requested.size)
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Une ligne sélectionnée n’appartient pas à cette vente.",
+          });
+        const refundCents = Math.min(
+          sale.amountPaidCents,
+          returned.reduce((sum, line) => sum + line.refundCents, 0)
+        );
+        const costCents = returned.reduce(
+          (sum, line) => sum + line.costCents,
+          0
+        );
+        const ledger = await lockProducts(
+          tx,
+          returned
+            .filter(line => line.restock)
+            .map(line => line.item.productId),
+          ctx.user.companyId
+        );
+        const timezone = await companyTimezone(tx, ctx.user.companyId);
+        const creditNoteNumber = await nextDocumentNumber(
+          tx,
+          ctx.user.companyId!,
+          "AV",
+          Number(dayKey(new Date(), timezone).slice(0, 4))
+        );
+        const method = input.method ?? sale.paymentMethod;
+        const returnResult = await tx.insert(saleReturns).values({
+          companyId: ctx.user.companyId,
+          saleId: sale.id,
+          creditNoteNumber,
+          refundCents,
+          costCents,
+          method,
+          reason: input.reason ?? null,
+          createdByUserId: ctx.user.id,
+        });
+        const returnId = Number(returnResult[0].insertId);
+        for (const line of returned) {
+          await tx
+            .insert(saleReturnItems)
+            .values({
+              returnId,
+              saleItemId: line.item.id,
+              productId: line.item.productId,
+              quantity: line.quantity,
+              restocked: line.restock,
+              refundCents: line.refundCents,
+            });
+          await tx
+            .update(saleItems)
+            .set({
+              returnedQuantity: line.item.returnedQuantity + line.quantity,
+            })
+            .where(
+              and(eq(saleItems.id, line.item.id), eq(saleItems.saleId, sale.id))
+            );
+          if (line.restock)
+            await ledger.apply(line.item.productId, {
+              type: "entry",
+              quantity: line.quantity,
+              reason: `Retour ${creditNoteNumber} (${sale.invoiceNumber})`,
+              createdByUserId: ctx.user.id,
+            });
+        }
+        if (refundCents > 0) {
+          await tx
+            .insert(salePayments)
+            .values({
+              saleId: sale.id,
+              method,
+              amountCents: -refundCents,
+              createdByUserId: ctx.user.id,
+            });
+          const share = refundCents / Math.max(1, sale.totalCents);
+          const commissions = await tx
+            .select()
+            .from(saleCommissions)
+            .where(eq(saleCommissions.saleId, sale.id));
+          const positives = new Map<
+            string,
+            { row: (typeof commissions)[number]; cents: number }
+          >();
+          for (const row of commissions.filter(
+            item => item.commissionCents > 0
+          )) {
+            const key = `${row.beneficiaryType}:${row.beneficiaryId}`;
+            positives.set(key, {
+              row,
+              cents: (positives.get(key)?.cents ?? 0) + row.commissionCents,
+            });
+          }
+          for (const { row, cents } of Array.from(positives.values())) {
+            const reversal = Math.round(cents * share);
+            if (reversal > 0)
+              await tx
+                .insert(saleCommissions)
+                .values({
+                  saleId: sale.id,
+                  beneficiaryType: row.beneficiaryType,
+                  beneficiaryId: row.beneficiaryId,
+                  commissionBasis: row.commissionBasis,
+                  rateBasisPoints: row.rateBasisPoints,
+                  commissionCents: -reversal,
+                });
+          }
+        }
+        const fullyReturned = items.every(
+          item =>
+            item.quantity -
+              item.returnedQuantity -
+              (requested.get(item.id)?.quantity ?? 0) <=
+            0
+        );
+        await tx
+          .update(sales)
+          .set({
+            amountPaidCents: sale.amountPaidCents - refundCents,
+            returnedCents: sale.returnedCents + refundCents,
+            returnedCostCents: sale.returnedCostCents + costCents,
+            ...(fullyReturned
+              ? {
+                  status: "void" as const,
+                  voidedAt: new Date(),
+                  refundedAt: new Date(),
+                }
+              : {}),
+          })
+          .where(
+            and(
+              eq(sales.id, sale.id),
+              companyScope(sales.companyId, ctx.user.companyId)
+            )
+          );
+        await tx.insert(auditLogs).values({
+          companyId: ctx.user.companyId,
+          actorUserId: ctx.user.id,
+          action: "Retour",
+          entityType: "Facture",
+          entityId: String(sale.id),
+          detail: `Retour ${creditNoteNumber} sur ${sale.invoiceNumber} : ${returned.reduce((sum, line) => sum + line.quantity, 0)} article(s), ${refundCents} centimes remboursés`,
+        });
+        return { creditNoteNumber, refundCents, fullyReturned };
+      });
     }),
   createDraft: protectedProcedure
     .input(

@@ -216,3 +216,12 @@ Ces évolutions ne corrigent pas un défaut : elles ajoutent des capacités et e
 - Nouveau routeur `documents` : `sendSale` (factures et devis) et `sendPurchaseOrder`. Le PDF est généré par le client (même rendu que le téléchargement), contrôlé côté serveur (signature `%PDF-`, 5 Mo maximum), envoyé en pièce jointe avec l'adresse de l'entreprise en réponse, et l'envoi est tracé dans le journal d'audit. Accès limité aux documents de l'entreprise, limitation à 60 envois par heure et par entreprise.
 - Client : « Envoyer par e-mail » expédie directement depuis le serveur ; si aucun serveur SMTP n'est configuré, l'ancien parcours (partage natif ou `mailto:` avec PDF téléchargé) prend le relais. Le partage WhatsApp reste un lien `wa.me`.
 - Tests : `server/test/lot9.documents.db.test.ts`.
+
+### Lot 9.2 — Retours partiels et avoirs partiels
+
+- Migration **`0047_partial_returns`** : tables `saleReturns` (avoir numéroté par retour) et `saleReturnItems`, colonnes `saleItems.returnedQuantity`, `sales.returnedCents` et `sales.returnedCostCents`.
+- `transactions.returnItems` : sur une vente intégralement encaissée, l'utilisateur choisit articles et quantités (contrôle de la quantité restante), la remise en stock ligne par ligne (désactivable pour un article abîmé), le moyen de remboursement et un motif. Montant remboursé au prorata des lignes, remises et TVA comprises, hors frais de livraison ; paiement négatif enregistré ; commissions contrepassées au prorata ; avoir `AV-…` ; la vente passe à « annulée » quand tout est rendu. Mêmes autorisations que le remboursement pour les vendeurs.
+- Le remboursement total tient compte des retours déjà faits (seul le reste revient en stock).
+- Tableau de bord : chiffre d'affaires et marge nets des retours.
+- Client : bouton « Retourner des articles » et historique des retours/avoirs sur la fiche facture.
+- Tests : `server/test/lot9.returns.db.test.ts` (4 scénarios).

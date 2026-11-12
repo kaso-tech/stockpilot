@@ -1,5 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { CheckoutSheet } from "@/components/CheckoutSheet";
+import { ReturnItemsDialog } from "@/components/ReturnItemsDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -52,6 +53,7 @@ export default function InvoiceDetail() {
   const [checkout, setCheckout] = useState<any>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmRefund, setConfirmRefund] = useState(false);
+  const [returnOpen, setReturnOpen] = useState(false);
   const removeDraft = trpc.transactions.removeDraft.useMutation({
     onSuccess: () => {
       utils.transactions.list.invalidate();
@@ -335,8 +337,54 @@ export default function InvoiceDetail() {
               Rembourser la facture
             </Button>
           )}
+          {sale.status === "paid" && canRefund && (
+            <Button
+              variant="outline"
+              className="sm:col-span-2 lg:col-span-4 border-cyan-400/30 text-cyan-200"
+              onClick={() => setReturnOpen(true)}
+            >
+              <Undo2 className="mr-2 h-4 w-4" />
+              Retourner des articles
+            </Button>
+          )}
         </div>
+        {detail.returns?.length > 0 && (
+          <div className="mt-4 rounded-2xl border border-white/[0.07] bg-[#111722] p-4">
+            <p className="text-sm font-semibold text-slate-200">
+              Retours et avoirs
+            </p>
+            <ul className="mt-2 space-y-1 text-sm text-slate-400">
+              {detail.returns.map((item: any) => (
+                <li
+                  key={item.id}
+                  className="flex flex-wrap justify-between gap-2"
+                >
+                  <span>
+                    {item.creditNoteNumber} · {formatDate(item.createdAt, true)}
+                    {item.reason ? ` · ${item.reason}` : ""}
+                  </span>
+                  <span className="font-medium text-amber-300">
+                    −{formatCurrency(item.refundCents)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </section>
+      <ReturnItemsDialog
+        open={returnOpen}
+        onOpenChange={setReturnOpen}
+        saleId={sale.id}
+        items={detail.items}
+        defaultMethod={sale.paymentMethod}
+        onDone={() => {
+          utils.commerce.sales.detail.invalidate();
+          utils.transactions.list.invalidate();
+          utils.products.list.invalidate();
+          utils.dashboard.get.invalidate();
+        }}
+      />
       <CheckoutSheet
         open={Boolean(checkout)}
         onOpenChange={open => !open && setCheckout(null)}

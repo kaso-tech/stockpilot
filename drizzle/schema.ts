@@ -392,6 +392,9 @@ export const sales = mysqlTable(
     /** Numéro de l'avoir émis lors d'un remboursement (séquence AV par entreprise). */
     creditNoteNumber: varchar("creditNoteNumber", { length: 60 }),
     refundedAt: timestamp("refundedAt"),
+    /** Montant remboursé par des retours partiels (TTC) et coût d'achat correspondant. */
+    returnedCents: int("returnedCents").notNull().default(0),
+    returnedCostCents: int("returnedCostCents").notNull().default(0),
     offlineOperationId: varchar("offlineOperationId", { length: 80 }).unique(),
     channel: mysqlEnum("channel", ["pos", "invoice", "quote"])
       .notNull()
@@ -540,6 +543,8 @@ export const saleItems = mysqlTable(
     lineSubtotalCents: int("lineSubtotalCents").notNull().default(0),
     lineTotalCents: int("lineTotalCents").notNull(),
     lineCostCents: int("lineCostCents").notNull(),
+    /** Quantité déjà rendue par des retours partiels. */
+    returnedQuantity: int("returnedQuantity").notNull().default(0),
   },
   table => [
     index("sale_items_sale_idx").on(table.saleId),
@@ -794,4 +799,48 @@ export const authTokens = mysqlTable(
     unique("auth_tokens_hash_unique").on(table.tokenHash),
     index("auth_tokens_user_type_idx").on(table.userId, table.type),
   ]
+);
+
+/** Retour partiel d'articles d'une vente encaissée, avec son avoir numéroté. */
+export const saleReturns = mysqlTable(
+  "saleReturns",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    companyId: int("companyId"),
+    saleId: int("saleId").notNull(),
+    creditNoteNumber: varchar("creditNoteNumber", { length: 60 }).notNull(),
+    refundCents: int("refundCents").notNull(),
+    costCents: int("costCents").notNull().default(0),
+    method: mysqlEnum("method", [
+      "cash",
+      "card",
+      "mobile_money",
+      "bank_transfer",
+      "credit",
+    ]).notNull(),
+    reason: varchar("reason", { length: 500 }),
+    createdByUserId: int("createdByUserId").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [
+    index("sale_returns_company_sale_idx").on(table.companyId, table.saleId),
+    unique("sale_returns_company_number_unique").on(
+      table.companyId,
+      table.creditNoteNumber
+    ),
+  ]
+);
+
+export const saleReturnItems = mysqlTable(
+  "saleReturnItems",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    returnId: int("returnId").notNull(),
+    saleItemId: int("saleItemId").notNull(),
+    productId: int("productId").notNull(),
+    quantity: int("quantity").notNull(),
+    restocked: boolean("restocked").notNull().default(true),
+    refundCents: int("refundCents").notNull(),
+  },
+  table => [index("sale_return_items_return_idx").on(table.returnId)]
 );

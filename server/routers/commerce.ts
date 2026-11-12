@@ -12,6 +12,7 @@ import {
   saleCommissions,
   sellerCredentials,
   saleItems,
+  saleReturns,
   salePayments,
   sales,
   saleSettings,
@@ -1484,12 +1485,23 @@ export const commerceRouter = router({
               )[0] ?? null)
             : null,
         ]);
+        const returns = await db
+          .select()
+          .from(saleReturns)
+          .where(
+            and(
+              eq(saleReturns.saleId, sale.id),
+              companyScope(saleReturns.companyId, ctx.user.companyId)
+            )
+          )
+          .orderBy(desc(saleReturns.createdAt));
         return {
           sale,
           customer,
           items,
           payments,
           commissions,
+          returns,
           participants: {
             seller: seller
               ? {

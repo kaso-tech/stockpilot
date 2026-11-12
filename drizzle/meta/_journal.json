@@ -330,6 +330,13 @@
       "when": 1794500407855,
       "tag": "0046_auth_tokens_email_verification",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "5",
+      "when": 1794500851330,
+      "tag": "0047_partial_returns",
+      "breakpoints": true
     }
   ]
 }

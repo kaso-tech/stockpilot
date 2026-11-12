@@ -142,16 +142,14 @@ export const documentsRouter = router({
         ],
       });
       if (result.delivered)
-        await db
-          .insert(auditLogs)
-          .values({
-            companyId: ctx.user.companyId,
-            actorUserId: ctx.user.id,
-            action: "Envoi par e-mail",
-            entityType: sale.channel === "quote" ? "Devis" : "Facture",
-            entityId: String(sale.id),
-            detail: `${sale.invoiceNumber} envoyé à ${to}`,
-          });
+        await db.insert(auditLogs).values({
+          companyId: ctx.user.companyId,
+          actorUserId: ctx.user.id,
+          action: "Envoi par e-mail",
+          entityType: sale.channel === "quote" ? "Devis" : "Facture",
+          entityId: String(sale.id),
+          detail: `${sale.invoiceNumber} envoyé à ${to}`,
+        });
       return result;
     }),
   sendPurchaseOrder: protectedProcedure
@@ -214,16 +212,14 @@ export const documentsRouter = router({
         ],
       });
       if (result.delivered)
-        await db
-          .insert(auditLogs)
-          .values({
-            companyId: ctx.user.companyId,
-            actorUserId: ctx.user.id,
-            action: "Envoi par e-mail",
-            entityType: "Bon de commande",
-            entityId: String(order.id),
-            detail: `${order.orderNumber} envoyé à ${to}`,
-          });
+        await db.insert(auditLogs).values({
+          companyId: ctx.user.companyId,
+          actorUserId: ctx.user.id,
+          action: "Envoi par e-mail",
+          entityType: "Bon de commande",
+          entityId: String(order.id),
+          detail: `${order.orderNumber} envoyé à ${to}`,
+        });
       return result;
     }),
 });
