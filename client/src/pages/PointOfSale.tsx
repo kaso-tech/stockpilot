@@ -1,4 +1,5 @@
 import { BarcodeCameraDialog } from "@/components/BarcodeCameraDialog";
+import { computeVatBreakdown, vatRatesLabel } from "@shared/pricing";
 import {
   calculateDiscount,
   DiscountEditor,
@@ -192,9 +193,16 @@ export default function PointOfSale() {
   const vatRateBasisPoints = settings?.vatEnabled
     ? (settings.vatRateBasisPoints ?? 0)
     : 0;
-  const vatCents = Math.round(
-    (taxableSubtotalCents * vatRateBasisPoints) / 10000
-  );
+  // Même calcul que le serveur : taux du produit, sinon taux de l'entreprise (9.6).
+  const vatCents = computeVatBreakdown(
+    lines.map(line => ({
+      netCents: line.totalCents,
+      vatRateBasisPoints: settings?.vatEnabled
+        ? (line.product.vatRateBasisPoints ?? vatRateBasisPoints)
+        : 0,
+    })),
+    invoiceDiscountCents
+  ).vatCents;
   const totalCents = taxableSubtotalCents + vatCents;
 
   const add = (productId: number) =>
@@ -689,7 +697,16 @@ export default function PointOfSale() {
                   {vatCents > 0 && (
                     <div className="flex items-center justify-between">
                       <span>
-                        TVA ({(vatRateBasisPoints / 100).toFixed(2)} %)
+                        TVA (
+                        {vatRatesLabel(
+                          lines.map(line =>
+                            settings?.vatEnabled
+                              ? (line.product.vatRateBasisPoints ??
+                                vatRateBasisPoints)
+                              : 0
+                          )
+                        )}
+                        )
                       </span>
                       <span>{formatCurrency(vatCents)}</span>
                     </div>

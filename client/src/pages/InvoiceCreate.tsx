@@ -1,4 +1,5 @@
 import { BarcodeCameraDialog } from "@/components/BarcodeCameraDialog";
+import { computeVatBreakdown } from "@shared/pricing";
 import {
   calculateDiscount,
   DiscountEditor,
@@ -191,9 +192,16 @@ export default function InvoiceCreate({
   const vatRateBasisPoints = settings?.vatEnabled
     ? (settings.vatRateBasisPoints ?? 0)
     : 0;
-  const vatCents = Math.round(
-    (taxableSubtotalCents * vatRateBasisPoints) / 10000
+  const vatBreakdown = computeVatBreakdown(
+    lines.map(line => ({
+      netCents: line.totalCents,
+      vatRateBasisPoints: settings?.vatEnabled
+        ? (line.product.vatRateBasisPoints ?? vatRateBasisPoints)
+        : 0,
+    })),
+    invoiceDiscountCents
   );
+  const vatCents = vatBreakdown.vatCents;
   const deliveryFeeCents = Math.max(
     0,
     Math.round((Number(deliveryFeeInput) || 0) * 100)
@@ -820,7 +828,17 @@ export default function InvoiceCreate({
               )}
               {vatCents > 0 && (
                 <div className="flex justify-between">
-                  <span>TVA ({(vatRateBasisPoints / 100).toFixed(2)} %)</span>
+                  <span>
+                    TVA (
+                    {vatBreakdown.byRate
+                      .filter(rate => rate.vatCents > 0)
+                      .map(
+                        rate =>
+                          `${(rate.vatRateBasisPoints / 100).toFixed(2)} %`
+                      )
+                      .join(" · ")}
+                    )
+                  </span>
                   <span>{formatCurrency(vatCents)}</span>
                 </div>
               )}

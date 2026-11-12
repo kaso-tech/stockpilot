@@ -174,6 +174,8 @@ export const products = mysqlTable(
     wholesalePriceCents: int("wholesalePriceCents").notNull().default(0),
     quantity: int("quantity").notNull().default(0),
     minimumQuantity: int("minimumQuantity").notNull().default(0),
+    /** Taux de TVA propre au produit (points de base) ; NULL = taux de l'entreprise. */
+    vatRateBasisPoints: int("vatRateBasisPoints"),
     supplierId: int("supplierId"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -545,6 +547,9 @@ export const saleItems = mysqlTable(
     lineCostCents: int("lineCostCents").notNull(),
     /** Quantité déjà rendue par des retours partiels. */
     returnedQuantity: int("returnedQuantity").notNull().default(0),
+    /** TVA de la ligne (taux appliqué et montant après répartition de la remise globale). */
+    vatRateBasisPoints: int("vatRateBasisPoints").notNull().default(0),
+    vatCents: int("vatCents").notNull().default(0),
   },
   table => [
     index("sale_items_sale_idx").on(table.saleId),

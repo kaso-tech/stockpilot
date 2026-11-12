@@ -51,6 +51,8 @@ type ProductForm = {
   wholesalePrice: string;
   quantity: string;
   minimumQuantity: string;
+  /** Taux de TVA spécifique en %, vide = taux de l'entreprise. */
+  vatPercent: string;
   supplierId: string;
   retailTiersEnabled: boolean;
   wholesaleTiersEnabled: boolean;
@@ -70,6 +72,7 @@ const emptyProduct: ProductForm = {
   wholesalePrice: "",
   quantity: "0",
   minimumQuantity: "0",
+  vatPercent: "",
   supplierId: "none",
   retailTiersEnabled: false,
   wholesaleTiersEnabled: false,
@@ -200,6 +203,11 @@ export default function Products() {
       wholesalePrice: (product.wholesalePriceCents / 100).toFixed(2),
       quantity: String(product.quantity),
       minimumQuantity: String(product.minimumQuantity),
+      vatPercent:
+        product.vatRateBasisPoints === null ||
+        product.vatRateBasisPoints === undefined
+          ? ""
+          : String(product.vatRateBasisPoints / 100),
       supplierId: product.supplierId ? String(product.supplierId) : "none",
       retailTiersEnabled: retail.length > 0,
       wholesaleTiersEnabled: wholesale.length > 0,
@@ -251,6 +259,9 @@ export default function Products() {
       wholesalePriceCents: Math.round(Number(form.wholesalePrice) * 100),
       quantity: Number(form.quantity),
       minimumQuantity: Number(form.minimumQuantity),
+      vatRateBasisPoints: form.vatPercent.trim()
+        ? Math.round(Number(form.vatPercent.replace(",", ".")) * 100)
+        : null,
       supplierId: form.supplierId === "none" ? null : Number(form.supplierId),
       retailPriceTiers,
       wholesalePriceTiers,
@@ -1142,6 +1153,16 @@ function ProductDialog({
                 value={form.minimumQuantity}
                 onChange={event =>
                   setForm({ ...form, minimumQuantity: event.target.value })
+                }
+              />
+            </Field>
+            <Field label="TVA spécifique (%)">
+              <Input
+                inputMode="decimal"
+                placeholder="Taux de l’entreprise"
+                value={form.vatPercent}
+                onChange={event =>
+                  setForm({ ...form, vatPercent: event.target.value })
                 }
               />
             </Field>

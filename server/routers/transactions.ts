@@ -42,7 +42,7 @@ import {
   MAX_LINE_ITEMS,
   MAX_QUANTITY,
 } from "../numericLimits";
-import { calculateCommercialTotals } from "../commercialTotals";
+import { computeVatBreakdown } from "@shared/pricing";
 import { lockProducts } from "../stockLedger";
 import { nextDocumentNumber } from "../documentNumbers";
 import { companyTimezone, dayKey } from "../companyTime";
@@ -956,17 +956,40 @@ export const transactionsRouter = router({
             });
           }
         }
+        // TVA par ligne (9.6) : taux du produit, sinon taux de l'entreprise.
+        const companyVatRate = permissions?.vatEnabled
+          ? permissions.vatRateBasisPoints
+          : 0;
+        const vat = computeVatBreakdown(
+          lines.map(line => ({
+            netCents: line.lineTotalCents,
+            vatRateBasisPoints: permissions?.vatEnabled
+              ? (line.product.vatRateBasisPoints ?? companyVatRate)
+              : 0,
+          })),
+          invoiceDiscountCents
+        );
         const taxableSubtotalCents = assertSafeDatabaseInt(
-          lineNetCents - invoiceDiscountCents,
+          vat.taxableCents,
           "Base taxable"
         );
-        const commercialTotals = calculateCommercialTotals({
-          subtotalCents: taxableSubtotalCents,
-          vatRateBasisPoints: permissions?.vatEnabled
-            ? permissions.vatRateBasisPoints
-            : 0,
-          deliveryFeeCents: input.deliveryFeeCents,
-        });
+        const commercialTotals = {
+          vatRateBasisPoints: companyVatRate,
+          vatCents: assertSafeDatabaseInt(vat.vatCents, "TVA"),
+          deliveryFeeCents: assertSafeDatabaseInt(
+            input.deliveryFeeCents,
+            "Frais de livraison"
+          ),
+          totalCents: assertSafeDatabaseInt(
+            taxableSubtotalCents + vat.vatCents + input.deliveryFeeCents,
+            "Total TTC"
+          ),
+        };
+        if (commercialTotals.totalCents > MAX_CENTS)
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Le total commercial dépasse la limite autorisée.",
+          });
         const totalCents = commercialTotals.totalCents;
         const totalCostCents = assertSafeDatabaseInt(
           lines.reduce((sum, line) => sum + line.lineCostCents, 0),
@@ -1013,9 +1036,12 @@ export const transactionsRouter = router({
           status: "draft",
         });
         const saleId = Number(result[0].insertId);
-        for (const line of lines)
+        for (let index = 0; index < lines.length; index += 1) {
+          const line = lines[index]!;
           await tx.insert(saleItems).values({
             saleId,
+            vatRateBasisPoints: vat.perLine[index]!.vatRateBasisPoints,
+            vatCents: vat.perLine[index]!.vatCents,
             productId: line.product.id,
             productName: line.product.name,
             productReference: line.product.reference,
@@ -1029,6 +1055,7 @@ export const transactionsRouter = router({
             lineTotalCents: line.lineTotalCents,
             lineCostCents: line.lineCostCents,
           });
+        }
         await tx.insert(auditLogs).values({
           companyId: ctx.user.companyId,
           actorUserId: ctx.user.id,

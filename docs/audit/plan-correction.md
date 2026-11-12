@@ -225,3 +225,10 @@ Ces évolutions ne corrigent pas un défaut : elles ajoutent des capacités et e
 - Tableau de bord : chiffre d'affaires et marge nets des retours.
 - Client : bouton « Retourner des articles » et historique des retours/avoirs sur la fiche facture.
 - Tests : `server/test/lot9.returns.db.test.ts` (4 scénarios).
+
+### Lot 9.6 — TVA par produit
+
+- Migration **`0048_vat_per_product`** : `products.vatRateBasisPoints` (vide = taux de l'entreprise), `saleItems.vatRateBasisPoints` et `saleItems.vatCents` ; les lignes existantes reçoivent le taux de leur vente et la TVA de la vente répartie au prorata.
+- Calcul commun client/serveur `computeVatBreakdown` (`shared/pricing.ts`) : remise globale répartie au prorata des lignes, chaque ligne taxée à son taux, ventilation par taux. Utilisé par la création de documents (serveur, qui fait foi), le point de vente et l'écran de facture (aperçu identique).
+- Fiche produit : champ « TVA spécifique (%) ». Factures (écran et PDF) et point de vente : affichage de tous les taux appliqués.
+- Tests : `server/test/lot9.vat.db.test.ts`.

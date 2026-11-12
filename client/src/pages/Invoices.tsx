@@ -1,4 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { vatRatesLabel } from "@shared/pricing";
 import { LoadMore, usePagedLimit } from "@/components/LoadMore";
 import { CheckoutSheet } from "@/components/CheckoutSheet";
 import {
@@ -629,9 +630,7 @@ export function InvoiceDocument({
         )}
         {vatCents > 0 && (
           <div className="row">
-            <span>
-              TVA ({((detail.sale.vatRateBasisPoints || 0) / 100).toFixed(2)} %)
-            </span>
+            <span>TVA ({invoiceVatLabel(detail)})</span>
             <span>{formatCurrency(vatCents)}</span>
           </div>
         )}
@@ -739,7 +738,7 @@ export function createInvoicePdf(
   }
   if (detail.sale.vatCents > 0) {
     doc.text(
-      `TVA (${((detail.sale.vatRateBasisPoints || 0) / 100).toFixed(2)} %) : ${formatCurrency(detail.sale.vatCents)}`,
+      `TVA (${invoiceVatLabel(detail)}) : ${formatCurrency(detail.sale.vatCents)}`,
       552,
       y,
       { align: "right" }
@@ -764,6 +763,16 @@ export function createInvoicePdf(
     type: "application/pdf",
   });
 }
+/** Taux réellement appliqués aux lignes (TVA par produit), à défaut celui de la facture. */
+function invoiceVatLabel(detail: any) {
+  const rates = (detail.items ?? [])
+    .filter((item: any) => item.vatCents > 0)
+    .map((item: any) => item.vatRateBasisPoints as number);
+  return vatRatesLabel(
+    rates.length ? rates : [detail.sale.vatRateBasisPoints || 0]
+  );
+}
+
 export function downloadFile(file: File) {
   const url = URL.createObjectURL(file);
   const link = document.createElement("a");

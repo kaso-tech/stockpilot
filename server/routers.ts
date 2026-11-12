@@ -107,6 +107,14 @@ const productInput = z
     wholesalePriceCents: z.number().int().min(0).max(MAX_CENTS),
     quantity: z.number().int().min(0).max(MAX_QUANTITY),
     minimumQuantity: z.number().int().min(0).max(MAX_QUANTITY),
+    /** Taux de TVA propre au produit en points de base (2000 = 20 %) ; null = taux de l'entreprise. */
+    vatRateBasisPoints: z
+      .number()
+      .int()
+      .min(0)
+      .max(10000)
+      .nullable()
+      .optional(),
     supplierId: z.number().int().positive().nullable(),
     priceTiers: z
       .array(
