@@ -232,3 +232,11 @@ Ces évolutions ne corrigent pas un défaut : elles ajoutent des capacités et e
 - Calcul commun client/serveur `computeVatBreakdown` (`shared/pricing.ts`) : remise globale répartie au prorata des lignes, chaque ligne taxée à son taux, ventilation par taux. Utilisé par la création de documents (serveur, qui fait foi), le point de vente et l'écran de facture (aperçu identique).
 - Fiche produit : champ « TVA spécifique (%) ». Factures (écran et PDF) et point de vente : affichage de tous les taux appliqués.
 - Tests : `server/test/lot9.vat.db.test.ts`.
+
+### Lot 9.4 — Catégories et unités par identifiant (P8)
+
+- Migration **`0049_catalog_references`** : `products.categoryId` et `products.unitId` ; les catégories et unités utilisées par des produits mais absentes du catalogue de leur entreprise y sont ajoutées, puis chaque produit est relié par identifiant.
+- Création et modification de produit : rattachement automatique au catalogue de l'entreprise (une valeur saisie librement est ajoutée au catalogue). Le libellé reste copié dans le produit pour l'affichage et l'historique.
+- Renommage et suppression de catégories/unités : par identifiant (repli sur le libellé pour d'éventuelles lignes non reliées) ; le renommage relie au passage les anciennes lignes.
+- Sauvegardes : les références produits → catégories/unités sont validées à la restauration.
+- Tests : `server/test/lot9.catalog.db.test.ts`.

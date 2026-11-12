@@ -169,6 +169,9 @@ export const products = mysqlTable(
     description: text("description"),
     category: varchar("category", { length: 100 }).notNull(),
     unit: varchar("unit", { length: 30 }).notNull().default("unité"),
+    /** Références vers le catalogue (9.4) ; les libellés ci-dessus restent copiés pour l'affichage. */
+    categoryId: int("categoryId"),
+    unitId: int("unitId"),
     purchasePriceCents: int("purchasePriceCents").notNull().default(0),
     retailPriceCents: int("retailPriceCents").notNull().default(0),
     wholesalePriceCents: int("wholesalePriceCents").notNull().default(0),

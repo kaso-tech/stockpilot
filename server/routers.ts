@@ -1,5 +1,13 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, getTableColumns, inArray } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  getTableColumns,
+  inArray,
+  isNull,
+  or,
+} from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import {
@@ -242,6 +250,45 @@ async function sendVerificationEmail(
     subject: "Confirmez votre adresse e-mail StockPilot",
     text: `Bienvenue sur StockPilot.\n\nConfirmez votre adresse e-mail en ouvrant ce lien (valable 7 jours) :\n${appUrl(req)}/verifier-email?token=${token}`,
   });
+}
+
+/**
+ * Rattache le produit aux entrées du catalogue par identifiant (9.4) ; une
+ * catégorie ou unité saisie librement est ajoutée au catalogue de l'entreprise.
+ */
+async function resolveCatalogRefs(
+  tx: any,
+  companyId: number | null,
+  category: string,
+  unit: string
+) {
+  const find = async (
+    table: typeof productCategories | typeof productUnits,
+    name: string
+  ) =>
+    (
+      await tx
+        .select({ id: table.id })
+        .from(table)
+        .where(
+          and(eq(table.name, name), companyScope(table.companyId, companyId))
+        )
+        .limit(1)
+    )[0]?.id as number | undefined;
+  let categoryId = await find(productCategories, category);
+  if (!categoryId)
+    categoryId = Number(
+      (
+        await tx.insert(productCategories).values({ companyId, name: category })
+      )[0].insertId
+    );
+  let unitId = await find(productUnits, unit);
+  if (!unitId)
+    unitId = Number(
+      (await tx.insert(productUnits).values({ companyId, name: unit }))[0]
+        .insertId
+    );
+  return { categoryId, unitId };
 }
 
 async function assertSupplierInCompany(
@@ -1303,9 +1350,17 @@ export const appRouter = router({
             ? retailPriceTiers
             : priceTiers;
           const productId = await db.transaction(async tx => {
-            const result = await tx
-              .insert(products)
-              .values({ ...productData, companyId: ctx.user.companyId });
+            const refs = await resolveCatalogRefs(
+              tx,
+              ctx.user.companyId,
+              productData.category,
+              productData.unit
+            );
+            const result = await tx.insert(products).values({
+              ...productData,
+              ...refs,
+              companyId: ctx.user.companyId,
+            });
             const id = Number(result[0].insertId);
             const tiers = [
               ...retailTiers.map(tier => ({
@@ -1371,9 +1426,15 @@ export const appRouter = router({
           await db.transaction(async tx => {
             const { quantity: requestedQuantity, ...productValues } = values;
             const ledger = await lockProducts(tx, [id], ctx.user.companyId);
+            const refs = await resolveCatalogRefs(
+              tx,
+              ctx.user.companyId,
+              productValues.category,
+              productValues.unit
+            );
             await tx
               .update(products)
-              .set(productValues)
+              .set({ ...productValues, ...refs })
               .where(
                 and(
                   eq(products.id, id),
@@ -1601,10 +1662,16 @@ export const appRouter = router({
               );
             await tx
               .update(products)
-              .set({ category: input.name })
+              .set({ category: input.name, categoryId: input.id })
               .where(
                 and(
-                  eq(products.category, current.name),
+                  or(
+                    eq(products.categoryId, current.id),
+                    and(
+                      isNull(products.categoryId),
+                      eq(products.category, current.name)
+                    )
+                  ),
                   companyScope(products.companyId, ctx.user.companyId)
                 )
               );
@@ -1647,7 +1714,13 @@ export const appRouter = router({
           .from(products)
           .where(
             and(
-              eq(products.category, current.name),
+              or(
+                eq(products.categoryId, current.id),
+                and(
+                  isNull(products.categoryId),
+                  eq(products.category, current.name)
+                )
+              ),
               companyScope(products.companyId, ctx.user.companyId)
             )
           )
@@ -1738,10 +1811,16 @@ export const appRouter = router({
               );
             await tx
               .update(products)
-              .set({ unit: input.name })
+              .set({ unit: input.name, unitId: input.id })
               .where(
                 and(
-                  eq(products.unit, current.name),
+                  or(
+                    eq(products.unitId, current.id),
+                    and(
+                      isNull(products.unitId),
+                      eq(products.unit, current.name)
+                    )
+                  ),
                   companyScope(products.companyId, ctx.user.companyId)
                 )
               );
@@ -1784,7 +1863,10 @@ export const appRouter = router({
           .from(products)
           .where(
             and(
-              eq(products.unit, current.name),
+              or(
+                eq(products.unitId, current.id),
+                and(isNull(products.unitId), eq(products.unit, current.name))
+              ),
               companyScope(products.companyId, ctx.user.companyId)
             )
           )

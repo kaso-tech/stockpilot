@@ -192,6 +192,18 @@ const references: Array<{
   { table: "sales", column: "salesAgentId", target: "agents", nullable: true },
   { table: "sales", column: "cashierId", target: "agents", nullable: true },
   { table: "saleItems", column: "productId", target: "products" },
+  {
+    table: "products",
+    column: "categoryId",
+    target: "productCategories",
+    nullable: true,
+  },
+  {
+    table: "products",
+    column: "unitId",
+    target: "productUnits",
+    nullable: true,
+  },
   { table: "purchaseOrders", column: "supplierId", target: "suppliers" },
   { table: "purchaseOrderItems", column: "productId", target: "products" },
   { table: "inventoryItems", column: "productId", target: "products" },
