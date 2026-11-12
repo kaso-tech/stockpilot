@@ -44,6 +44,7 @@ import {
   Archive,
   Bell,
   Boxes,
+  Calculator,
   CheckCheck,
   ChevronDown,
   CircleAlert,
@@ -135,6 +136,12 @@ const menuItems: MenuItem[] = [
     label: "Dépenses",
     path: "/depenses",
     anyOf: ["expenses.manage"],
+  },
+  {
+    icon: Calculator,
+    label: "Caisse & comptabilité",
+    path: "/comptabilite",
+    anyOf: ["cash.close", "accounting.export"],
   },
   {
     icon: Archive,

@@ -76,6 +76,7 @@ import { backupRouter } from "./routers/backups";
 import { transactionsRouter } from "./routers/transactions";
 import { expensesRouter } from "./routers/expenses";
 import { documentsRouter } from "./routers/documents";
+import { accountingRouter } from "./routers/accounting";
 import {
   agentPaymentExpenseRows,
   budgetComparison,
@@ -395,6 +396,7 @@ export const appRouter = router({
   transactions: transactionsRouter,
   expenses: expensesRouter,
   documents: documentsRouter,
+  accounting: accountingRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(async ({ ctx }) => {

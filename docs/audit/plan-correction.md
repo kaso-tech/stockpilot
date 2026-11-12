@@ -249,3 +249,12 @@ Ces évolutions ne corrigent pas un défaut : elles ajoutent des capacités et e
 - Mots de passe : lecture et écriture unifiées quel que soit le rôle (`findPasswordHash` / `storePasswordHash`) : un vendeur promu administrateur (ou l'inverse) garde son mot de passe ; « Mon mot de passe » est désormais disponible pour tous les rôles.
 - Listes vendeurs et paie : élargies à tous les membres non administrateurs.
 - Tests : `shared/permissions.test.ts`, `server/test/lot9.roles.db.test.ts` (5 scénarios).
+
+### Lot 9.5 — Export comptable et clôture de caisse
+
+- Migration **`0051_cash_closures`** : table `cashClosures` (une clôture par entreprise et par journée).
+- `server/accounting.ts` : journal des ventes et journal des encaissements en CSV (séparateur `;`, BOM UTF-8, lisibles directement dans Excel) ; fichier des écritures comptables **FEC** (18 colonnes réglementaires) avec écritures équilibrées pour les ventes (client / ventes / frais de livraison / TVA collectée), les annulations, les avoirs (remboursements et retours partiels) et les encaissements (caisse ou banque). Comptes du **plan comptable général** (France) ou de **SYSCOHADA** au choix. L'export est refusé si une écriture n'est pas équilibrée.
+- `accounting.cash.summary/close/history` : clôture « Z » quotidienne dans le fuseau de l'entreprise, encaissements par moyen (remboursements déduits), fond de caisse, espèces comptées, écart ; une seule clôture par jour, pas de clôture d'une journée future ; tracée dans l'audit.
+- Droits : `accounting.export` (administrateur, gérant, comptable) et `cash.close` (administrateur, gérant, vendeur).
+- Client : page **Caisse & comptabilité** (menu « Finance »).
+- Tests : `server/test/lot9.accounting.db.test.ts` (4 scénarios).

@@ -860,3 +860,29 @@ export const saleReturnItems = mysqlTable(
   },
   table => [index("sale_return_items_return_idx").on(table.returnId)]
 );
+
+/** Clôture de caisse quotidienne (Z de caisse) : fond, encaissements attendus, comptage et écart. */
+export const cashClosures = mysqlTable(
+  "cashClosures",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    companyId: int("companyId"),
+    businessDay: varchar("businessDay", { length: 10 }).notNull(),
+    openingFloatCents: int("openingFloatCents").notNull().default(0),
+    cashSalesCents: int("cashSalesCents").notNull().default(0),
+    expectedCashCents: int("expectedCashCents").notNull(),
+    countedCashCents: int("countedCashCents").notNull(),
+    differenceCents: int("differenceCents").notNull(),
+    totalsByMethodJson: text("totalsByMethodJson").notNull(),
+    documentCount: int("documentCount").notNull().default(0),
+    note: varchar("note", { length: 500 }),
+    closedByUserId: int("closedByUserId").notNull(),
+    closedAt: timestamp("closedAt").defaultNow().notNull(),
+  },
+  table => [
+    unique("cash_closures_company_day_unique").on(
+      table.companyId,
+      table.businessDay
+    ),
+  ]
+);
