@@ -16,6 +16,7 @@ describe("filterSettingsSections", () => {
     expect(result).toHaveLength(1);
     expect(result[0]?.links.map(link => link.label)).toEqual([
       "Sécurité du compte",
+      "Abonnement et données",
       "Utilisateurs et rôles",
       "Historique des paramètres",
     ]);

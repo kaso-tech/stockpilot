@@ -28,6 +28,7 @@ import { companyScope } from "../companyScope";
 import { conflictOr } from "../dbErrors";
 import { emailIsTaken, revokeUserSessions } from "../authSessions";
 import { safeFileUrl } from "../inputRules";
+import { assertPlanLimit } from "../subscription";
 import { companyTimezone, isValidTimezone, monthKey } from "../companyTime";
 
 const optionalAlphaReference = z
@@ -771,6 +772,7 @@ export const commerceRouter = router({
             message: "Agent actif introuvable.",
           });
         await ensureLoginEmailAvailable(db, input.email);
+        await assertPlanLimit(db, ctx.user.companyId, "users");
         try {
           const result = await db.insert(users).values({
             openId: `local_seller_${randomUUID()}`,
@@ -917,6 +919,7 @@ export const commerceRouter = router({
         const db = await dbOrThrow();
         const openId = `local_seller_${randomUUID()}`;
         await ensureLoginEmailAvailable(db, input.email);
+        await assertPlanLimit(db, ctx.user.companyId, "users");
         try {
           const result = await db.insert(users).values({
             openId,

@@ -268,3 +268,13 @@ Ces évolutions ne corrigent pas un défaut : elles ajoutent des capacités et e
 - Sauvegardes : dépôts, stocks par dépôt, lots, retours, avoirs et clôtures de caisse inclus et validés ; une archive antérieure n'efface plus les tables qu'elle ne contient pas (le stock restauré est replacé dans le dépôt par défaut).
 - Client : page **Dépôts** (dépôts, transferts, lots à surveiller, stock par dépôt), lot et péremption à la réception d'un bon de commande avec choix du dépôt, choix du dépôt à la création d'un inventaire, bandeau des lots à surveiller sur la page Alertes.
 - Tests : `server/test/lot9.warehouses.db.test.ts` (6 scénarios).
+
+### Lot 9.8 — Abonnements SaaS, console plateforme, RGPD
+
+- Migration **`0054_subscriptions`** : `companies.plan` (essai, Starter, Pro), `trialEndsAt`, `planRenewsAt`, `status` (actif/suspendu), `suspendedReason`. **Les entreprises existantes passent en Pro** (aucune restriction au déploiement) ; les nouvelles inscriptions démarrent un essai de 14 jours.
+- Offres et limites dans `shared/plans.ts` (utilisateurs, produits, dépôts) ; vérifiées à la création de produits, d'utilisateurs (vendeurs, conversions) et de dépôts (y compris la réactivation).
+- Essai terminé ou espace suspendu : toutes les **écritures sont bloquées** par `permissionProcedure`, la consultation reste possible ainsi que les exports, les sauvegardes, la gestion des utilisateurs et des paramètres. Bandeau explicatif dans l'application.
+- Console **/plateforme** réservée aux adresses de `PLATFORM_ADMIN_EMAILS` : liste des entreprises (administrateur, utilisateurs, produits, ventes sur 30 jours, plan, essai), changement de plan, suspension avec motif, réactivation ; tracé dans l'audit de l'entreprise concernée.
+- **Paramètres › Abonnement et données** : offre, consommation, fin d'essai ; **export de toutes les données** en JSON lisible (sans empreintes de mots de passe) ; **suppression définitive de l'entreprise** après saisie de son nom (toutes les tables, sessions, jetons, réglages, compteurs, archives et fichiers stockés quand le pilote le permet).
+- Paiement en ligne : non branché (aucun prestataire choisi) ; le modèle d'abonnement (plan, échéance, statut) est prêt à recevoir les notifications d'un prestataire (Stripe, CinetPay, PayDunya…).
+- Tests : `server/test/lot9.saas.db.test.ts` (5 scénarios).

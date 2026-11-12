@@ -49,7 +49,7 @@ export async function seedTenant(slug: string): Promise<SeededTenant> {
     (
       await db
         .insert(companies)
-        .values({ name: `Entreprise ${slug}` })
+        .values({ name: `Entreprise ${slug}`, plan: "pro" })
         .$returningId()
     )[0]!.id
   );

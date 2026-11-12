@@ -729,6 +729,9 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     { enabled: user?.role === "seller" }
   );
   const { can: hasPermission, roleLabel } = usePermissions();
+  const { data: subscription } = trpc.company.subscription.useQuery(undefined, {
+    staleTime: 5 * 60_000,
+  });
   const visibleMenuItems = [
     ...menuItems.filter(
       item =>
@@ -742,6 +745,9 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         )
     ),
     ...(hasPermission("settings.manage") ? [] : personalMenuItems),
+    ...(subscription?.isPlatformAdmin
+      ? [{ icon: ShieldCheck, label: "Plateforme", path: "/plateforme" }]
+      : []),
   ];
 
   const activeMenuItem =
@@ -996,6 +1002,21 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           key={currency}
           className="min-h-screen bg-[radial-gradient(circle_at_80%_-5%,rgba(34,211,238,0.05),transparent_24%),linear-gradient(rgba(255,255,255,0.012)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.012)_1px,transparent_1px)] bg-[size:auto,44px_44px,44px_44px] p-4 sm:p-6 lg:p-8"
         >
+          {subscription && !subscription.writable && (
+            <div
+              className="mb-4 rounded-xl border border-rose-400/25 bg-rose-400/[0.07] px-4 py-3 text-sm text-rose-100"
+              role="alert"
+            >
+              {subscription.reason === "suspended"
+                ? "Cet espace est suspendu : les données restent consultables, les nouvelles opérations sont bloquées. Contactez le support."
+                : "La période d’essai est terminée : les données restent consultables et exportables. Choisissez une offre pour continuer à enregistrer des opérations."}{" "}
+              {hasPermission("settings.manage") && (
+                <Link href="/parametres/abonnement" className="underline">
+                  Voir l’abonnement
+                </Link>
+              )}
+            </div>
+          )}
           {user && !user.emailVerifiedAt && <EmailVerificationBanner />}
           {children}
         </main>

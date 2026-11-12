@@ -16,6 +16,16 @@ export const companies = mysqlTable("companies", {
   ownerUserId: int("ownerUserId"),
   onboardingCompletedAt: timestamp("onboardingCompletedAt"),
   onboardingSkippedAt: timestamp("onboardingSkippedAt"),
+  /** Abonnement (9.8) : plan, fin de l'essai et suspension éventuelle. */
+  plan: mysqlEnum("plan", ["trial", "starter", "pro"])
+    .notNull()
+    .default("trial"),
+  trialEndsAt: timestamp("trialEndsAt"),
+  planRenewsAt: timestamp("planRenewsAt"),
+  status: mysqlEnum("status", ["active", "suspended"])
+    .notNull()
+    .default("active"),
+  suspendedReason: varchar("suspendedReason", { length: 300 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

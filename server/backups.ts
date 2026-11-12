@@ -306,7 +306,7 @@ function parentKeyOf(source: ChildSource) {
 }
 
 /** Lit toutes les données de l'entreprise, tables enfants comprises. */
-async function readCompanyTables(db: any, companyId: number) {
+export async function readCompanyTables(db: any, companyId: number) {
   const tables: Record<string, Row[]> = {};
   for (const source of snapshotSources) {
     if (source.kind === "company") {
@@ -842,4 +842,87 @@ export async function restoreBackupPayload(
     detail: `Sauvegarde ${payload.exportedAt} restaurée (${restoredCount} enregistrements)`,
   });
   return { restoredCount };
+}
+
+/**
+ * Suppression définitive des données d'une entreprise (9.8, droit à l'effacement) :
+ * toutes les tables métier, puis les sessions, jetons, réglages, archives,
+ * compteurs et l'entreprise elle-même. Les fichiers stockés sont supprimés quand
+ * le pilote le permet.
+ */
+export async function purgeCompany(companyId: number) {
+  const scopedCompanyId = requireBackupCompanyId(companyId);
+  const db = await dbOrThrow();
+  const {
+    authTokens,
+    backupArchives: archives,
+    backupSettings,
+    companies,
+    documentSequences,
+    userSessions,
+  } = await import("../drizzle/schema");
+  const storageKeys: string[] = [];
+  await db.transaction(async tx => {
+    const current = await readCompanyTables(tx, scopedCompanyId);
+    const userIds = (current.users ?? []).map(row => row.id as number);
+    for (const source of [...snapshotSources].reverse()) {
+      if (source.kind === "company")
+        await tx
+          .delete(source.table)
+          .where(companyScope(source.table.companyId, scopedCompanyId));
+      else {
+        const parentValues = (current[source.parent] ?? [])
+          .map(row => row[parentKeyOf(source)])
+          .filter(value => value !== null && value !== undefined);
+        if (parentValues.length)
+          await tx
+            .delete(source.table)
+            .where(inArray(source.table[source.foreignKey], parentValues));
+      }
+    }
+    if (userIds.length) {
+      await tx
+        .delete(userSessions)
+        .where(inArray(userSessions.userId, userIds));
+      await tx.delete(authTokens).where(inArray(authTokens.userId, userIds));
+    }
+    const archiveRows = await tx
+      .select({ storageKey: archives.storageKey })
+      .from(archives)
+      .where(companyScope(archives.companyId, scopedCompanyId));
+    storageKeys.push(
+      ...archiveRows
+        .map((row: { storageKey: string | null }) => row.storageKey)
+        .filter((key: string | null): key is string => Boolean(key))
+    );
+    await tx
+      .delete(archives)
+      .where(companyScope(archives.companyId, scopedCompanyId));
+    await tx
+      .delete(backupSettings)
+      .where(companyScope(backupSettings.companyId, scopedCompanyId));
+    await tx
+      .delete(documentSequences)
+      .where(eq(documentSequences.companyId, scopedCompanyId));
+    await tx.delete(companies).where(eq(companies.id, scopedCompanyId));
+  });
+  for (const key of storageKeys) await storageDelete(key).catch(() => false);
+  return { deletedArchives: storageKeys.length };
+}
+
+/** Export de toutes les données de l'entreprise en JSON lisible (droit à la portabilité). */
+export async function exportCompanyData(companyId: number) {
+  const scopedCompanyId = requireBackupCompanyId(companyId);
+  const db = await dbOrThrow();
+  const tables = await readCompanyTables(db, scopedCompanyId);
+  // Les empreintes de mots de passe ne sont pas des données personnelles utiles : elles sont retirées.
+  delete tables.adminFallbackPasswords;
+  tables.sellerCredentials = (tables.sellerCredentials ?? []).map(
+    ({ passwordHash: _hash, ...row }) => row
+  );
+  return {
+    exportedAt: new Date().toISOString(),
+    companyId: scopedCompanyId,
+    tables,
+  };
 }

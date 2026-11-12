@@ -379,6 +379,13 @@
       "when": 1794502639024,
       "tag": "0053_inventory_warehouse",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "5",
+      "when": 1794503073717,
+      "tag": "0054_subscriptions",
+      "breakpoints": true
     }
   ]
 }

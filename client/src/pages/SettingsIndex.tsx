@@ -157,6 +157,14 @@ export const settingsSections: SettingsSection[] = [
         keywords: "sécurité session mot de passe compte",
       },
       {
+        href: "/parametres/abonnement",
+        icon: CircleDollarSign,
+        label: "Abonnement et données",
+        detail: "Offre, limites, export RGPD et suppression de l’entreprise",
+        keywords:
+          "abonnement plan offre essai facturation rgpd export suppression",
+      },
+      {
         href: "/parametres/utilisateurs",
         icon: UsersRound,
         label: "Utilisateurs et rôles",

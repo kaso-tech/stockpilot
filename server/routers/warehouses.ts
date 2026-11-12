@@ -12,6 +12,7 @@ import { companyScope } from "../companyScope";
 import { companyTimezone, dayKey } from "../companyTime";
 import { getDb } from "../db";
 import { conflictOr } from "../dbErrors";
+import { assertPlanLimit } from "../subscription";
 import { MAX_QUANTITY } from "../numericLimits";
 import { defaultWarehouseId, lockProducts } from "../stockLedger";
 import { permissionProcedure, protectedProcedure, router } from "../_core/trpc";
@@ -59,6 +60,9 @@ export const warehousesRouter = router({
     .input(z.object({ name: z.string().trim().min(2).max(120) }))
     .mutation(async ({ ctx, input }) => {
       const db = await dbOrThrow();
+      // Le dépôt par défaut, créé à la demande, compte dans la limite du plan.
+      await defaultWarehouseId(db, ctx.user.companyId);
+      await assertPlanLimit(db, ctx.user.companyId, "warehouses");
       try {
         const result = await db
           .insert(warehouses)
@@ -100,6 +104,8 @@ export const warehousesRouter = router({
           code: "BAD_REQUEST",
           message: "Le dépôt par défaut ne peut pas être désactivé.",
         });
+      if (input.active && !current.active)
+        await assertPlanLimit(db, ctx.user.companyId, "warehouses");
       if (!input.active) {
         const stocked = (
           await db

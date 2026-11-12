@@ -79,6 +79,7 @@ import { expensesRouter } from "./routers/expenses";
 import { documentsRouter } from "./routers/documents";
 import { accountingRouter } from "./routers/accounting";
 import { warehousesRouter } from "./routers/warehouses";
+import { companyRouter, platformRouter } from "./routers/company";
 import {
   agentPaymentExpenseRows,
   budgetComparison,
@@ -102,6 +103,8 @@ import {
 } from "./authSessions";
 import { conflictOr } from "./dbErrors";
 import { ROLE_LABELS, ROLES } from "@shared/permissions";
+import { TRIAL_DAYS } from "@shared/plans";
+import { assertPlanLimit } from "./subscription";
 import { appUrl, sendMail } from "./mailer";
 import { consumeToken, issueToken } from "./authTokens";
 import { defaultWarehouseId, lockProducts } from "./stockLedger";
@@ -400,6 +403,8 @@ export const appRouter = router({
   documents: documentsRouter,
   accounting: accountingRouter,
   warehouses: warehousesRouter,
+  company: companyRouter,
+  platform: platformRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(async ({ ctx }) => {
@@ -515,7 +520,11 @@ export const appRouter = router({
           async tx => {
             const companyResult = await tx
               .insert(companies)
-              .values({ name: input.companyName })
+              .values({
+                name: input.companyName,
+                plan: "trial",
+                trialEndsAt: new Date(Date.now() + TRIAL_DAYS * 86_400_000),
+              })
               .$returningId();
             const companyId = Number(companyResult[0]?.id);
             const userResult = await tx
@@ -1285,6 +1294,7 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const db = await requireDb();
         await assertSupplierInCompany(input.supplierId, ctx.user.companyId);
+        await assertPlanLimit(db, ctx.user.companyId, "products");
         try {
           const {
             priceTiers,
