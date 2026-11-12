@@ -83,7 +83,10 @@ describe("commerce.sales.detail", () => {
                                 : { id: 8, name: "Moussa Caissier" },
                             ]
                           : [];
-          const chain = Object.assign(rows, { limit: async () => rows });
+          const chain = Object.assign(rows, {
+            limit: async () => rows,
+            orderBy: async () => rows,
+          });
           return { where: () => chain, then: (resolve: any) => resolve(rows) };
         },
       }),
