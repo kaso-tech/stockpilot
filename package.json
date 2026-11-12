@@ -99,7 +99,6 @@
     "esbuild": "^0.25.0",
     "fake-indexeddb": "^6.2.5",
     "playwright": "^1.62.1",
-    "pnpm": "^10.15.1",
     "postcss": "^8.4.47",
     "prettier": "^3.6.2",
     "tailwindcss": "^4.1.14",
