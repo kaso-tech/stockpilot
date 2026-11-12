@@ -28,6 +28,7 @@ function userFor(
     createdAt: now,
     updatedAt: now,
     lastSignedIn: now,
+    emailVerifiedAt: null,
   };
 }
 

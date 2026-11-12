@@ -21,6 +21,10 @@ export function validateEnvironment(env: NodeJS.ProcessEnv = process.env) {
       );
   }
   const warnings: string[] = [];
+  if (isProduction && !env.SMTP_URL)
+    warnings.push(
+      "SMTP_URL n'est pas définie : les e-mails (mot de passe oublié, vérification, factures) ne sont pas envoyés."
+    );
   if (isProduction && !env.BACKUP_ENCRYPTION_KEY)
     warnings.push(
       "BACKUP_ENCRYPTION_KEY n'est pas définie : les archives de sauvegarde sont stockées en clair."

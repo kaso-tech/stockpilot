@@ -779,6 +779,8 @@ export const commerceRouter = router({
             role: "seller",
             active: true,
             companyId: ctx.user.companyId,
+            // Compte créé par l'administrateur, qui en garantit l'adresse.
+            emailVerifiedAt: new Date(),
           });
           const userId = Number(result[0].insertId);
           await db.insert(sellerCredentials).values({
@@ -923,6 +925,8 @@ export const commerceRouter = router({
             role: "seller",
             active: true,
             companyId: ctx.user.companyId,
+            // Compte créé par l'administrateur, qui en garantit l'adresse.
+            emailVerifiedAt: new Date(),
           });
           const userId = Number(result[0].insertId);
           await db.insert(sellerCredentials).values({

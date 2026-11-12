@@ -26,6 +26,7 @@ function adminContext(): TrpcContext {
       createdAt: new Date(),
       updatedAt: new Date(),
       lastSignedIn: new Date(),
+      emailVerifiedAt: null,
     },
     req: { protocol: "https", headers: {} } as TrpcContext["req"],
     res: { clearCookie: () => undefined } as unknown as TrpcContext["res"],

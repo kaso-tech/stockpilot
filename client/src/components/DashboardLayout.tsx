@@ -227,204 +227,6 @@ export default function DashboardLayout({
               onBack={() => setPublicLocation("/")}
             />
           )}
-          <div className="hidden">
-            {authMode === "login" ? (
-              <form
-                onSubmit={event => {
-                  event.preventDefault();
-                  passwordLogin.mutate({ email, password, rememberMe });
-                }}
-                className="mt-6 space-y-3"
-              >
-                <Input
-                  value={email}
-                  onChange={event => setEmail(event.target.value)}
-                  placeholder="Adresse e-mail"
-                  type="email"
-                  autoComplete="email"
-                  className="border-white/10 bg-white/[0.04]"
-                />
-                <Input
-                  value={password}
-                  onChange={event => setPassword(event.target.value)}
-                  placeholder="Mot de passe"
-                  type="password"
-                  autoComplete="current-password"
-                  className="border-white/10 bg-white/[0.04]"
-                />
-                <label
-                  htmlFor="remember-me"
-                  className="flex cursor-pointer items-start gap-3 rounded-xl border border-white/[0.08] bg-white/[0.02] px-3 py-2.5 text-left transition hover:border-cyan-400/35"
-                >
-                  <Checkbox
-                    id="remember-me"
-                    checked={rememberMe}
-                    onCheckedChange={value => setRememberMe(value === true)}
-                    disabled={passwordLogin.isPending}
-                    className="mt-0.5 border-slate-500"
-                  />
-                  <span>
-                    <span className="block text-sm font-medium text-slate-200">
-                      Se souvenir de moi
-                    </span>
-                    <span className="mt-0.5 block text-xs text-slate-400">
-                      Prolonge la session sur cet appareil.
-                    </span>
-                  </span>
-                </label>
-                <Button
-                  type="submit"
-                  disabled={passwordLogin.isPending || !email || !password}
-                  className="h-11 w-full bg-cyan-400 text-slate-950 hover:bg-cyan-300"
-                >
-                  {passwordLogin.isPending ? "Connexion…" : "Se connecter"}
-                </Button>
-                {passwordLogin.error && (
-                  <p className="text-center text-xs text-rose-300">
-                    {passwordLogin.error.message}
-                  </p>
-                )}
-                <div className="relative py-1 text-center text-xs text-slate-500">
-                  <span className="relative z-10 bg-[#111722] px-3">
-                    Première utilisation ?
-                  </span>
-                  <span className="absolute inset-x-0 top-1/2 border-t border-white/10" />
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setPublicLocation("/inscription")}
-                  className="h-11 w-full border-cyan-400/40 bg-cyan-400/10 text-cyan-200 hover:bg-cyan-400/20 hover:text-cyan-100"
-                >
-                  Créer mon entreprise
-                </Button>
-              </form>
-            ) : (
-              <form
-                onSubmit={event => {
-                  event.preventDefault();
-                  if (password !== passwordConfirmation) return;
-                  registerCompany.mutate({
-                    companyName,
-                    administratorName,
-                    email,
-                    password,
-                    rememberMe,
-                  });
-                }}
-                className="mt-6 space-y-3"
-              >
-                <Input
-                  value={companyName}
-                  onChange={event => setCompanyName(event.target.value)}
-                  placeholder="Nom de l’entreprise"
-                  autoComplete="organization"
-                  className="border-white/10 bg-white/[0.04]"
-                />
-                <Input
-                  value={administratorName}
-                  onChange={event => setAdministratorName(event.target.value)}
-                  placeholder="Votre nom complet"
-                  autoComplete="name"
-                  className="border-white/10 bg-white/[0.04]"
-                />
-                <Input
-                  value={email}
-                  onChange={event => setEmail(event.target.value)}
-                  placeholder="Adresse e-mail professionnelle"
-                  type="email"
-                  autoComplete="email"
-                  className="border-white/10 bg-white/[0.04]"
-                />
-                <Input
-                  value={password}
-                  onChange={event => setPassword(event.target.value)}
-                  placeholder="Mot de passe (10 caractères minimum)"
-                  type="password"
-                  autoComplete="new-password"
-                  className="border-white/10 bg-white/[0.04]"
-                />
-                <Input
-                  value={passwordConfirmation}
-                  onChange={event =>
-                    setPasswordConfirmation(event.target.value)
-                  }
-                  placeholder="Confirmer le mot de passe"
-                  type="password"
-                  autoComplete="new-password"
-                  className="border-white/10 bg-white/[0.04]"
-                />
-                <label
-                  htmlFor="remember-new-company"
-                  className="flex cursor-pointer items-start gap-3 rounded-xl border border-white/[0.08] bg-white/[0.02] px-3 py-2.5 text-left transition hover:border-cyan-400/35"
-                >
-                  <Checkbox
-                    id="remember-new-company"
-                    checked={rememberMe}
-                    onCheckedChange={value => setRememberMe(value === true)}
-                    disabled={registerCompany.isPending}
-                    className="mt-0.5 border-slate-500"
-                  />
-                  <span>
-                    <span className="block text-sm font-medium text-slate-200">
-                      Se souvenir de moi
-                    </span>
-                    <span className="mt-0.5 block text-xs text-slate-400">
-                      Prolonge la session sur cet appareil.
-                    </span>
-                  </span>
-                </label>
-                {passwordConfirmation && password !== passwordConfirmation && (
-                  <p className="text-xs text-rose-300">
-                    Les mots de passe ne correspondent pas.
-                  </p>
-                )}
-                <Button
-                  type="submit"
-                  disabled={
-                    registerCompany.isPending ||
-                    !companyName ||
-                    !administratorName ||
-                    !email ||
-                    password.length < 10 ||
-                    password !== passwordConfirmation
-                  }
-                  className="h-11 w-full bg-cyan-400 text-slate-950 hover:bg-cyan-300"
-                >
-                  {registerCompany.isPending ? "Création…" : "Créer mon espace"}
-                </Button>
-                {registerCompany.error && (
-                  <p className="text-center text-xs text-rose-300">
-                    {registerCompany.error.message}
-                  </p>
-                )}
-                <p className="px-1 text-center text-xs leading-5 text-slate-400">
-                  En créant votre espace, vous acceptez les{" "}
-                  <Link
-                    href="/conditions-utilisation"
-                    className="text-cyan-300 hover:underline"
-                  >
-                    Conditions d’utilisation
-                  </Link>{" "}
-                  et reconnaissez avoir lu la{" "}
-                  <Link
-                    href="/politique-confidentialite"
-                    className="text-cyan-300 hover:underline"
-                  >
-                    Politique de confidentialité
-                  </Link>
-                  .
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setPublicLocation("/")}
-                  className="w-full pt-1 text-sm font-medium text-cyan-300 hover:text-cyan-200 hover:underline"
-                >
-                  J’ai déjà un compte
-                </button>
-              </form>
-            )}
-          </div>
         </div>
       </div>
     );
@@ -581,6 +383,12 @@ function LoginForm({
         {pending ? "Connexion…" : "Se connecter"}
       </Button>
       {error && <p className="text-center text-xs text-rose-300">{error}</p>}
+      <Link
+        href="/mot-de-passe-oublie"
+        className="block text-center text-sm text-cyan-300 hover:text-cyan-200 hover:underline"
+      >
+        Mot de passe oublié ?
+      </Link>
       <div className="relative py-1 text-center text-xs text-slate-500">
         <span className="relative z-10 bg-[#111722] px-3">
           Première utilisation ?
@@ -776,6 +584,35 @@ function RegistrationForm({
         J’ai déjà un compte
       </button>
     </form>
+  );
+}
+
+function EmailVerificationBanner() {
+  const resend = trpc.auth.resendVerification.useMutation();
+  return (
+    <div
+      className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300/25 bg-amber-300/[0.07] px-4 py-3 text-sm text-amber-100"
+      role="status"
+    >
+      <span>
+        Confirmez votre adresse e-mail pour sécuriser la récupération de votre
+        compte.
+      </span>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        disabled={resend.isPending || resend.isSuccess}
+        onClick={() => resend.mutate()}
+        className="border-amber-300/40 text-amber-100"
+      >
+        {resend.isSuccess
+          ? "E-mail envoyé"
+          : resend.isPending
+            ? "Envoi…"
+            : "Renvoyer le lien"}
+      </Button>
+    </div>
   );
 }
 
@@ -1065,6 +902,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           key={currency}
           className="min-h-screen bg-[radial-gradient(circle_at_80%_-5%,rgba(34,211,238,0.05),transparent_24%),linear-gradient(rgba(255,255,255,0.012)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.012)_1px,transparent_1px)] bg-[size:auto,44px_44px,44px_44px] p-4 sm:p-6 lg:p-8"
         >
+          {user && !user.emailVerifiedAt && <EmailVerificationBanner />}
           {children}
         </main>
       </SidebarInset>

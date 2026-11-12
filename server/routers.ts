@@ -88,6 +88,8 @@ import {
   revokeUserSessions,
 } from "./authSessions";
 import { conflictOr } from "./dbErrors";
+import { appUrl, sendMail } from "./mailer";
+import { consumeToken, issueToken } from "./authTokens";
 import { lockProducts } from "./stockLedger";
 import { nextDocumentNumber } from "./documentNumbers";
 import { companyTimezone, dayKey, lastDayKeys, monthKey } from "./companyTime";
@@ -204,6 +206,20 @@ async function createAudit(
     entityType,
     entityId: entityId === null ? null : String(entityId),
     detail,
+  });
+}
+
+async function sendVerificationEmail(
+  db: any,
+  userId: number,
+  email: string,
+  req: { protocol?: string; get?: (name: string) => string | undefined }
+) {
+  const token = await issueToken(db, userId, "email_verification");
+  return sendMail({
+    to: email,
+    subject: "Confirmez votre adresse e-mail StockPilot",
+    text: `Bienvenue sur StockPilot.\n\nConfirmez votre adresse e-mail en ouvrant ce lien (valable 7 jours) :\n${appUrl(req)}/verifier-email?token=${token}`,
   });
 }
 
@@ -502,8 +518,151 @@ export const appRouter = router({
           "[Auth registration] Company administrator session issued",
           { companyId }
         );
+        await sendVerificationEmail(db, administratorId, email, ctx.req).catch(
+          error =>
+            console.error(
+              "[Auth registration] e-mail de vérification non envoyé",
+              error instanceof Error ? error.message : error
+            )
+        );
         return { success: true, companyId } as const;
       }),
+    requestPasswordReset: publicProcedure
+      .input(z.object({ email: z.string().trim().email().max(320) }))
+      .mutation(async ({ ctx, input }) => {
+        assertRateLimit(
+          ctx.req,
+          "auth:password-reset",
+          10,
+          15 * 60 * 1000,
+          input.email
+        );
+        const db = await requireDb();
+        const account = await findLoginAccount(db, input.email);
+        // Réponse identique que le compte existe ou non (pas d'énumération).
+        if (account?.email) {
+          const token = await issueToken(db, account.id, "password_reset");
+          const link = `${appUrl(ctx.req)}/reinitialiser-mot-de-passe?token=${token}`;
+          await sendMail({
+            to: account.email,
+            subject: "Réinitialisation de votre mot de passe StockPilot",
+            text: `Bonjour ${account.name || ""},\n\nPour choisir un nouveau mot de passe, ouvrez ce lien (valable 1 heure) :\n${link}\n\nSi vous n’êtes pas à l’origine de cette demande, ignorez ce message : votre mot de passe actuel reste valable.`,
+          });
+        }
+        return { success: true } as const;
+      }),
+    resetPassword: publicProcedure
+      .input(
+        z.object({
+          token: z.string().min(20).max(200),
+          password: z.string().min(10).max(256),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        assertRateLimit(
+          ctx.req,
+          "auth:password-reset-confirm",
+          20,
+          15 * 60 * 1000
+        );
+        const db = await requireDb();
+        const passwordHash = await hashPassword(input.password);
+        const userId = await db.transaction(async tx => {
+          const id = await consumeToken(tx, input.token, "password_reset");
+          if (!id) return null;
+          const account = (
+            await tx.select().from(users).where(eq(users.id, id)).limit(1)
+          )[0]; // tenant-scope-ok: utilisateur désigné par un jeton à usage unique
+          if (!account || !account.active) return null;
+          if (account.role === "admin") {
+            const current = (
+              await tx
+                .select()
+                .from(adminFallbackPasswords)
+                .where(eq(adminFallbackPasswords.ownerOpenId, account.openId))
+                .limit(1)
+            )[0];
+            if (current)
+              await tx
+                .update(adminFallbackPasswords)
+                .set({ passwordHash, updatedByUserId: account.id })
+                .where(eq(adminFallbackPasswords.id, current.id));
+            else
+              await tx.insert(adminFallbackPasswords).values({
+                ownerOpenId: account.openId,
+                passwordHash,
+                updatedByUserId: account.id,
+              });
+          } else {
+            const credential = (
+              await tx
+                .select()
+                .from(sellerCredentials)
+                .where(eq(sellerCredentials.userId, account.id))
+                .limit(1)
+            )[0];
+            if (!credential) return null;
+            await tx
+              .update(sellerCredentials)
+              .set({ passwordHash })
+              .where(eq(sellerCredentials.id, credential.id));
+          }
+          // Le lien reçu prouve aussi la maîtrise de l'adresse e-mail.
+          await tx
+            .update(users)
+            .set({ emailVerifiedAt: account.emailVerifiedAt ?? new Date() })
+            .where(eq(users.id, account.id)); // tenant-scope-ok: utilisateur du jeton
+          return account.id;
+        });
+        if (!userId)
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              "Ce lien est invalide ou a expiré. Demandez un nouveau lien.",
+          });
+        await revokeUserSessions(db, userId);
+        return { success: true } as const;
+      }),
+    verifyEmail: publicProcedure
+      .input(z.object({ token: z.string().min(20).max(200) }))
+      .mutation(async ({ ctx, input }) => {
+        assertRateLimit(ctx.req, "auth:verify-email", 20, 15 * 60 * 1000);
+        const db = await requireDb();
+        const userId = await db.transaction(async tx => {
+          const id = await consumeToken(tx, input.token, "email_verification");
+          if (id)
+            await tx
+              .update(users)
+              .set({ emailVerifiedAt: new Date() })
+              .where(eq(users.id, id)); // tenant-scope-ok: utilisateur du jeton
+          return id;
+        });
+        if (!userId)
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Ce lien de vérification est invalide ou a expiré.",
+          });
+        return { success: true } as const;
+      }),
+    resendVerification: protectedProcedure.mutation(async ({ ctx }) => {
+      if (ctx.user.emailVerifiedAt || !ctx.user.email)
+        return { success: true, alreadyVerified: true } as const;
+      assertRateLimit(
+        ctx.req,
+        "auth:resend-verification",
+        3,
+        60 * 60 * 1000,
+        ctx.user.email
+      );
+      const db = await requireDb();
+      const { delivered } = await sendVerificationEmail(
+        db,
+        ctx.user.id,
+        ctx.user.email,
+        ctx.req
+      );
+      return { success: true, alreadyVerified: false, delivered } as const;
+    }),
     sessions: router({
       list: protectedProcedure.query(async ({ ctx }) => {
         const db = await requireDb();

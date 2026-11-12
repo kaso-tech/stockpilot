@@ -35,6 +35,8 @@ export const users = mysqlTable(
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
     lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
+    /** Date de confirmation de l'adresse e-mail (lien envoyé à l'inscription). */
+    emailVerifiedAt: timestamp("emailVerifiedAt"),
   },
   table => [
     index("users_company_active_idx").on(table.companyId, table.active),
@@ -770,5 +772,26 @@ export const documentSequences = mysqlTable(
       table.series,
       table.year
     ),
+  ]
+);
+
+/**
+ * Jetons à usage unique envoyés par e-mail (réinitialisation de mot de passe,
+ * vérification d'adresse). Seule l'empreinte SHA-256 du jeton est stockée.
+ */
+export const authTokens = mysqlTable(
+  "authTokens",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull(),
+    type: mysqlEnum("type", ["password_reset", "email_verification"]).notNull(),
+    tokenHash: varchar("tokenHash", { length: 64 }).notNull(),
+    expiresAt: timestamp("expiresAt").notNull(),
+    usedAt: timestamp("usedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [
+    unique("auth_tokens_hash_unique").on(table.tokenHash),
+    index("auth_tokens_user_type_idx").on(table.userId, table.type),
   ]
 );

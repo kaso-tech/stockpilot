@@ -29,8 +29,9 @@ describe("validation de l'environnement", () => {
         NODE_ENV: "production",
         DATABASE_URL: "mysql://x",
         JWT_SECRET: "x".repeat(40),
+        SMTP_URL: "smtp://localhost",
       }).warnings
-    ).toHaveLength(1);
+    ).toEqual([expect.stringContaining("BACKUP_ENCRYPTION_KEY")]);
     expect(
       validateEnvironment({ NODE_ENV: "development", JWT_SECRET: "dev" })
         .problems

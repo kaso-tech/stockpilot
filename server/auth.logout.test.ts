@@ -29,6 +29,7 @@ function createAuthContext(): {
     createdAt: new Date(),
     updatedAt: new Date(),
     lastSignedIn: new Date(),
+    emailVerifiedAt: null,
   };
 
   const ctx: TrpcContext = {

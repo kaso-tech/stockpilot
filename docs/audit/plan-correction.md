@@ -201,3 +201,12 @@ Ces évolutions ne corrigent pas un défaut : elles ajoutent des capacités et e
 - Lecture interne des fichiers mutualisée (`storageRead`, utilisée par la copie Google Drive).
 - Dépendances : `@aws-sdk/client-s3` et `s3-request-presigner` réintégrés ; mise à jour de `zod` (4.6) et surcharges `follow-redirects`, `body-parser`, `qs`, `fast-xml-parser` pour les vulnérabilités publiées depuis le lot 6 : **`pnpm audit --prod` : 0 vulnérabilité**.
 - Tests : `server/test/lot9.storage.db.test.ts` contre un vrai service S3 (S3Mock d'Adobe, ajouté à la CI).
+
+### Lot 9.1 — Mot de passe oublié et vérification d'e-mail
+
+- Migration **`0046_auth_tokens_email_verification`** : table `authTokens` (jetons à usage unique, seule l'empreinte SHA-256 est stockée) et `users.emailVerifiedAt` ; **les comptes existants sont marqués vérifiés**.
+- Envoi d'e-mails par SMTP (`server/mailer.ts`, `SMTP_URL`, `MAIL_FROM`) ; sans configuration, le message est écrit dans les journaux et un avertissement est émis au démarrage en production.
+- `auth.requestPasswordReset` (réponse identique que l'adresse existe ou non, limitation de débit), `auth.resetPassword` (lien valable 1 heure, usage unique, **toutes les sessions sont fermées**, fonctionne pour administrateurs et vendeurs), `auth.verifyEmail` (lien valable 7 jours), `auth.resendVerification`.
+- Inscription : envoi automatique du lien de vérification. Les vendeurs créés par un administrateur sont considérés comme vérifiés. La vérification n'est pas bloquante : un bandeau invite à confirmer l'adresse.
+- Client : lien « Mot de passe oublié ? », pages `/mot-de-passe-oublie`, `/reinitialiser-mot-de-passe`, `/verifier-email`. Suppression d'un doublon caché des formulaires de connexion et d'inscription (≈200 lignes mortes dans `DashboardLayout`).
+- Tests : `server/test/lot9.auth-recovery.db.test.ts` (5 scénarios).

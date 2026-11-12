@@ -323,6 +323,13 @@
       "when": 1791848630833,
       "tag": "0045_sequences_timezone_credit_notes",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "5",
+      "when": 1794500407855,
+      "tag": "0046_auth_tokens_email_verification",
+      "breakpoints": true
     }
   ]
 }

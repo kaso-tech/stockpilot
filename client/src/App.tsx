@@ -9,6 +9,21 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { PreferencesProvider } from "./contexts/PreferencesContext";
 import { OfflineProvider } from "./contexts/OfflineContext";
 
+const ForgotPassword = lazy(() =>
+  import("./pages/AccountRecovery").then(module => ({
+    default: module.ForgotPassword,
+  }))
+);
+const ResetPassword = lazy(() =>
+  import("./pages/AccountRecovery").then(module => ({
+    default: module.ResetPassword,
+  }))
+);
+const VerifyEmail = lazy(() =>
+  import("./pages/AccountRecovery").then(module => ({
+    default: module.VerifyEmail,
+  }))
+);
 // Chaque page est chargée à la demande (P1) ; le service worker précache tous les fragments pour le mode hors connexion.
 const Alerts = lazy(() => import("./pages/Alerts"));
 const Agents = lazy(() => import("./pages/Agents"));
@@ -147,6 +162,9 @@ function Router() {
     <Suspense fallback={<PageFallback />}>
       <Switch>
         <Route path="/conditions-utilisation" component={TermsOfUse} />
+        <Route path="/mot-de-passe-oublie" component={ForgotPassword} />
+        <Route path="/reinitialiser-mot-de-passe" component={ResetPassword} />
+        <Route path="/verifier-email" component={VerifyEmail} />
         <Route path="/politique-confidentialite" component={PrivacyPolicy} />
         <Route component={DashboardRouter} />
       </Switch>
