@@ -8,7 +8,7 @@ import {
 import { and, eq } from "drizzle-orm";
 import { backupArchives, backupSettings } from "../drizzle/schema";
 import { getDb } from "./db";
-import { storageGetSignedUrl } from "./storage";
+import { storageRead } from "./storage";
 import { companyScope } from "./companyScope";
 
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
@@ -263,13 +263,7 @@ export async function syncArchiveToGoogleDrive(
         )
       );
   }
-  const signedUrl = await storageGetSignedUrl(archive.storageKey);
-  const source = await fetch(signedUrl);
-  if (!source.ok)
-    throw new Error(
-      "Impossible de lire l’archive locale avant la copie Drive."
-    );
-  const content = Buffer.from(await source.arrayBuffer());
+  const content = await storageRead(archive.storageKey);
   const uploaded = await multipartUpload(
     accessToken,
     {

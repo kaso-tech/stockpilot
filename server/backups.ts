@@ -33,7 +33,7 @@ import { and, desc, eq, getTableColumns, inArray } from "drizzle-orm";
 import { companyScope } from "./companyScope";
 import { getDb } from "./db";
 import { openBuffer, parseKey, sealBuffer } from "./secretBox";
-import { storageGetSignedUrl, storagePut } from "./storage";
+import { storageDelete, storageGetSignedUrl, storagePut } from "./storage";
 
 type Trigger = "manual" | "scheduled";
 type AnyTable = any;
@@ -506,9 +506,21 @@ export async function runBackupWithStatus(
   const archives = (
     await listBackups(Math.max(retentionCount + 20, 50), scopedCompanyId)
   ).filter(item => item.status !== "failed");
-  // Les fichiers déjà stockés ne peuvent pas être supprimés via l'API de stockage
-  // actuelle : ils restent chiffrés lorsque BACKUP_ENCRYPTION_KEY est configurée.
+  // Avec un stockage S3 le fichier est supprimé définitivement (B2) ; avec le
+  // stockage Manus, qui ne le permet pas, il reste chiffré si
+  // BACKUP_ENCRYPTION_KEY est configurée.
   await applyRetentionPolicy(archives, retentionCount, async id => {
+    const storageKey = archives.find(item => item.id === id)?.storageKey;
+    if (storageKey) {
+      try {
+        await storageDelete(storageKey);
+      } catch (error) {
+        console.error("[Backup] suppression du fichier d'archive impossible", {
+          id,
+          error: error instanceof Error ? error.message : error,
+        });
+      }
+    }
     await db
       .delete(backupArchives)
       .where(

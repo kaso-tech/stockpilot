@@ -17,7 +17,7 @@ Règles d'exécution :
 | 6 | Code mort et dépendances (mise à jour + retrait) | §4, §2.5, H5 | ✅ Fait |
 | 7 | Corrections fonctionnelles (tableau de bord, fuseau horaire, pagination, inventaire, numérotation, remboursements) | E4–E8, E10, E12, E18 | ✅ Fait |
 | 8 | Performance et qualité (lazy loading, écritures par requête, requêtes non bornées, CI) | P1–P7, P9–P11, E22–E24 | ✅ Fait |
-| 9 | Fonctionnalités manquantes (feuille de route, nécessite arbitrages produit) | §6, P8, B2, P12 | ⏳ Décisions attendues |
+| 9 | Fonctionnalités manquantes (feuille de route, nécessite arbitrages produit) | §6, P8, B2, P12 | 🔄 En cours |
 
 Le détail des modifications de chaque lot est consigné dans la section « Journal » ci-dessous au fil de l'eau.
 
@@ -175,3 +175,29 @@ Ces évolutions ne corrigent pas un défaut : elles ajoutent des capacités et e
 | 9.9 | **Envoi des factures et devis par e-mail/WhatsApp** depuis le serveur | Lié à 9.1 (e-mail) ; API WhatsApp Business ou lien de partage | 2–3 j |
 | 9.10 | **Stockage S3 avec suppression réelle** des archives (fin de B2, P12) | Rester sur Manus ou héberger ailleurs | 1–2 j |
 | 9.11 | Tests de bout en bout automatisés (Playwright) en CI à partir des scripts `scripts/verify_*.mjs` | Aucune | 2–3 j |
+
+#### Décisions par défaut retenues pour démarrer le lot 9
+
+À votre demande, le lot 9 est engagé sans attendre d'arbitrage. Les choix ci-dessous sont des valeurs par défaut prudentes, toutes configurables ou réversibles :
+
+| # | Décision retenue |
+|---|---|
+| 9.10 | Pilote de stockage interchangeable : S3 (ou compatible : MinIO, R2, Scaleway…) si `S3_BUCKET` est défini, sinon stockage Manus. Suppression réelle des archives avec S3. |
+| 9.1 | Envoi d'e-mails par SMTP standard (`SMTP_URL`, `MAIL_FROM`), compatible avec tout fournisseur (Brevo, SES, Mailjet, Gmail…). Sans configuration, les e-mails sont écrits dans les journaux du serveur (développement). |
+| 9.9 | Envoi des factures/devis en PDF par e-mail depuis le serveur ; le partage WhatsApp reste un lien `wa.me` (pas d'API WhatsApp Business payante). |
+| 9.2 | Retour partiel : l'utilisateur choisit les articles et quantités ; remise en stock activée par défaut (désactivable par ligne pour un article abîmé) ; remboursement par le moyen de paiement choisi ; avoir numéroté par retour. |
+| 9.6 | Taux de TVA facultatif par produit ; à défaut, le taux de l'entreprise s'applique. |
+| 9.4 | Catégories et unités référencées par identifiant, le libellé reste copié pour l'affichage et l'historique. |
+| 9.3 | Rôles : administrateur, gérant, vendeur, comptable, lecture seule, avec une matrice de droits centralisée (`shared/permissions.ts`). |
+| 9.5 | Export du journal des ventes et des encaissements en CSV et au format FEC (France) ; clôture de caisse quotidienne avec fond de caisse, comptage et écart. |
+| 9.7 | Valorisation au coût moyen pondéré (CMUP) ; dépôts multiples avec stock par dépôt et transferts ; lots avec date de péremption et alertes. |
+| 9.8 | Plans d'abonnement (Essai, Starter, Pro) avec limites (utilisateurs, produits, dépôts) ; console super-administrateur réservée aux e-mails listés dans `PLATFORM_ADMIN_EMAILS` ; attribution manuelle des plans (le prestataire de paiement se branchera sur ce modèle) ; export RGPD et suppression d'entreprise. |
+| 9.11 | Tests de bout en bout Playwright exécutés en CI sur le serveur de production compilé. |
+
+### Lot 9.10 — Stockage S3 et suppression réelle des archives
+
+- `server/storage.ts` choisit le pilote : **S3 ou compatible** si `S3_BUCKET` est défini (identifiants lus par le SDK AWS, point d'accès personnalisé via `S3_ENDPOINT`), sinon le stockage Manus. Les URL publiées restent `/manus-storage/{clé}` (aucune donnée à migrer) ; le proxy vérifie les droits puis redirige vers une URL signée valable 5 minutes, quel que soit le pilote.
+- **B2 terminé avec S3** : la rétention supprime définitivement les fichiers d'archives périmés (`storageDelete`). Avec le stockage Manus, la mesure compensatoire du lot 5 (chiffrement) reste en vigueur.
+- Lecture interne des fichiers mutualisée (`storageRead`, utilisée par la copie Google Drive).
+- Dépendances : `@aws-sdk/client-s3` et `s3-request-presigner` réintégrés ; mise à jour de `zod` (4.6) et surcharges `follow-redirects`, `body-parser`, `qs`, `fast-xml-parser` pour les vulnérabilités publiées depuis le lot 6 : **`pnpm audit --prod` : 0 vulnérabilité**.
+- Tests : `server/test/lot9.storage.db.test.ts` contre un vrai service S3 (S3Mock d'Adobe, ajouté à la CI).
