@@ -68,6 +68,7 @@ function sessionDeviceLabel(userAgent: string | undefined) {
 import { backupRouter } from "./routers/backups";
 import { transactionsRouter } from "./routers/transactions";
 import { expensesRouter } from "./routers/expenses";
+import { documentsRouter } from "./routers/documents";
 import {
   agentPaymentExpenseRows,
   budgetComparison,
@@ -324,6 +325,7 @@ export const appRouter = router({
   backups: backupRouter,
   transactions: transactionsRouter,
   expenses: expensesRouter,
+  documents: documentsRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(async ({ ctx }) => {

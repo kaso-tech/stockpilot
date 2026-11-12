@@ -23,6 +23,7 @@ import {
 import { formatCurrency, formatDate } from "@/lib/format";
 import { invoiceEmailMessage, invoiceEmailSubject } from "@/lib/invoiceShare";
 import { trpc } from "@/lib/trpc";
+import { fileToBase64 } from "@/lib/emailDocument";
 import {
   Download,
   Eye,
@@ -62,6 +63,7 @@ export default function Invoices() {
   const [deleteTarget, setDeleteTarget] = useState<Invoice | null>(null);
   const [refundTarget, setRefundTarget] = useState<Invoice | null>(null);
   const utils = trpc.useUtils();
+  const sendSaleByEmail = trpc.documents.sendSale.useMutation();
   const paging = usePagedLimit();
   const {
     data: transactions = [],
@@ -165,6 +167,24 @@ export default function Invoices() {
       invoiceNumber: detail.sale.invoiceNumber,
       total: formatCurrency(detail.sale.totalCents),
     });
+    // Envoi direct par le serveur (pièce jointe PDF) ; partage local si aucun
+    // serveur d'e-mails n'est configuré.
+    try {
+      const result = await sendSaleByEmail.mutateAsync({
+        id: detail.sale.id,
+        pdfBase64: await fileToBase64(file),
+        filename: file.name,
+        subject,
+        message,
+      });
+      if (result.delivered) {
+        toast.success(`Facture envoyée à ${email}.`);
+        return;
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Envoi impossible.");
+      return;
+    }
     if (navigator.canShare?.({ files: [file] })) {
       try {
         await navigator.share({ title: subject, text: message, files: [file] });

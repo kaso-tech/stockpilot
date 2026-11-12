@@ -15,6 +15,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { invoiceEmailMessage, invoiceEmailSubject } from "@/lib/invoiceShare";
 import { trpc } from "@/lib/trpc";
+import { fileToBase64 } from "@/lib/emailDocument";
 import {
   ArrowLeft,
   Download,
@@ -41,6 +42,7 @@ export default function InvoiceDetail() {
   const { user } = useAuth();
   const id = Number(params?.id);
   const utils = trpc.useUtils();
+  const sendSaleByEmail = trpc.documents.sendSale.useMutation();
   const { data: detail, isLoading } = trpc.commerce.sales.detail.useQuery(
     { id },
     { enabled: Number.isFinite(id) && id > 0 }
@@ -119,6 +121,24 @@ export default function InvoiceDetail() {
       invoiceNumber: sale.invoiceNumber,
       total: formatCurrency(sale.totalCents),
     });
+    // Envoi direct par le serveur (pièce jointe PDF) ; partage local si aucun
+    // serveur d'e-mails n'est configuré.
+    try {
+      const result = await sendSaleByEmail.mutateAsync({
+        id: sale.id,
+        pdfBase64: await fileToBase64(file),
+        filename: file.name,
+        subject,
+        message,
+      });
+      if (result.delivered) {
+        toast.success(`Facture envoyée à ${email}.`);
+        return;
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Envoi impossible.");
+      return;
+    }
     if (navigator.canShare?.({ files: [file] })) {
       try {
         await navigator.share({ title: subject, text: message, files: [file] });

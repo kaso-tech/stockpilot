@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
+import { fileToBase64 } from "@/lib/emailDocument";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -97,6 +98,7 @@ export default function PurchaseOrderDetail() {
   const { user } = useAuth();
   const canManage = user?.role === "admin";
   const utils = trpc.useUtils();
+  const sendOrderByEmail = trpc.documents.sendPurchaseOrder.useMutation();
   const { data, isLoading } = trpc.purchaseOrders.get.useQuery(
     { id: orderId },
     { enabled: Number.isInteger(orderId) && orderId > 0 }
@@ -207,6 +209,23 @@ export default function PurchaseOrderDetail() {
     if (!order.supplier?.email)
       return toast.error("L’adresse e-mail du fournisseur est indisponible.");
     const file = createPdf(order);
+    try {
+      const result = await sendOrderByEmail.mutateAsync({
+        id: order.id,
+        pdfBase64: await fileToBase64(file),
+        filename: file.name,
+        subject: `Bon de commande ${order.orderNumber}`,
+        message,
+      });
+      if (result.delivered) {
+        toast.success(`Bon de commande envoyé à ${order.supplier.email}.`);
+        markOrderSent();
+        return;
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Envoi impossible.");
+      return;
+    }
     if (navigator.canShare?.({ files: [file] })) {
       try {
         await navigator.share({
