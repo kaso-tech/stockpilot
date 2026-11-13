@@ -267,7 +267,9 @@ export default function Warehouses() {
                     {nameOf(lot.warehouseId)}
                   </span>
                   <span
-                    className={lot.expired ? "text-rose-300" : "text-amber-300"}
+                    className={
+                      lot.expired ? "text-destructive" : "text-warning"
+                    }
                   >
                     {lot.quantity} {lot.unit} ·{" "}
                     {lot.expired ? "périmé le" : "expire le"} {lot.expiryDate}

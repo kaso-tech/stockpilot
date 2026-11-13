@@ -54,68 +54,68 @@ export default function Inventories() {
     <div className="mx-auto max-w-[1400px] space-y-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-medium uppercase tracking-[0.16em] text-cyan-300">
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
             Stock
           </p>
-          <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">
+          <h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">
             Inventaires
           </h1>
-          <p className="mt-1.5 text-sm text-slate-400">
+          <p className="mt-1.5 text-sm text-muted-foreground">
             Comptez le stock physique puis validez les écarts de façon traçable.
           </p>
         </div>
         {isAdmin && (
           <Button
             onClick={() => setOpen(true)}
-            className="bg-cyan-400 text-slate-950"
+            className="bg-primary text-primary-foreground"
           >
             <Plus className="mr-2 h-4 w-4" /> Nouvel inventaire
           </Button>
         )}
       </header>
       <section className="grid gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
-        <Card className="h-fit border-white/[0.07] bg-[#111722]">
+        <Card className="h-fit border-border bg-card">
           <CardContent className="p-3">
             {inventories.length ? (
               inventories.map(item => (
                 <button
                   key={item.id}
                   onClick={() => setSelectedId(item.id)}
-                  className={`w-full rounded-xl p-4 text-left ${selectedId === item.id ? "bg-cyan-400/10" : "hover:bg-white/[0.04]"}`}
+                  className={`w-full rounded-xl p-4 text-left ${selectedId === item.id ? "bg-primary/10" : "hover:bg-accent"}`}
                 >
                   <div className="flex items-center justify-between">
-                    <p className="truncate text-sm font-medium text-slate-200">
+                    <p className="truncate text-sm font-medium text-foreground">
                       {item.name}
                     </p>
                     <span
-                      className={`h-2 w-2 rounded-full ${item.status === "validated" ? "bg-emerald-400" : "bg-amber-300"}`}
+                      className={`h-2 w-2 rounded-full ${item.status === "validated" ? "bg-success" : "bg-warning"}`}
                     />
                   </div>
-                  <p className="mt-1 text-xs text-slate-500">
+                  <p className="mt-1 text-xs text-faint">
                     {formatDate(item.createdAt)}
                   </p>
-                  <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-faint">
                     {item.status === "validated" ? "Validé" : "Brouillon"}
                   </p>
                 </button>
               ))
             ) : (
-              <div className="p-8 text-center text-sm text-slate-500">
+              <div className="p-8 text-center text-sm text-faint">
                 Aucun inventaire.
               </div>
             )}
           </CardContent>
         </Card>
-        <Card className="border-white/[0.07] bg-[#111722]">
+        <Card className="border-border bg-card">
           <CardContent className="p-0">
             {detail ? (
               <>
-                <div className="flex flex-col gap-3 border-b border-white/[0.07] px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col gap-3 border-b border-border px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-white">
+                    <p className="text-sm font-semibold text-foreground">
                       {detail.session.name}
                     </p>
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="mt-1 text-xs text-faint">
                       Créé le {formatDate(detail.session.createdAt, true)}
                     </p>
                   </div>
@@ -128,7 +128,7 @@ export default function Inventories() {
                         )
                       }
                       disabled={validate.isPending}
-                      className="bg-emerald-400 text-emerald-950 hover:bg-emerald-300"
+                      className="bg-success text-success-foreground hover:bg-success/90"
                     >
                       <ShieldCheck className="mr-2 h-4 w-4" /> Valider les
                       écarts
@@ -137,7 +137,7 @@ export default function Inventories() {
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[700px] text-left">
-                    <thead className="bg-white/[0.018] text-[10px] uppercase tracking-[0.13em] text-slate-500">
+                    <thead className="bg-muted/50 text-[10px] uppercase tracking-[0.13em] text-faint">
                       <tr>
                         <th className="px-5 py-3">Produit</th>
                         <th className="px-4 py-3">Théorique</th>
@@ -145,7 +145,7 @@ export default function Inventories() {
                         <th className="px-5 py-3 text-right">Écart</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-white/[0.06]">
+                    <tbody className="divide-y divide-border">
                       {detail.items.map(item => {
                         const diff =
                           item.countedQuantity === null
@@ -154,14 +154,14 @@ export default function Inventories() {
                         return (
                           <tr key={item.id} className="text-sm">
                             <td className="px-5 py-4">
-                              <p className="font-medium text-slate-200">
+                              <p className="font-medium text-foreground">
                                 {item.productName}
                               </p>
-                              <p className="mt-1 text-xs text-slate-500">
+                              <p className="mt-1 text-xs text-faint">
                                 {item.reference}
                               </p>
                             </td>
-                            <td className="px-4 py-4 text-slate-400">
+                            <td className="px-4 py-4 text-muted-foreground">
                               {item.expectedQuantity}
                             </td>
                             <td className="px-4 py-4">
@@ -187,16 +187,16 @@ export default function Inventories() {
                                         }
                                       );
                                   }}
-                                  className="h-8 w-24 border-white/10 bg-white/[0.03]"
+                                  className="h-8 w-24 border-border bg-muted/50"
                                 />
                               ) : (
-                                <span className="text-slate-300">
+                                <span className="text-muted-foreground">
                                   {item.countedQuantity ?? "—"}
                                 </span>
                               )}
                             </td>
                             <td
-                              className={`px-5 py-4 text-right font-semibold ${diff === null ? "text-slate-600" : diff === 0 ? "text-emerald-300" : "text-amber-300"}`}
+                              className={`px-5 py-4 text-right font-semibold ${diff === null ? "text-faint" : diff === 0 ? "text-success" : "text-warning"}`}
                             >
                               {diff === null
                                 ? "—"
@@ -211,8 +211,8 @@ export default function Inventories() {
               </>
             ) : (
               <div className="py-24 text-center">
-                <ClipboardCheck className="mx-auto h-7 w-7 text-slate-600" />
-                <p className="mt-4 text-sm text-slate-500">
+                <ClipboardCheck className="mx-auto h-7 w-7 text-faint" />
+                <p className="mt-4 text-sm text-faint">
                   Sélectionnez ou créez une session d’inventaire.
                 </p>
               </div>
@@ -221,7 +221,7 @@ export default function Inventories() {
         </Card>
       </section>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="border-white/10 bg-[#141b27] text-slate-100">
+        <DialogContent className="border-border bg-card text-foreground">
           <DialogHeader>
             <DialogTitle>Nouveau inventaire</DialogTitle>
           </DialogHeader>
@@ -266,7 +266,7 @@ export default function Inventories() {
                   );
               }}
               disabled={create.isPending}
-              className="bg-cyan-400 text-slate-950"
+              className="bg-primary text-primary-foreground"
             >
               <Save className="mr-2 h-4 w-4" /> Créer
             </Button>

@@ -212,7 +212,7 @@ export default function Invoices() {
           <p className="text-xs font-semibold uppercase tracking-[.16em] text-primary">
             Facturation
           </p>
-          <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">
+          <h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">
             Factures
           </h1>
         </div>
@@ -243,31 +243,31 @@ export default function Invoices() {
                 key={invoice.id}
                 type="button"
                 onClick={() => setLocation(`/factures/${invoice.id}`)}
-                className="group flex min-w-0 items-center gap-3 rounded-xl border border-white/[0.07] bg-[#111722] px-3 py-2.5 text-left shadow-sm transition hover:border-primary/45 hover:bg-[#141e2d]"
+                className="group flex min-w-0 items-center gap-3 rounded-xl border border-border bg-card px-3 py-2.5 text-left shadow-sm transition hover:border-primary/45 hover:bg-card"
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <p className="truncate text-sm font-semibold text-slate-100">
+                    <p className="truncate text-sm font-semibold text-foreground">
                       {invoice.invoiceNumber}
                     </p>
                     <StatusBadge status={invoice.status} />
                   </div>
-                  <p className="mt-1 truncate text-xs text-slate-400">
+                  <p className="mt-1 truncate text-xs text-muted-foreground">
                     {invoice.customerName || "Client comptoir"} ·{" "}
                     {formatDate(invoice.createdAt, true)}
                   </p>
                 </div>
                 <div className="shrink-0 text-right">
-                  <p className="text-sm font-semibold text-cyan-300">
+                  <p className="text-sm font-semibold text-primary">
                     {formatCurrency(invoice.totalCents)}
                   </p>
-                  <p className="mt-0.5 text-[11px] text-slate-500">
+                  <p className="mt-0.5 text-[11px] text-faint">
                     {remaining > 0
                       ? `Solde ${formatCurrency(remaining)}`
                       : "Réglée"}
                   </p>
                 </div>
-                <Eye className="h-4 w-4 shrink-0 text-slate-600 transition group-hover:text-primary" />
+                <Eye className="h-4 w-4 shrink-0 text-faint transition group-hover:text-primary" />
               </button>
             );
           })
@@ -349,7 +349,7 @@ export default function Invoices() {
                               size="icon"
                               variant="ghost"
                               onClick={() => setDeleteTarget(invoice)}
-                              className="text-rose-300"
+                              className="text-destructive"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -360,7 +360,7 @@ export default function Invoices() {
                               size="sm"
                               variant="outline"
                               onClick={() => askRefund(invoice)}
-                              className="border-amber-400/30 text-amber-600"
+                              className="border-warning/25 text-warning"
                             >
                               <Undo2 className="mr-2 h-4 w-4" />
                               Rembourser
@@ -439,7 +439,7 @@ export default function Invoices() {
                 {detail.sale.status === "draft" && (
                   <Button
                     variant="outline"
-                    className="sm:col-span-3 border-rose-400/30 text-rose-300"
+                    className="sm:col-span-3 border-destructive/25 text-destructive"
                     onClick={() => setDeleteTarget(detail.sale)}
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
@@ -450,7 +450,7 @@ export default function Invoices() {
                   detail.sale.status === "partial") && (
                   <Button
                     variant="outline"
-                    className="sm:col-span-3 border-amber-400/30 text-amber-600"
+                    className="sm:col-span-3 border-warning/25 text-warning"
                     onClick={() => askRefund(detail.sale)}
                   >
                     <Undo2 className="mr-2 h-4 w-4" />
@@ -498,7 +498,7 @@ export default function Invoices() {
               onClick={() =>
                 deleteTarget && removeDraft.mutate({ saleId: deleteTarget.id })
               }
-              className="bg-rose-600 text-white hover:bg-rose-700"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Annuler la facture
             </AlertDialogAction>
@@ -525,7 +525,7 @@ export default function Invoices() {
               onClick={() =>
                 refundTarget && refund.mutate({ saleId: refundTarget.id })
               }
-              className="bg-amber-600 text-white hover:bg-amber-700"
+              className="bg-warning text-warning-foreground hover:bg-warning/90"
             >
               Confirmer le remboursement
             </AlertDialogAction>
@@ -537,10 +537,10 @@ export default function Invoices() {
 }
 
 export const invoiceStatusMeta = {
-  paid: ["Payée", "bg-emerald-500/10 text-emerald-600"],
-  partial: ["Partielle", "bg-orange-500/10 text-orange-600"],
-  draft: ["À encaisser", "bg-orange-500/10 text-orange-600"],
-  void: ["Remboursée / annulée", "bg-rose-500/10 text-rose-600"],
+  paid: ["Payée", "bg-success-soft text-success"],
+  partial: ["Partielle", "bg-warning-soft text-warning"],
+  draft: ["À encaisser", "bg-warning-soft text-warning"],
+  void: ["Remboursée / annulée", "bg-destructive-soft text-destructive"],
 } as const;
 
 export function StatusBadge({ status }: { status: Invoice["status"] }) {

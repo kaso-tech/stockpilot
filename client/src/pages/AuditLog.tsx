@@ -25,22 +25,22 @@ export default function AuditLog() {
   return (
     <div className="mx-auto max-w-[1400px] space-y-6">
       <header>
-        <p className="text-xs font-medium uppercase tracking-[0.16em] text-cyan-300">
+        <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
           Conformité
         </p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
           Journal des opérations
         </h1>
-        <p className="mt-1.5 text-sm text-slate-400">
+        <p className="mt-1.5 text-sm text-muted-foreground">
           Conservez une trace horodatée de chaque action structurante de
           l’espace stock.
         </p>
       </header>
-      <Card className="border-white/[0.07] bg-[#111722] shadow-none">
+      <Card className="border-border bg-card shadow-none">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[850px] text-left">
-              <thead className="bg-white/[0.018] text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">
+              <thead className="bg-muted/50 text-[10px] font-semibold uppercase tracking-[0.13em] text-faint">
                 <tr>
                   <th className="px-6 py-3">Action</th>
                   <th className="px-4 py-3">Détail</th>
@@ -48,39 +48,39 @@ export default function AuditLog() {
                   <th className="px-6 py-3 text-right">Date</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/[0.06]">
+              <tbody className="divide-y divide-border">
                 {isLoading ? (
                   <tr>
                     <td
                       colSpan={4}
-                      className="px-6 py-12 text-center text-sm text-slate-500"
+                      className="px-6 py-12 text-center text-sm text-faint"
                     >
                       Chargement du journal…
                     </td>
                   </tr>
                 ) : logs.length ? (
                   logs.map(log => (
-                    <tr key={log.id} className="text-sm hover:bg-white/[0.018]">
+                    <tr key={log.id} className="text-sm hover:bg-accent">
                       <td className="px-6 py-4">
-                        <Badge className="border-0 bg-cyan-400/10 text-cyan-300">
+                        <Badge className="border-0 bg-primary/10 text-primary">
                           {log.action}
                         </Badge>
-                        <p className="mt-1.5 text-xs text-slate-600">
+                        <p className="mt-1.5 text-xs text-faint">
                           {log.entityType}
                         </p>
                       </td>
-                      <td className="max-w-md px-4 py-4 text-slate-400">
+                      <td className="max-w-md px-4 py-4 text-muted-foreground">
                         {displayCurrencyLabel(log.detail || "—")}
                       </td>
                       <td className="px-4 py-4">
-                        <p className="text-slate-200">
+                        <p className="text-foreground">
                           {log.actorName || "Utilisateur supprimé"}
                         </p>
-                        <p className="mt-0.5 text-xs text-slate-600">
+                        <p className="mt-0.5 text-xs text-faint">
                           {log.actorEmail || "—"}
                         </p>
                       </td>
-                      <td className="px-6 py-4 text-right text-xs text-slate-500">
+                      <td className="px-6 py-4 text-right text-xs text-faint">
                         {formatDate(log.createdAt, true)}
                       </td>
                     </tr>
@@ -89,7 +89,7 @@ export default function AuditLog() {
                   <tr>
                     <td
                       colSpan={4}
-                      className="px-6 py-16 text-center text-sm text-slate-500"
+                      className="px-6 py-16 text-center text-sm text-faint"
                     >
                       Aucune action à afficher pour le moment.
                     </td>
@@ -120,11 +120,13 @@ export function Restricted({
   return (
     <div className="mx-auto grid min-h-[65vh] max-w-xl place-items-center text-center">
       <div>
-        <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-violet-400/10 text-violet-300">
+        <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-info-soft text-info">
           <LockKeyhole className="h-6 w-6" />
         </span>
-        <h1 className="mt-5 text-2xl font-semibold text-white">{title}</h1>
-        <p className="mt-2 text-sm leading-6 text-slate-400">{description}</p>
+        <h1 className="mt-5 text-2xl font-semibold text-foreground">{title}</h1>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+          {description}
+        </p>
       </div>
     </div>
   );

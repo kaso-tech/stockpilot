@@ -104,7 +104,7 @@ function CashClosure() {
           ))}
         </div>
         {summary?.closure ? (
-          <p className="flex items-center gap-2 text-sm text-emerald-300">
+          <p className="flex items-center gap-2 text-sm text-success">
             <Lock className="h-4 w-4" />
             Journée clôturée le {formatDate(summary.closure.closedAt, true)} :
             attendu {formatCurrency(summary.closure.expectedCashCents)}, compté{" "}
@@ -185,8 +185,8 @@ function CashClosure() {
                   <span
                     className={
                       item.differenceCents === 0
-                        ? "text-emerald-300"
-                        : "text-amber-300"
+                        ? "text-success"
+                        : "text-warning"
                     }
                   >
                     écart {formatCurrency(item.differenceCents)}

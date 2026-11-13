@@ -89,7 +89,7 @@ const currencies: Array<{
   { code: "EUR", name: "Euro", display: "EUR", symbol: "€" },
 ];
 const primaryPresets = [
-  "#007B8B",
+  "#0B6E76",
   "#2563EB",
   "#6D28D9",
   "#BE123C",
@@ -273,7 +273,7 @@ export default function Settings({ section }: { section: SettingsSection }) {
                   icon={Moon}
                   label="Sombre"
                   detail="Cockpit nuit"
-                  preview="bg-[#0d1420]"
+                  preview="bg-background"
                 />
                 <ThemeOption
                   active={theme === "light"}
@@ -281,7 +281,7 @@ export default function Settings({ section }: { section: SettingsSection }) {
                   icon={Sun}
                   label="Clair bleu"
                   detail="Lisibilité renforcée"
-                  preview="bg-[#eaf4ff]"
+                  preview="bg-primary/10"
                 />
               </div>
             </CardContent>
@@ -677,7 +677,7 @@ function InvoiceColorPreview({
           </div>
         </div>
         {format === "a4" ? (
-          <article className="mx-auto max-w-2xl overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-800 shadow-sm">
+          <article className="mx-auto max-w-2xl overflow-hidden rounded-xl border border-border bg-card text-foreground shadow-sm">
             <div
               className="flex items-start justify-between px-5 py-4"
               style={{ backgroundColor: color, color: foreground }}
@@ -694,15 +694,15 @@ function InvoiceColorPreview({
             </div>
             <div className="space-y-4 p-5 text-sm">
               <div className="flex justify-between">
-                <span className="text-slate-500">Client</span>
+                <span className="text-faint">Client</span>
                 <b>Client comptoir</b>
               </div>
-              <div className="border-y border-slate-200 py-3">
+              <div className="border-y border-border py-3">
                 <div className="flex justify-between">
                   <span>Produit de démonstration</span>
                   <b>{formatCurrency(250_000)}</b>
                 </div>
-                <div className="mt-2 flex justify-between text-slate-500">
+                <div className="mt-2 flex justify-between text-faint">
                   <span>Quantité</span>
                   <span>1</span>
                 </div>
@@ -720,8 +720,8 @@ function InvoiceColorPreview({
             </div>
           </article>
         ) : (
-          <article className="mx-auto max-w-[280px] rounded-md bg-white p-4 font-mono text-[11px] text-slate-800 shadow-sm ring-1 ring-slate-200">
-            <div className="mb-3 border-b border-dashed border-slate-300 pb-3 text-center">
+          <article className="mx-auto max-w-[280px] rounded-md bg-card p-4 font-mono text-[11px] text-foreground shadow-sm ring-1 ring-border">
+            <div className="mb-3 border-b border-dashed border-border pb-3 text-center">
               <div
                 className="mx-auto mb-2 inline-block rounded-full px-3 py-1 text-[10px] font-bold tracking-[0.14em]"
                 style={{ backgroundColor: color, color: foreground }}
@@ -731,14 +731,14 @@ function InvoiceColorPreview({
               <p className="font-sans text-base font-bold">
                 {identity.companyName || "Votre entreprise"}
               </p>
-              <p className="mt-1 text-slate-500">POS-2026-0042 · Comptoir</p>
+              <p className="mt-1 text-faint">POS-2026-0042 · Comptoir</p>
             </div>
-            <div className="space-y-2 border-b border-dashed border-slate-300 pb-3">
+            <div className="space-y-2 border-b border-dashed border-border pb-3">
               <div className="flex justify-between gap-3">
                 <span>Produit de démonstration ×1</span>
                 <b>{formatCurrency(250_000)}</b>
               </div>
-              <div className="flex justify-between text-slate-500">
+              <div className="flex justify-between text-faint">
                 <span>Espèces</span>
                 <span>{formatCurrency(250_000)}</span>
               </div>
@@ -747,7 +747,7 @@ function InvoiceColorPreview({
               <span>TOTAL</span>
               <span style={{ color }}>{formatCurrency(250_000)}</span>
             </div>
-            <div className="mt-3 border-t border-dashed border-slate-300 pt-3 text-center text-[10px] text-slate-500">
+            <div className="mt-3 border-t border-dashed border-border pt-3 text-center text-[10px] text-faint">
               Merci de votre achat · À bientôt
             </div>
           </article>

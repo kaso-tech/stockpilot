@@ -99,7 +99,7 @@ export default function CustomerDetail() {
   });
   if (isLoading)
     return (
-      <div className="mx-auto max-w-[1500px] py-24 text-center text-sm text-slate-500">
+      <div className="mx-auto max-w-[1500px] py-24 text-center text-sm text-faint">
         Chargement de la fiche client…
       </div>
     );
@@ -118,10 +118,10 @@ export default function CustomerDetail() {
         <ArrowLeft className="mr-2 h-4 w-4" />
         Retour aux clients
       </Button>
-      <section className="rounded-2xl border border-white/[0.07] bg-[#111722] p-5 shadow-sm sm:p-6">
+      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
         <div className="flex min-w-0 items-start gap-4">
           <span
-            className={`grid h-14 w-14 shrink-0 place-items-center rounded-2xl ${customer.type === "wholesale" ? "bg-violet-400/10 text-violet-300" : "bg-primary/10 text-primary"}`}
+            className={`grid h-14 w-14 shrink-0 place-items-center rounded-2xl ${customer.type === "wholesale" ? "bg-info-soft text-info" : "bg-primary/10 text-primary"}`}
           >
             {customer.type === "wholesale" ? (
               <Building2 className="h-7 w-7" />
@@ -135,10 +135,10 @@ export default function CustomerDetail() {
             </p>
             <div className="mt-1 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
-                <h1 className="truncate text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+                <h1 className="truncate text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
                   {customer.name}
                 </h1>
-                <p className="mt-2 text-sm text-slate-400">
+                <p className="mt-2 text-sm text-muted-foreground">
                   {customer.address || "Adresse non renseignée"}
                 </p>
               </div>
@@ -147,7 +147,7 @@ export default function CustomerDetail() {
                   <Button
                     onClick={() => setEditOpen(true)}
                     variant="outline"
-                    className="border-white/10 text-slate-300 hover:border-primary/40 hover:bg-primary/[0.06] hover:text-primary"
+                    className="border-border text-muted-foreground hover:border-primary/40 hover:bg-primary/[0.06] hover:text-primary"
                   >
                     <Edit3 className="mr-2 h-4 w-4" />
                     Modifier
@@ -159,7 +159,7 @@ export default function CustomerDetail() {
                         remove.mutate({ id: customer.id });
                     }}
                     disabled={remove.isPending}
-                    className="border-rose-400/30 text-rose-300 hover:bg-rose-400/10 hover:text-rose-200"
+                    className="border-destructive/25 text-destructive hover:bg-destructive-soft hover:text-destructive"
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
                     Supprimer
@@ -193,7 +193,7 @@ export default function CustomerDetail() {
             icon={<ReceiptText className="h-4 w-4" />}
           />
         </div>
-        <div className="mt-5 flex flex-wrap gap-2 border-t border-white/[0.07] pt-5">
+        <div className="mt-5 flex flex-wrap gap-2 border-t border-border pt-5">
           <ContactButton
             label="Appeler"
             icon={<Phone className="h-4 w-4" />}
@@ -225,11 +225,11 @@ export default function CustomerDetail() {
       <CustomerNotes notes={customer.notes} />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,.8fr)]">
         <section>
-          <Card className="border-white/[0.07] bg-[#111722] shadow-none">
+          <Card className="border-border bg-card shadow-none">
             <CardContent className="p-5 sm:p-6">
               <div className="flex items-center gap-2">
                 <FileText className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-semibold text-white">
+                <h2 className="text-lg font-semibold text-foreground">
                   Historique des factures
                 </h2>
               </div>
@@ -242,13 +242,13 @@ export default function CustomerDetail() {
                       onClick={() =>
                         setLocation(`/factures?facture=${invoice.id}`)
                       }
-                      className="flex w-full items-center justify-between gap-3 rounded-xl border border-white/[0.07] bg-white/[0.02] p-4 text-left transition hover:border-primary/40 hover:bg-primary/[0.04]"
+                      className="flex w-full items-center justify-between gap-3 rounded-xl border border-border bg-muted/50 p-4 text-left transition hover:border-primary/40 hover:bg-primary/[0.04]"
                     >
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-slate-100">
+                        <p className="truncate text-sm font-semibold text-foreground">
                           {invoice.invoiceNumber}
                         </p>
-                        <p className="mt-1 text-xs text-slate-500">
+                        <p className="mt-1 text-xs text-faint">
                           {formatDate(invoice.createdAt)} ·{" "}
                           {invoice.status === "paid"
                             ? "Encaissée"
@@ -258,11 +258,11 @@ export default function CustomerDetail() {
                         </p>
                       </div>
                       <div className="shrink-0 text-right">
-                        <p className="text-sm font-semibold text-slate-100">
+                        <p className="text-sm font-semibold text-foreground">
                           {formatCurrency(invoice.totalCents)}
                         </p>
                         {invoice.amountPaidCents < invoice.totalCents && (
-                          <p className="mt-1 text-xs font-medium text-amber-300">
+                          <p className="mt-1 text-xs font-medium text-warning">
                             Reste{" "}
                             {formatCurrency(
                               invoice.totalCents - invoice.amountPaidCents
@@ -348,7 +348,7 @@ function CustomerEditDialog({
   }, [customer, open]);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto border-white/10 bg-[#141b27] text-slate-100">
+      <DialogContent className="max-h-[90vh] overflow-y-auto border-border bg-card text-foreground">
         <DialogHeader>
           <DialogTitle>Modifier le client</DialogTitle>
         </DialogHeader>
@@ -460,7 +460,7 @@ function ContactButton({
       variant="outline"
       disabled={!href}
       asChild={Boolean(href)}
-      className="border-white/10 text-slate-300 hover:border-primary/40 hover:bg-primary/[0.06] hover:text-primary disabled:opacity-45"
+      className="border-border text-muted-foreground hover:border-primary/40 hover:bg-primary/[0.06] hover:text-primary disabled:opacity-45"
     >
       {href ? (
         <a href={href}>
@@ -486,12 +486,12 @@ function Info({
   icon: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-white/[0.07] bg-white/[0.025] p-3">
-      <p className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.11em] text-slate-500">
+    <div className="rounded-xl border border-border bg-muted/50 p-3">
+      <p className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.11em] text-faint">
         {icon}
         {label}
       </p>
-      <p className="mt-1 truncate text-sm font-medium text-slate-200">
+      <p className="mt-1 truncate text-sm font-medium text-foreground">
         {value}
       </p>
     </div>
@@ -499,15 +499,15 @@ function Info({
 }
 function CustomerNotes({ notes }: { notes: string | null }) {
   return (
-    <Card className="border-white/[0.07] bg-[#111722] shadow-none">
+    <Card className="border-border bg-card shadow-none">
       <CardContent className="p-5 sm:p-6">
         <div className="flex items-center gap-2">
           <MapPin className="h-5 w-5 text-primary" />
-          <h2 className="text-base font-semibold text-white">
+          <h2 className="text-base font-semibold text-foreground">
             Informations complémentaires
           </h2>
         </div>
-        <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-slate-400">
+        <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
           {notes || "Aucune note enregistrée."}
         </p>
       </CardContent>
@@ -525,16 +525,16 @@ function Metric({
 }) {
   const style =
     tone === "success"
-      ? "text-emerald-300"
+      ? "text-success"
       : tone === "warning"
-        ? "text-amber-300"
+        ? "text-warning"
         : tone === "primary"
           ? "text-primary"
-          : "text-slate-100";
+          : "text-foreground";
   return (
-    <Card className="border-white/[0.07] bg-[#111722] shadow-none">
+    <Card className="border-border bg-card shadow-none">
       <CardContent className="p-5">
-        <p className="text-xs text-slate-500">{label}</p>
+        <p className="text-xs text-faint">{label}</p>
         <p className={`mt-2 text-xl font-semibold ${style}`}>{value}</p>
       </CardContent>
     </Card>
@@ -542,7 +542,7 @@ function Metric({
 }
 function Empty({ text }: { text: string }) {
   return (
-    <div className="mt-5 rounded-xl border border-dashed border-white/10 px-4 py-10 text-center text-sm text-slate-500">
+    <div className="mt-5 rounded-xl border border-dashed border-border px-4 py-10 text-center text-sm text-faint">
       {text}
     </div>
   );
@@ -556,7 +556,7 @@ function Field({
 }) {
   return (
     <div className="space-y-2">
-      <Label className="text-xs text-slate-300">{label}</Label>
+      <Label className="text-xs text-muted-foreground">{label}</Label>
       {children}
     </div>
   );
@@ -568,10 +568,12 @@ function MissingCustomer({ onBack }: { onBack: () => void }) {
         <ArrowLeft className="mr-2 h-4 w-4" />
         Retour aux clients
       </Button>
-      <Card className="border-dashed border-white/10 bg-[#111722] shadow-none">
+      <Card className="border-dashed border-border bg-card shadow-none">
         <CardContent className="py-16 text-center">
-          <UsersRound className="mx-auto h-7 w-7 text-slate-600" />
-          <p className="mt-4 font-medium text-slate-300">Client introuvable</p>
+          <UsersRound className="mx-auto h-7 w-7 text-faint" />
+          <p className="mt-4 font-medium text-muted-foreground">
+            Client introuvable
+          </p>
         </CardContent>
       </Card>
     </div>

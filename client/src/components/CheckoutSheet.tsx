@@ -464,35 +464,37 @@ export function CheckoutSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="w-full overflow-y-auto border-white/10 bg-[#111722] p-0 text-slate-100 sm:!inset-y-auto sm:!left-1/2 sm:!right-auto sm:!top-1/2 sm:!h-auto sm:!max-h-[88vh] sm:!w-[min(94vw,620px)] sm:!max-w-none sm:!-translate-x-1/2 sm:!-translate-y-1/2 sm:!rounded-2xl"
+        className="w-full overflow-y-auto border-border bg-card p-0 text-foreground sm:!inset-y-auto sm:!left-1/2 sm:!right-auto sm:!top-1/2 sm:!h-auto sm:!max-h-[88vh] sm:!w-[min(94vw,620px)] sm:!max-w-none sm:!-translate-x-1/2 sm:!-translate-y-1/2 sm:!rounded-2xl"
       >
-        <SheetHeader className="border-b border-white/[0.08] px-5 py-4 text-left">
-          <SheetTitle className="text-lg text-white">Encaissement</SheetTitle>
-          <p className="text-xs text-slate-400">
+        <SheetHeader className="border-b border-border px-5 py-4 text-left">
+          <SheetTitle className="text-lg text-foreground">
+            Encaissement
+          </SheetTitle>
+          <p className="text-xs text-muted-foreground">
             {sale?.invoiceNumber || "Vente comptoir"}
           </p>
         </SheetHeader>
         <div className="space-y-4 p-5">
-          <section className="rounded-xl border border-[#00bcd4]/20 bg-[#00bcd4]/[0.07] p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#a7f3ff]">
+          <section className="rounded-xl border border-primary/25 bg-primary/5 p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
               Total à encaisser
             </p>
-            <p className="mt-1 text-2xl font-semibold text-white">
+            <p className="mt-1 text-2xl font-semibold text-foreground">
               {formatCurrency(remaining)}
             </p>
             {previouslyPaid > 0 && (
-              <p className="mt-1 text-xs text-slate-400">
+              <p className="mt-1 text-xs text-muted-foreground">
                 Déjà encaissé : {formatCurrency(previouslyPaid)}
               </p>
             )}
           </section>
           {!isPos && (
-            <div className="flex rounded-xl bg-white/[0.04] p-1">
+            <div className="flex rounded-xl bg-muted/50 p-1">
               <Button
                 type="button"
                 onClick={() => changeMode("full")}
                 variant="ghost"
-                className={`flex-1 ${mode === "full" ? "bg-[#00bcd4] text-slate-950 hover:bg-[#66ddea]" : "text-slate-400"}`}
+                className={`flex-1 ${mode === "full" ? "bg-primary text-primary-foreground hover:bg-primary/90" : "text-muted-foreground"}`}
               >
                 Intégral
               </Button>
@@ -500,18 +502,18 @@ export function CheckoutSheet({
                 type="button"
                 onClick={() => changeMode("partial")}
                 variant="ghost"
-                className={`flex-1 ${mode === "partial" ? "bg-[#00bcd4] text-slate-950 hover:bg-[#66ddea]" : "text-slate-400"}`}
+                className={`flex-1 ${mode === "partial" ? "bg-primary text-primary-foreground hover:bg-primary/90" : "text-muted-foreground"}`}
               >
                 Partiel
               </Button>
             </div>
           )}
           <section>
-            <Label className="text-sm font-semibold text-slate-200">
+            <Label className="text-sm font-semibold text-foreground">
               Moyens de paiement
             </Label>
             {!enabledMethods.length ? (
-              <p className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/[0.08] p-3 text-sm text-amber-200">
+              <p className="mt-3 rounded-xl border border-warning/25 bg-warning-soft p-3 text-sm text-warning">
                 Aucun moyen de paiement n’est activé dans les réglages POS.
               </p>
             ) : (
@@ -519,7 +521,7 @@ export function CheckoutSheet({
                 {enabledMethods.map(({ id, label, icon: Icon }) => (
                   <div
                     key={id}
-                    className={`rounded-xl border p-2.5 transition ${checked.includes(id) ? "border-[#00bcd4]/40 bg-[#00bcd4]/[0.06]" : "border-white/[0.08] bg-white/[0.02]"}`}
+                    className={`rounded-xl border p-2.5 transition ${checked.includes(id) ? "border-primary/40 bg-primary/5" : "border-border bg-muted/50"}`}
                   >
                     <div className="flex items-center gap-3">
                       <Checkbox
@@ -529,9 +531,9 @@ export function CheckoutSheet({
                       />
                       <Label
                         htmlFor={`payment-${id}`}
-                        className="flex flex-1 cursor-pointer items-center gap-2 text-sm text-slate-200"
+                        className="flex flex-1 cursor-pointer items-center gap-2 text-sm text-foreground"
                       >
-                        <Icon className="h-4 w-4 text-[#66ddea]" />
+                        <Icon className="h-4 w-4 text-primary" />
                         {label}
                       </Label>
                       {checked.includes(id) && (
@@ -542,9 +544,9 @@ export function CheckoutSheet({
                               updateAmount(id, event.target.value)
                             }
                             inputMode="decimal"
-                            className="h-8 border-white/10 bg-black/10 pr-9 text-right text-sm"
+                            className="h-8 border-border bg-muted pr-9 text-right text-sm"
                           />
-                          <span className="absolute right-2 top-2 text-[10px] text-slate-500">
+                          <span className="absolute right-2 top-2 text-[10px] text-faint">
                             FCFA
                           </span>
                         </div>
@@ -556,33 +558,33 @@ export function CheckoutSheet({
             )}
             <div className="mt-3 space-y-1 text-sm">
               <div className="flex justify-between">
-                <span className="text-slate-400">Montant saisi</span>
+                <span className="text-muted-foreground">Montant saisi</span>
                 <span
                   className={
                     difference === 0
-                      ? "font-semibold text-emerald-300"
-                      : "font-semibold text-amber-300"
+                      ? "font-semibold text-success"
+                      : "font-semibold text-warning"
                   }
                 >
                   {formatCurrency(paidCents)}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">
+                <span className="text-muted-foreground">
                   {mode === "full" ? "Écart à répartir" : "Solde restant"}
                 </span>
                 <span
                   className={
                     difference === 0
-                      ? "font-semibold text-emerald-300"
-                      : "font-semibold text-slate-100"
+                      ? "font-semibold text-success"
+                      : "font-semibold text-foreground"
                   }
                 >
                   {formatCurrency(Math.abs(difference))}
                 </span>
               </div>
               {mode === "full" && checked.length > 0 && difference !== 0 && (
-                <p className="pt-1 text-xs text-amber-300">
+                <p className="pt-1 text-xs text-warning">
                   La répartition doit être égale au total pour valider.
                 </p>
               )}
@@ -620,11 +622,11 @@ export function CheckoutSheet({
               )
             )}
           </section>
-          <div className="flex gap-3 border-t border-white/[0.08] pt-4">
+          <div className="flex gap-3 border-t border-border pt-4">
             <Button
               variant="outline"
               onClick={() => onOpenChange(false)}
-              className="flex-1 border-white/10 text-slate-200"
+              className="flex-1 border-border text-foreground"
             >
               <X className="mr-2 h-4 w-4" />
               Annuler
@@ -632,7 +634,7 @@ export function CheckoutSheet({
             <Button
               onClick={submit}
               disabled={checkout.isPending || !canSubmit}
-              className="flex-1 bg-[#007B8B] text-white hover:bg-[#006976]"
+              className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
             >
               Valider l’encaissement
             </Button>
@@ -646,8 +648,8 @@ export function CheckoutSheet({
 function AgentReadOnly({ label, name }: { label: string; name: string }) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-slate-300">{label}</Label>
-      <div className="rounded-lg border border-primary/25 bg-primary/[0.07] px-3 py-2 text-sm text-slate-100">
+      <Label className="text-muted-foreground">{label}</Label>
+      <div className="rounded-lg border border-primary/25 bg-primary/[0.07] px-3 py-2 text-sm text-foreground">
         <span className="mr-2 text-[10px] font-semibold uppercase tracking-wide text-primary">
           Par défaut
         </span>
@@ -670,7 +672,7 @@ function AgentSelect({
   return (
     <div className="space-y-1.5">
       <Label>
-        {label} <span className="text-rose-300">*</span>
+        {label} <span className="text-destructive">*</span>
       </Label>
       <Select value={value || undefined} onValueChange={onChange}>
         <SelectTrigger>

@@ -94,11 +94,11 @@ export function ReturnItemsDialog({
             return (
               <div
                 key={item.id}
-                className="grid grid-cols-[1fr_auto_auto] items-center gap-3 rounded-xl border border-white/10 p-3 text-sm"
+                className="grid grid-cols-[1fr_auto_auto] items-center gap-3 rounded-xl border border-border p-3 text-sm"
               >
                 <div>
                   <p className="font-medium">{item.productName}</p>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-faint">
                     Vendu : {item.quantity} · déjà rendu :{" "}
                     {item.returnedQuantity}
                   </p>
@@ -124,7 +124,7 @@ export function ReturnItemsDialog({
                   }
                   className="w-20"
                 />
-                <label className="flex items-center gap-2 text-xs text-slate-400">
+                <label className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Checkbox
                     checked={restock[item.id] ?? true}
                     onCheckedChange={value =>
@@ -141,7 +141,7 @@ export function ReturnItemsDialog({
           })}
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-sm">
-              <span className="mb-1 block text-xs text-slate-400">
+              <span className="mb-1 block text-xs text-muted-foreground">
                 Remboursement par
               </span>
               <select
@@ -157,7 +157,7 @@ export function ReturnItemsDialog({
               </select>
             </label>
             <label className="text-sm">
-              <span className="mb-1 block text-xs text-slate-400">
+              <span className="mb-1 block text-xs text-muted-foreground">
                 Motif (facultatif)
               </span>
               <Input
@@ -168,7 +168,7 @@ export function ReturnItemsDialog({
               />
             </label>
           </div>
-          <p className="text-sm text-slate-300">
+          <p className="text-sm text-muted-foreground">
             Montant estimé (hors frais de livraison, remises et TVA répartis au
             prorata) : <strong>{formatCurrency(estimate)}</strong>
           </p>

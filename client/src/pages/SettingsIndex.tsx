@@ -235,21 +235,21 @@ export default function SettingsIndex() {
   return (
     <div className="mx-auto max-w-5xl space-y-4">
       <header>
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#007B8B]">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
           Organisation
         </p>
-        <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">
+        <h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">
           Paramètres
         </h1>
       </header>
       <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-500" />
+        <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-faint" />
         <Input
           value={query}
           onChange={event => setQuery(event.target.value)}
           placeholder="Rechercher un paramètre…"
           aria-label="Rechercher un paramètre"
-          className="border-white/[0.12] bg-[#111722] pl-9 text-white placeholder:text-slate-500"
+          className="border-border bg-card pl-9 text-foreground placeholder:text-faint"
         />
       </div>
       {filteredSections.length ? (
@@ -262,31 +262,31 @@ export default function SettingsIndex() {
               <div className="mb-1 px-1">
                 <h2
                   id={`settings-section-${section.id}`}
-                  className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-300"
+                  className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground"
                 >
                   {section.label}
                 </h2>
               </div>
-              <Card className="border-white/[0.07] bg-[#111722]">
-                <CardContent className="divide-y divide-white/[0.06] p-2">
+              <Card className="border-border bg-card">
+                <CardContent className="divide-y divide-border p-2">
                   {section.links.map(item => (
                     <Link
                       key={item.href}
                       href={item.href}
-                      className="group flex items-center gap-3 rounded-xl px-3 py-3 transition hover:bg-white/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      className="group flex items-center gap-3 rounded-xl px-3 py-3 transition hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     >
-                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#007B8B]/10 text-[#00bcd4]">
+                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
                         <item.icon className="h-5 w-5" />
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block font-semibold text-slate-100">
+                        <span className="block font-semibold text-foreground">
                           {item.label}
                         </span>
-                        <span className="mt-1 block text-sm text-slate-500">
+                        <span className="mt-1 block text-sm text-faint">
                           {item.detail}
                         </span>
                       </span>
-                      <ChevronRight className="h-5 w-5 shrink-0 text-slate-500 transition group-hover:translate-x-0.5 group-hover:text-[#00bcd4]" />
+                      <ChevronRight className="h-5 w-5 shrink-0 text-faint transition group-hover:translate-x-0.5 group-hover:text-primary" />
                     </Link>
                   ))}
                 </CardContent>
@@ -295,8 +295,8 @@ export default function SettingsIndex() {
           ))}
         </div>
       ) : (
-        <Card className="border-white/[0.07] bg-[#111722]">
-          <CardContent className="px-4 py-12 text-center text-sm text-slate-400">
+        <Card className="border-border bg-card">
+          <CardContent className="px-4 py-12 text-center text-sm text-muted-foreground">
             Aucun paramètre ne correspond à « {query} ».
           </CardContent>
         </Card>

@@ -122,7 +122,7 @@ export default function ProductDetail() {
   );
   if (isLoading)
     return (
-      <div className="mx-auto max-w-6xl py-20 text-center text-sm text-slate-500">
+      <div className="mx-auto max-w-6xl py-20 text-center text-sm text-faint">
         Chargement de la fiche produit…
       </div>
     );
@@ -132,39 +132,39 @@ export default function ProductDetail() {
         <Button
           variant="outline"
           onClick={() => setLocation("/produits")}
-          className="border-white/10 text-slate-200"
+          className="border-border text-foreground"
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
           Retour aux produits
         </Button>
-        <div className="mt-6 rounded-2xl border border-rose-400/20 bg-rose-400/[0.06] p-6 text-rose-200">
+        <div className="mt-6 rounded-2xl border border-destructive/25 bg-destructive-soft p-6 text-destructive">
           {error?.message || "Produit introuvable."}
         </div>
       </div>
     );
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <header className="flex flex-col gap-4 border-b border-white/[0.07] pb-6 lg:flex-row lg:items-start lg:justify-between">
+      <header className="flex flex-col gap-4 border-b border-border pb-6 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <Button
             variant="ghost"
             onClick={() => setLocation("/produits")}
-            className="mb-4 -ml-3 text-slate-400 hover:text-white"
+            className="mb-4 -ml-3 text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
             Retour au catalogue
           </Button>
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="truncate text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+            <h1 className="truncate text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
               {product.name}
             </h1>
             <Badge
-              className={`border-0 ${lowStock ? "bg-amber-400/10 text-amber-300" : "bg-emerald-400/10 text-emerald-300"}`}
+              className={`border-0 ${lowStock ? "bg-warning-soft text-warning" : "bg-success-soft text-success"}`}
             >
               {lowStock ? "Stock faible" : "Stock sain"}
             </Badge>
           </div>
-          <p className="mt-2 text-sm text-slate-400">
+          <p className="mt-2 text-sm text-muted-foreground">
             {product.reference} · {product.category} · {product.unit}
           </p>
         </div>
@@ -189,7 +189,7 @@ export default function ProductDetail() {
               <Button
                 onClick={() => setLocation(`/produits?modifier=${product.id}`)}
                 variant="outline"
-                className="border-white/10 text-slate-200"
+                className="border-border text-foreground"
               >
                 <Edit3 className="mr-2 h-4 w-4" />
                 Modifier
@@ -201,7 +201,7 @@ export default function ProductDetail() {
                 }}
                 variant="outline"
                 disabled={remove.isPending}
-                className="border-rose-400/20 text-rose-300 hover:bg-rose-400/10"
+                className="border-destructive/25 text-destructive hover:bg-destructive-soft"
               >
                 <Trash2 className="mr-2 h-4 w-4" />
                 Supprimer
@@ -211,19 +211,19 @@ export default function ProductDetail() {
         </div>
       </header>
       {product.description && (
-        <section className="rounded-2xl border border-white/[0.07] bg-[#111722] p-5 text-sm leading-6 text-slate-300">
+        <section className="rounded-2xl border border-border bg-card p-5 text-sm leading-6 text-muted-foreground">
           {product.description}
         </section>
       )}
       {lowStock && (
-        <section className="flex flex-col gap-3 rounded-2xl border border-amber-400/20 bg-amber-400/[0.07] p-4 sm:flex-row sm:items-center sm:justify-between">
+        <section className="flex flex-col gap-3 rounded-2xl border border-warning/25 bg-warning-soft p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex gap-3">
-            <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
+            <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
             <div>
-              <p className="font-medium text-amber-100">
+              <p className="font-medium text-warning">
                 Réapprovisionnement recommandé
               </p>
-              <p className="mt-1 text-sm text-amber-200/70">
+              <p className="mt-1 text-sm text-warning">
                 Stock actuel : {product.quantity} {product.unit} · Seuil :{" "}
                 {product.minimumQuantity} {product.unit}
               </p>
@@ -232,7 +232,7 @@ export default function ProductDetail() {
           <Button
             size="sm"
             onClick={() => setOrderOpen(true)}
-            className="bg-amber-400 text-slate-950 hover:bg-amber-300"
+            className="bg-warning text-warning-foreground hover:bg-warning/90"
           >
             Commander {suggestedQuantity} {product.unit}
           </Button>
@@ -261,7 +261,7 @@ export default function ProductDetail() {
               />
             </div>
             {data.statistics.lastSaleAt && (
-              <p className="mt-4 text-xs text-slate-500">
+              <p className="mt-4 text-xs text-faint">
                 Dernière vente : {formatDate(data.statistics.lastSaleAt)}
               </p>
             )}
@@ -274,32 +274,32 @@ export default function ProductDetail() {
                 size="sm"
                 variant="outline"
                 onClick={() => setLocation(`/mouvements?produit=${product.id}`)}
-                className="border-white/10 text-slate-300"
+                className="border-border text-muted-foreground"
               >
                 Voir le registre
               </Button>
             }
           >
             {data.movements.length ? (
-              <div className="divide-y divide-white/[0.07]">
+              <div className="divide-y divide-border">
                 {data.movements.map(movement => (
                   <div
                     key={movement.id}
                     className="flex items-center justify-between gap-4 py-3"
                   >
                     <div>
-                      <p className="text-sm font-medium text-slate-200">
+                      <p className="text-sm font-medium text-foreground">
                         {labels[movement.type] ?? movement.type} ·{" "}
                         {movement.quantity > 0 ? "+" : ""}
                         {movement.quantity} {product.unit}
                       </p>
-                      <p className="mt-1 text-xs text-slate-500">
+                      <p className="mt-1 text-xs text-faint">
                         {movement.reason} · {formatDate(movement.occurredAt)}
                       </p>
                     </div>
-                    <p className="text-right text-sm text-slate-300">
+                    <p className="text-right text-sm text-muted-foreground">
                       {movement.previousQuantity} →{" "}
-                      <span className="font-semibold text-white">
+                      <span className="font-semibold text-foreground">
                         {movement.resultingQuantity}
                       </span>
                     </p>
@@ -315,10 +315,10 @@ export default function ProductDetail() {
           <Panel title="Fournisseur" icon={Truck}>
             {data.supplier ? (
               <div>
-                <p className="text-lg font-semibold text-white">
+                <p className="text-lg font-semibold text-foreground">
                   {data.supplier.name}
                 </p>
-                <p className="mt-1 text-sm text-slate-400">
+                <p className="mt-1 text-sm text-muted-foreground">
                   {data.supplier.phone ||
                     data.supplier.email ||
                     "Coordonnées non renseignées"}
@@ -331,7 +331,7 @@ export default function ProductDetail() {
                       `/fournisseurs?fournisseur=${data.supplier?.id}`
                     )
                   }
-                  className="mt-4 border-white/10 text-slate-300"
+                  className="mt-4 border-border text-muted-foreground"
                 >
                   Voir le fournisseur
                 </Button>
@@ -351,17 +351,17 @@ export default function ProductDetail() {
                   <button
                     key={sale.id}
                     onClick={() => setLocation(`/factures?facture=${sale.id}`)}
-                    className="flex w-full items-center justify-between rounded-xl bg-white/[0.03] px-3 py-2.5 text-left transition hover:bg-white/[0.06]"
+                    className="flex w-full items-center justify-between rounded-xl bg-muted/50 px-3 py-2.5 text-left transition hover:bg-accent"
                   >
                     <span>
-                      <span className="block text-sm font-medium text-slate-200">
+                      <span className="block text-sm font-medium text-foreground">
                         {sale.invoiceNumber}
                       </span>
-                      <span className="mt-1 block text-xs text-slate-500">
+                      <span className="mt-1 block text-xs text-faint">
                         {formatDate(sale.createdAt)}
                       </span>
                     </span>
-                    <span className="font-medium text-cyan-200">
+                    <span className="font-medium text-primary">
                       {formatCurrency(sale.totalCents)}
                     </span>
                   </button>
@@ -374,14 +374,14 @@ export default function ProductDetail() {
         </div>
       </section>
       <Dialog open={orderOpen} onOpenChange={setOrderOpen}>
-        <DialogContent className="border-white/10 bg-[#141b27] text-slate-100 sm:max-w-md">
+        <DialogContent className="border-border bg-card text-foreground sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Préparer un bon de commande</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="rounded-xl bg-white/[0.04] p-3">
+            <div className="rounded-xl bg-muted/50 p-3">
               <p className="font-medium">{product.name}</p>
-              <p className="mt-1 text-sm text-slate-400">
+              <p className="mt-1 text-sm text-muted-foreground">
                 {data.supplier?.name ?? "Fournisseur à définir"}
               </p>
             </div>
@@ -394,9 +394,9 @@ export default function ProductDetail() {
                 onChange={event => setQuantity(event.target.value)}
               />
             </div>
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-muted-foreground">
               Estimation :{" "}
-              <span className="font-medium text-white">
+              <span className="font-medium text-foreground">
                 {formatCurrency(
                   product.purchasePriceCents *
                     Math.max(1, Number(quantity) || suggestedQuantity)
@@ -433,23 +433,23 @@ function MetricCard({
   tone: string;
 }) {
   const colors = {
-    cyan: "bg-cyan-400/10 text-cyan-300",
-    violet: "bg-violet-400/10 text-violet-300",
-    emerald: "bg-emerald-400/10 text-emerald-300",
-    amber: "bg-amber-400/10 text-amber-300",
-    slate: "bg-slate-400/10 text-slate-300",
+    cyan: "bg-primary/10 text-primary",
+    violet: "bg-info-soft text-info",
+    emerald: "bg-success-soft text-success",
+    amber: "bg-warning-soft text-warning",
+    slate: "bg-muted text-muted-foreground",
   };
   return (
-    <div className="rounded-2xl border border-white/[0.07] bg-[#111722] p-4">
+    <div className="rounded-2xl border border-border bg-card p-4">
       <div className="flex items-center justify-between">
-        <p className="text-xs text-slate-400">{label}</p>
+        <p className="text-xs text-muted-foreground">{label}</p>
         <span
           className={`grid h-9 w-9 place-items-center rounded-xl ${colors[tone as keyof typeof colors]}`}
         >
           <Icon className="h-4 w-4" />
         </span>
       </div>
-      <p className="mt-3 text-lg font-semibold text-white">{value}</p>
+      <p className="mt-3 text-lg font-semibold text-foreground">{value}</p>
     </div>
   );
 }
@@ -465,9 +465,9 @@ function Panel({
   action?: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-white/[0.07] bg-[#111722] p-5">
+    <section className="rounded-2xl border border-border bg-card p-5">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2 font-semibold text-white">
+        <h2 className="flex items-center gap-2 font-semibold text-foreground">
           <Icon className="h-4 w-4 text-primary" />
           {title}
         </h2>
@@ -479,9 +479,9 @@ function Panel({
 }
 function MiniMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl bg-white/[0.04] p-3">
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="mt-1 font-semibold text-slate-100">{value}</p>
+    <div className="rounded-xl bg-muted/50 p-3">
+      <p className="text-xs text-faint">{label}</p>
+      <p className="mt-1 font-semibold text-foreground">{value}</p>
     </div>
   );
 }
@@ -494,7 +494,7 @@ function TierList({
 }) {
   return (
     <div className="mb-4 last:mb-0">
-      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-faint">
         {title}
       </p>
       {tiers.length ? (
@@ -502,21 +502,23 @@ function TierList({
           {tiers.map(tier => (
             <div
               key={tier.minQuantity}
-              className="flex justify-between rounded-lg bg-white/[0.04] px-3 py-2 text-sm"
+              className="flex justify-between rounded-lg bg-muted/50 px-3 py-2 text-sm"
             >
-              <span className="text-slate-400">Dès {tier.minQuantity}</span>
-              <span className="font-medium text-slate-100">
+              <span className="text-muted-foreground">
+                Dès {tier.minQuantity}
+              </span>
+              <span className="font-medium text-foreground">
                 {formatCurrency(tier.unitPriceCents)}
               </span>
             </div>
           ))}
         </div>
       ) : (
-        <p className="text-sm text-slate-500">Aucun palier défini.</p>
+        <p className="text-sm text-faint">Aucun palier défini.</p>
       )}
     </div>
   );
 }
 function Empty({ text }: { text: string }) {
-  return <p className="py-5 text-center text-sm text-slate-500">{text}</p>;
+  return <p className="py-5 text-center text-sm text-faint">{text}</p>;
 }

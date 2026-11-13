@@ -1,8 +1,11 @@
-export const DEFAULT_PRIMARY_COLOR = "#007B8B";
+export const DEFAULT_PRIMARY_COLOR = "#0B6E76";
+/** Ancienne couleur par défaut, enregistrée pour toutes les entreprises créées avant le thème « Ardoise & Pétrole ». */
+const LEGACY_DEFAULT_PRIMARY_COLOR = "#007B8B";
 
 export function normalizePrimaryColor(value: string | null | undefined) {
   if (!value || !/^#[0-9a-fA-F]{6}$/.test(value)) return DEFAULT_PRIMARY_COLOR;
-  return value.toUpperCase();
+  const upper = value.toUpperCase();
+  return upper === LEGACY_DEFAULT_PRIMARY_COLOR ? DEFAULT_PRIMARY_COLOR : upper;
 }
 
 export function primaryForeground(color: string) {

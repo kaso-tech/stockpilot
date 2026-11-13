@@ -16,7 +16,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/lib/format";
 import {
   isCheckoutShortcut,
@@ -76,9 +75,12 @@ export default function PointOfSale() {
   const { data: settings } = trpc.commerce.settings.get.useQuery();
   const [query, setQuery] = useState("");
   const [lowStockOnly, setLowStockOnly] = useState(false);
+  const [categoryId, setCategoryId] = useState<number | null>(null);
+  const { data: categories = [] } = trpc.categories.list.useQuery();
   const [purchaseListOpen, setPurchaseListOpen] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [cartCollapsed, setCartCollapsed] = useState(false);
+  // Sur téléphone, le panier reste replié en barre de total pour laisser la place aux produits.
+  const [cartCollapsed, setCartCollapsed] = useState(true);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [invoiceDiscount, setInvoiceDiscount] =
     useState<DiscountForm>(noDiscount);
@@ -99,10 +101,18 @@ export default function PointOfSale() {
         return (
           product.quantity - (pendingProductQuantities[product.id] ?? 0) > 0 &&
           matchesSearch &&
+          (categoryId === null || product.categoryId === categoryId) &&
           (!lowStockOnly || isLowStock(product))
         );
       }),
-    [isLowStock, lowStockOnly, pendingProductQuantities, products, query]
+    [
+      categoryId,
+      isLowStock,
+      lowStockOnly,
+      pendingProductQuantities,
+      products,
+      query,
+    ]
   );
   const purchaseItems = useMemo<PurchaseItem[]>(() => {
     if (!lowStockOnly) return [];
@@ -214,7 +224,6 @@ export default function PointOfSale() {
         0,
         product.quantity - (pendingProductQuantities[productId] ?? 0)
       );
-      setCartCollapsed(false);
       return item
         ? current.map(value =>
             value.productId === productId
@@ -347,126 +356,163 @@ export default function PointOfSale() {
     return () => window.removeEventListener("keydown", handleShortcut);
   }, [cart.length, draft.isPending, openCheckout]);
 
+  const usedCategories = categories.filter(category =>
+    products.some(product => product.categoryId === category.id)
+  );
   const bottomSpacing = cart.length
     ? cartCollapsed
-      ? "pb-24 sm:pb-28"
-      : "pb-[27rem] sm:pb-[31rem]"
+      ? "pb-36 sm:pb-40 lg:pb-0"
+      : "pb-[27rem] sm:pb-[31rem] lg:pb-0"
     : "";
+  const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   return (
-    <div className={`mx-auto max-w-[1600px] space-y-5 ${bottomSpacing}`}>
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#007B8B]">
-            Vente comptoir
-          </p>
-          <h1 className="mt-2 text-2xl font-semibold text-slate-950 dark:text-white sm:text-3xl">
-            Vente Rapide
+    <div
+      className={`mx-auto grid max-w-[1600px] gap-6 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_420px] ${bottomSpacing}`}
+    >
+      <section className="min-w-0 space-y-[18px]">
+        <header className="flex flex-wrap items-center gap-3">
+          <h1 className="flex-1 text-[22px] font-bold tracking-tight text-foreground">
+            Vente rapide
           </h1>
-        </div>
-        {cart.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setCartCollapsed(false)}
-            className="inline-flex items-center gap-2 self-start rounded-xl border border-[#007B8B]/20 bg-[#007B8B]/[0.07] px-3 py-2 text-sm font-medium text-[#007B8B]"
+          <span
+            className={`inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold ${isOnline ? "bg-success-soft text-success" : "bg-warning-soft text-warning"}`}
           >
-            <ShoppingCart className="h-4 w-4" />
-            {cart.length} article{cart.length > 1 ? "s" : ""} au panier
-            {cartCollapsed && " · Ouvrir"}
-          </button>
-        )}
-      </header>
-      <section className="rounded-2xl border border-border bg-card p-5">
-        <div className="flex flex-col gap-2 xl:flex-row xl:items-center">
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input
+            <span
+              className={`h-[7px] w-[7px] rounded-full ${isOnline ? "bg-success" : "bg-warning"}`}
+            />
+            {isOnline ? "Caisse en ligne" : "Caisse hors connexion"}
+          </span>
+        </header>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <label className="flex h-12 flex-1 items-center gap-2.5 rounded-[10px] border border-input bg-card px-3.5 text-faint focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/30">
+            <Search className="h-5 w-5 shrink-0" aria-hidden="true" />
+            <input
               value={query}
               onChange={event => setQuery(event.target.value)}
-              placeholder="Rechercher un produit ou une référence"
-              className="pl-9"
+              onKeyDown={event => {
+                if (event.key === "Enter" && query.trim()) {
+                  const exact = products.find(
+                    item =>
+                      item.reference.toLowerCase() ===
+                      query.trim().toLowerCase()
+                  );
+                  if (exact) handleCode(query);
+                  else if (available.length === 1) {
+                    add(available[0].id);
+                    setQuery("");
+                  }
+                }
+              }}
+              placeholder="Nom, référence ou code-barres"
+              aria-label="Rechercher un produit"
+              className="min-w-0 flex-1 bg-transparent text-base text-foreground outline-none placeholder:text-faint"
             />
-          </div>
-          <div className="flex flex-wrap gap-2">
+          </label>
+          <div className="flex gap-2">
             <Button
               aria-label="Scanner un code-barres"
               variant="outline"
-              size="icon"
+              className="h-12 w-12 px-0"
               onClick={() => setCameraOpen(true)}
             >
-              <Camera className="h-4 w-4" />
+              <Camera className="h-5 w-5" />
             </Button>
             <Button
               type="button"
               variant="outline"
               aria-pressed={lowStockOnly}
               onClick={() => setLowStockOnly(value => !value)}
-              className={
-                lowStockOnly
-                  ? "border-amber-500 bg-amber-500/10 text-amber-800 hover:bg-amber-500/15 dark:text-amber-200"
-                  : ""
-              }
+              className={`h-12 ${lowStockOnly ? "border-warning bg-warning-soft text-warning hover:bg-warning-soft" : ""}`}
             >
-              <AlertTriangle className="mr-2 h-4 w-4" />
+              <AlertTriangle className="h-4 w-4" />
               Stock faible
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={!lowStockOnly || !purchaseItems.length}
-              onClick={() => setPurchaseListOpen(true)}
-              className="border-[#007B8B]/30 text-[#007B8B] hover:bg-[#007B8B]/5"
-            >
-              <ClipboardList className="mr-2 h-4 w-4" />
-              Liste d’achats
-            </Button>
+            {lowStockOnly && (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!purchaseItems.length}
+                onClick={() => setPurchaseListOpen(true)}
+                className="h-12"
+              >
+                <ClipboardList className="h-4 w-4" />
+                Liste d’achats
+              </Button>
+            )}
           </div>
         </div>
+        {usedCategories.length > 0 && (
+          <div
+            className="flex flex-wrap gap-2"
+            role="group"
+            aria-label="Catégories"
+          >
+            {[
+              { id: null as number | null, name: "Tout" },
+              ...usedCategories,
+            ].map(category => {
+              const active = categoryId === category.id;
+              return (
+                <button
+                  key={category.id ?? "all"}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setCategoryId(category.id)}
+                  className={`h-10 rounded-full border px-4 text-sm font-semibold transition-colors ${active ? "border-primary bg-primary text-primary-foreground" : "border-input bg-card text-foreground hover:bg-accent"}`}
+                >
+                  {category.name}
+                </button>
+              );
+            })}
+          </div>
+        )}
         {lowStockOnly && (
-          <p className="mt-3 text-xs text-muted-foreground">
+          <p className="text-[13px] text-muted-foreground">
             La liste d’achats regroupe les produits filtrés et propose une
             quantité suffisante pour dépasser le seuil de sécurité.
           </p>
         )}
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-3">
           {available.map(product => {
             const productIsLowStock = isLowStock(product);
+            const inCart = cart.some(item => item.productId === product.id);
+            const remaining =
+              product.quantity - (pendingProductQuantities[product.id] ?? 0);
             return (
               <button
                 key={product.id}
                 onClick={() => add(product.id)}
-                className={`rounded-xl border p-4 text-left transition hover:border-[#007B8B]/40 hover:bg-[#007B8B]/5 ${productIsLowStock ? "border-amber-500/50 bg-amber-500/[0.04]" : "border-border"}`}
+                className={`flex min-h-[112px] flex-col gap-1.5 rounded-xl border bg-card p-3.5 text-left transition-colors hover:border-primary/60 hover:bg-accent/40 ${inCart ? "border-primary ring-1 ring-primary" : "border-border"}`}
               >
-                <p className="truncate font-medium">{product.name}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {product.reference} · {product.quantity} {product.unit}
-                </p>
+                <span className="line-clamp-2 text-[15px] font-semibold leading-snug text-foreground">
+                  {product.name}
+                </span>
+                <span
+                  className={`text-xs font-medium ${productIsLowStock ? "text-warning" : "text-faint"}`}
+                >
+                  {productIsLowStock ? "Stock bas" : "En stock"} · {remaining}{" "}
+                  {product.unit}
+                </span>
                 {product.priceTiers?.length ? (
-                  <p className="mt-2 text-[11px] font-medium text-primary">
+                  <span className="text-[11px] font-medium text-primary">
                     Paliers dès {product.priceTiers[0].minQuantity}{" "}
                     {product.unit}
-                  </p>
-                ) : null}
-                {productIsLowStock && (
-                  <p className="mt-2 inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
-                    <AlertTriangle className="h-3 w-3" />
-                    Stock faible · seuil {product.minimumQuantity}
-                  </p>
-                )}
-                <div className="mt-4 flex items-center justify-between">
-                  <span className="font-semibold text-[#007B8B]">
-                    {formatCurrency(product.retailPriceCents)}
                   </span>
-                  <Plus className="h-4 w-4" />
-                </div>
+                ) : null}
+                <span className="mt-auto text-base font-bold text-foreground">
+                  {formatCurrency(product.retailPriceCents)}
+                </span>
               </button>
             );
           })}
         </div>
         {!available.length && (
-          <p className="py-14 text-center text-sm text-muted-foreground">
+          <p className="rounded-xl border border-dashed border-border py-14 text-center text-sm text-muted-foreground">
             {lowStockOnly
               ? "Aucun produit en stock faible ne correspond à votre recherche."
-              : "Aucun produit disponible."}
+              : query || categoryId !== null
+                ? "Aucun produit ne correspond à votre recherche."
+                : "Aucun produit disponible."}
           </p>
         )}
       </section>
@@ -499,7 +545,7 @@ export default function PointOfSale() {
                 className="rounded-xl border border-border"
               >
                 <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-4 py-3 font-medium">
-                  <PackagePlus className="h-4 w-4 text-[#007B8B]" />
+                  <PackagePlus className="h-4 w-4 text-primary" />
                   {group.supplierName}
                 </div>
                 <div className="divide-y divide-border">
@@ -516,7 +562,7 @@ export default function PointOfSale() {
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold text-[#007B8B]">
+                        <p className="font-semibold text-primary">
                           + {item.quantityToOrder} {item.unit}
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
@@ -531,11 +577,11 @@ export default function PointOfSale() {
               </section>
             ))}
           </div>
-          <div className="flex items-center justify-between rounded-xl bg-[#007B8B]/[0.06] px-4 py-3">
+          <div className="flex items-center justify-between rounded-xl bg-primary/5 px-4 py-3">
             <span className="text-sm text-muted-foreground">
               Estimation des achats
             </span>
-            <span className="text-lg font-semibold text-[#007B8B]">
+            <span className="text-lg font-semibold text-primary">
               {formatCurrency(purchaseTotalCents)}
             </span>
           </div>
@@ -549,32 +595,34 @@ export default function PointOfSale() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      {cart.length > 0 && !checkoutSale && (
-        <aside
-          aria-label="Panier de vente"
-          className="fixed inset-x-0 bottom-0 z-30 mx-auto w-full max-w-3xl overflow-hidden rounded-t-[1.75rem] border border-border bg-card shadow-[0_-16px_45px_rgba(15,23,42,0.18)] sm:bottom-5 sm:rounded-[1.75rem]"
+      <aside
+        aria-label="Panier de vente"
+        className={`fixed inset-x-0 bottom-0 z-30 mx-auto w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl border border-border bg-card shadow-2xl sm:bottom-5 sm:rounded-2xl lg:sticky lg:top-[5.5rem] lg:bottom-auto lg:z-0 lg:mx-0 lg:max-h-[calc(100vh-7.5rem)] lg:max-w-none lg:self-start lg:rounded-xl lg:shadow-none ${cart.length > 0 && !checkoutSale ? "flex" : "hidden lg:flex"}`}
+      >
+        <div
+          className={`flex flex-col gap-2.5 border-b border-border px-5 lg:px-6 lg:py-5 ${cartCollapsed ? "py-2.5" : "py-4"}`}
         >
-          <div className="flex items-center justify-between border-b border-border px-5 py-4">
-            <div className="flex items-center gap-3">
-              <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#007B8B]/10 text-[#007B8B]">
-                <ShoppingCart className="h-5 w-5" />
-              </span>
-              <div>
-                <h2 className="font-semibold">
-                  Panier · {cart.length} article{cart.length > 1 ? "s" : ""}
-                </h2>
-                {!cartCollapsed && (
-                  <p className="text-xs text-muted-foreground">
-                    Les articles sélectionnés restent visibles.
-                  </p>
-                )}
-              </div>
-            </div>
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-[17px] font-semibold text-foreground">
+              Panier · {itemCount} article{itemCount > 1 ? "s" : ""}
+            </h2>
             <div className="flex items-center gap-1">
+              {cart.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearCart}
+                  className="text-destructive hover:bg-destructive-soft hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Vider
+                </Button>
+              )}
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
+                className="lg:hidden"
                 aria-label={
                   cartCollapsed ? "Ouvrir le panier" : "Réduire le panier"
                 }
@@ -587,161 +635,169 @@ export default function PointOfSale() {
                   <ChevronDown className="h-4 w-4" />
                 )}
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearCart}
-                className="text-rose-600 hover:bg-rose-500/10 hover:text-rose-700"
-              >
-                <Trash2 className="mr-1.5 h-4 w-4" />
-                Vider
-              </Button>
             </div>
           </div>
-          {cartCollapsed ? (
-            <div className="flex items-center justify-between bg-muted/30 px-5 py-3">
-              <span className="text-sm text-muted-foreground">
-                Total à payer
+        </div>
+        {cartCollapsed && (
+          <div className="flex items-center gap-3 px-5 py-3 lg:hidden">
+            <button
+              type="button"
+              onClick={() => setCartCollapsed(false)}
+              className="min-w-0 flex-1 text-left"
+            >
+              <span className="block text-xs text-muted-foreground">
+                Total TTC · voir le détail
               </span>
-              <button
-                type="button"
-                onClick={() => setCartCollapsed(false)}
-                className="font-semibold text-[#007B8B]"
-              >
-                {formatCurrency(totalCents)} · Ouvrir
-              </button>
+              <span className="block truncate text-xl font-bold tracking-tight text-foreground">
+                {formatCurrency(totalCents)}
+              </span>
+            </button>
+            <Button
+              onClick={openCheckout}
+              disabled={draft.isPending || !cart.length}
+              className="h-12 rounded-xl px-6 text-base font-bold"
+            >
+              {draft.isPending ? "Préparation…" : "Encaisser"}
+            </Button>
+          </div>
+        )}
+        <div
+          className={`min-h-0 flex-1 flex-col ${cartCollapsed ? "hidden lg:flex" : "flex"}`}
+        >
+          {lines.length ? (
+            <div className="max-h-[16.75rem] min-h-0 flex-1 overflow-y-auto px-5 sm:max-h-[20rem] lg:max-h-none lg:px-6">
+              {lines.map(line => (
+                <div
+                  key={line.productId}
+                  className="flex items-center gap-3 border-b border-border py-3.5 last:border-b-0"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[15px] font-medium text-foreground">
+                      {line.product.name}
+                    </p>
+                    <p className="mt-0.5 text-[13px] text-faint">
+                      {formatCurrency(line.unitPriceCents)} × {line.quantity}
+                    </p>
+                    {line.tierMinQuantity && (
+                      <p className="mt-0.5 text-[11px] font-medium text-primary">
+                        Palier {line.tierMinQuantity}+ retenu
+                      </p>
+                    )}
+                    {line.isLowStock && (
+                      <p className="mt-1 inline-flex items-center gap-1 rounded-md bg-warning-soft px-1.5 py-0.5 text-[11px] font-medium text-warning">
+                        <AlertTriangle className="h-3 w-3" />
+                        {line.remainingAfterSale} restant · seuil{" "}
+                        {line.product.minimumQuantity}
+                      </p>
+                    )}
+                    <div className="mt-1 hidden sm:block">
+                      <DiscountEditor
+                        compact
+                        label="Remise"
+                        value={line.discount}
+                        onChange={discount =>
+                          setLineDiscount(line.productId, discount)
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center overflow-hidden rounded-[10px] border border-input">
+                    <button
+                      type="button"
+                      aria-label={`Retirer une unité de ${line.product.name}`}
+                      className="grid h-11 w-11 place-items-center text-muted-foreground hover:bg-accent"
+                      onClick={() =>
+                        quantity(line.productId, line.quantity - 1)
+                      }
+                    >
+                      <Minus className="h-4 w-4" />
+                    </button>
+                    <span className="w-9 text-center text-[15px] font-semibold">
+                      {line.quantity}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label={`Ajouter une unité de ${line.product.name}`}
+                      className="grid h-11 w-11 place-items-center text-muted-foreground hover:bg-accent"
+                      onClick={() =>
+                        quantity(line.productId, line.quantity + 1)
+                      }
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <p className="w-24 shrink-0 text-right text-[15px] font-semibold text-foreground">
+                    {formatCurrency(line.totalCents)}
+                  </p>
+                </div>
+              ))}
             </div>
           ) : (
-            <>
-              <div className="max-h-[16.75rem] divide-y divide-border overflow-y-auto px-5 sm:max-h-[20rem]">
-                {lines.map(line => (
-                  <div
-                    key={line.productId}
-                    className="grid min-h-[5.25rem] grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 py-3"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate font-medium">
-                        {line.product.name}
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {formatCurrency(line.unitPriceCents)} l’unité
-                      </p>
-                      {line.tierMinQuantity && (
-                        <p className="mt-1 text-[11px] font-medium text-primary">
-                          Palier {line.tierMinQuantity}+ retenu
-                        </p>
-                      )}
-                      {line.isLowStock && (
-                        <p className="mt-1 inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
-                          <AlertTriangle className="h-3 w-3" />
-                          Stock faible · {line.remainingAfterSale} restant ·
-                          seuil {line.product.minimumQuantity}
-                        </p>
-                      )}
-                      <div className="mt-1 hidden sm:block">
-                        <DiscountEditor
-                          compact
-                          label="Remise"
-                          value={line.discount}
-                          onChange={discount =>
-                            setLineDiscount(line.productId, discount)
-                          }
-                        />
-                      </div>
-                    </div>
-                    <div className="flex items-center overflow-hidden rounded-xl border border-border bg-background">
-                      <Button
-                        aria-label={`Retirer une unité de ${line.product.name}`}
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 rounded-none"
-                        onClick={() =>
-                          quantity(line.productId, line.quantity - 1)
-                        }
-                      >
-                        <Minus className="h-3.5 w-3.5" />
-                      </Button>
-                      <span className="w-6 text-center text-sm font-semibold">
-                        {line.quantity}
-                      </span>
-                      <Button
-                        aria-label={`Ajouter une unité de ${line.product.name}`}
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 rounded-none"
-                        onClick={() =>
-                          quantity(line.productId, line.quantity + 1)
-                        }
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                    <p className="min-w-20 text-right font-semibold">
-                      {formatCurrency(line.totalCents)}
-                    </p>
-                  </div>
-                ))}
+            <div className="grid flex-1 place-items-center px-6 py-10 text-center">
+              <div>
+                <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-muted text-faint">
+                  <ShoppingCart className="h-5 w-5" />
+                </span>
+                <p className="mt-3 text-sm font-medium text-foreground">
+                  Panier vide
+                </p>
+                <p className="mt-1 text-[13px] text-muted-foreground">
+                  Touchez un produit ou scannez un code-barres.
+                </p>
               </div>
-              <div className="space-y-3 border-t border-border bg-muted/30 px-5 py-4">
-                <DiscountEditor
-                  compact
-                  label="Remise sur le panier"
-                  value={invoiceDiscount}
-                  onChange={setInvoiceDiscount}
-                />
-                <div className="space-y-1 text-sm text-muted-foreground">
-                  <div className="flex items-center justify-between">
-                    <span>Sous-total net</span>
-                    <span>{formatCurrency(taxableSubtotalCents)}</span>
-                  </div>
-                  {vatCents > 0 && (
-                    <div className="flex items-center justify-between">
-                      <span>
-                        TVA (
-                        {vatRatesLabel(
-                          lines.map(line =>
-                            settings?.vatEnabled
-                              ? (line.product.vatRateBasisPoints ??
-                                vatRateBasisPoints)
-                              : 0
-                          )
-                        )}
-                        )
-                      </span>
-                      <span>{formatCurrency(vatCents)}</span>
-                    </div>
-                  )}
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">
-                    Total TTC
-                  </span>
-                  <span className="text-2xl font-semibold tracking-tight">
-                    {formatCurrency(totalCents)}
-                  </span>
-                </div>
-                <Button
-                  onClick={openCheckout}
-                  disabled={draft.isPending}
-                  className="h-12 w-full bg-[#007B8B] text-base text-white hover:bg-[#006976]"
-                >
-                  {draft.isPending ? (
-                    "Préparation…"
-                  ) : (
-                    <>
-                      <Keyboard className="mr-2 h-4 w-4" />
-                      {isOnline ? "Encaisser" : "Encaisser hors connexion"}{" "}
-                      <span className="ml-2 rounded bg-white/20 px-1.5 py-0.5 text-xs">
-                        F9
-                      </span>
-                    </>
-                  )}
-                </Button>
-              </div>
-            </>
+            </div>
           )}
-        </aside>
-      )}
+          <div className="space-y-2.5 border-t border-border bg-muted/40 px-5 py-5 lg:px-6">
+            <DiscountEditor
+              compact
+              label="Remise sur le panier"
+              value={invoiceDiscount}
+              onChange={setInvoiceDiscount}
+            />
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <span>{vatCents > 0 ? "Sous-total HT" : "Sous-total"}</span>
+              <span>{formatCurrency(taxableSubtotalCents)}</span>
+            </div>
+            {vatCents > 0 && (
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span>
+                  TVA{" "}
+                  {vatRatesLabel(
+                    lines.map(line =>
+                      settings?.vatEnabled
+                        ? (line.product.vatRateBasisPoints ??
+                          vatRateBasisPoints)
+                        : 0
+                    )
+                  )}
+                </span>
+                <span>{formatCurrency(vatCents)}</span>
+              </div>
+            )}
+            <div className="flex items-baseline justify-between pt-1.5">
+              <span className="text-base font-semibold text-foreground">
+                Total TTC
+              </span>
+              <span className="text-[28px] font-bold tracking-tight text-foreground">
+                {formatCurrency(totalCents)}
+              </span>
+            </div>
+            <Button
+              onClick={openCheckout}
+              disabled={draft.isPending || !cart.length}
+              className="mt-1.5 h-14 w-full rounded-xl text-[17px] font-bold"
+            >
+              {draft.isPending
+                ? "Préparation…"
+                : `${isOnline ? "Encaisser" : "Encaisser hors connexion"} ${formatCurrency(totalCents)}`}
+            </Button>
+            <p className="hidden items-center justify-center gap-1.5 text-center text-xs text-faint sm:flex">
+              <Keyboard className="h-3.5 w-3.5" />
+              F9 pour encaisser
+            </p>
+          </div>
+        </div>
+      </aside>
     </div>
   );
 }

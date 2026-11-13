@@ -170,20 +170,20 @@ export default function InvoiceDetail() {
         </Button>
         <StatusBadge status={sale.status} />
       </header>
-      <section className="rounded-2xl border border-white/[0.07] bg-[#111722] p-5 sm:p-6">
+      <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-300">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
               Facture
             </p>
-            <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">
+            <h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">
               {sale.invoiceNumber}
             </h1>
-            <p className="mt-2 text-sm text-slate-500">
+            <p className="mt-2 text-sm text-faint">
               Émise le {formatDate(sale.createdAt, true)}
             </p>
             {sale.creditNoteNumber && (
-              <p className="mt-1 text-sm text-amber-300">
+              <p className="mt-1 text-sm text-warning">
                 Remboursée — avoir {sale.creditNoteNumber}
                 {sale.refundedAt
                   ? ` du ${formatDate(sale.refundedAt, true)}`
@@ -196,7 +196,7 @@ export default function InvoiceDetail() {
             <Info label="Solde" value={formatCurrency(remaining)} />
           </div>
         </div>
-        <div className="mt-6 grid gap-4 border-t border-white/[0.07] pt-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-6 grid gap-4 border-t border-border pt-5 sm:grid-cols-2 lg:grid-cols-4">
           <Info
             label="Client"
             value={detail.customer?.name || "Client comptoir"}
@@ -215,34 +215,34 @@ export default function InvoiceDetail() {
           />
         </div>
         {sale.deliveryAddress && (
-          <div className="mt-4 rounded-xl border border-cyan-400/15 bg-cyan-400/[0.05] p-3 text-sm text-slate-300">
-            <span className="font-medium text-cyan-300">Livraison :</span>{" "}
+          <div className="mt-4 rounded-xl border border-primary/25 bg-primary/5 p-3 text-sm text-muted-foreground">
+            <span className="font-medium text-primary">Livraison :</span>{" "}
             {sale.deliveryAddress}
           </div>
         )}
       </section>
       <section className="grid gap-5 lg:grid-cols-[1.5fr_.75fr]">
-        <Card className="border-white/[0.07] bg-[#111722]">
+        <Card className="border-border bg-card">
           <CardContent className="p-5">
-            <h2 className="font-semibold text-white">Articles facturés</h2>
+            <h2 className="font-semibold text-foreground">Articles facturés</h2>
             <div className="mt-4 space-y-3">
               {detail.items.map((item: any) => (
                 <div
                   key={item.id}
-                  className="flex items-center justify-between gap-4 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3"
+                  className="flex items-center justify-between gap-4 rounded-xl border border-border bg-muted/50 p-3"
                 >
                   <div className="min-w-0">
-                    <p className="truncate font-medium text-slate-200">
+                    <p className="truncate font-medium text-foreground">
                       {item.productName}
                     </p>
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="mt-1 text-xs text-faint">
                       {item.quantity} × {formatCurrency(item.unitPriceCents)}
                       {item.productReference
                         ? ` · ${item.productReference}`
                         : ""}
                     </p>
                   </div>
-                  <p className="shrink-0 font-semibold text-cyan-300">
+                  <p className="shrink-0 font-semibold text-primary">
                     {formatCurrency(item.lineTotalCents)}
                   </p>
                 </div>
@@ -250,18 +250,18 @@ export default function InvoiceDetail() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-white/[0.07] bg-[#111722]">
+        <Card className="border-border bg-card">
           <CardContent className="p-5">
-            <h2 className="font-semibold text-white">Règlements</h2>
+            <h2 className="font-semibold text-foreground">Règlements</h2>
             <div className="mt-4 space-y-3">
               <Info label="Encaissé" value={formatCurrency(paid)} />
               <Info
                 label="Reste à encaisser"
                 value={formatCurrency(remaining)}
               />
-              <div className="border-t border-white/[0.07] pt-3">
-                <p className="text-xs text-slate-500">Moyens utilisés</p>
-                <div className="mt-2 space-y-1 text-sm text-slate-300">
+              <div className="border-t border-border pt-3">
+                <p className="text-xs text-faint">Moyens utilisés</p>
+                <div className="mt-2 space-y-1 text-sm text-muted-foreground">
                   {detail.payments.length ? (
                     detail.payments.map((payment: any) => (
                       <p key={payment.id}>
@@ -277,16 +277,16 @@ export default function InvoiceDetail() {
           </CardContent>
         </Card>
       </section>
-      <section className="rounded-2xl border border-white/[0.07] bg-[#111722] p-5">
+      <section className="rounded-2xl border border-border bg-card p-5">
         <div
           id="invoice-print"
-          className="rounded-xl bg-white p-5 text-slate-900"
+          className="rounded-xl bg-card p-5 text-foreground"
         >
           <InvoiceDocument detail={detail} identity={identity} />
         </div>
       </section>
-      <section className="rounded-2xl border border-white/[0.07] bg-[#111722] p-5">
-        <h2 className="font-semibold text-white">Actions</h2>
+      <section className="rounded-2xl border border-border bg-card p-5">
+        <h2 className="font-semibold text-foreground">Actions</h2>
         <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           <Button variant="outline" onClick={downloadPdf}>
             <Download className="mr-2 h-4 w-4" />
@@ -316,7 +316,7 @@ export default function InvoiceDetail() {
           {sale.status === "draft" && (
             <Button
               variant="outline"
-              className="sm:col-span-2 lg:col-span-4 border-rose-400/30 text-rose-300"
+              className="sm:col-span-2 lg:col-span-4 border-destructive/25 text-destructive"
               onClick={() => setConfirmDelete(true)}
             >
               <Trash2 className="mr-2 h-4 w-4" />
@@ -327,7 +327,7 @@ export default function InvoiceDetail() {
             <Button
               variant="outline"
               disabled={!canRefund}
-              className="sm:col-span-2 lg:col-span-4 border-amber-400/30 text-amber-300"
+              className="sm:col-span-2 lg:col-span-4 border-warning/25 text-warning"
               onClick={() =>
                 canRefund
                   ? setConfirmRefund(true)
@@ -343,7 +343,7 @@ export default function InvoiceDetail() {
           {sale.status === "paid" && canRefund && (
             <Button
               variant="outline"
-              className="sm:col-span-2 lg:col-span-4 border-cyan-400/30 text-cyan-200"
+              className="sm:col-span-2 lg:col-span-4 border-primary/25 text-primary"
               onClick={() => setReturnOpen(true)}
             >
               <Undo2 className="mr-2 h-4 w-4" />
@@ -352,11 +352,11 @@ export default function InvoiceDetail() {
           )}
         </div>
         {detail.returns?.length > 0 && (
-          <div className="mt-4 rounded-2xl border border-white/[0.07] bg-[#111722] p-4">
-            <p className="text-sm font-semibold text-slate-200">
+          <div className="mt-4 rounded-2xl border border-border bg-card p-4">
+            <p className="text-sm font-semibold text-foreground">
               Retours et avoirs
             </p>
-            <ul className="mt-2 space-y-1 text-sm text-slate-400">
+            <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
               {detail.returns.map((item: any) => (
                 <li
                   key={item.id}
@@ -366,7 +366,7 @@ export default function InvoiceDetail() {
                     {item.creditNoteNumber} · {formatDate(item.createdAt, true)}
                     {item.reason ? ` · ${item.reason}` : ""}
                   </span>
-                  <span className="font-medium text-amber-300">
+                  <span className="font-medium text-warning">
                     −{formatCurrency(item.refundCents)}
                   </span>
                 </li>
@@ -412,7 +412,7 @@ export default function InvoiceDetail() {
           <AlertDialogFooter>
             <AlertDialogCancel>Annuler</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-rose-600 text-white"
+              className="bg-destructive text-destructive-foreground"
               onClick={() => removeDraft.mutate({ saleId: sale.id })}
             >
               Annuler la facture
@@ -432,7 +432,7 @@ export default function InvoiceDetail() {
           <AlertDialogFooter>
             <AlertDialogCancel>Annuler</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-amber-600 text-white"
+              className="bg-warning text-warning-foreground"
               onClick={() => refund.mutate({ saleId: sale.id })}
             >
               Confirmer le remboursement
@@ -446,8 +446,8 @@ export default function InvoiceDetail() {
 function Info({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="mt-1 truncate font-medium text-slate-200">{value}</p>
+      <p className="text-xs text-faint">{label}</p>
+      <p className="mt-1 truncate font-medium text-foreground">{value}</p>
     </div>
   );
 }

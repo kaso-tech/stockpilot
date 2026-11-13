@@ -74,19 +74,19 @@ type PurchaseOrder = {
 const statusMeta: Record<OrderStatus, { label: string; className: string }> = {
   draft: {
     label: "En attente",
-    className: "border-amber-400/25 bg-amber-400/10 text-amber-200",
+    className: "border-warning/25 bg-warning-soft text-warning",
   },
   sent: {
     label: "Envoyé",
-    className: "border-sky-400/25 bg-sky-400/10 text-sky-200",
+    className: "border-info/25 bg-info-soft text-info",
   },
   received: {
     label: "Reçu",
-    className: "border-emerald-400/25 bg-emerald-400/10 text-emerald-200",
+    className: "border-success/25 bg-success-soft text-success",
   },
   cancelled: {
     label: "Annulé",
-    className: "border-rose-400/25 bg-rose-400/10 text-rose-200",
+    className: "border-destructive/25 bg-destructive-soft text-destructive",
   },
 };
 
@@ -190,7 +190,7 @@ export default function SupplierDetail() {
 
   if (isLoading)
     return (
-      <div className="mx-auto max-w-[1500px] py-24 text-center text-sm text-slate-500">
+      <div className="mx-auto max-w-[1500px] py-24 text-center text-sm text-faint">
         Chargement du fournisseur…
       </div>
     );
@@ -225,7 +225,7 @@ export default function SupplierDetail() {
         <ArrowLeft className="mr-2 h-4 w-4" />
         Retour aux fournisseurs
       </Button>
-      <section className="rounded-2xl border border-white/[0.07] bg-[#111722] p-5 shadow-sm sm:p-6">
+      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
         <div className="flex min-w-0 items-start gap-4">
           <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary">
             <Building2 className="h-7 w-7" />
@@ -236,10 +236,10 @@ export default function SupplierDetail() {
             </p>
             <div className="mt-1 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
-                <h1 className="truncate text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+                <h1 className="truncate text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
                   {supplier.name}
                 </h1>
-                <p className="mt-2 text-sm text-slate-400">
+                <p className="mt-2 text-sm text-muted-foreground">
                   {supplier.address || "Adresse non renseignée"}
                 </p>
               </div>
@@ -259,7 +259,7 @@ export default function SupplierDetail() {
                         removeSupplier.mutate({ id: supplier.id });
                     }}
                     disabled={removeSupplier.isPending}
-                    className="border-rose-400/30 text-rose-300 hover:bg-rose-400/10 hover:text-rose-200"
+                    className="border-destructive/25 text-destructive hover:bg-destructive-soft hover:text-destructive"
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
                     Supprimer
@@ -291,7 +291,7 @@ export default function SupplierDetail() {
             icon={<PackageCheck className="h-4 w-4" />}
           />
         </div>
-        <div className="mt-5 flex flex-wrap gap-2 border-t border-white/[0.07] pt-5">
+        <div className="mt-5 flex flex-wrap gap-2 border-t border-border pt-5">
           <ContactButton
             label="Appeler"
             icon={<Phone className="h-4 w-4" />}
@@ -312,11 +312,11 @@ export default function SupplierDetail() {
       <SupplierNotes notes={supplier.notes} />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,.8fr)]">
         <section className="space-y-6">
-          <Card className="border-white/[0.07] bg-[#111722] shadow-none">
+          <Card className="border-border bg-card shadow-none">
             <CardContent className="p-5 sm:p-6">
               <div className="flex items-center gap-2">
                 <ShoppingCart className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-semibold text-white">
+                <h2 className="text-lg font-semibold text-foreground">
                   Préparer un bon de commande
                 </h2>
               </div>
@@ -332,7 +332,7 @@ export default function SupplierDetail() {
                       return (
                         <div
                           key={product.id}
-                          className={`flex flex-col gap-3 rounded-xl border p-3 transition sm:flex-row sm:items-center ${selected ? "border-primary/40 bg-primary/[0.06]" : "border-white/[0.07] bg-white/[0.02]"}`}
+                          className={`flex flex-col gap-3 rounded-xl border p-3 transition sm:flex-row sm:items-center ${selected ? "border-primary/40 bg-primary/[0.06]" : "border-border bg-muted/50"}`}
                         >
                           <Checkbox
                             checked={selected}
@@ -347,19 +347,17 @@ export default function SupplierDetail() {
                             aria-label={`Sélectionner ${product.name}`}
                           />
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-semibold text-slate-100">
+                            <p className="truncate text-sm font-semibold text-foreground">
                               {product.name}
                             </p>
-                            <p className="mt-0.5 text-xs text-slate-500">
+                            <p className="mt-0.5 text-xs text-faint">
                               {product.reference} · Stock {product.quantity}{" "}
                               {product.unit} · Achat{" "}
                               {formatCurrency(product.purchasePriceCents)}
                             </p>
                           </div>
                           <div className="flex items-center justify-between gap-2 sm:justify-end">
-                            <Label className="text-xs text-slate-500">
-                              Qté
-                            </Label>
+                            <Label className="text-xs text-faint">Qté</Label>
                             <Input
                               type="number"
                               min="1"
@@ -371,7 +369,7 @@ export default function SupplierDetail() {
                                   Number(event.target.value)
                                 )
                               }
-                              className="h-9 w-20 border-white/10 bg-[#0e141f] text-right"
+                              className="h-9 w-20 border-border bg-muted text-right"
                             />
                           </div>
                         </div>
@@ -383,7 +381,7 @@ export default function SupplierDetail() {
                       value={notes}
                       onChange={event => setNotes(event.target.value)}
                       placeholder="Note à afficher sur le bon de commande"
-                      className="min-h-10 border-white/10 bg-[#0e141f]"
+                      className="min-h-10 border-border bg-muted"
                     />
                     <Button
                       onClick={startOrder}
@@ -397,12 +395,12 @@ export default function SupplierDetail() {
                     </Button>
                   </div>
                   <div className="mt-3 flex items-center justify-between text-sm">
-                    <span className="text-slate-500">
+                    <span className="text-faint">
                       {selectedLines.length} produit
                       {selectedLines.length > 1 ? "s" : ""} sélectionné
                       {selectedLines.length > 1 ? "s" : ""}
                     </span>
-                    <span className="font-semibold text-slate-100">
+                    <span className="font-semibold text-foreground">
                       {formatCurrency(
                         linkedProducts
                           .filter(product => quantities[product.id] > 0)
@@ -455,21 +453,21 @@ export default function SupplierDetail() {
             icon={<Truck className="h-5 w-5 text-primary" />}
           >
             {entries.length ? (
-              <div className="divide-y divide-white/[0.07] overflow-hidden rounded-xl border border-white/[0.07]">
+              <div className="divide-y divide-border overflow-hidden rounded-xl border border-border">
                 {entries.slice(0, 12).map(entry => (
                   <div
                     key={entry.id}
                     className="flex items-center justify-between gap-3 px-4 py-3"
                   >
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-slate-200">
+                      <p className="truncate text-sm font-medium text-foreground">
                         {entry.productName}
                       </p>
-                      <p className="mt-0.5 text-xs text-slate-500">
+                      <p className="mt-0.5 text-xs text-faint">
                         {formatDate(entry.occurredAt)} · {entry.reason}
                       </p>
                     </div>
-                    <span className="shrink-0 text-sm font-semibold text-emerald-300">
+                    <span className="shrink-0 text-sm font-semibold text-success">
                       {formatSignedQuantity(entry.quantity)}
                     </span>
                   </div>
@@ -536,35 +534,37 @@ function SupplierOrderCard({
     <button
       type="button"
       onClick={onOpen}
-      className={`w-full rounded-xl border p-4 text-left transition hover:-translate-y-0.5 hover:border-primary/45 hover:bg-primary/[0.05] ${overdue ? "border-rose-400/35 bg-rose-400/[0.04]" : "border-white/[0.07] bg-white/[0.02]"}`}
+      className={`w-full rounded-xl border p-4 text-left transition hover:-translate-y-0.5 hover:border-primary/45 hover:bg-primary/[0.05] ${overdue ? "border-destructive/25 bg-destructive-soft" : "border-border bg-muted/50"}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-semibold text-slate-100">
+            <span className="font-semibold text-foreground">
               {order.orderNumber}
             </span>
             <StatusBadge status={order.status} />
           </div>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-faint">
             Commandé le {formatDate(order.createdAt)} · {order.items.length}{" "}
             produit{order.items.length > 1 ? "s" : ""}
           </p>
         </div>
-        <span className="shrink-0 text-sm font-semibold text-slate-100">
+        <span className="shrink-0 text-sm font-semibold text-foreground">
           {formatCurrency(order.totalCents)}
         </span>
       </div>
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
         <span
-          className={overdue ? "font-medium text-rose-300" : "text-slate-400"}
+          className={
+            overdue ? "font-medium text-destructive" : "text-muted-foreground"
+          }
         >
           {expected
             ? `${overdue ? "En retard · " : "Livraison prévue · "}${formatDate(expected)}`
             : "Livraison non planifiée"}
         </span>
         {received > 0 && (
-          <span className="text-emerald-300">
+          <span className="text-success">
             {received} unité{received > 1 ? "s" : ""} reçue
             {received > 1 ? "s" : ""}
           </span>
@@ -611,7 +611,7 @@ function ReceiptOrderDialog({
     .filter(item => item.quantity > 0);
   return (
     <Dialog open={Boolean(order)} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto border-white/10 bg-[#141b27] text-slate-100 sm:max-w-2xl">
+      <DialogContent className="max-h-[90vh] overflow-y-auto border-border bg-card text-foreground sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Réception partielle · {order.orderNumber}</DialogTitle>
         </DialogHeader>
@@ -621,13 +621,13 @@ function ReceiptOrderDialog({
             return (
               <div
                 key={item.id}
-                className="grid gap-2 rounded-xl border border-white/[0.07] bg-white/[0.025] p-3 sm:grid-cols-[1fr_auto]"
+                className="grid gap-2 rounded-xl border border-border bg-muted/50 p-3 sm:grid-cols-[1fr_auto]"
               >
                 <div>
-                  <p className="text-sm font-semibold text-slate-100">
+                  <p className="text-sm font-semibold text-foreground">
                     {item.productName}
                   </p>
-                  <p className="mt-1 text-xs text-slate-500">
+                  <p className="mt-1 text-xs text-faint">
                     Commandé : {item.quantity} {item.unit} · Déjà reçu :{" "}
                     {item.receivedQuantity} · Reste : {remaining}
                   </p>
@@ -644,7 +644,7 @@ function ReceiptOrderDialog({
                       [item.id]: Number(event.target.value) || 0,
                     }))
                   }
-                  className="h-9 w-full border-white/10 bg-[#0e141f] text-right sm:w-24"
+                  className="h-9 w-full border-border bg-muted text-right sm:w-24"
                 />
               </div>
             );
@@ -685,19 +685,19 @@ function CancelOrderDialog({
   if (!order) return null;
   return (
     <Dialog open={Boolean(order)} onOpenChange={onOpenChange}>
-      <DialogContent className="border-white/10 bg-[#141b27] text-slate-100">
+      <DialogContent className="border-border bg-card text-foreground">
         <DialogHeader>
           <DialogTitle>Annuler le bon {order.orderNumber}</DialogTitle>
         </DialogHeader>
         <div className="py-2">
-          <Label className="text-xs font-medium text-slate-300">
+          <Label className="text-xs font-medium text-muted-foreground">
             Motif d’annulation *
           </Label>
           <Textarea
             value={reason}
             onChange={event => setReason(event.target.value)}
             placeholder="Expliquez la raison de l’annulation"
-            className="mt-2 min-h-28 border-white/10 bg-[#0e141f]"
+            className="mt-2 min-h-28 border-border bg-muted"
           />
         </div>
         <DialogFooter>
@@ -707,7 +707,7 @@ function CancelOrderDialog({
           <Button
             disabled={pending || reason.trim().length < 3}
             onClick={() => onConfirm(reason.trim())}
-            className="bg-rose-600 text-white hover:bg-rose-500"
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
             <Trash2 className="mr-2 h-4 w-4" />
             {pending ? "Annulation…" : "Confirmer l’annulation"}
@@ -769,7 +769,7 @@ function SupplierEditDialog({
   };
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto border-white/10 bg-[#141b27] text-slate-100">
+      <DialogContent className="max-h-[90vh] overflow-y-auto border-border bg-card text-foreground">
         <DialogHeader>
           <DialogTitle>Modifier le fournisseur</DialogTitle>
         </DialogHeader>
@@ -845,10 +845,10 @@ function MissingSupplier({ onBack }: { onBack: () => void }) {
         <ArrowLeft className="mr-2 h-4 w-4" />
         Retour aux fournisseurs
       </Button>
-      <Card className="border-dashed border-white/10 bg-[#111722] shadow-none">
+      <Card className="border-dashed border-border bg-card shadow-none">
         <CardContent className="py-16 text-center">
-          <Building2 className="mx-auto h-7 w-7 text-slate-600" />
-          <p className="mt-4 font-medium text-slate-300">
+          <Building2 className="mx-auto h-7 w-7 text-faint" />
+          <p className="mt-4 font-medium text-muted-foreground">
             Fournisseur introuvable
           </p>
         </CardContent>
@@ -872,7 +872,7 @@ function ContactButton({
       variant="outline"
       disabled={!href}
       asChild={Boolean(href)}
-      className="border-white/10 text-slate-300 hover:border-primary/40 hover:bg-primary/[0.06] hover:text-primary disabled:opacity-45"
+      className="border-border text-muted-foreground hover:border-primary/40 hover:bg-primary/[0.06] hover:text-primary disabled:opacity-45"
     >
       {href ? (
         <a
@@ -902,12 +902,12 @@ function Info({
   icon: ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-white/[0.07] bg-white/[0.025] p-3">
-      <p className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.11em] text-slate-500">
+    <div className="rounded-xl border border-border bg-muted/50 p-3">
+      <p className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.11em] text-faint">
         {icon}
         {label}
       </p>
-      <p className="mt-1 truncate text-sm font-medium text-slate-200">
+      <p className="mt-1 truncate text-sm font-medium text-foreground">
         {value}
       </p>
     </div>
@@ -915,15 +915,15 @@ function Info({
 }
 function SupplierNotes({ notes }: { notes: string | null }) {
   return (
-    <Card className="border-white/[0.07] bg-[#111722] shadow-none">
+    <Card className="border-border bg-card shadow-none">
       <CardContent className="p-5 sm:p-6">
         <div className="flex items-center gap-2">
           <MapPin className="h-5 w-5 text-primary" />
-          <h2 className="text-base font-semibold text-white">
+          <h2 className="text-base font-semibold text-foreground">
             Informations complémentaires
           </h2>
         </div>
-        <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-slate-400">
+        <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
           {notes || "Aucune note enregistrée."}
         </p>
       </CardContent>
@@ -940,11 +940,11 @@ function History({
   children: ReactNode;
 }) {
   return (
-    <Card className="border-white/[0.07] bg-[#111722] shadow-none">
+    <Card className="border-border bg-card shadow-none">
       <CardContent className="p-5 sm:p-6">
         <div className="flex items-center gap-2">
           {icon}
-          <h2 className="text-lg font-semibold text-white">{title}</h2>
+          <h2 className="text-lg font-semibold text-foreground">{title}</h2>
         </div>
         <div className="mt-5">{children}</div>
       </CardContent>
@@ -953,18 +953,20 @@ function History({
 }
 function Empty({ icon, text }: { icon: ReactNode; text: string }) {
   return (
-    <div className="rounded-xl border border-dashed border-white/10 px-4 py-8 text-center">
-      <span className="mx-auto grid h-9 w-9 place-items-center rounded-xl bg-white/[0.035] text-slate-500">
+    <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center">
+      <span className="mx-auto grid h-9 w-9 place-items-center rounded-xl bg-muted/50 text-faint">
         {icon}
       </span>
-      <p className="mt-3 text-sm text-slate-500">{text}</p>
+      <p className="mt-3 text-sm text-faint">{text}</p>
     </div>
   );
 }
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="space-y-2">
-      <Label className="text-xs font-medium text-slate-300">{label}</Label>
+      <Label className="text-xs font-medium text-muted-foreground">
+        {label}
+      </Label>
       {children}
     </div>
   );

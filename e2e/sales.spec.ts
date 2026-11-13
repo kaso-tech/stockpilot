@@ -20,9 +20,7 @@ test("vente au comptoir de bout en bout : produit, panier, encaissement, stock",
     supplierId: null,
   });
   await page.goto("/pos");
-  await page
-    .getByPlaceholder("Rechercher un produit ou une référence")
-    .fill("E2E-001");
+  await page.getByPlaceholder("Nom, référence ou code-barres").fill("E2E-001");
   await page.getByRole("button", { name: /Savon E2E/ }).click();
   await page.getByRole("button", { name: /^Encaisser/ }).click();
   const validate = page.getByRole("button", { name: "Valider l’encaissement" });

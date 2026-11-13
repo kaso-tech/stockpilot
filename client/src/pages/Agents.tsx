@@ -295,10 +295,10 @@ export default function Agents() {
     <div className="mx-auto max-w-[1320px] space-y-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-300">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
             Ressources humaines
           </p>
-          <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">
+          <h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">
             Agents & rémunérations
           </h1>
         </div>
@@ -309,7 +309,7 @@ export default function Agents() {
               setForm(blankAgentForm);
               setOpen(true);
             }}
-            className="bg-cyan-400 text-slate-950 hover:bg-cyan-300"
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
           >
             <Plus className="mr-2 h-4 w-4" />
             Nouvel agent
@@ -344,7 +344,7 @@ export default function Agents() {
           return (
             <div
               key={`${beneficiary.type}-${beneficiary.id}`}
-              className="group flex min-w-0 items-center gap-2 rounded-2xl border border-white/[0.07] bg-[#111722] p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-cyan-400/35 hover:bg-[#141e2d]"
+              className="group flex min-w-0 items-center gap-2 rounded-2xl border border-border bg-card p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/25 hover:bg-card"
             >
               <button
                 type="button"
@@ -353,36 +353,36 @@ export default function Agents() {
                 }
                 className="flex min-w-0 flex-1 items-center gap-3 text-left"
               >
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-cyan-400/10 text-sm font-semibold text-cyan-300">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-sm font-semibold text-primary">
                   {beneficiary.name.slice(0, 2).toUpperCase()}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-2">
-                    <span className="truncate font-semibold text-slate-100">
+                    <span className="truncate font-semibold text-foreground">
                       {beneficiary.name}
                     </span>
-                    <Badge className="shrink-0 border-0 bg-white/[0.06] text-[10px] text-slate-400">
+                    <Badge className="shrink-0 border-0 bg-muted text-[10px] text-muted-foreground">
                       {beneficiary.role}
                     </Badge>
                   </span>
                   <span className="mt-1 flex items-center justify-between gap-2 text-xs">
-                    <span className="truncate text-slate-500">
+                    <span className="truncate text-faint">
                       {beneficiary.email ||
                         beneficiary.phone ||
                         "Coordonnées non renseignées"}
                     </span>
-                    <span className="shrink-0 font-medium text-amber-300">
+                    <span className="shrink-0 font-medium text-warning">
                       {formatCurrency(Math.max(0, balance?.dueCents ?? 0))}
                     </span>
                   </span>
                 </span>
-                <ChevronRight className="h-4 w-4 shrink-0 text-slate-600 transition group-hover:text-cyan-300" />
+                <ChevronRight className="h-4 w-4 shrink-0 text-faint transition group-hover:text-primary" />
               </button>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 shrink-0 text-slate-400 hover:text-cyan-300"
+                className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary"
                 aria-label={`Modifier ou convertir ${beneficiary.name}`}
                 title="Modifier ou convertir"
                 hidden={!canManageTeam}
@@ -395,8 +395,8 @@ export default function Agents() {
         })}
       </section>
       {!beneficiaries.length && (
-        <Card className="border-dashed border-white/10 bg-[#111722]">
-          <CardContent className="py-12 text-center text-sm text-slate-500">
+        <Card className="border-dashed border-border bg-card">
+          <CardContent className="py-12 text-center text-sm text-faint">
             Aucun agent actif.
           </CardContent>
         </Card>
@@ -444,7 +444,7 @@ export function AgentDialog({
   const typeChanged = Boolean(editing && editing.kind !== form.type);
   return (
     <Dialog open={open} onOpenChange={value => !value && onClose()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto border-white/10 bg-[#141b27] text-slate-100">
+      <DialogContent className="max-h-[90vh] overflow-y-auto border-border bg-card text-foreground">
         <DialogHeader>
           <DialogTitle>
             {editing ? "Modifier l’agent" : "Créer un agent"}
@@ -473,7 +473,7 @@ export function AgentDialog({
             </Select>
           </Field>
           {typeChanged && (
-            <p className="rounded-lg border border-amber-400/20 bg-amber-400/10 p-3 text-xs text-amber-100">
+            <p className="rounded-lg border border-warning/25 bg-warning-soft p-3 text-xs text-warning">
               Le changement de type préserve l’historique et crée un nouveau
               profil actif.
             </p>
@@ -528,8 +528,8 @@ export function AgentDialog({
               </Field>
             </>
           )}
-          <div className="space-y-4 rounded-xl border border-white/[0.08] p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.13em] text-cyan-300">
+          <div className="space-y-4 rounded-xl border border-border p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.13em] text-primary">
               Rémunération
             </p>
             <Field label="Système">
@@ -610,7 +610,7 @@ export function AgentDialog({
           <Button
             onClick={onSubmit}
             disabled={pending}
-            className="bg-cyan-400 text-slate-950 hover:bg-cyan-300"
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
           >
             {editing ? "Enregistrer" : "Créer l’agent"}
           </Button>
@@ -630,13 +630,13 @@ function Metric({
   icon: typeof Banknote;
 }) {
   return (
-    <Card className="border-white/[0.07] bg-[#111722]">
+    <Card className="border-border bg-card">
       <CardContent className="flex items-start justify-between p-5">
         <div>
-          <p className="text-xs text-slate-500">{label}</p>
-          <p className="mt-2 text-xl font-semibold text-white">{value}</p>
+          <p className="text-xs text-faint">{label}</p>
+          <p className="mt-2 text-xl font-semibold text-foreground">{value}</p>
         </div>
-        <Icon className="h-5 w-5 text-cyan-300" />
+        <Icon className="h-5 w-5 text-primary" />
       </CardContent>
     </Card>
   );
@@ -650,7 +650,7 @@ function Field({
 }) {
   return (
     <div className="space-y-2">
-      <Label className="text-xs text-slate-300">{label}</Label>
+      <Label className="text-xs text-muted-foreground">{label}</Label>
       {children}
     </div>
   );

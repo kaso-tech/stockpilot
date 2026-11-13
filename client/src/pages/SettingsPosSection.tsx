@@ -180,21 +180,23 @@ export default function SettingsPosSection({
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
           Vente rapide
         </p>
-        <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">
+        <h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">
           {titles[section]}
         </h1>
-        <p className="mt-2 text-sm text-slate-400">{descriptions[section]}</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {descriptions[section]}
+        </p>
       </header>
       {show("assignment") && (
-        <Card className="border-white/[0.07] bg-[#111722]">
+        <Card className="border-border bg-card">
           <CardContent className="space-y-6 p-6">
             <div className="flex items-center gap-3">
               <UsersRound className="h-5 w-5 text-primary" />
               <div>
-                <h2 className="font-semibold text-slate-100">
+                <h2 className="font-semibold text-foreground">
                   Rattachement des ventes
                 </h2>
-                <p className="mt-1 text-sm text-slate-400">
+                <p className="mt-1 text-sm text-muted-foreground">
                   Le vendeur connecté est toujours rattaché automatiquement à sa
                   vente et à sa rémunération.
                 </p>
@@ -228,11 +230,11 @@ export default function SettingsPosSection({
       {(show("ticket") || show("payments")) && (
         <div className="grid gap-6 lg:grid-cols-2">
           {show("ticket") && (
-            <Card className="border-white/[0.07] bg-[#111722]">
+            <Card className="border-border bg-card">
               <CardContent className="space-y-5 p-6">
                 <div className="flex items-center gap-3">
                   <ReceiptText className="h-5 w-5 text-primary" />
-                  <h2 className="font-semibold text-slate-100">
+                  <h2 className="font-semibold text-foreground">
                     Tickets de caisse
                   </h2>
                 </div>
@@ -270,11 +272,11 @@ export default function SettingsPosSection({
             </Card>
           )}
           {show("payments") && (
-            <Card className="border-white/[0.07] bg-[#111722]">
+            <Card className="border-border bg-card">
               <CardContent className="space-y-5 p-6">
                 <div className="flex items-center gap-3">
                   <Settings2 className="h-5 w-5 text-primary" />
-                  <h2 className="font-semibold text-slate-100">
+                  <h2 className="font-semibold text-foreground">
                     Moyens de paiement
                   </h2>
                 </div>
@@ -314,10 +316,10 @@ export default function SettingsPosSection({
             <div className="flex items-center gap-3">
               <ShieldCheck className="h-5 w-5 text-primary" />
               <div>
-                <h2 className="font-semibold text-slate-100">
+                <h2 className="font-semibold text-foreground">
                   Actions sensibles des vendeurs
                 </h2>
-                <p className="mt-1 text-sm text-slate-400">
+                <p className="mt-1 text-sm text-muted-foreground">
                   Chaque autorisation est contrôlée côté serveur et enregistrée
                   dans le journal d’activité.
                 </p>
@@ -368,7 +370,7 @@ export default function SettingsPosSection({
                 }
               />
             </Field>
-            <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-4 text-sm text-slate-400">
+            <div className="rounded-xl border border-border bg-muted/50 p-4 text-sm text-muted-foreground">
               La correction vendeur est limitée à un ajustement sans
               fournisseur. Le remboursement réintègre le stock, annule les
               commissions liées et laisse une trace dans le journal.
@@ -409,10 +411,10 @@ function AssignmentCard({
   agentNoun: string;
 }) {
   return (
-    <section className="space-y-4 rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5">
+    <section className="space-y-4 rounded-2xl border border-border bg-muted/50 p-5">
       <div>
-        <h3 className="font-semibold text-slate-100">{title}</h3>
-        <p className="mt-1 text-sm text-slate-400">{description}</p>
+        <h3 className="font-semibold text-foreground">{title}</h3>
+        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
       </div>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <Button
@@ -422,7 +424,7 @@ function AssignmentCard({
           className={
             mode === "default"
               ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
-              : "border-white/20 text-slate-200"
+              : "border-border text-foreground"
           }
         >
           Compte par défaut
@@ -434,7 +436,7 @@ function AssignmentCard({
           className={
             mode === "prompt"
               ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
-              : "border-white/20 text-slate-200"
+              : "border-border text-foreground"
           }
         >
           Demander au comptoir
@@ -442,7 +444,7 @@ function AssignmentCard({
       </div>
       {mode === "default" ? (
         <div className="space-y-2">
-          <Label className="text-sm text-slate-300">
+          <Label className="text-sm text-muted-foreground">
             Compte appliqué à toutes les ventes
           </Label>
           <Select value={value} onValueChange={onValueChange}>
@@ -458,12 +460,12 @@ function AssignmentCard({
               ))}
             </SelectContent>
           </Select>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-muted-foreground">
             Le vendeur ne verra pas ce champ lors de la création de la facture.
           </p>
         </div>
       ) : (
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-muted-foreground">
           Le vendeur choisira cet intervenant à chaque facture, avec le choix «
           Aucun » disponible.
         </p>
@@ -480,7 +482,7 @@ function Field({
 }) {
   return (
     <div className="space-y-2">
-      <Label className="text-sm text-slate-200">{label}</Label>
+      <Label className="text-sm text-foreground">{label}</Label>
       {children}
     </div>
   );
@@ -495,8 +497,8 @@ function Toggle({
   onChange: (value: boolean) => void;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 border-t border-white/[0.07] py-3">
-      <Label className="text-sm text-slate-200">{label}</Label>
+    <div className="flex items-center justify-between gap-4 border-t border-border py-3">
+      <Label className="text-sm text-foreground">{label}</Label>
       <Switch checked={checked} onCheckedChange={onChange} />
     </div>
   );

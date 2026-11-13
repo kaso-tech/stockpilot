@@ -329,7 +329,7 @@ export default function Products() {
           <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
             Catalogue
           </p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
             Produits & références
           </h1>
         </div>
@@ -346,17 +346,17 @@ export default function Products() {
           </Button>
         )}
       </header>
-      <Card className="border-white/[0.07] bg-[#111722] shadow-none">
+      <Card className="border-border bg-card shadow-none">
         <CardContent className="p-0">
-          <div className="border-b border-white/[0.07] p-4">
+          <div className="border-b border-border p-4">
             <div className="flex flex-col gap-3 xl:flex-row">
               <div className="relative min-w-0 flex-1">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
                 <Input
                   value={query}
                   onChange={event => setQuery(event.target.value)}
                   placeholder="Rechercher une référence…"
-                  className="border-white/10 bg-white/[0.03] pl-9"
+                  className="border-border bg-muted/50 pl-9"
                 />
               </div>
               <Select value={filterCategory} onValueChange={setFilterCategory}>
@@ -400,7 +400,7 @@ export default function Products() {
                 <Button
                   onClick={clearFilters}
                   variant="ghost"
-                  className="text-slate-400"
+                  className="text-muted-foreground"
                 >
                   <RotateCcw className="mr-2 h-4 w-4" />
                   Réinitialiser
@@ -409,7 +409,7 @@ export default function Products() {
             </div>
           </div>
           {isLoading ? (
-            <div className="px-6 py-16 text-center text-sm text-slate-500">
+            <div className="px-6 py-16 text-center text-sm text-faint">
               Chargement du catalogue…
             </div>
           ) : !filtered.length ? (
@@ -462,7 +462,7 @@ export default function Products() {
           <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
             Catalogue
           </p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
             Produits & références
           </h1>
         </div>
@@ -479,17 +479,17 @@ export default function Products() {
           </Button>
         )}
       </header>
-      <Card className="border-white/[0.07] bg-[#111722] shadow-none">
+      <Card className="border-border bg-card shadow-none">
         <CardContent className="p-0">
-          <div className="border-b border-white/[0.07] p-4">
+          <div className="border-b border-border p-4">
             <div className="flex flex-col gap-3 xl:flex-row">
               <div className="relative min-w-0 flex-1">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
                 <Input
                   value={query}
                   onChange={event => setQuery(event.target.value)}
                   placeholder="Rechercher une référence…"
-                  className="border-white/10 bg-white/[0.03] pl-9"
+                  className="border-border bg-muted/50 pl-9"
                 />
               </div>
               <Select value={filterCategory} onValueChange={setFilterCategory}>
@@ -533,7 +533,7 @@ export default function Products() {
                 <Button
                   onClick={clearFilters}
                   variant="ghost"
-                  className="text-slate-400"
+                  className="text-muted-foreground"
                 >
                   <RotateCcw className="mr-2 h-4 w-4" />
                   Réinitialiser
@@ -542,7 +542,7 @@ export default function Products() {
             </div>
           </div>
           {isLoading ? (
-            <div className="px-6 py-16 text-center text-sm text-slate-500">
+            <div className="px-6 py-16 text-center text-sm text-faint">
               Chargement du catalogue…
             </div>
           ) : !filtered.length ? (
@@ -550,7 +550,7 @@ export default function Products() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1040px] text-left">
-                <thead className="bg-white/[0.018] text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">
+                <thead className="bg-muted/50 text-[10px] font-semibold uppercase tracking-[0.13em] text-faint">
                   <tr>
                     <th className="px-6 py-3">Produit</th>
                     <th className="px-4 py-3">Achat</th>
@@ -560,26 +560,23 @@ export default function Products() {
                     <th className="px-6 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/[0.06]">
+                <tbody className="divide-y divide-border">
                   {filtered.map(product => {
                     const low = product.quantity <= product.minimumQuantity;
                     const retail =
                       product.retailPriceTiers ?? product.priceTiers ?? [];
                     const wholesale = product.wholesalePriceTiers ?? [];
                     return (
-                      <tr
-                        key={product.id}
-                        className="text-sm hover:bg-white/[0.018]"
-                      >
+                      <tr key={product.id} className="text-sm hover:bg-accent">
                         <td className="px-6 py-4">
                           <button
                             onClick={() => setDetailId(product.id)}
                             className="text-left"
                           >
-                            <p className="font-medium text-slate-100 hover:text-primary">
+                            <p className="font-medium text-foreground hover:text-primary">
                               {product.name}
                             </p>
-                            <p className="mt-0.5 text-xs text-slate-500">
+                            <p className="mt-0.5 text-xs text-faint">
                               {product.reference} · {product.category}
                             </p>
                             {retail.length || wholesale.length ? (
@@ -595,22 +592,22 @@ export default function Products() {
                             ) : null}
                           </button>
                         </td>
-                        <td className="px-4 py-4 text-slate-400">
+                        <td className="px-4 py-4 text-muted-foreground">
                           {formatCurrency(product.purchasePriceCents)}
                         </td>
-                        <td className="px-4 py-4 font-medium text-cyan-200">
+                        <td className="px-4 py-4 font-medium text-primary">
                           {formatCurrency(product.retailPriceCents)}
                         </td>
-                        <td className="px-4 py-4 font-medium text-violet-200">
+                        <td className="px-4 py-4 font-medium text-info">
                           {formatCurrency(product.wholesalePriceCents)}
                         </td>
                         <td className="px-4 py-4">
                           <Badge
-                            className={`border-0 ${low ? "bg-amber-400/10 text-amber-300" : "bg-emerald-400/10 text-emerald-300"}`}
+                            className={`border-0 ${low ? "bg-warning-soft text-warning" : "bg-success-soft text-success"}`}
                           >
                             {product.quantity} {product.unit}
                           </Badge>
-                          <p className="mt-1 text-[10px] text-slate-500">
+                          <p className="mt-1 text-[10px] text-faint">
                             Alerte à {product.minimumQuantity} {product.unit}
                           </p>
                         </td>
@@ -631,7 +628,7 @@ export default function Products() {
                                     size="icon"
                                     variant="ghost"
                                     onClick={() => edit(product)}
-                                    className="h-8 w-8 text-slate-400"
+                                    className="h-8 w-8 text-muted-foreground"
                                   >
                                     <Edit3 className="h-4 w-4" />
                                   </Button>
@@ -646,7 +643,7 @@ export default function Products() {
                                       )
                                         remove.mutate({ id: product.id });
                                     }}
-                                    className="h-8 w-8 text-rose-300"
+                                    className="h-8 w-8 text-destructive"
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
@@ -720,11 +717,11 @@ export default function Products() {
 function EmptyCatalog() {
   return (
     <div className="px-6 py-16 text-center">
-      <SlidersHorizontal className="mx-auto h-6 w-6 text-slate-600" />
-      <p className="mt-3 font-medium text-slate-300">
+      <SlidersHorizontal className="mx-auto h-6 w-6 text-faint" />
+      <p className="mt-3 font-medium text-muted-foreground">
         Aucune référence trouvée
       </p>
-      <p className="mt-1 text-xs text-slate-500">
+      <p className="mt-1 text-xs text-faint">
         Modifiez vos filtres ou ajoutez un produit.
       </p>
     </div>
@@ -759,38 +756,38 @@ function ProductCards({
                 onOpen(product.id);
               }
             }}
-            className="group flex cursor-pointer items-center gap-3 rounded-xl border border-white/[0.07] bg-[#0e141f] px-3 py-3 text-left transition hover:border-primary/35 hover:bg-white/[0.025] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:px-4"
+            className="group flex cursor-pointer items-center gap-3 rounded-xl border border-border bg-muted px-3 py-3 text-left transition hover:border-primary/35 hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:px-4"
           >
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/[0.08] text-xs font-bold text-primary">
               {product.name.slice(0, 1).toUpperCase()}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-slate-100 group-hover:text-primary">
+              <p className="truncate text-sm font-semibold text-foreground group-hover:text-primary">
                 {product.name}
               </p>
-              <p className="mt-0.5 truncate text-xs text-slate-500">
+              <p className="mt-0.5 truncate text-xs text-faint">
                 {product.reference} · {product.category}
               </p>
             </div>
             <div className="hidden min-w-28 text-right sm:block">
-              <p className="text-[10px] uppercase tracking-wide text-slate-500">
+              <p className="text-[10px] uppercase tracking-wide text-faint">
                 Détail
               </p>
-              <p className="mt-0.5 text-sm font-semibold text-cyan-200">
+              <p className="mt-0.5 text-sm font-semibold text-primary">
                 {formatCurrency(product.retailPriceCents)}
               </p>
             </div>
             <div className="min-w-20 text-right">
               <p
-                className={`text-sm font-semibold ${low ? "text-amber-300" : "text-slate-100"}`}
+                className={`text-sm font-semibold ${low ? "text-warning" : "text-foreground"}`}
               >
                 {product.quantity} {product.unit}
               </p>
-              <p className="mt-0.5 text-[10px] text-slate-500">
+              <p className="mt-0.5 text-[10px] text-faint">
                 {low ? "Seuil atteint" : "En stock"}
               </p>
             </div>
-            <ChevronRight className="h-4 w-4 shrink-0 text-slate-600 transition group-hover:text-primary" />
+            <ChevronRight className="h-4 w-4 shrink-0 text-faint transition group-hover:text-primary" />
           </article>
         );
       })}
@@ -825,10 +822,10 @@ function ProductDetailDialog({
   };
   return (
     <Dialog open={Boolean(product)} onOpenChange={value => !value && onClose()}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto border-white/10 bg-[#141b27] text-slate-100 sm:max-w-2xl">
+      <DialogContent className="max-h-[85vh] overflow-y-auto border-border bg-card text-foreground sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{product?.name ?? "Fiche produit"}</DialogTitle>
-          <DialogDescription className="text-slate-400">
+          <DialogDescription className="text-muted-foreground">
             {product?.reference} · {product?.category}
           </DialogDescription>
         </DialogHeader>
@@ -851,7 +848,7 @@ function ProductDetailDialog({
               <h3 className="text-sm font-semibold">
                 Historique des mouvements
               </h3>
-              <div className="mt-3 divide-y divide-white/[0.07] rounded-xl border border-white/[0.08]">
+              <div className="mt-3 divide-y divide-border rounded-xl border border-border">
                 {movements.length ? (
                   movements.map(movement => (
                     <div
@@ -864,14 +861,14 @@ function ProductDetailDialog({
                           {movement.quantity > 0 ? "+" : ""}
                           {movement.quantity} {product.unit}
                         </p>
-                        <p className="mt-1 text-xs text-slate-500">
+                        <p className="mt-1 text-xs text-faint">
                           {movement.reason} · {formatDate(movement.occurredAt)}
                           {movement.operatorName
                             ? ` · ${movement.operatorName}`
                             : ""}
                         </p>
                       </div>
-                      <p className="text-right text-sm text-slate-300">
+                      <p className="text-right text-sm text-muted-foreground">
                         {movement.previousQuantity} →{" "}
                         <span className="font-semibold">
                           {movement.resultingQuantity}
@@ -880,7 +877,7 @@ function ProductDetailDialog({
                     </div>
                   ))
                 ) : (
-                  <p className="px-4 py-10 text-center text-sm text-slate-500">
+                  <p className="px-4 py-10 text-center text-sm text-faint">
                     Aucun mouvement enregistré pour ce produit.
                   </p>
                 )}
@@ -909,10 +906,10 @@ function PurchasePriceDialog({
 }) {
   return (
     <Dialog open={Boolean(product)} onOpenChange={open => !open && onClose()}>
-      <DialogContent className="border-white/10 bg-[#141b27] text-slate-100 sm:max-w-md">
+      <DialogContent className="border-border bg-card text-foreground sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Modifier le coût d’achat</DialogTitle>
-          <DialogDescription className="text-slate-400">
+          <DialogDescription className="text-muted-foreground">
             {product?.name} — cette action est consignée dans le journal.
           </DialogDescription>
         </DialogHeader>
@@ -954,11 +951,11 @@ function Metric({
     tone === "primary"
       ? "bg-primary/10 text-primary"
       : tone === "warning"
-        ? "bg-amber-400/10 text-amber-300"
-        : "bg-white/[0.04] text-slate-100";
+        ? "bg-warning-soft text-warning"
+        : "bg-muted/50 text-foreground";
   return (
     <div className={`rounded-xl p-3 ${classes}`}>
-      <p className="text-xs text-slate-400">{label}</p>
+      <p className="text-xs text-muted-foreground">{label}</p>
       <p className="mt-1 truncate text-lg font-semibold">{value}</p>
     </div>
   );
@@ -1040,12 +1037,12 @@ function ProductDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={value => !value && onClose()}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto border-white/10 bg-[#141b27] text-slate-100 sm:max-w-xl">
+        <DialogContent className="max-h-[90vh] overflow-y-auto border-border bg-card text-foreground sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>
               {editing ? "Modifier le produit" : "Nouveau produit"}
             </DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription className="text-muted-foreground">
               Configurez indépendamment les paliers du prix détail et du prix
               grossiste.
             </DialogDescription>
@@ -1242,7 +1239,7 @@ function TierSection({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-sm font-semibold">{title}</p>
-          <p className="mt-1 text-xs text-slate-400">{description}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{description}</p>
         </div>
         <div className="flex items-center gap-2">
           {copyFromRetail && (
@@ -1309,7 +1306,7 @@ function TierSection({
                 onClick={() =>
                   onChange(tiers.filter((_, position) => position !== index))
                 }
-                className="text-rose-300"
+                className="text-destructive"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -1363,7 +1360,7 @@ function ManagedSelect({
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="space-y-2">
-      <Label className="text-xs text-slate-300">{label}</Label>
+      <Label className="text-xs text-muted-foreground">{label}</Label>
       {children}
     </div>
   );

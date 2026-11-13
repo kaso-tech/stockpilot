@@ -144,17 +144,17 @@ export default function Backups() {
     <div className="mx-auto max-w-6xl space-y-6">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#007B8B]">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
             Protection des données
           </p>
-          <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">
+          <h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">
             Sauvegardes
           </h1>
         </div>
         <Button
           onClick={() => runNow.mutate()}
           disabled={runNow.isPending}
-          className="bg-[#007B8B] text-white hover:bg-[#006a78]"
+          className="bg-primary text-primary-foreground hover:bg-primary/90"
         >
           <HardDriveDownload className="mr-2 h-4 w-4" />
           {runNow.isPending ? "Sauvegarde…" : "Sauvegarder maintenant"}
@@ -210,27 +210,27 @@ export default function Backups() {
         />
       </div>
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(340px,0.8fr)]">
-        <Card className="border-white/[0.07] bg-[#111722]">
+        <Card className="border-border bg-card">
           <CardContent className="space-y-6 p-6">
             <div className="flex items-center gap-3">
-              <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#007B8B]/10 text-[#00bcd4]">
+              <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary">
                 <RefreshCw className="h-5 w-5" />
               </span>
               <div>
-                <h2 className="font-semibold text-slate-100">
+                <h2 className="font-semibold text-foreground">
                   Planification automatique
                 </h2>
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-faint">
                   La fréquence initiale est de 24 heures et peut être ajustée.
                 </p>
               </div>
             </div>
-            <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.025] p-4">
+            <div className="flex items-center justify-between rounded-xl border border-border bg-muted/50 p-4">
               <div>
-                <p className="font-medium text-slate-100">
+                <p className="font-medium text-foreground">
                   Sauvegardes automatiques
                 </p>
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="mt-1 text-sm text-faint">
                   Archive locale et copie Drive après connexion.
                 </p>
               </div>
@@ -240,14 +240,14 @@ export default function Backups() {
               />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <label className="grid gap-2 text-sm font-medium text-slate-300">
+              <label className="grid gap-2 text-sm font-medium text-muted-foreground">
                 <span>Fréquence</span>
                 <select
                   value={currentFrequency}
                   onChange={event =>
                     setFrequencyHours(Number(event.target.value))
                   }
-                  className="h-10 rounded-md border border-white/10 bg-white/[0.04] px-3 text-sm text-slate-100 outline-none focus:border-[#007B8B]"
+                  className="h-10 rounded-md border border-border bg-muted/50 px-3 text-sm text-foreground outline-none focus:border-primary"
                 >
                   {frequencyOptions.map(option => (
                     <option key={option.hours} value={option.hours}>
@@ -256,7 +256,7 @@ export default function Backups() {
                   ))}
                 </select>
               </label>
-              <label className="grid gap-2 text-sm font-medium text-slate-300">
+              <label className="grid gap-2 text-sm font-medium text-muted-foreground">
                 <span>Archives à conserver</span>
                 <Input
                   type="number"
@@ -280,7 +280,7 @@ export default function Backups() {
               }
               disabled={saveConfiguration.isPending}
               variant="outline"
-              className="border-white/10 text-slate-200"
+              className="border-border text-foreground"
             >
               <CheckCircle2 className="mr-2 h-4 w-4" />
               {saveConfiguration.isPending
@@ -290,15 +290,17 @@ export default function Backups() {
           </CardContent>
         </Card>
         <div className="space-y-6">
-          <Card className="border-white/[0.07] bg-[#111722]">
+          <Card className="border-border bg-card">
             <CardContent className="space-y-4 p-6">
               <div className="flex items-center gap-3">
-                <span className="grid h-10 w-10 place-items-center rounded-xl bg-blue-400/10 text-blue-300">
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-info-soft text-info">
                   <Cloud className="h-5 w-5" />
                 </span>
                 <div>
-                  <h2 className="font-semibold text-slate-100">Google Drive</h2>
-                  <p className="text-sm text-slate-500">
+                  <h2 className="font-semibold text-foreground">
+                    Google Drive
+                  </h2>
+                  <p className="text-sm text-faint">
                     Copie cloud sécurisée des archives.
                   </p>
                 </div>
@@ -310,7 +312,7 @@ export default function Backups() {
                       "/api/integrations/google-drive/connect"
                     )
                   }
-                  className="w-full bg-blue-500 text-white hover:bg-blue-400"
+                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
                 >
                   <UploadCloud className="mr-2 h-4 w-4" />
                   {activeSettings.googleDriveConnected
@@ -318,17 +320,17 @@ export default function Backups() {
                     : "Connecter Google Drive"}
                 </Button>
               ) : (
-                <div className="rounded-xl border border-amber-500/30 bg-amber-400/10 p-3 text-sm text-amber-800 dark:text-amber-100">
+                <div className="rounded-xl border border-warning/25 bg-warning-soft p-3 text-sm text-warning">
                   Ajoutez les identifiants OAuth Google Drive dans les secrets
                   du projet pour activer cette connexion.
                 </div>
               )}
             </CardContent>
           </Card>
-          <Card className="border-amber-500/30 bg-amber-400/[0.07]">
+          <Card className="border-warning/25 bg-warning-soft">
             <CardContent className="flex gap-3 p-5">
-              <ShieldAlert className="h-5 w-5 shrink-0 text-amber-700 dark:text-amber-300" />
-              <p className="text-sm leading-6 text-amber-900 dark:text-amber-100">
+              <ShieldAlert className="h-5 w-5 shrink-0 text-warning" />
+              <p className="text-sm leading-6 text-warning">
                 La restauration remplace les données métier actuelles par celles
                 de l’archive choisie. Créez une sauvegarde récente avant de
                 restaurer.
@@ -337,21 +339,21 @@ export default function Backups() {
           </Card>
         </div>
       </div>
-      <Card className="border-white/[0.07] bg-[#111722]">
+      <Card className="border-border bg-card">
         <CardContent className="p-6">
           <div className="mb-5 flex items-center gap-3">
-            <ArchiveRestore className="h-5 w-5 text-[#00bcd4]" />
-            <h2 className="font-semibold text-slate-100">
+            <ArchiveRestore className="h-5 w-5 text-primary" />
+            <h2 className="font-semibold text-foreground">
               Restauration locale
             </h2>
           </div>
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-            <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-white/15 bg-white/[0.025] p-4 text-center">
-              <FileUp className="mb-2 h-5 w-5 text-[#00bcd4]" />
-              <span className="text-sm font-medium text-slate-200">
+            <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/50 p-4 text-center">
+              <FileUp className="mb-2 h-5 w-5 text-primary" />
+              <span className="text-sm font-medium text-foreground">
                 Choisir une archive JSON
               </span>
-              <span className="mt-1 text-xs text-slate-500">
+              <span className="mt-1 text-xs text-faint">
                 Archive StockPilot · 20 Mo maximum
               </span>
               <input
@@ -361,18 +363,18 @@ export default function Backups() {
                 onChange={event => onRestoreFile(event.target.files?.[0])}
               />
             </label>
-            <div className="rounded-xl border border-white/10 bg-white/[0.025] p-4">
+            <div className="rounded-xl border border-border bg-muted/50 p-4">
               {previewRestore.isPending ? (
-                <div className="flex items-center gap-2 text-sm text-slate-400">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" /> Vérification de
                   l’archive…
                 </div>
               ) : preview ? (
                 <div className="space-y-3">
-                  <p className="text-sm text-slate-300">
-                    <span className="text-slate-500">Archive exportée le </span>
+                  <p className="text-sm text-muted-foreground">
+                    <span className="text-faint">Archive exportée le </span>
                     {formatDate(preview.exportedAt, true)}{" "}
-                    <span className="text-slate-500">· </span>
+                    <span className="text-faint">· </span>
                     {preview.total} enregistrements
                   </p>
                   <div className="flex items-center gap-2">
@@ -401,7 +403,7 @@ export default function Backups() {
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-faint">
                   Importez une archive pour en vérifier le contenu avant toute
                   restauration.
                 </p>
@@ -410,12 +412,12 @@ export default function Backups() {
           </div>
         </CardContent>
       </Card>
-      <Card className="border-white/[0.07] bg-[#111722]">
+      <Card className="border-border bg-card">
         <CardContent className="p-6">
           <div className="mb-5 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <UserRound className="h-5 w-5 text-primary" />
-              <h2 className="font-semibold text-slate-100">
+              <h2 className="font-semibold text-foreground">
                 Sauvegardes manuelles des vendeurs
               </h2>
             </div>
@@ -424,7 +426,7 @@ export default function Backups() {
             </Badge>
           </div>
           {isLoading ? (
-            <div className="py-6 text-sm text-slate-500">Chargement…</div>
+            <div className="py-6 text-sm text-faint">Chargement…</div>
           ) : sellerManualArchives.length ? (
             <div className="grid gap-3 md:grid-cols-2">
               {sellerManualArchives.map(archive => (
@@ -434,32 +436,32 @@ export default function Backups() {
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="font-medium text-slate-100">
+                      <p className="font-medium text-foreground">
                         {archive.createdByName || "Vendeur non identifié"}
                       </p>
-                      <p className="mt-1 text-xs text-slate-500">
+                      <p className="mt-1 text-xs text-faint">
                         {formatDate(archive.createdAt, true)}
                       </p>
                     </div>
                     <Badge
                       className={
                         archive.status === "completed"
-                          ? "border-0 bg-emerald-400/10 text-emerald-300"
-                          : "border-0 bg-rose-400/10 text-rose-300"
+                          ? "border-0 bg-success-soft text-success"
+                          : "border-0 bg-destructive-soft text-destructive"
                       }
                     >
                       {archive.status === "completed" ? "Réussie" : "Échec"}
                     </Badge>
                   </div>
-                  <p className="mt-3 truncate text-xs text-slate-400">
+                  <p className="mt-3 truncate text-xs text-muted-foreground">
                     {archive.filename}
                   </p>
-                  <p className="mt-1 text-xs text-slate-500">
+                  <p className="mt-1 text-xs text-faint">
                     {formatBytes(archive.sizeBytes)} · {archive.recordCount}{" "}
                     enregistrements
                   </p>
                   {archive.error && (
-                    <p className="mt-2 text-xs text-rose-300">
+                    <p className="mt-2 text-xs text-destructive">
                       {archive.error}
                     </p>
                   )}
@@ -467,39 +469,39 @@ export default function Backups() {
               ))}
             </div>
           ) : (
-            <div className="rounded-xl border border-dashed border-white/10 py-8 text-center text-sm text-slate-500">
+            <div className="rounded-xl border border-dashed border-border py-8 text-center text-sm text-faint">
               Aucune sauvegarde manuelle réalisée par un vendeur.
             </div>
           )}
         </CardContent>
       </Card>
-      <Card className="border-white/[0.07] bg-[#111722]">
+      <Card className="border-border bg-card">
         <CardContent className="p-6">
           <div className="mb-5 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <History className="h-5 w-5 text-[#00bcd4]" />
-              <h2 className="font-semibold text-slate-100">
+              <History className="h-5 w-5 text-primary" />
+              <h2 className="font-semibold text-foreground">
                 Historique des archives
               </h2>
             </div>
-            <Badge className="border-0 bg-white/[0.06] text-slate-300">
+            <Badge className="border-0 bg-muted text-muted-foreground">
               {data?.archives.length ?? 0}
             </Badge>
           </div>
           {isLoading ? (
-            <div className="py-6 text-sm text-slate-500">Chargement…</div>
+            <div className="py-6 text-sm text-faint">Chargement…</div>
           ) : data?.archives.length ? (
-            <div className="divide-y divide-white/[0.07]">
+            <div className="divide-y divide-border">
               {data.archives.map(archive => (
                 <div
                   key={archive.id}
                   className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-slate-100">
+                    <p className="truncate text-sm font-medium text-foreground">
                       {archive.filename}
                     </p>
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="mt-1 text-xs text-faint">
                       {formatDate(archive.createdAt, true)} ·{" "}
                       {formatBytes(archive.sizeBytes)} · {archive.recordCount}{" "}
                       enregistrements ·{" "}
@@ -517,7 +519,7 @@ export default function Backups() {
                       variant="outline"
                       onClick={() => download.mutate({ id: archive.id })}
                       disabled={download.isPending}
-                      className="border-white/10 text-slate-200"
+                      className="border-border text-foreground"
                     >
                       <Download className="mr-2 h-3.5 w-3.5" />
                       Télécharger
@@ -529,7 +531,7 @@ export default function Backups() {
               ))}
             </div>
           ) : (
-            <p className="py-6 text-sm text-slate-500">
+            <p className="py-6 text-sm text-faint">
               Aucune archive n’a encore été créée.
             </p>
           )}
@@ -553,24 +555,24 @@ function StatusCard({
   tone: "cyan" | "green" | "rose" | "slate";
 }) {
   const tones = {
-    cyan: "bg-[#007B8B]/10 text-[#00bcd4]",
-    green: "bg-emerald-400/10 text-emerald-300",
-    rose: "bg-rose-400/10 text-rose-300",
-    slate: "bg-white/[0.06] text-slate-300",
+    cyan: "bg-primary/10 text-primary",
+    green: "bg-success-soft text-success",
+    rose: "bg-destructive-soft text-destructive",
+    slate: "bg-muted text-muted-foreground",
   };
   return (
-    <Card className="border-white/[0.07] bg-[#111722]">
+    <Card className="border-border bg-card">
       <CardContent className="p-5">
         <span
           className={`mb-4 grid h-9 w-9 place-items-center rounded-xl ${tones[tone]}`}
         >
           <Icon className="h-4.5 w-4.5" />
         </span>
-        <p className="text-xs font-medium uppercase tracking-[0.12em] text-slate-500">
+        <p className="text-xs font-medium uppercase tracking-[0.12em] text-faint">
           {label}
         </p>
-        <p className="mt-2 text-lg font-semibold text-slate-100">{value}</p>
-        <p className="mt-1 text-xs text-slate-500">{detail}</p>
+        <p className="mt-2 text-lg font-semibold text-foreground">{value}</p>
+        <p className="mt-1 text-xs text-faint">{detail}</p>
       </CardContent>
     </Card>
   );

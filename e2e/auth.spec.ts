@@ -5,7 +5,7 @@ test("inscription, déconnexion puis reconnexion", async ({ page }) => {
   const errors = trackErrors(page);
   await register(page, "awa@e2e.test");
   await expect(page.getByText("Confirmez votre adresse e-mail")).toBeVisible();
-  await page.getByText("awa@e2e.test").first().click();
+  await page.getByRole("button", { name: /Awa Diallo/ }).click();
   await page.getByRole("menuitem", { name: "Se déconnecter" }).click();
   await expect(
     page.getByRole("button", { name: "Se connecter" })

@@ -1,6 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -27,9 +26,12 @@ import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
+  SidebarGroup,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
@@ -39,6 +41,7 @@ import {
 import { useIsMobile } from "@/hooks/useMobile";
 import { usePreferences } from "@/contexts/PreferencesContext";
 import { useOffline } from "@/contexts/OfflineContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import {
   ArrowLeftRight,
   Archive,
@@ -60,6 +63,9 @@ import {
   WalletCards,
   LayoutDashboard,
   LogOut,
+  Moon,
+  Search,
+  Sun,
   PackageSearch,
   ReceiptText,
   Ruler,
@@ -74,7 +80,7 @@ import {
   Warehouse,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -88,105 +94,167 @@ type MenuItem = {
   anyOf?: Permission[];
 };
 
-const menuItems: MenuItem[] = [
-  { icon: LayoutDashboard, label: "Vue d’ensemble", path: "/" },
+type MenuGroup = { title: string; items: MenuItem[] };
+
+/** Navigation groupée par métier, dans l'ordre du travail quotidien. */
+const menuGroups: MenuGroup[] = [
   {
-    icon: ShoppingCart,
-    label: "Vente Rapide",
-    path: "/pos",
-    anyOf: ["sales.create"],
-  },
-  { icon: ReceiptText, label: "Factures", path: "/factures" },
-  { icon: FileText, label: "Devis", path: "/devis" },
-  { icon: UserRound, label: "Clients", path: "/clients" },
-  { icon: PackageSearch, label: "Produits", path: "/produits" },
-  {
-    icon: Boxes,
-    label: "Catégories",
-    path: "/categories",
-    anyOf: ["catalog.manage"],
-  },
-  { icon: Ruler, label: "Unités", path: "/unites", anyOf: ["catalog.manage"] },
-  { icon: ArrowLeftRight, label: "Mouvements", path: "/mouvements" },
-  {
-    icon: ClipboardCheck,
-    label: "Inventaires",
-    path: "/inventaires",
-    anyOf: ["inventory.manage"],
+    title: "Pilotage",
+    items: [{ icon: LayoutDashboard, label: "Vue d’ensemble", path: "/" }],
   },
   {
-    icon: Warehouse,
-    label: "Dépôts",
-    path: "/depots",
-    anyOf: ["inventory.manage", "catalog.manage"],
+    title: "Ventes",
+    items: [
+      {
+        icon: ShoppingCart,
+        label: "Vente rapide",
+        path: "/pos",
+        anyOf: ["sales.create"],
+      },
+      { icon: ReceiptText, label: "Factures", path: "/factures" },
+      { icon: FileText, label: "Devis", path: "/devis" },
+      { icon: UserRound, label: "Clients", path: "/clients" },
+    ],
   },
   {
-    icon: Truck,
-    label: "Fournisseurs",
-    path: "/fournisseurs",
-    anyOf: ["catalog.manage", "purchasing.manage"],
+    title: "Stock",
+    items: [
+      { icon: PackageSearch, label: "Produits", path: "/produits" },
+      {
+        icon: Boxes,
+        label: "Catégories",
+        path: "/categories",
+        anyOf: ["catalog.manage"],
+      },
+      {
+        icon: Ruler,
+        label: "Unités",
+        path: "/unites",
+        anyOf: ["catalog.manage"],
+      },
+      { icon: ArrowLeftRight, label: "Mouvements", path: "/mouvements" },
+      {
+        icon: ClipboardCheck,
+        label: "Inventaires",
+        path: "/inventaires",
+        anyOf: ["inventory.manage"],
+      },
+      {
+        icon: Warehouse,
+        label: "Dépôts",
+        path: "/depots",
+        anyOf: ["inventory.manage", "catalog.manage"],
+      },
+      {
+        icon: TriangleAlert,
+        label: "Alertes",
+        path: "/alertes",
+        anyOf: ["catalog.manage", "purchasing.manage"],
+      },
+    ],
   },
   {
-    icon: FileText,
-    label: "Bons de commande",
-    path: "/bons-commande",
-    anyOf: ["purchasing.manage", "accounting.export"],
+    title: "Achats",
+    items: [
+      {
+        icon: Truck,
+        label: "Fournisseurs",
+        path: "/fournisseurs",
+        anyOf: ["catalog.manage", "purchasing.manage"],
+      },
+      {
+        icon: FileText,
+        label: "Bons de commande",
+        path: "/bons-commande",
+        anyOf: ["purchasing.manage", "accounting.export"],
+      },
+    ],
   },
   {
-    icon: UsersRound,
-    label: "Agents & paie",
-    path: "/agents",
-    anyOf: ["team.view", "payroll.manage"],
+    title: "Finance",
+    items: [
+      {
+        icon: Calculator,
+        label: "Caisse & comptabilité",
+        path: "/comptabilite",
+        anyOf: ["cash.close", "accounting.export"],
+      },
+      {
+        icon: WalletCards,
+        label: "Dépenses",
+        path: "/depenses",
+        anyOf: ["expenses.manage"],
+      },
+      {
+        icon: UsersRound,
+        label: "Agents & paie",
+        path: "/agents",
+        anyOf: ["team.view", "payroll.manage"],
+      },
+    ],
   },
   {
-    icon: WalletCards,
-    label: "Dépenses",
-    path: "/depenses",
-    anyOf: ["expenses.manage"],
-  },
-  {
-    icon: Calculator,
-    label: "Caisse & comptabilité",
-    path: "/comptabilite",
-    anyOf: ["cash.close", "accounting.export"],
-  },
-  {
-    icon: Archive,
-    label: "Import & export",
-    path: "/donnees",
-    anyOf: ["catalog.manage"],
-  },
-  {
-    icon: SlidersHorizontal,
-    label: "Paramètres",
-    path: "/parametres",
-    anyOf: ["settings.manage"],
-  },
-  {
-    icon: DatabaseBackup,
-    label: "Sauvegardes",
-    path: "/sauvegardes",
-    anyOf: ["backups.manage"],
-  },
-  {
-    icon: TriangleAlert,
-    label: "Alertes",
-    path: "/alertes",
-    anyOf: ["catalog.manage", "purchasing.manage"],
-  },
-  {
-    icon: ClipboardList,
-    label: "Journal",
-    path: "/journal",
-    anyOf: ["audit.view"],
-  },
-  {
-    icon: CloudUpload,
-    label: "Synchronisation",
-    path: "/synchronisation",
-    anyOf: ["sales.create"],
+    title: "Administration",
+    items: [
+      {
+        icon: SlidersHorizontal,
+        label: "Paramètres",
+        path: "/parametres",
+        anyOf: ["settings.manage"],
+      },
+      {
+        icon: Archive,
+        label: "Import & export",
+        path: "/donnees",
+        anyOf: ["catalog.manage"],
+      },
+      {
+        icon: DatabaseBackup,
+        label: "Sauvegardes",
+        path: "/sauvegardes",
+        anyOf: ["backups.manage"],
+      },
+      {
+        icon: ClipboardList,
+        label: "Journal",
+        path: "/journal",
+        anyOf: ["audit.view"],
+      },
+      {
+        icon: CloudUpload,
+        label: "Synchronisation",
+        path: "/synchronisation",
+        anyOf: ["sales.create"],
+      },
+    ],
   },
 ];
+
+/** Pages de détail rattachées à une entrée du menu. */
+function isMenuItemActive(path: string, location: string) {
+  if (path === location) return true;
+  return (
+    path !== "/" &&
+    [
+      "/produits",
+      "/clients",
+      "/fournisseurs",
+      "/bons-commande",
+      "/devis",
+      "/factures",
+      "/agents",
+    ].includes(path) &&
+    location.startsWith(`${path}/`)
+  );
+}
+
+function normalizeSearch(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
 
 /** Réglages personnels proposés aux rôles qui n'accèdent pas aux paramètres de l'entreprise. */
 const personalMenuItems: MenuItem[] = [
@@ -247,15 +315,17 @@ export default function DashboardLayout({
 
   if (!user) {
     return (
-      <div className="grid min-h-screen place-items-center bg-[#090c13] px-6 text-slate-100">
-        <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#111722] p-8 shadow-2xl shadow-black/30">
+      <div className="grid min-h-screen place-items-center bg-background px-6 text-foreground">
+        <div className="w-full max-w-md rounded-3xl border border-border bg-card p-8 shadow-2xl">
           <div className="mb-8 flex items-center gap-3">
-            <div className="grid h-11 w-11 place-items-center rounded-2xl bg-cyan-400 text-slate-950">
+            <div className="grid h-11 w-11 place-items-center rounded-2xl bg-primary text-primary-foreground">
               <Boxes className="h-6 w-6" />
             </div>
             <div>
               <p className="text-lg font-semibold tracking-tight">StockPilot</p>
-              <p className="text-xs text-slate-400">Operations workspace</p>
+              <p className="text-xs text-muted-foreground">
+                Operations workspace
+              </p>
             </div>
           </div>
           <h1 className="text-2xl font-semibold tracking-tight">
@@ -263,7 +333,7 @@ export default function DashboardLayout({
               ? "Accédez à votre espace commercial"
               : "Créez votre entreprise"}
           </h1>
-          <p className="mt-2 text-sm text-slate-400">
+          <p className="mt-2 text-sm text-muted-foreground">
             {authMode === "login"
               ? "Connectez-vous avec l’adresse e-mail et le mot de passe de votre compte."
               : "Créez le premier compte administrateur de votre espace StockPilot."}
@@ -271,10 +341,10 @@ export default function DashboardLayout({
           {authMode === "login" && (
             <Link
               href="/inscription"
-              className="mt-4 flex items-center justify-between rounded-xl border border-cyan-400/35 bg-cyan-400/10 px-4 py-3 text-sm font-semibold text-cyan-100 transition hover:border-cyan-300 hover:bg-cyan-400/20"
+              className="mt-4 flex items-center justify-between rounded-xl border border-primary/25 bg-primary/10 px-4 py-3 text-sm font-semibold text-primary transition hover:border-primary hover:bg-primary/20"
             >
               Nouveau sur StockPilot ?{" "}
-              <span className="text-cyan-300">Créer mon entreprise →</span>
+              <span className="text-primary">Créer mon entreprise →</span>
             </Link>
           )}
           {authMode === "login" && (
@@ -362,12 +432,12 @@ function PasswordField({
         type={visible ? "text" : "password"}
         autoComplete={autoComplete}
         disabled={disabled}
-        className="border-white/10 bg-white/[0.04] pr-11"
+        className="border-border bg-muted/50 pr-11"
       />
       <button
         type="button"
         onClick={() => setVisible(current => !current)}
-        className="absolute inset-y-0 right-0 grid w-11 place-items-center text-slate-400 transition hover:text-cyan-200"
+        className="absolute inset-y-0 right-0 grid w-11 place-items-center text-muted-foreground transition hover:text-primary"
         aria-label={
           visible ? "Masquer le mot de passe" : "Afficher le mot de passe"
         }
@@ -383,25 +453,25 @@ function PasswordStrength({ password }: { password: string }) {
   const { score, label } = getPasswordStrength(password);
   const state =
     label === "Faible"
-      ? { tone: "bg-rose-400", text: "text-rose-300" }
+      ? { tone: "bg-destructive", text: "text-destructive" }
       : label === "Moyen"
-        ? { tone: "bg-amber-400", text: "text-amber-300" }
-        : { tone: "bg-emerald-400", text: "text-emerald-300" };
+        ? { tone: "bg-warning", text: "text-warning" }
+        : { tone: "bg-success", text: "text-success" };
   return (
     <div className="px-1">
       <div className="flex items-center justify-between text-xs">
-        <span className="text-slate-400">Force du mot de passe</span>
+        <span className="text-muted-foreground">Force du mot de passe</span>
         <span className={state.text}>{label}</span>
       </div>
       <div className="mt-1.5 grid grid-cols-5 gap-1">
         {Array.from({ length: 5 }, (_, index) => (
           <span
             key={index}
-            className={`h-1 rounded-full ${index < score ? state.tone : "bg-white/10"}`}
+            className={`h-1 rounded-full ${index < score ? state.tone : "bg-muted"}`}
           />
         ))}
       </div>
-      <p className="mt-1.5 text-[11px] text-slate-500">
+      <p className="mt-1.5 text-[11px] text-faint">
         Utilisez au moins 10 caractères, avec majuscule, minuscule, chiffre et
         symbole.
       </p>
@@ -446,7 +516,7 @@ function LoginForm({
         placeholder="Adresse e-mail"
         type="email"
         autoComplete="email"
-        className="border-white/10 bg-white/[0.04]"
+        className="border-border bg-muted/50"
       />
       <PasswordField
         value={password}
@@ -457,20 +527,20 @@ function LoginForm({
       />
       <label
         htmlFor="remember-me-main"
-        className="flex cursor-pointer items-start gap-3 rounded-xl border border-white/[0.08] bg-white/[0.02] px-3 py-2.5 text-left transition hover:border-cyan-400/35"
+        className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted/50 px-3 py-2.5 text-left transition hover:border-primary/25"
       >
         <Checkbox
           id="remember-me-main"
           checked={rememberMe}
           onCheckedChange={value => onRememberMeChange(value === true)}
           disabled={pending}
-          className="mt-0.5 border-slate-500"
+          className="mt-0.5 border-input"
         />
         <span>
-          <span className="block text-sm font-medium text-slate-200">
+          <span className="block text-sm font-medium text-foreground">
             Se souvenir de moi
           </span>
-          <span className="mt-0.5 block text-xs text-slate-400">
+          <span className="mt-0.5 block text-xs text-muted-foreground">
             Prolonge la session sur cet appareil.
           </span>
         </span>
@@ -478,28 +548,28 @@ function LoginForm({
       <Button
         type="submit"
         disabled={pending || !email || !password}
-        className="h-11 w-full bg-cyan-400 text-slate-950 hover:bg-cyan-300"
+        className="h-11 w-full bg-primary text-primary-foreground hover:bg-primary/90"
       >
         {pending ? "Connexion…" : "Se connecter"}
       </Button>
-      {error && <p className="text-center text-xs text-rose-300">{error}</p>}
+      {error && <p className="text-center text-xs text-destructive">{error}</p>}
       <Link
         href="/mot-de-passe-oublie"
-        className="block text-center text-sm text-cyan-300 hover:text-cyan-200 hover:underline"
+        className="block text-center text-sm text-primary hover:text-primary hover:underline"
       >
         Mot de passe oublié ?
       </Link>
-      <div className="relative py-1 text-center text-xs text-slate-500">
-        <span className="relative z-10 bg-[#111722] px-3">
+      <div className="relative py-1 text-center text-xs text-faint">
+        <span className="relative z-10 bg-card px-3">
           Première utilisation ?
         </span>
-        <span className="absolute inset-x-0 top-1/2 border-t border-white/10" />
+        <span className="absolute inset-x-0 top-1/2 border-t border-border" />
       </div>
       <Button
         type="button"
         variant="outline"
         onClick={onRegister}
-        className="h-11 w-full border-cyan-400/40 bg-cyan-400/10 text-cyan-200 hover:bg-cyan-400/20 hover:text-cyan-100"
+        className="h-11 w-full border-primary/40 bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
       >
         Créer mon entreprise
       </Button>
@@ -560,10 +630,10 @@ function RegistrationForm({
   const emailTone = !email
     ? ""
     : !emailLooksValid || emailAvailability === false
-      ? "text-rose-300"
+      ? "text-destructive"
       : emailChecking
-        ? "text-slate-400"
-        : "text-emerald-300";
+        ? "text-muted-foreground"
+        : "text-success";
   const canSubmit = Boolean(
     companyName &&
       administratorName &&
@@ -586,14 +656,14 @@ function RegistrationForm({
         onChange={event => onCompanyNameChange(event.target.value)}
         placeholder="Nom de l’entreprise"
         autoComplete="organization"
-        className="border-white/10 bg-white/[0.04]"
+        className="border-border bg-muted/50"
       />
       <Input
         value={administratorName}
         onChange={event => onAdministratorNameChange(event.target.value)}
         placeholder="Votre nom complet"
         autoComplete="name"
-        className="border-white/10 bg-white/[0.04]"
+        className="border-border bg-muted/50"
       />
       <div>
         <Input
@@ -605,7 +675,7 @@ function RegistrationForm({
           aria-invalid={Boolean(
             email && (!emailLooksValid || emailAvailability === false)
           )}
-          className="border-white/10 bg-white/[0.04]"
+          className="border-border bg-muted/50"
         />
         {emailState && (
           <p className={`mt-1.5 px-1 text-xs ${emailTone}`}>{emailState}</p>
@@ -627,26 +697,26 @@ function RegistrationForm({
         disabled={pending}
       />
       {passwordConfirmation && password !== passwordConfirmation && (
-        <p className="text-xs text-rose-300">
+        <p className="text-xs text-destructive">
           Les mots de passe ne correspondent pas.
         </p>
       )}
       <label
         htmlFor="remember-new-company"
-        className="flex cursor-pointer items-start gap-3 rounded-xl border border-white/[0.08] bg-white/[0.02] px-3 py-2.5 text-left transition hover:border-cyan-400/35"
+        className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted/50 px-3 py-2.5 text-left transition hover:border-primary/25"
       >
         <Checkbox
           id="remember-new-company"
           checked={rememberMe}
           onCheckedChange={value => onRememberMeChange(value === true)}
           disabled={pending}
-          className="mt-0.5 border-slate-500"
+          className="mt-0.5 border-input"
         />
         <span>
-          <span className="block text-sm font-medium text-slate-200">
+          <span className="block text-sm font-medium text-foreground">
             Se souvenir de moi
           </span>
-          <span className="mt-0.5 block text-xs text-slate-400">
+          <span className="mt-0.5 block text-xs text-muted-foreground">
             Prolonge la session sur cet appareil.
           </span>
         </span>
@@ -654,23 +724,23 @@ function RegistrationForm({
       <Button
         type="submit"
         disabled={pending || !canSubmit}
-        className="h-11 w-full bg-cyan-400 text-slate-950 hover:bg-cyan-300"
+        className="h-11 w-full bg-primary text-primary-foreground hover:bg-primary/90"
       >
         {pending ? "Création…" : "Créer mon espace"}
       </Button>
-      {error && <p className="text-center text-xs text-rose-300">{error}</p>}
-      <p className="px-1 text-center text-xs leading-5 text-slate-400">
+      {error && <p className="text-center text-xs text-destructive">{error}</p>}
+      <p className="px-1 text-center text-xs leading-5 text-muted-foreground">
         En créant votre espace, vous acceptez les{" "}
         <Link
           href="/conditions-utilisation"
-          className="text-cyan-300 hover:underline"
+          className="text-primary hover:underline"
         >
           Conditions d’utilisation
         </Link>{" "}
         et reconnaissez avoir lu la{" "}
         <Link
           href="/politique-confidentialite"
-          className="text-cyan-300 hover:underline"
+          className="text-primary hover:underline"
         >
           Politique de confidentialité
         </Link>
@@ -679,7 +749,7 @@ function RegistrationForm({
       <button
         type="button"
         onClick={onBack}
-        className="w-full pt-1 text-sm font-medium text-cyan-300 hover:text-cyan-200 hover:underline"
+        className="w-full pt-1 text-sm font-medium text-primary hover:text-primary hover:underline"
       >
         J’ai déjà un compte
       </button>
@@ -691,7 +761,7 @@ function EmailVerificationBanner() {
   const resend = trpc.auth.resendVerification.useMutation();
   return (
     <div
-      className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300/25 bg-amber-300/[0.07] px-4 py-3 text-sm text-amber-100"
+      className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warning/25 bg-warning-soft px-4 py-3 text-sm text-warning"
       role="status"
     >
       <span>
@@ -704,7 +774,7 @@ function EmailVerificationBanner() {
         variant="outline"
         disabled={resend.isPending || resend.isSuccess}
         onClick={() => resend.mutate()}
-        className="border-amber-300/40 text-amber-100"
+        className="border-warning/40 text-warning"
       >
         {resend.isSuccess
           ? "E-mail envoyé"
@@ -721,47 +791,73 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const { currency } = usePreferences();
   const { isOnline, pendingCount, sales: offlineSales, syncNow } = useOffline();
   const [location, setLocation] = useLocation();
-  const { state } = useSidebar();
+  const { state, setOpenMobile } = useSidebar();
   const isCollapsed = state === "collapsed";
   const isMobile = useIsMobile();
-  const { data: sellerPermissions } = trpc.commerce.settings.get.useQuery(
+  const { data: companySettings } = trpc.commerce.settings.get.useQuery(
     undefined,
-    { enabled: user?.role === "seller" }
+    { staleTime: 5 * 60_000 }
   );
+  const [menuSearch, setMenuSearch] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const focusSearch = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      }
+    };
+    window.addEventListener("keydown", focusSearch);
+    return () => window.removeEventListener("keydown", focusSearch);
+  }, []);
   const { can: hasPermission, roleLabel } = usePermissions();
+  const { theme, setTheme } = useTheme();
   const { data: subscription } = trpc.company.subscription.useQuery(undefined, {
     staleTime: 5 * 60_000,
   });
-  const visibleMenuItems = [
-    ...menuItems.filter(
-      item =>
-        (!item.anyOf ||
-          item.anyOf.some(permission => hasPermission(permission))) &&
-        // Un vendeur ne voit les produits que s'il peut modifier le coût d'achat (réglage du point de vente).
-        !(
-          item.path === "/produits" &&
-          user?.role === "seller" &&
-          !sellerPermissions?.sellerCanEditPurchasePrice
-        )
-    ),
-    ...(hasPermission("settings.manage") ? [] : personalMenuItems),
-    ...(subscription?.isPlatformAdmin
-      ? [{ icon: ShieldCheck, label: "Plateforme", path: "/plateforme" }]
-      : []),
-  ];
-
+  const canSeeItem = (item: MenuItem) =>
+    (!item.anyOf || item.anyOf.some(permission => hasPermission(permission))) &&
+    // Un vendeur ne voit les produits que s'il peut modifier le coût d'achat (réglage du point de vente).
+    !(
+      item.path === "/produits" &&
+      user?.role === "seller" &&
+      !companySettings?.sellerCanEditPurchasePrice
+    );
+  const visibleGroups: MenuGroup[] = menuGroups
+    .map(group => {
+      const items = group.items.filter(canSeeItem);
+      if (group.title === "Administration") {
+        if (!hasPermission("settings.manage")) items.push(...personalMenuItems);
+        if (subscription?.isPlatformAdmin)
+          items.push({
+            icon: ShieldCheck,
+            label: "Plateforme",
+            path: "/plateforme",
+          });
+      }
+      return { ...group, items };
+    })
+    .filter(group => group.items.length > 0);
+  const visibleMenuItems = visibleGroups.flatMap(group => group.items);
+  const searchTerm = normalizeSearch(menuSearch);
+  const displayedGroups = searchTerm
+    ? visibleGroups
+        .map(group => ({
+          ...group,
+          items: group.items.filter(item =>
+            normalizeSearch(`${item.label} ${group.title}`).includes(searchTerm)
+          ),
+        }))
+        .filter(group => group.items.length > 0)
+    : visibleGroups;
+  const activeGroup =
+    visibleGroups.find(group =>
+      group.items.some(item => isMenuItemActive(item.path, location))
+    ) ?? visibleGroups[0];
   const activeMenuItem =
-    visibleMenuItems.find(
-      item =>
-        item.path === location ||
-        (item.path === "/produits" && location.startsWith("/produits/")) ||
-        (item.path === "/clients" && location.startsWith("/clients/")) ||
-        (item.path === "/fournisseurs" &&
-          location.startsWith("/fournisseurs/")) ||
-        (item.path === "/bons-commande" &&
-          location.startsWith("/bons-commande/")) ||
-        (item.path === "/devis" && location.startsWith("/devis/"))
-    ) ?? visibleMenuItems[0];
+    activeGroup?.items.find(item => isMenuItemActive(item.path, location)) ??
+    visibleMenuItems[0];
   const initials = (user?.name || user?.email || "U").slice(0, 2).toUpperCase();
   const isAdmin = hasPermission("backups.manage");
   const canRunBackup = Boolean(user);
@@ -851,114 +947,165 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const markAllNotificationsRead = () =>
     saveReadNotifications(notifications.map(notification => notification.id));
 
+  const lowStockCount = dashboard?.lowStock?.length ?? 0;
+  const companyName = companySettings?.companyName || "StockPilot";
+  const goTo = (path: string) => {
+    setMenuSearch("");
+    setOpenMobile(false);
+    setLocation(path);
+  };
+
   return (
     <>
-      <Sidebar
-        collapsible="icon"
-        className="border-r border-white/[0.07] bg-[#0e141f] text-slate-300"
-      >
-        <SidebarHeader className="h-20 justify-center border-b border-white/[0.07] px-3">
+      <Sidebar collapsible="icon" className="border-r border-sidebar-border">
+        <SidebarHeader className="gap-4 px-3 pt-5 pb-2">
           <button
-            onClick={() => setLocation("/")}
-            className="flex w-full items-center gap-3 rounded-xl p-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+            onClick={() => goTo("/")}
+            className="flex w-full items-center gap-3 rounded-lg px-2 py-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
             aria-label="Aller au tableau de bord"
           >
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-950/20">
-              <Boxes className="h-5 w-5" />
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary text-[15px] font-bold text-primary-foreground">
+              {companySettings?.companyLogoUrl ? (
+                <img
+                  src={companySettings.companyLogoUrl}
+                  alt=""
+                  className="h-8 w-8 rounded-lg bg-card object-contain"
+                />
+              ) : (
+                companyName.slice(0, 1).toUpperCase()
+              )}
             </span>
             {!isCollapsed && (
               <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold tracking-tight text-white">
+                <span className="block truncate text-[15px] font-bold tracking-tight text-foreground">
                   StockPilot
                 </span>
-                <span className="block truncate text-[10px] font-medium uppercase tracking-[0.16em] text-cyan-300/70">
-                  B2B Operations
+                <span className="block truncate text-xs text-faint">
+                  {companyName}
                 </span>
               </span>
             )}
           </button>
+          {!isCollapsed && (
+            <label className="flex h-9 items-center gap-2 rounded-lg border border-border bg-muted px-2.5 text-faint focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20">
+              <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <input
+                ref={searchInputRef}
+                value={menuSearch}
+                onChange={event => setMenuSearch(event.target.value)}
+                onKeyDown={event => {
+                  if (event.key === "Enter" && displayedGroups[0]?.items[0])
+                    goTo(displayedGroups[0].items[0].path);
+                  if (event.key === "Escape") setMenuSearch("");
+                }}
+                placeholder="Rechercher…"
+                aria-label="Rechercher une page"
+                className="min-w-0 flex-1 bg-transparent text-[13px] text-foreground outline-none placeholder:text-faint"
+              />
+              <kbd className="hidden rounded border border-border bg-card px-1.5 text-[10px] font-medium text-faint sm:inline">
+                Ctrl K
+              </kbd>
+            </label>
+          )}
         </SidebarHeader>
 
-        <SidebarContent className="px-3 py-5">
-          {!isCollapsed && (
-            <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-              Pilotage
+        <SidebarContent className="gap-0 overflow-y-auto px-3 pb-4">
+          {displayedGroups.map(group => (
+            <SidebarGroup key={group.title} className="shrink-0 px-0 py-2">
+              <SidebarGroupLabel className="h-6 px-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-faint">
+                {group.title}
+              </SidebarGroupLabel>
+              <SidebarMenu className="gap-0.5">
+                {group.items.map(item => {
+                  const isActive = isMenuItemActive(item.path, location);
+                  const badge =
+                    item.path === "/alertes" && lowStockCount > 0
+                      ? lowStockCount
+                      : null;
+                  return (
+                    <SidebarMenuItem key={item.path}>
+                      <SidebarMenuButton
+                        isActive={isActive}
+                        tooltip={item.label}
+                        onClick={() => goTo(item.path)}
+                        className="h-[34px] rounded-lg px-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground data-[active=true]:bg-primary-soft data-[active=true]:font-semibold data-[active=true]:text-primary"
+                      >
+                        <item.icon className="h-[17px] w-[17px]" />
+                        <span>{item.label}</span>
+                      </SidebarMenuButton>
+                      {badge !== null && (
+                        <SidebarMenuBadge className="rounded-full bg-destructive-soft px-1.5 text-xs font-semibold text-destructive peer-data-[active=true]/menu-button:text-destructive">
+                          {badge > 99 ? "99+" : badge}
+                        </SidebarMenuBadge>
+                      )}
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroup>
+          ))}
+          {searchTerm && displayedGroups.length === 0 && (
+            <p className="px-2.5 py-3 text-sm text-faint">
+              Aucune page ne correspond.
             </p>
           )}
-          <SidebarMenu className="gap-1">
-            {visibleMenuItems.map(item => {
-              const isActive =
-                location === item.path ||
-                (item.path === "/clients" &&
-                  location.startsWith("/clients/")) ||
-                (item.path === "/fournisseurs" &&
-                  location.startsWith("/fournisseurs/")) ||
-                (item.path === "/bons-commande" &&
-                  location.startsWith("/bons-commande/")) ||
-                (item.path === "/devis" && location.startsWith("/devis/"));
-              return (
-                <SidebarMenuItem key={item.path}>
-                  <SidebarMenuButton
-                    isActive={isActive}
-                    tooltip={item.label}
-                    onClick={() => setLocation(item.path)}
-                    className="h-10 rounded-xl px-3 text-slate-400 hover:bg-white/[0.06] hover:text-white data-[active=true]:bg-cyan-400 data-[active=true]:text-slate-950"
-                  >
-                    <item.icon className="h-[18px] w-[18px]" />
-                    <span className="font-medium">{item.label}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              );
-            })}
-          </SidebarMenu>
         </SidebarContent>
 
-        <SidebarFooter className="border-t border-white/[0.07] p-3">
+        <SidebarFooter className="border-t border-sidebar-border p-3">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex w-full items-center gap-3 rounded-xl p-2 text-left transition-colors hover:bg-white/[0.06] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">
-                <Avatar className="h-8 w-8 shrink-0 border border-white/10">
-                  <AvatarFallback className="bg-slate-700 text-[11px] font-semibold text-cyan-200">
+              <button className="flex w-full items-center gap-3 rounded-lg p-2 text-left transition-colors hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <Avatar className="h-8 w-8 shrink-0 border border-border">
+                  <AvatarFallback className="bg-primary-soft text-[11px] font-semibold text-primary">
                     {initials}
                   </AvatarFallback>
                 </Avatar>
                 {!isCollapsed && (
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-xs font-medium text-slate-100">
+                    <span className="block truncate text-[13px] font-medium text-foreground">
                       {user?.name || "Utilisateur"}
                     </span>
-                    <span className="block truncate pt-0.5 text-[11px] text-slate-500">
-                      {user?.email || "Compte membre"}
+                    <span className="block truncate pt-0.5 text-xs text-faint">
+                      {roleLabel}
                     </span>
                   </span>
                 )}
                 {!isCollapsed && (
-                  <ChevronDown className="h-3.5 w-3.5 text-slate-500" />
+                  <ChevronDown className="h-3.5 w-3.5 text-faint" />
                 )}
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              side="top"
-              className="w-56 border-white/10 bg-[#141b27] text-slate-200"
-            >
+            <DropdownMenuContent align="end" side="top" className="w-60">
               <DropdownMenuLabel className="font-normal">
                 <p className="truncate text-sm font-medium">
                   {user?.name || "Utilisateur"}
                 </p>
-                <p className="mt-0.5 truncate text-xs text-slate-500">
+                <p className="mt-0.5 truncate text-xs text-faint">
                   {user?.email}
                 </p>
               </DropdownMenuLabel>
-              <DropdownMenuSeparator className="bg-white/10" />
-              <DropdownMenuItem className="cursor-default focus:bg-transparent">
-                <Badge className="border-0 bg-cyan-400/10 text-cyan-300 hover:bg-cyan-400/10">
-                  {roleLabel}
-                </Badge>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                className="cursor-pointer"
+              >
+                {theme === "dark" ? (
+                  <Sun className="mr-2 h-4 w-4" />
+                ) : (
+                  <Moon className="mr-2 h-4 w-4" />
+                )}
+                {theme === "dark" ? "Thème clair" : "Thème sombre"}
               </DropdownMenuItem>
               <DropdownMenuItem
+                onClick={() => goTo("/parametres/securite")}
+                className="cursor-pointer"
+              >
+                <ShieldCheck className="mr-2 h-4 w-4" /> Sécurité du compte
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
                 onClick={logout}
-                className="cursor-pointer text-rose-300 focus:bg-rose-400/10 focus:text-rose-200"
+                className="cursor-pointer text-destructive focus:bg-destructive-soft focus:text-destructive"
               >
                 <LogOut className="mr-2 h-4 w-4" /> Se déconnecter
               </DropdownMenuItem>
@@ -967,16 +1114,16 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         </SidebarFooter>
       </Sidebar>
 
-      <SidebarInset className="min-w-0 bg-[#090c13] text-slate-100">
-        <header className="app-header sticky top-0 z-40 flex h-16 items-center gap-3 border-b border-slate-200 bg-white/95 px-4 text-slate-900 shadow-sm shadow-slate-950/5 backdrop-blur dark:border-white/[0.07] dark:bg-[#0e141f]/95 dark:text-slate-100 dark:shadow-black/20 sm:px-6">
-          <div className="lg:hidden">
-            <SidebarTrigger className="h-9 w-9 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 dark:border-white/10 dark:bg-[#111722] dark:text-slate-200 dark:hover:bg-white/[0.07]" />
-          </div>
-          <div className="flex min-w-0 items-center gap-2">
-            <activeMenuItem.icon className="h-4 w-4 shrink-0 text-primary" />
-            <span className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
-              {activeMenuItem.label}
-            </span>
+      <SidebarInset className="min-w-0 bg-background text-foreground">
+        <header className="app-header sticky top-0 z-40 flex min-h-16 items-center gap-3 border-b border-border bg-card/95 px-4 backdrop-blur sm:px-8">
+          <SidebarTrigger className="h-9 w-9 shrink-0 rounded-lg border border-input bg-card text-muted-foreground hover:bg-accent lg:hidden" />
+          <div className="min-w-0">
+            <p className="truncate text-xs font-medium text-faint">
+              {activeGroup?.title ?? "Pilotage"}
+            </p>
+            <p className="truncate text-[17px] font-semibold tracking-tight text-foreground">
+              {activeMenuItem?.label ?? "Vue d’ensemble"}
+            </p>
           </div>
           <div className="ml-auto">
             <HeaderActions
@@ -986,7 +1133,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
               onBackup={() => runBackup.mutate()}
               notifications={notifications}
               readNotificationIds={readNotificationIdsState}
-              onNotification={setLocation}
+              onNotification={goTo}
               onMarkNotificationRead={markNotificationRead}
               onMarkAllNotificationsRead={markAllNotificationsRead}
               isOnline={isOnline}
@@ -1000,18 +1147,21 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         </header>
         <div
           key={currency}
-          className="min-h-screen bg-[radial-gradient(circle_at_80%_-5%,rgba(34,211,238,0.05),transparent_24%),linear-gradient(rgba(255,255,255,0.012)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.012)_1px,transparent_1px)] bg-[size:auto,44px_44px,44px_44px] p-4 sm:p-6 lg:p-8"
+          className="min-h-[calc(100vh-4rem)] px-4 py-6 sm:px-8 sm:py-7"
         >
           {subscription && !subscription.writable && (
             <div
-              className="mb-4 rounded-xl border border-rose-400/25 bg-rose-400/[0.07] px-4 py-3 text-sm text-rose-100"
+              className="mb-4 rounded-xl border border-destructive/25 bg-destructive-soft px-4 py-3 text-sm text-destructive"
               role="alert"
             >
               {subscription.reason === "suspended"
                 ? "Cet espace est suspendu : les données restent consultables, les nouvelles opérations sont bloquées. Contactez le support."
                 : "La période d’essai est terminée : les données restent consultables et exportables. Choisissez une offre pour continuer à enregistrer des opérations."}{" "}
               {hasPermission("settings.manage") && (
-                <Link href="/parametres/abonnement" className="underline">
+                <Link
+                  href="/parametres/abonnement"
+                  className="font-semibold underline"
+                >
                   Voir l’abonnement
                 </Link>
               )}
@@ -1066,9 +1216,9 @@ function HeaderActions({
   );
   const counter = unreadCount > 9 ? "9+" : String(unreadCount);
   const tones = {
-    amber: "bg-amber-400/10 text-amber-300",
-    violet: "bg-violet-400/10 text-violet-300",
-    rose: "bg-rose-400/10 text-rose-300",
+    amber: "bg-warning-soft text-warning",
+    violet: "bg-info-soft text-info",
+    rose: "bg-destructive-soft text-destructive",
   };
   return (
     <div className="flex items-center gap-2">
@@ -1078,7 +1228,7 @@ function HeaderActions({
           disabled={!isOnline}
           variant="outline"
           size={compact ? "icon" : "sm"}
-          className={`h-9 border-slate-200 bg-white ${hasFailedOfflineSale ? "text-rose-600" : !isOnline ? "text-amber-700" : "text-primary"}`}
+          className={`h-9 border-border bg-card ${hasFailedOfflineSale ? "text-destructive" : !isOnline ? "text-warning" : "text-primary"}`}
           aria-label={
             !isOnline
               ? "Mode hors connexion"
@@ -1117,12 +1267,12 @@ function HeaderActions({
           <Button
             size="icon"
             variant="outline"
-            className="relative h-9 w-9 border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
+            className="relative h-9 w-9 border-border bg-card text-foreground hover:bg-accent"
             aria-label={`${unreadCount} notification(s) non lue(s)`}
           >
             <Bell className="h-4 w-4" />
             {unreadCount > 0 && (
-              <span className="absolute -right-1.5 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-orange-500 px-1 text-[9px] font-bold leading-none text-white shadow-sm">
+              <span className="absolute -right-1.5 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-warning px-1 text-[9px] font-bold leading-none text-warning-foreground shadow-sm">
                 {counter}
               </span>
             )}
@@ -1130,7 +1280,7 @@ function HeaderActions({
         </DropdownMenuTrigger>
         <DropdownMenuContent
           align="end"
-          className="w-[340px] border-slate-200 bg-white p-0 text-slate-800 shadow-xl"
+          className="w-[340px] border-border bg-card p-0 text-foreground shadow-xl"
         >
           <DropdownMenuLabel className="flex items-center justify-between gap-3 px-4 py-3">
             <span>Notifications</span>
@@ -1144,12 +1294,12 @@ function HeaderActions({
                 Tout marquer comme lu
               </button>
             ) : (
-              <span className="text-xs font-normal text-slate-500">
+              <span className="text-xs font-normal text-faint">
                 Tout est à jour
               </span>
             )}
           </DropdownMenuLabel>
-          <DropdownMenuSeparator className="bg-slate-100" />
+          <DropdownMenuSeparator className="bg-muted" />
           {notifications.length ? (
             <div className="max-h-[360px] overflow-y-auto py-1">
               {notifications.map(notification => {
@@ -1161,7 +1311,7 @@ function HeaderActions({
                       onMarkNotificationRead(notification.id);
                       onNotification(notification.path);
                     }}
-                    className={`cursor-pointer items-start gap-3 px-4 py-3 focus:bg-slate-50 ${unread ? "bg-cyan-50/70" : ""}`}
+                    className={`cursor-pointer items-start gap-3 px-4 py-3 focus:bg-accent ${unread ? "bg-primary/5" : ""}`}
                   >
                     <span
                       className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg ${tones[notification.tone]}`}
@@ -1171,7 +1321,7 @@ function HeaderActions({
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-2">
                         <span
-                          className={`block text-sm text-slate-800 ${unread ? "font-semibold" : "font-medium"}`}
+                          className={`block text-sm text-foreground ${unread ? "font-semibold" : "font-medium"}`}
                         >
                           {notification.title}
                         </span>
@@ -1182,7 +1332,7 @@ function HeaderActions({
                           />
                         )}
                       </span>
-                      <span className="mt-0.5 block text-xs leading-relaxed text-slate-500">
+                      <span className="mt-0.5 block text-xs leading-relaxed text-faint">
                         {notification.detail}
                       </span>
                     </span>
@@ -1192,9 +1342,11 @@ function HeaderActions({
             </div>
           ) : (
             <div className="px-5 py-9 text-center">
-              <Bell className="mx-auto h-5 w-5 text-slate-400" />
-              <p className="mt-2 text-sm text-slate-700">Aucune notification</p>
-              <p className="mt-1 text-xs text-slate-500">
+              <Bell className="mx-auto h-5 w-5 text-muted-foreground" />
+              <p className="mt-2 text-sm text-foreground">
+                Aucune notification
+              </p>
+              <p className="mt-1 text-xs text-faint">
                 Les alertes importantes apparaîtront ici.
               </p>
             </div>

@@ -189,41 +189,41 @@ export default function AgentDetail() {
           <Button
             variant="outline"
             onClick={remove}
-            className="border-rose-400/30 text-rose-300 hover:bg-rose-400/10"
+            className="border-destructive/25 text-destructive hover:bg-destructive-soft"
           >
             <Trash2 className="mr-2 h-4 w-4" />
             Supprimer
           </Button>
         </div>
       </header>
-      <section className="rounded-2xl border border-white/[0.07] bg-[#111722] p-5 shadow-sm sm:p-6">
+      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
         <div className="flex min-w-0 gap-4">
-          <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-cyan-400/10 text-xl font-semibold text-cyan-300">
+          <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-primary/10 text-xl font-semibold text-primary">
             {agent.name.slice(0, 2).toUpperCase()}
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-cyan-300">
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
               {agent.role}
             </p>
-            <h1 className="mt-1 truncate text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+            <h1 className="mt-1 truncate text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
               {agent.name}
             </h1>
             <div className="mt-3 flex flex-wrap gap-2">
-              <Badge className="border-0 bg-white/[0.06] text-slate-400">
+              <Badge className="border-0 bg-muted text-muted-foreground">
                 {agent.active ? "Actif" : "Désactivé"}
               </Badge>
               {agent.username && (
-                <Badge className="border-0 bg-cyan-400/10 text-cyan-300">
+                <Badge className="border-0 bg-primary/10 text-primary">
                   @{agent.username}
                 </Badge>
               )}
-              <Badge className="border-0 bg-amber-400/10 text-amber-300">
+              <Badge className="border-0 bg-warning-soft text-warning">
                 Solde dû : {formatCurrency(summary.dueCents)}
               </Badge>
             </div>
           </div>
         </div>
-        <div className="mt-6 flex flex-wrap gap-2 border-t border-white/[0.07] pt-5">
+        <div className="mt-6 flex flex-wrap gap-2 border-t border-border pt-5">
           <Contact
             label="Appeler"
             href={phoneDigits ? `tel:${phoneDigits}` : undefined}
@@ -241,7 +241,7 @@ export default function AgentDetail() {
           />
           <Button
             onClick={() => setOpenPay(true)}
-            className="bg-cyan-400 text-slate-950 hover:bg-cyan-300"
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
           >
             <WalletCards className="mr-2 h-4 w-4" />
             Enregistrer un paiement
@@ -271,9 +271,9 @@ export default function AgentDetail() {
         />
       </section>
       <section className="grid gap-5 lg:grid-cols-2">
-        <Card className="border-white/[0.07] bg-[#111722]">
+        <Card className="border-border bg-card">
           <CardContent className="p-5">
-            <h2 className="font-semibold text-white">
+            <h2 className="font-semibold text-foreground">
               Rémunération & commissions
             </h2>
             <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
@@ -302,8 +302,8 @@ export default function AgentDetail() {
                 value={formatCurrency(summary.monthlyPaidCents)}
               />
             </div>
-            <div className="mt-5 border-t border-white/[0.07] pt-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            <div className="mt-5 border-t border-border pt-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-faint">
                 Dernières commissions
               </p>
               <div className="mt-3 space-y-2">
@@ -313,17 +313,17 @@ export default function AgentDetail() {
                       key={item.id}
                       className="flex items-center justify-between gap-3 text-sm"
                     >
-                      <span className="truncate text-slate-400">
+                      <span className="truncate text-muted-foreground">
                         {item.invoiceNumber} ·{" "}
                         {new Date(item.createdAt).toLocaleDateString("fr-FR")}
                       </span>
-                      <span className="shrink-0 font-semibold text-emerald-300">
+                      <span className="shrink-0 font-semibold text-success">
                         {formatCurrency(item.commissionCents)}
                       </span>
                     </div>
                   ))
                 ) : (
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-faint">
                     Aucune commission enregistrée.
                   </p>
                 )}
@@ -331,9 +331,9 @@ export default function AgentDetail() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-white/[0.07] bg-[#111722]">
+        <Card className="border-border bg-card">
           <CardContent className="p-5">
-            <h2 className="font-semibold text-white">
+            <h2 className="font-semibold text-foreground">
               Historique des paiements
             </h2>
             <div className="mt-4 space-y-3">
@@ -341,33 +341,31 @@ export default function AgentDetail() {
                 data.payments.map(item => (
                   <div
                     key={item.id}
-                    className="flex items-start justify-between gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3"
+                    className="flex items-start justify-between gap-3 rounded-xl border border-border bg-muted/50 p-3"
                   >
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-slate-200">
+                      <p className="text-sm font-medium text-foreground">
                         {new Date(item.paidAt).toLocaleDateString("fr-FR")}
                       </p>
-                      <p className="mt-1 truncate text-xs text-slate-500">
+                      <p className="mt-1 truncate text-xs text-faint">
                         {item.periodLabel || "Période libre"}
                         {item.note ? ` · ${item.note}` : ""}
                       </p>
                     </div>
-                    <span className="shrink-0 font-semibold text-emerald-300">
+                    <span className="shrink-0 font-semibold text-success">
                       {formatCurrency(item.amountCents)}
                     </span>
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-slate-500">
-                  Aucun paiement enregistré.
-                </p>
+                <p className="text-sm text-faint">Aucun paiement enregistré.</p>
               )}
             </div>
           </CardContent>
         </Card>
       </section>
-      <section className="rounded-2xl border border-white/[0.07] bg-[#111722] p-5">
-        <h2 className="font-semibold text-white">Ventes associées</h2>
+      <section className="rounded-2xl border border-border bg-card p-5">
+        <h2 className="font-semibold text-foreground">Ventes associées</h2>
         <div className="mt-4 grid gap-2 md:grid-cols-2">
           {data.sales.length ? (
             data.sales.map(sale => (
@@ -375,24 +373,24 @@ export default function AgentDetail() {
                 key={sale.id}
                 type="button"
                 onClick={() => setLocation(`/factures?facture=${sale.id}`)}
-                className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 text-left hover:border-cyan-400/35"
+                className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/50 p-3 text-left hover:border-primary/25"
               >
                 <span className="min-w-0">
-                  <span className="block truncate text-sm font-medium text-slate-200">
+                  <span className="block truncate text-sm font-medium text-foreground">
                     {sale.invoiceNumber}
                   </span>
-                  <span className="block truncate text-xs text-slate-500">
+                  <span className="block truncate text-xs text-faint">
                     {sale.customerName} ·{" "}
                     {new Date(sale.createdAt).toLocaleDateString("fr-FR")}
                   </span>
                 </span>
-                <span className="shrink-0 text-sm font-semibold text-cyan-300">
+                <span className="shrink-0 text-sm font-semibold text-primary">
                   {formatCurrency(sale.totalCents)}
                 </span>
               </button>
             ))
           ) : (
-            <p className="text-sm text-slate-500">Aucune vente associée.</p>
+            <p className="text-sm text-faint">Aucune vente associée.</p>
           )}
         </div>
       </section>
@@ -406,7 +404,7 @@ export default function AgentDetail() {
         pending={updateAgent.isPending || updateSeller.isPending}
       />
       <Dialog open={openPay} onOpenChange={setOpenPay}>
-        <DialogContent className="border-white/10 bg-[#141b27] text-slate-100">
+        <DialogContent className="border-border bg-card text-foreground">
           <DialogHeader>
             <DialogTitle>Paiement · {agent.name}</DialogTitle>
           </DialogHeader>
@@ -425,7 +423,7 @@ export default function AgentDetail() {
               Annuler
             </Button>
             <Button
-              className="bg-cyan-400 text-slate-950"
+              className="bg-primary text-primary-foreground"
               onClick={() => {
                 const amountCents = Math.round(Number(amount) * 100);
                 if (!amountCents)
@@ -462,7 +460,7 @@ function Contact({
     <Button
       asChild
       variant="outline"
-      className="border-white/10 text-slate-200 hover:border-cyan-400/35 hover:bg-cyan-400/5"
+      className="border-border text-foreground hover:border-primary/25 hover:bg-primary/5"
     >
       <a
         href={href || undefined}
@@ -491,13 +489,13 @@ function Metric({
   icon: React.ReactNode;
 }) {
   return (
-    <Card className="border-white/[0.07] bg-[#111722]">
+    <Card className="border-border bg-card">
       <CardContent className="flex items-start justify-between p-5">
         <div>
-          <p className="text-xs text-slate-500">{label}</p>
-          <p className="mt-2 text-lg font-semibold text-white">{value}</p>
+          <p className="text-xs text-faint">{label}</p>
+          <p className="mt-2 text-lg font-semibold text-foreground">{value}</p>
         </div>
-        <span className="text-cyan-300">{icon}</span>
+        <span className="text-primary">{icon}</span>
       </CardContent>
     </Card>
   );
@@ -505,8 +503,8 @@ function Metric({
 function Value({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="mt-1 font-medium text-slate-200">{value}</p>
+      <p className="text-xs text-faint">{label}</p>
+      <p className="mt-1 font-medium text-foreground">{value}</p>
     </div>
   );
 }

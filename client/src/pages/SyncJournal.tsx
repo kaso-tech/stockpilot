@@ -19,27 +19,27 @@ type Filter = "all" | SyncLogEntry["status"];
 const statusMeta = {
   queued: {
     label: "En attente",
-    tone: "bg-amber-400/10 text-amber-300",
+    tone: "bg-warning-soft text-warning",
     icon: Clock3,
   },
   syncing: {
     label: "Synchronisation",
-    tone: "bg-cyan-400/10 text-cyan-300",
+    tone: "bg-primary/10 text-primary",
     icon: RefreshCw,
   },
   succeeded: {
     label: "Réussie",
-    tone: "bg-emerald-400/10 text-emerald-300",
+    tone: "bg-success-soft text-success",
     icon: CheckCircle2,
   },
   failed: {
     label: "Échec",
-    tone: "bg-rose-400/10 text-rose-300",
+    tone: "bg-destructive-soft text-destructive",
     icon: TriangleAlert,
   },
   discarded: {
     label: "Retirée",
-    tone: "bg-slate-400/10 text-slate-300",
+    tone: "bg-muted text-muted-foreground",
     icon: Trash2,
   },
 };
@@ -73,7 +73,7 @@ export default function SyncJournal() {
           <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
             Mode hors connexion
           </p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
             Journal de synchronisation
           </h1>
         </div>
@@ -90,7 +90,7 @@ export default function SyncJournal() {
             variant="outline"
             onClick={clearCompletedSyncLog}
             disabled={!syncLog.some(entry => entry.status === "succeeded")}
-            className="border-white/10 text-slate-300"
+            className="border-border text-muted-foreground"
           >
             <Trash2 className="mr-2 h-4 w-4" />
             Effacer les réussies
@@ -100,11 +100,11 @@ export default function SyncJournal() {
       {persistenceError && (
         <div
           role="alert"
-          className="flex flex-col gap-3 rounded-2xl border border-rose-400/20 bg-rose-400/[0.06] px-4 py-3 text-sm text-rose-100 sm:flex-row sm:items-center sm:justify-between"
+          className="flex flex-col gap-3 rounded-2xl border border-destructive/25 bg-destructive-soft px-4 py-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between"
         >
           <div>
             <p className="font-medium">Persistance locale indisponible</p>
-            <p className="mt-1 text-rose-200/80">
+            <p className="mt-1 text-destructive">
               La file affichée n’est pas encore confirmée dans IndexedDB.
               Réessayez avant de fermer cette page.
             </p>
@@ -114,7 +114,7 @@ export default function SyncJournal() {
             variant="outline"
             onClick={retryPersistence}
             disabled={persistenceStatus === "saving"}
-            className="border-rose-300/30 text-rose-100 hover:bg-rose-300/10"
+            className="border-destructive/25 text-destructive hover:bg-destructive-soft"
           >
             {persistenceStatus === "saving"
               ? "Nouvelle tentative…"
@@ -161,7 +161,7 @@ export default function SyncJournal() {
             className={
               filter === value
                 ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                : "border-white/10 text-slate-300"
+                : "border-border text-muted-foreground"
             }
           >
             {value === "all" ? "Toutes" : statusMeta[value].label}
@@ -187,7 +187,7 @@ export default function SyncJournal() {
             />
           ))
         ) : (
-          <div className="rounded-2xl border border-dashed border-white/10 px-6 py-16 text-center text-sm text-slate-500">
+          <div className="rounded-2xl border border-dashed border-border px-6 py-16 text-center text-sm text-faint">
             Aucune synchronisation à afficher.
           </div>
         )}
@@ -207,22 +207,22 @@ function SummaryCard({
   icon: typeof CloudUpload;
 }) {
   const classes = {
-    cyan: "bg-cyan-400/10 text-cyan-300",
-    rose: "bg-rose-400/10 text-rose-300",
-    emerald: "bg-emerald-400/10 text-emerald-300",
-    amber: "bg-amber-400/10 text-amber-300",
+    cyan: "bg-primary/10 text-primary",
+    rose: "bg-destructive-soft text-destructive",
+    emerald: "bg-success-soft text-success",
+    amber: "bg-warning-soft text-warning",
   };
   return (
-    <div className="rounded-2xl border border-white/[0.07] bg-[#111722] p-4">
+    <div className="rounded-2xl border border-border bg-card p-4">
       <div className="flex items-center justify-between">
-        <p className="text-xs text-slate-400">{label}</p>
+        <p className="text-xs text-muted-foreground">{label}</p>
         <span
           className={`grid h-9 w-9 place-items-center rounded-xl ${classes[tone]}`}
         >
           <Icon className="h-4 w-4" />
         </span>
       </div>
-      <p className="mt-3 text-xl font-semibold text-white">{value}</p>
+      <p className="mt-3 text-xl font-semibold text-foreground">{value}</p>
     </div>
   );
 }
@@ -243,11 +243,11 @@ function SyncCard({
     entry.error ?? ""
   );
   return (
-    <article className="rounded-2xl border border-white/[0.07] bg-[#111722] p-4 shadow-sm">
+    <article className="rounded-2xl border border-border bg-card p-4 shadow-sm">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="font-medium text-slate-100">{entry.summary}</p>
+            <p className="font-medium text-foreground">{entry.summary}</p>
             <Badge className={`border-0 ${meta.tone}`}>
               <Icon
                 className={`mr-1 h-3.5 w-3.5 ${entry.status === "syncing" ? "animate-spin" : ""}`}
@@ -255,19 +255,19 @@ function SyncCard({
               {meta.label}
             </Badge>
           </div>
-          <p className="mt-2 text-xs text-slate-500">
+          <p className="mt-2 text-xs text-faint">
             Créée le {formatDate(new Date(entry.createdAt))} · Dernière activité
             le {formatDate(new Date(entry.updatedAt))} · Tentative
             {entry.attemptCount > 1 ? "s" : ""} : {entry.attemptCount}
           </p>
           {entry.error && (
-            <div className="mt-3 rounded-xl border border-rose-400/15 bg-rose-400/[0.06] px-3 py-2 text-sm text-rose-200">
+            <div className="mt-3 rounded-xl border border-destructive/25 bg-destructive-soft px-3 py-2 text-sm text-destructive">
               <span className="font-medium">Cause : </span>
               {entry.error}
             </div>
           )}
           {stockConflict && (
-            <p className="mt-2 text-xs leading-relaxed text-amber-200">
+            <p className="mt-2 text-xs leading-relaxed text-warning">
               Vérifiez le stock disponible, corrigez l’écart si nécessaire, puis
               relancez cette opération.
             </p>
@@ -289,7 +289,7 @@ function SyncCard({
                 asChild
                 size="sm"
                 variant="outline"
-                className="border-amber-300/30 text-amber-200 hover:bg-amber-300/10"
+                className="border-warning/25 text-warning hover:bg-warning-soft"
               >
                 <Link href="/inventaires">Revoir le stock</Link>
               </Button>
@@ -298,7 +298,7 @@ function SyncCard({
               size="sm"
               variant="outline"
               onClick={onDiscard}
-              className="border-white/10 text-slate-300"
+              className="border-border text-muted-foreground"
             >
               <Trash2 className="mr-2 h-3.5 w-3.5" />
               Retirer de la file

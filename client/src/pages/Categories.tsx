@@ -84,7 +84,7 @@ export default function Categories() {
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
             Catalogue
           </p>
-          <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">
+          <h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">
             Catégories
           </h1>
         </div>
@@ -100,14 +100,14 @@ export default function Categories() {
           Nouvelle catégorie
         </Button>
       </header>
-      <Card className="border-white/[0.07] bg-[#111722]">
+      <Card className="border-border bg-card">
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="px-6 py-16 text-center text-sm text-slate-500">
+            <div className="px-6 py-16 text-center text-sm text-faint">
               Chargement des catégories…
             </div>
           ) : categories.length ? (
-            <div className="divide-y divide-white/[0.06]">
+            <div className="divide-y divide-border">
               {categories.map(category => (
                 <div
                   key={category.id}
@@ -117,7 +117,7 @@ export default function Categories() {
                     <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
                       <Tags className="h-4 w-4" />
                     </span>
-                    <p className="truncate font-medium text-slate-100">
+                    <p className="truncate font-medium text-foreground">
                       {category.name}
                     </p>
                   </div>
@@ -147,7 +147,7 @@ export default function Categories() {
                         )
                           remove.mutate({ id: category.id });
                       }}
-                      className="text-rose-300"
+                      className="text-destructive"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -157,11 +157,11 @@ export default function Categories() {
             </div>
           ) : (
             <div className="px-6 py-16 text-center">
-              <Tags className="mx-auto h-7 w-7 text-slate-600" />
-              <p className="mt-3 font-medium text-slate-300">
+              <Tags className="mx-auto h-7 w-7 text-faint" />
+              <p className="mt-3 font-medium text-muted-foreground">
                 Aucune catégorie
               </p>
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-sm text-faint">
                 Créez une catégorie avant d’ajouter un produit.
               </p>
             </div>
@@ -169,14 +169,14 @@ export default function Categories() {
         </CardContent>
       </Card>
       <Dialog open={open} onOpenChange={value => !value && close()}>
-        <DialogContent className="border-white/10 bg-[#141b27] text-slate-100">
+        <DialogContent className="border-border bg-card text-foreground">
           <DialogHeader>
             <DialogTitle>
               {editing ? "Modifier la catégorie" : "Nouvelle catégorie"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-2">
-            <Label className="text-xs text-slate-300">
+            <Label className="text-xs text-muted-foreground">
               Nom de la catégorie
             </Label>
             <Input

@@ -1180,7 +1180,7 @@ export const commerceRouter = router({
           primaryColor:
             input.primaryColor?.toUpperCase() ??
             current?.primaryColor ??
-            "#007B8B",
+            "#0B6E76",
           companyName:
             input.companyName ?? current?.companyName ?? "StockPilot",
           companyLogoUrl:

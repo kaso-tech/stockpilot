@@ -180,7 +180,7 @@ export default function Customers() {
           <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
             Ventes
           </p>
-          <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">
+          <h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">
             Clients & tarifs
           </h1>
         </div>
@@ -197,21 +197,21 @@ export default function Customers() {
           </Button>
         )}
       </header>
-      <div className="grid gap-3 rounded-2xl border border-white/[0.07] bg-[#111722] p-4 md:grid-cols-[minmax(0,1fr)_170px]">
+      <div className="grid gap-3 rounded-2xl border border-border bg-card p-4 md:grid-cols-[minmax(0,1fr)_170px]">
         <div className="relative">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
+          <Search className="absolute left-3 top-3 h-4 w-4 text-faint" />
           <Input
             value={search}
             onChange={event => setSearch(event.target.value)}
             placeholder="Rechercher nom, téléphone ou fiscal"
-            className="border-white/10 bg-white/[0.03] pl-9"
+            className="border-border bg-muted/50 pl-9"
           />
         </div>
         <Select
           value={typeFilter}
           onValueChange={value => setTypeFilter(value as typeof typeFilter)}
         >
-          <SelectTrigger className="border-white/10 bg-white/[0.03]">
+          <SelectTrigger className="border-border bg-muted/50">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -221,7 +221,7 @@ export default function Customers() {
           </SelectContent>
         </Select>
       </div>
-      <p className="text-sm text-slate-500">
+      <p className="text-sm text-faint">
         {visible.length} client{visible.length > 1 ? "s" : ""} affiché
         {visible.length > 1 ? "s" : ""}
       </p>
@@ -239,11 +239,11 @@ export default function Customers() {
                   setLocation(`/clients/${customer.id}`);
                 }
               }}
-              className="cursor-pointer border-white/[0.07] bg-[#111722] shadow-none transition hover:border-primary/40 hover:bg-primary/[0.04]"
+              className="cursor-pointer border-border bg-card shadow-none transition hover:border-primary/40 hover:bg-primary/[0.04]"
             >
               <CardContent className="flex min-h-24 items-center gap-3 p-4">
                 <span
-                  className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${customer.type === "wholesale" ? "bg-violet-400/10 text-violet-300" : "bg-primary/10 text-primary"}`}
+                  className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${customer.type === "wholesale" ? "bg-info-soft text-info" : "bg-primary/10 text-primary"}`}
                 >
                   {customer.type === "wholesale" ? (
                     <Building2 className="h-5 w-5" />
@@ -253,22 +253,22 @@ export default function Customers() {
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <p className="truncate font-semibold text-white">
+                    <p className="truncate font-semibold text-foreground">
                       {customer.name}
                     </p>
                     <Badge
-                      className={`shrink-0 border-0 text-[10px] ${customer.type === "wholesale" ? "bg-violet-400/10 text-violet-200" : "bg-primary/10 text-primary"}`}
+                      className={`shrink-0 border-0 text-[10px] ${customer.type === "wholesale" ? "bg-info-soft text-info" : "bg-primary/10 text-primary"}`}
                     >
                       {customer.type === "wholesale" ? "Gros" : "Détail"}
                     </Badge>
                   </div>
-                  <p className="mt-1 truncate text-xs text-slate-400">
+                  <p className="mt-1 truncate text-xs text-muted-foreground">
                     {customer.phone ||
                       customer.email ||
                       customer.address ||
                       "Coordonnées à compléter"}
                   </p>
-                  <p className="mt-2 text-[11px] text-slate-500">
+                  <p className="mt-2 text-[11px] text-faint">
                     {customer.taxNumber
                       ? `Fiscal : ${customer.taxNumber}`
                       : "Fiche client"}
@@ -285,7 +285,7 @@ export default function Customers() {
                           event.stopPropagation();
                           edit(customer);
                         }}
-                        className="h-8 w-8 text-slate-400 hover:text-primary"
+                        className="h-8 w-8 text-muted-foreground hover:text-primary"
                       >
                         <Edit3 className="h-4 w-4" />
                       </Button>
@@ -297,20 +297,20 @@ export default function Customers() {
                           event.stopPropagation();
                           setDeleteTarget(customer);
                         }}
-                        className="h-8 w-8 text-rose-300"
+                        className="h-8 w-8 text-destructive"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </>
                   )}
-                  <ArrowUpRight className="h-4 w-4 text-slate-500" />
+                  <ArrowUpRight className="h-4 w-4 text-faint" />
                 </div>
               </CardContent>
             </Card>
           ))
         ) : (
-          <Card className="col-span-full border-dashed border-white/10 bg-[#111722]">
-            <CardContent className="py-16 text-center text-slate-500">
+          <Card className="col-span-full border-dashed border-border bg-card">
+            <CardContent className="py-16 text-center text-faint">
               Aucun client ne correspond à ces critères.
             </CardContent>
           </Card>
@@ -343,7 +343,7 @@ export default function Customers() {
               onClick={() =>
                 deleteTarget && remove.mutate({ id: deleteTarget.id })
               }
-              className="bg-rose-600 text-white hover:bg-rose-700"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Supprimer
             </AlertDialogAction>
@@ -373,7 +373,7 @@ function CustomerDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto border-white/10 bg-[#141b27] text-slate-100">
+      <DialogContent className="max-h-[90vh] overflow-y-auto border-border bg-card text-foreground">
         <DialogHeader>
           <DialogTitle>
             {editing ? "Modifier le client" : "Nouveau client"}
@@ -466,7 +466,7 @@ function CustomerDialog({
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="space-y-2">
-      <Label className="text-xs text-slate-300">{label}</Label>
+      <Label className="text-xs text-muted-foreground">{label}</Label>
       {children}
     </div>
   );

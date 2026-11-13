@@ -80,26 +80,26 @@ export default function Movements() {
   };
 
   const registry = (
-    <Card className="border-white/[0.07] bg-[#111722] shadow-none">
+    <Card className="border-border bg-card shadow-none">
       <CardContent className="p-0">
-        <div className="border-b border-white/[0.07] px-5 py-5">
-          <p className="text-sm font-semibold text-white">
+        <div className="border-b border-border px-5 py-5">
+          <p className="text-sm font-semibold text-foreground">
             Registre des mouvements
           </p>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-faint">
             Chaque ligne contient le niveau avant et après opération.
           </p>
         </div>
         {isLoading ? (
-          <div className="px-5 py-12 text-center text-sm text-slate-500">
+          <div className="px-5 py-12 text-center text-sm text-faint">
             Chargement des mouvements…
           </div>
         ) : movements.length === 0 ? (
           <div className="px-5 py-16 text-center">
-            <p className="font-medium text-slate-300">
+            <p className="font-medium text-muted-foreground">
               Aucun mouvement enregistré
             </p>
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-faint">
               {canRecordMovement
                 ? "Utilisez le formulaire pour tracer votre première opération."
                 : "Les mouvements enregistrés apparaîtront ici."}
@@ -108,7 +108,7 @@ export default function Movements() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[800px] text-left">
-              <thead className="bg-white/[0.018] text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-500">
+              <thead className="bg-muted/50 text-[10px] font-semibold uppercase tracking-[0.13em] text-faint">
                 <tr>
                   <th className="px-5 py-3">Produit</th>
                   <th className="px-4 py-3">Mouvement</th>
@@ -117,38 +117,35 @@ export default function Movements() {
                   <th className="px-5 py-3 text-right">Horodatage</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/[0.06]">
+              <tbody className="divide-y divide-border">
                 {movements.map(movement => (
-                  <tr
-                    key={movement.id}
-                    className="text-sm hover:bg-white/[0.018]"
-                  >
+                  <tr key={movement.id} className="text-sm hover:bg-accent">
                     <td className="px-5 py-4">
-                      <p className="font-medium text-slate-200">
+                      <p className="font-medium text-foreground">
                         {movement.productName}
                       </p>
-                      <p className="mt-0.5 text-xs text-slate-500">
+                      <p className="mt-0.5 text-xs text-faint">
                         {movement.reason}
                       </p>
                     </td>
                     <td className="px-4 py-4">
                       <Badge
-                        className={`border-0 ${movement.type === "entry" ? "bg-emerald-400/10 text-emerald-300" : movement.type === "exit" ? "bg-rose-400/10 text-rose-300" : "bg-violet-400/10 text-violet-300"}`}
+                        className={`border-0 ${movement.type === "entry" ? "bg-success-soft text-success" : movement.type === "exit" ? "bg-destructive-soft text-destructive" : "bg-info-soft text-info"}`}
                       >
                         {movementLabels[movement.type]}
                       </Badge>
                     </td>
                     <td
-                      className={`px-4 py-4 font-semibold ${movement.quantity >= 0 ? "text-emerald-300" : "text-rose-300"}`}
+                      className={`px-4 py-4 font-semibold ${movement.quantity >= 0 ? "text-success" : "text-destructive"}`}
                     >
                       {formatSignedQuantity(movement.quantity)}
                     </td>
-                    <td className="px-4 py-4 text-slate-400">
+                    <td className="px-4 py-4 text-muted-foreground">
                       {movement.previousQuantity}{" "}
-                      <span className="px-1 text-slate-600">→</span>{" "}
+                      <span className="px-1 text-faint">→</span>{" "}
                       {movement.resultingQuantity}
                     </td>
-                    <td className="px-5 py-4 text-right text-xs text-slate-500">
+                    <td className="px-5 py-4 text-right text-xs text-faint">
                       {formatDate(movement.occurredAt, true)}
                     </td>
                   </tr>
@@ -167,7 +164,7 @@ export default function Movements() {
         <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
           Opérations
         </p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
           Mouvements de stock
         </h1>
       </header>
@@ -178,12 +175,12 @@ export default function Movements() {
               <SlidersHorizontal className="h-5 w-5" />
             </span>
             <div>
-              <p className="text-sm font-semibold text-slate-100">
+              <p className="text-sm font-semibold text-foreground">
                 {canCorrectStock
                   ? "Correction de stock autorisée"
                   : "Consultation des mouvements"}
               </p>
-              <p className="mt-0.5 text-xs text-slate-400">
+              <p className="mt-0.5 text-xs text-muted-foreground">
                 {canCorrectStock
                   ? "Vous pouvez uniquement enregistrer un ajustement sans fournisseur. Les entrées et sorties restent réservées à l’administrateur."
                   : "Votre rôle vendeur permet de suivre le registre sans enregistrer ni corriger le stock."}
@@ -200,17 +197,17 @@ export default function Movements() {
         }
       >
         {canRecordMovement && (
-          <Card className="h-fit border-white/[0.07] bg-[#111722] shadow-none">
+          <Card className="h-fit border-border bg-card shadow-none">
             <CardContent className="p-5">
               <div className="mb-5 flex items-center gap-3">
                 <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
                   <SlidersHorizontal className="h-5 w-5" />
                 </span>
                 <div>
-                  <p className="text-sm font-semibold text-white">
+                  <p className="text-sm font-semibold text-foreground">
                     {canManage ? "Nouveau mouvement" : "Correction de stock"}
                   </p>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-faint">
                     {canManage
                       ? "Mise à jour instantanée du stock"
                       : "Ajustement tracé dans le journal"}
@@ -249,9 +246,9 @@ export default function Movements() {
                     </SelectContent>
                   </Select>
                   {selectedProduct && (
-                    <p className="pt-1 text-xs text-slate-500">
+                    <p className="pt-1 text-xs text-faint">
                       Stock disponible :{" "}
-                      <span className="font-medium text-slate-300">
+                      <span className="font-medium text-muted-foreground">
                         {selectedProduct.quantity} {selectedProduct.unit}
                       </span>
                     </p>
@@ -337,7 +334,9 @@ function Field({
 }) {
   return (
     <div className="space-y-2">
-      <Label className="text-xs font-medium text-slate-300">{label}</Label>
+      <Label className="text-xs font-medium text-muted-foreground">
+        {label}
+      </Label>
       {children}
     </div>
   );

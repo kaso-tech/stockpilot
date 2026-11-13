@@ -253,7 +253,7 @@ export default function Expenses() {
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-semibold text-white sm:text-3xl">
+        <h1 className="text-2xl font-semibold text-foreground sm:text-3xl">
           Dépenses
         </h1>
         <Button
@@ -357,15 +357,15 @@ function Metric({
 }) {
   const colors = {
     primary: "bg-primary/10 text-primary",
-    amber: "bg-amber-400/10 text-amber-300",
-    violet: "bg-violet-400/10 text-violet-300",
+    amber: "bg-warning-soft text-warning",
+    violet: "bg-info-soft text-info",
   };
   return (
-    <Card className="border-white/[0.07] bg-[#111722]">
+    <Card className="border-border bg-card">
       <CardContent className="flex items-start justify-between p-5">
         <div>
-          <p className="text-xs text-slate-500">{label}</p>
-          <p className="mt-2 text-xl font-semibold text-white">{value}</p>
+          <p className="text-xs text-faint">{label}</p>
+          <p className="mt-2 text-xl font-semibold text-foreground">{value}</p>
         </div>
         <span
           className={`grid h-10 w-10 place-items-center rounded-xl ${colors[tone]}`}
@@ -393,7 +393,7 @@ function BudgetCard({
 }) {
   const exceeded = remaining !== null && remaining < 0;
   return (
-    <Card className="border-white/[0.07] bg-[#111722]">
+    <Card className="border-border bg-card">
       <CardContent className="p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
@@ -401,7 +401,7 @@ function BudgetCard({
               <Target className="h-5 w-5" />
             </span>
             <div>
-              <p className="text-sm font-semibold text-white">
+              <p className="text-sm font-semibold text-foreground">
                 Budget de{" "}
                 {new Intl.DateTimeFormat("fr-FR", {
                   month: "long",
@@ -409,7 +409,7 @@ function BudgetCard({
                 }).format(new Date(`${monthKey}-01T12:00:00`))}
               </p>
               <p
-                className={`mt-1 text-xs ${exceeded ? "text-rose-300" : "text-slate-500"}`}
+                className={`mt-1 text-xs ${exceeded ? "text-destructive" : "text-faint"}`}
               >
                 {budgetCents === null
                   ? "Aucun budget défini pour ce mois."
@@ -431,22 +431,24 @@ function BudgetCard({
         {budgetCents !== null && (
           <div className="mt-5">
             <div className="mb-2 flex justify-between text-xs">
-              <span className="text-slate-400">{percent}% consommés</span>
+              <span className="text-muted-foreground">
+                {percent}% consommés
+              </span>
               <span
                 className={
                   exceeded
-                    ? "font-semibold text-rose-300"
+                    ? "font-semibold text-destructive"
                     : percent >= warningPercent
-                      ? "font-semibold text-amber-300"
-                      : "font-semibold text-slate-300"
+                      ? "font-semibold text-warning"
+                      : "font-semibold text-muted-foreground"
                 }
               >
                 {formatCurrency(budgetCents)}
               </span>
             </div>
-            <div className="h-2 overflow-hidden rounded-full bg-white/[0.07]">
+            <div className="h-2 overflow-hidden rounded-full bg-muted">
               <div
-                className={`h-full rounded-full ${exceeded ? "bg-rose-400" : percent >= warningPercent ? "bg-amber-400" : "bg-primary"}`}
+                className={`h-full rounded-full ${exceeded ? "bg-destructive" : percent >= warningPercent ? "bg-warning" : "bg-primary"}`}
                 style={{ width: `${Math.min(percent, 100)}%` }}
               />
             </div>
@@ -472,14 +474,14 @@ function MonthlyReport({
   };
 }) {
   return (
-    <Card className="border-white/[0.07] bg-[#111722]">
+    <Card className="border-border bg-card">
       <CardContent className="p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm font-semibold text-white">
+            <p className="text-sm font-semibold text-foreground">
               Rapport mensuel par catégorie
             </p>
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-faint">
               Les salaires et commissions versés aux agents sont inclus dans la
               catégorie Salaire.
             </p>
@@ -488,7 +490,7 @@ function MonthlyReport({
             type="month"
             value={reportMonth}
             onChange={event => setReportMonth(event.target.value)}
-            className="w-full border-white/10 bg-white/[0.04] sm:w-44"
+            className="w-full border-border bg-muted/50 sm:w-44"
           />
         </div>
         {report?.breakdown.length ? (
@@ -496,24 +498,24 @@ function MonthlyReport({
             {report.breakdown.map(item => (
               <div
                 key={item.category}
-                className="flex items-center justify-between rounded-xl border border-white/[0.07] bg-white/[0.025] px-3 py-2.5"
+                className="flex items-center justify-between rounded-xl border border-border bg-muted/50 px-3 py-2.5"
               >
-                <span className="text-sm text-slate-300">
+                <span className="text-sm text-muted-foreground">
                   {categoryLabel(item.category)}
                 </span>
-                <span className="text-sm font-semibold text-white">
+                <span className="text-sm font-semibold text-foreground">
                   {formatCurrency(item.amountCents)}
                 </span>
               </div>
             ))}
             {report.agentPaymentCents > 0 && (
-              <div className="sm:col-span-2 rounded-xl border border-violet-400/15 bg-violet-400/[0.05] px-3 py-2.5 text-xs text-violet-200">
+              <div className="sm:col-span-2 rounded-xl border border-info/25 bg-info-soft px-3 py-2.5 text-xs text-info">
                 Dont {formatCurrency(report.agentPaymentCents)} de salaires et
                 commissions versés ({report.agentPaymentCount} paiement(s)).
               </div>
             )}
-            <div className="sm:col-span-2 mt-1 flex items-center justify-between border-t border-white/[0.08] pt-3">
-              <span className="text-sm text-slate-400">
+            <div className="sm:col-span-2 mt-1 flex items-center justify-between border-t border-border pt-3">
+              <span className="text-sm text-muted-foreground">
                 {report.count} dépense(s)
               </span>
               <span className="text-lg font-semibold text-primary">
@@ -522,9 +524,9 @@ function MonthlyReport({
             </div>
           </div>
         ) : (
-          <div className="mt-5 rounded-xl border border-dashed border-white/[0.1] px-4 py-7 text-center">
-            <ReceiptText className="mx-auto h-5 w-5 text-slate-600" />
-            <p className="mt-2 text-sm text-slate-400">
+          <div className="mt-5 rounded-xl border border-dashed border-border px-4 py-7 text-center">
+            <ReceiptText className="mx-auto h-5 w-5 text-faint" />
+            <p className="mt-2 text-sm text-muted-foreground">
               Aucune dépense pour cette période.
             </p>
           </div>
@@ -547,21 +549,21 @@ function ExpenseList({
   remove: ReturnType<typeof trpc.expenses.remove.useMutation>;
 }) {
   return (
-    <Card className="border-white/[0.07] bg-[#111722]">
+    <Card className="border-border bg-card">
       <CardContent className="p-0">
-        <div className="border-b border-white/[0.07] px-5 py-5">
-          <p className="text-sm font-semibold text-white">
+        <div className="border-b border-border px-5 py-5">
+          <p className="text-sm font-semibold text-foreground">
             Registre des dépenses
           </p>
         </div>
         {loading ? (
           <div className="space-y-3 p-5">
             {Array.from({ length: 4 }).map((_, index) => (
-              <Skeleton key={index} className="h-16 bg-white/10" />
+              <Skeleton key={index} className="h-16 bg-muted" />
             ))}
           </div>
         ) : expenses.length ? (
-          <div className="divide-y divide-white/[0.06]">
+          <div className="divide-y divide-border">
             {expenses.map(expense => (
               <div
                 key={expense.id}
@@ -572,14 +574,14 @@ function ExpenseList({
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium text-slate-100">
+                    <p className="font-medium text-foreground">
                       {expense.description}
                     </p>
-                    <span className="rounded-full bg-white/[0.07] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                       {categoryLabel(expense.category)}
                     </span>
                   </div>
-                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-faint">
                     <span>{formatDate(expense.spentAt, true)}</span>
                     {expense.receiptUrl && (
                       <a
@@ -595,7 +597,7 @@ function ExpenseList({
                     )}
                   </div>
                 </div>
-                <p className="text-lg font-semibold text-rose-300">
+                <p className="text-lg font-semibold text-destructive">
                   −{formatCurrency(expense.amountCents)}
                 </p>
                 <div className="flex gap-1">
@@ -614,7 +616,7 @@ function ExpenseList({
                     disabled={remove.isPending}
                     variant="ghost"
                     size="icon"
-                    className="text-rose-300 hover:bg-rose-400/10"
+                    className="text-destructive hover:bg-destructive-soft"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -624,8 +626,8 @@ function ExpenseList({
           </div>
         ) : (
           <div className="px-6 py-16 text-center">
-            <WalletCards className="mx-auto h-7 w-7 text-slate-600" />
-            <p className="mt-3 text-sm font-medium text-slate-300">
+            <WalletCards className="mx-auto h-7 w-7 text-faint" />
+            <p className="mt-3 text-sm font-medium text-muted-foreground">
               Aucune dépense enregistrée
             </p>
             <Button
@@ -666,7 +668,7 @@ function ExpenseDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={value => !value && onClose()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto border-white/10 bg-[#141b27] text-slate-100">
+      <DialogContent className="max-h-[90vh] overflow-y-auto border-border bg-card text-foreground">
         <DialogHeader>
           <DialogTitle>
             {editing ? "Modifier la dépense" : "Ajouter une dépense"}
@@ -683,13 +685,13 @@ function ExpenseDialog({
                   category: event.target.value as ExpenseCategory,
                 })
               }
-              className="h-10 rounded-md border border-white/10 bg-white/[0.04] px-3 text-sm text-slate-100 outline-none focus:border-primary"
+              className="h-10 rounded-md border border-border bg-muted/50 px-3 text-sm text-foreground outline-none focus:border-primary"
             >
               {categories.map(category => (
                 <option
                   key={category.value}
                   value={category.value}
-                  className="bg-slate-900"
+                  className="bg-background"
                 >
                   {category.label}
                 </option>
@@ -740,7 +742,7 @@ function ExpenseDialog({
                 <span className="block text-sm font-medium">
                   Joindre un justificatif
                 </span>
-                <span className="mt-0.5 block truncate text-xs text-slate-500">
+                <span className="mt-0.5 block truncate text-xs text-faint">
                   {receipt?.filename ||
                     form.receiptName ||
                     "PDF, PNG, JPEG ou WEBP · 5 Mo max."}
@@ -759,7 +761,7 @@ function ExpenseDialog({
                 variant="ghost"
                 size="sm"
                 onClick={() => setReceipt(null)}
-                className="mt-2 h-7 px-0 text-xs text-slate-400"
+                className="mt-2 h-7 px-0 text-xs text-muted-foreground"
               >
                 Retirer le nouveau fichier
               </Button>
@@ -770,7 +772,7 @@ function ExpenseDialog({
           <Button
             variant="outline"
             onClick={onClose}
-            className="border-white/10 text-slate-200"
+            className="border-border text-foreground"
           >
             Annuler
           </Button>
@@ -807,7 +809,7 @@ function BudgetDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={value => !value && onClose()}>
-      <DialogContent className="border-white/10 bg-[#141b27] text-slate-100">
+      <DialogContent className="border-border bg-card text-foreground">
         <DialogHeader>
           <DialogTitle>Budget mensuel et alerte</DialogTitle>
         </DialogHeader>
@@ -833,7 +835,7 @@ function BudgetDialog({
               value={warning}
               onChange={event => setWarning(event.target.value)}
             />
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-faint">
               Une alerte visuelle apparaît sur le tableau de bord à ce seuil,
               puis en rouge en cas de dépassement.
             </span>
@@ -843,7 +845,7 @@ function BudgetDialog({
           <Button
             variant="outline"
             onClick={onClose}
-            className="border-white/10 text-slate-200"
+            className="border-border text-foreground"
           >
             Annuler
           </Button>

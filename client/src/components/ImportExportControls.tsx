@@ -84,7 +84,7 @@ export function ImportExportControls({
           variant="outline"
           size="sm"
           onClick={() => downloadCsv(filename, headers, rows)}
-          className="border-white/15 text-slate-300"
+          className="border-border text-muted-foreground"
         >
           <Download className="mr-2 h-4 w-4" />
           Exporter CSV
@@ -94,7 +94,7 @@ export function ImportExportControls({
           variant="ghost"
           size="sm"
           onClick={() => downloadCsv(`modele_${filename}`, headers, [])}
-          className="text-slate-400"
+          className="text-muted-foreground"
         >
           <FileSpreadsheet className="mr-2 h-4 w-4" />
           Modèle vide
@@ -104,17 +104,17 @@ export function ImportExportControls({
         open={Boolean(previewRows.length)}
         onOpenChange={value => !value && !importing && setPreviewRows([])}
       >
-        <DialogContent className="max-h-[85vh] overflow-y-auto border-white/10 bg-[#141b27] text-slate-100 sm:max-w-4xl">
+        <DialogContent className="max-h-[85vh] overflow-y-auto border-border bg-card text-foreground sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>Vérifier les données avant import</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-muted-foreground">
             {previewRows.length} ligne(s) détectée(s). Les cinq premières lignes
             sont affichées ci-dessous.
           </p>
-          <div className="overflow-x-auto rounded-xl border border-white/[0.08]">
+          <div className="overflow-x-auto rounded-xl border border-border">
             <table className="min-w-full text-left text-xs">
-              <thead className="bg-white/[0.04] text-slate-400">
+              <thead className="bg-muted/50 text-muted-foreground">
                 <tr>
                   {headers.map(header => (
                     <th key={header} className="px-3 py-2 font-medium">
@@ -123,13 +123,13 @@ export function ImportExportControls({
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/[0.06]">
+              <tbody className="divide-y divide-border">
                 {previewRows.slice(0, 5).map((row, index) => (
                   <tr key={index}>
                     {headers.map(header => (
                       <td
                         key={header}
-                        className="max-w-44 truncate px-3 py-2 text-slate-200"
+                        className="max-w-44 truncate px-3 py-2 text-foreground"
                       >
                         {row[header.toLowerCase()] || "—"}
                       </td>

@@ -119,7 +119,7 @@ export default function DataExchange() {
   };
   if (!can("catalog.manage"))
     return (
-      <div className="mx-auto max-w-3xl py-20 text-center text-slate-400">
+      <div className="mx-auto max-w-3xl py-20 text-center text-muted-foreground">
         Cette fonctionnalité est réservée aux administrateurs.
       </div>
     );
@@ -129,7 +129,7 @@ export default function DataExchange() {
         <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
           Outils
         </p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
           Import & export
         </h1>
       </header>
@@ -239,7 +239,7 @@ export default function DataExchange() {
         />
       </div>
       <Card className="border-primary/20 bg-primary/[0.04]">
-        <CardContent className="flex gap-3 p-4 text-sm text-slate-300">
+        <CardContent className="flex gap-3 p-4 text-sm text-muted-foreground">
           <FileSpreadsheet className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
           <p>
             Pour les produits, utilisez le format de palier{" "}
@@ -265,13 +265,13 @@ function ExchangeCard({
   controls: React.ReactNode;
 }) {
   return (
-    <Card className="border-white/[0.07] bg-[#111722] shadow-none">
+    <Card className="border-border bg-card shadow-none">
       <CardHeader className="pb-3">
         <span className="mb-3 grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary">
           {icon}
         </span>
-        <CardTitle className="text-base text-white">{title}</CardTitle>
-        <p className="text-xs text-slate-500">
+        <CardTitle className="text-base text-foreground">{title}</CardTitle>
+        <p className="text-xs text-faint">
           {count} entrée{count > 1 ? "s" : ""}
         </p>
       </CardHeader>

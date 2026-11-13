@@ -73,19 +73,19 @@ type Order = {
 const statusMeta: Record<Status, { label: string; className: string }> = {
   draft: {
     label: "En attente",
-    className: "border-amber-400/25 bg-amber-400/10 text-amber-200",
+    className: "border-warning/25 bg-warning-soft text-warning",
   },
   sent: {
     label: "Envoyé",
-    className: "border-sky-400/25 bg-sky-400/10 text-sky-200",
+    className: "border-info/25 bg-info-soft text-info",
   },
   received: {
     label: "Reçu",
-    className: "border-emerald-400/25 bg-emerald-400/10 text-emerald-200",
+    className: "border-success/25 bg-success-soft text-success",
   },
   cancelled: {
     label: "Annulé",
-    className: "border-rose-400/25 bg-rose-400/10 text-rose-200",
+    className: "border-destructive/25 bg-destructive-soft text-destructive",
   },
 };
 
@@ -160,7 +160,7 @@ export default function PurchaseOrderDetail() {
   });
   if (isLoading)
     return (
-      <div className="mx-auto max-w-[1500px] py-24 text-center text-sm text-slate-500">
+      <div className="mx-auto max-w-[1500px] py-24 text-center text-sm text-faint">
         Chargement du bon de commande…
       </div>
     );
@@ -264,7 +264,7 @@ export default function PurchaseOrderDetail() {
         {backLabel}
       </Button>
       <section
-        className={`rounded-2xl border p-5 shadow-sm sm:p-6 ${overdue ? "border-rose-400/35 bg-rose-400/[0.05]" : "border-white/[0.07] bg-[#111722]"}`}
+        className={`rounded-2xl border p-5 shadow-sm sm:p-6 ${overdue ? "border-destructive/25 bg-destructive-soft" : "border-border bg-card"}`}
       >
         <div className="flex min-w-0 items-start gap-4">
           <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary">
@@ -275,12 +275,12 @@ export default function PurchaseOrderDetail() {
               Bon de commande
             </p>
             <div className="mt-1 flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
                 {order.orderNumber}
               </h1>
               <StatusBadge status={order.status} />
             </div>
-            <p className="mt-2 text-sm text-slate-400">
+            <p className="mt-2 text-sm text-muted-foreground">
               {order.supplier?.name || "Fournisseur indisponible"}
             </p>
           </div>
@@ -312,23 +312,23 @@ export default function PurchaseOrderDetail() {
           />
         </div>
         {overdue && (
-          <div className="mt-4 flex items-center gap-2 rounded-xl border border-rose-400/25 bg-rose-400/10 px-3 py-2 text-sm font-medium text-rose-200">
+          <div className="mt-4 flex items-center gap-2 rounded-xl border border-destructive/25 bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive">
             <AlertTriangle className="h-4 w-4" />
             Livraison en retard depuis le {formatDate(expected!)}.
           </div>
         )}
       </section>
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,.8fr)]">
-        <Card className="border-white/[0.07] bg-[#111722] shadow-none">
+        <Card className="border-border bg-card shadow-none">
           <CardContent className="p-5 sm:p-6">
             <div className="flex items-center gap-2">
               <Truck className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-semibold text-white">
+              <h2 className="text-lg font-semibold text-foreground">
                 Lignes commandées
               </h2>
             </div>
-            <div className="mt-5 overflow-hidden rounded-xl border border-white/[0.07]">
-              <div className="grid grid-cols-[minmax(0,1fr)_70px_90px] gap-3 border-b border-white/[0.07] bg-white/[0.025] px-4 py-3 text-[10px] font-medium uppercase tracking-[0.1em] text-slate-500 sm:grid-cols-[minmax(0,1fr)_100px_100px_110px]">
+            <div className="mt-5 overflow-hidden rounded-xl border border-border">
+              <div className="grid grid-cols-[minmax(0,1fr)_70px_90px] gap-3 border-b border-border bg-muted/50 px-4 py-3 text-[10px] font-medium uppercase tracking-[0.1em] text-faint sm:grid-cols-[minmax(0,1fr)_100px_100px_110px]">
                 <span>Produit</span>
                 <span className="text-right">Qté</span>
                 <span className="text-right">Reçu</span>
@@ -339,24 +339,24 @@ export default function PurchaseOrderDetail() {
                 return (
                   <div
                     key={line.id}
-                    className="grid grid-cols-[minmax(0,1fr)_70px_90px] gap-3 border-b border-white/[0.07] px-4 py-4 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_100px_100px_110px]"
+                    className="grid grid-cols-[minmax(0,1fr)_70px_90px] gap-3 border-b border-border px-4 py-4 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_100px_100px_110px]"
                   >
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-slate-100">
+                      <p className="truncate text-sm font-semibold text-foreground">
                         {line.productName}
                       </p>
-                      <p className="mt-1 text-xs text-slate-500">
+                      <p className="mt-1 text-xs text-faint">
                         {line.productReference} · {line.unit} · Reste{" "}
                         {remaining}
                       </p>
                     </div>
-                    <span className="text-right text-sm text-slate-300">
+                    <span className="text-right text-sm text-muted-foreground">
                       {line.quantity}
                     </span>
-                    <span className="text-right text-sm font-semibold text-emerald-300">
+                    <span className="text-right text-sm font-semibold text-success">
                       {line.receivedQuantity}
                     </span>
-                    <span className="hidden text-right text-sm text-slate-300 sm:block">
+                    <span className="hidden text-right text-sm text-muted-foreground sm:block">
                       {formatCurrency(line.lineTotalCents)}
                     </span>
                   </div>
@@ -366,15 +366,15 @@ export default function PurchaseOrderDetail() {
           </CardContent>
         </Card>
         <aside className="space-y-6">
-          <Card className="border-white/[0.07] bg-[#111722] shadow-none">
+          <Card className="border-border bg-card shadow-none">
             <CardContent className="p-5">
-              <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-slate-500">
+              <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-faint">
                 Montant commandé
               </p>
-              <p className="mt-2 text-2xl font-semibold text-white">
+              <p className="mt-2 text-2xl font-semibold text-foreground">
                 {formatCurrency(order.totalCents)}
               </p>
-              <div className="mt-3 space-y-1 text-xs text-slate-400">
+              <div className="mt-3 space-y-1 text-xs text-muted-foreground">
                 <p>Sous-total : {formatCurrency(order.subtotalCents || 0)}</p>
                 {order.vatCents > 0 && (
                   <p>
@@ -389,23 +389,23 @@ export default function PurchaseOrderDetail() {
                   </p>
                 )}
               </div>
-              <p className="mt-3 text-sm text-slate-400">
+              <p className="mt-3 text-sm text-muted-foreground">
                 {order.notes || "Aucune note ajoutée."}
               </p>
             </CardContent>
           </Card>
           {order.cancellationReason && (
-            <Card className="border-rose-400/25 bg-rose-400/[0.05] shadow-none">
+            <Card className="border-destructive/25 bg-destructive-soft shadow-none">
               <CardContent className="p-5">
-                <div className="flex items-center gap-2 text-rose-200">
+                <div className="flex items-center gap-2 text-destructive">
                   <AlertTriangle className="h-5 w-5" />
                   <h2 className="font-semibold">Annulation</h2>
                 </div>
-                <p className="mt-3 text-sm text-rose-100/85">
+                <p className="mt-3 text-sm text-destructive">
                   {order.cancellationReason}
                 </p>
                 {order.cancelledAt && (
-                  <p className="mt-2 text-xs text-rose-200/70">
+                  <p className="mt-2 text-xs text-destructive">
                     Le {formatDate(order.cancelledAt)}
                   </p>
                 )}
@@ -415,12 +415,12 @@ export default function PurchaseOrderDetail() {
         </aside>
       </div>
       {canManage && (
-        <div className="flex flex-col gap-3 border-t border-white/[0.07] pt-6">
+        <div className="flex flex-col gap-3 border-t border-border pt-6">
           <div className="flex flex-wrap justify-end gap-2">
             <Button
               variant="outline"
               onClick={() => window.print()}
-              className="border-white/10 text-slate-300 hover:bg-primary/[0.06] hover:text-primary"
+              className="border-border text-muted-foreground hover:bg-primary/[0.06] hover:text-primary"
             >
               <Printer className="mr-2 h-4 w-4" />
               Imprimer
@@ -431,7 +431,7 @@ export default function PurchaseOrderDetail() {
               disabled={
                 order.status === "cancelled" || markSent.isPending || !phone
               }
-              className="border-white/10 text-slate-300 hover:bg-primary/[0.06] hover:text-primary"
+              className="border-border text-muted-foreground hover:bg-primary/[0.06] hover:text-primary"
             >
               <MessageCircle className="mr-2 h-4 w-4" />
               WhatsApp
@@ -444,7 +444,7 @@ export default function PurchaseOrderDetail() {
                 markSent.isPending ||
                 !order.supplier?.email
               }
-              className="border-white/10 text-slate-300 hover:bg-primary/[0.06] hover:text-primary"
+              className="border-border text-muted-foreground hover:bg-primary/[0.06] hover:text-primary"
             >
               <Send className="mr-2 h-4 w-4" />
               E-mail + PDF
@@ -468,7 +468,7 @@ export default function PurchaseOrderDetail() {
                 <Button
                   variant="outline"
                   onClick={() => setCancelOpen(true)}
-                  className="border-rose-400/30 text-rose-300 hover:bg-rose-400/10"
+                  className="border-destructive/25 text-destructive hover:bg-destructive-soft"
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
                   Annuler
@@ -482,7 +482,7 @@ export default function PurchaseOrderDetail() {
                   if (window.confirm(`Supprimer ${order.orderNumber} ?`))
                     remove.mutate({ id: order.id });
                 }}
-                className="border-rose-400/30 text-rose-300 hover:bg-rose-400/10"
+                className="border-destructive/25 text-destructive hover:bg-destructive-soft"
               >
                 <Trash2 className="mr-2 h-4 w-4" />
                 Supprimer
@@ -493,7 +493,7 @@ export default function PurchaseOrderDetail() {
             <Button
               variant="outline"
               onClick={() => setLocation(backPath)}
-              className="w-full border-white/10 text-slate-300 hover:bg-primary/[0.06] hover:text-primary"
+              className="w-full border-border text-muted-foreground hover:bg-primary/[0.06] hover:text-primary"
             >
               <RotateCcw className="mr-2 h-4 w-4" />
               {returnToOrders
@@ -561,24 +561,26 @@ function OrderEditDialog({
   }, [open, order]);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="border-white/10 bg-[#141b27] text-slate-100">
+      <DialogContent className="border-border bg-card text-foreground">
         <DialogHeader>
           <DialogTitle>Modifier le bon {order.orderNumber}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-4 py-2">
           <div>
-            <Label className="text-xs text-slate-300">Livraison attendue</Label>
+            <Label className="text-xs text-muted-foreground">
+              Livraison attendue
+            </Label>
             <Input
               type="date"
               value={date}
               onChange={event => setDate(event.target.value)}
-              className="mt-2 border-white/10 bg-[#0e141f]"
+              className="mt-2 border-border bg-muted"
             />
           </div>
           <div>
             <Label
               htmlFor="edit-delivery-fee"
-              className="text-xs text-slate-300"
+              className="text-xs text-muted-foreground"
             >
               Frais de livraison
             </Label>
@@ -589,15 +591,15 @@ function OrderEditDialog({
               step="1"
               value={deliveryFee}
               onChange={event => setDeliveryFee(event.target.value)}
-              className="mt-2 border-white/10 bg-[#0e141f]"
+              className="mt-2 border-border bg-muted"
             />
           </div>
           <div>
-            <Label className="text-xs text-slate-300">Note</Label>
+            <Label className="text-xs text-muted-foreground">Note</Label>
             <Textarea
               value={notes}
               onChange={event => setNotes(event.target.value)}
-              className="mt-2 min-h-28 border-white/10 bg-[#0e141f]"
+              className="mt-2 min-h-28 border-border bg-muted"
             />
           </div>
         </div>
@@ -688,7 +690,7 @@ function ReceiptDialog({
     .filter(line => line.quantity > 0);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto border-white/10 bg-[#141b27] text-slate-100 sm:max-w-2xl">
+      <DialogContent className="max-h-[90vh] overflow-y-auto border-border bg-card text-foreground sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Réception partielle · {order.orderNumber}</DialogTitle>
         </DialogHeader>
@@ -698,13 +700,13 @@ function ReceiptDialog({
             return (
               <div
                 key={line.id}
-                className="grid gap-2 rounded-xl border border-white/[0.07] bg-white/[0.025] p-3 sm:grid-cols-[1fr_auto]"
+                className="grid gap-2 rounded-xl border border-border bg-muted/50 p-3 sm:grid-cols-[1fr_auto]"
               >
                 <div>
-                  <p className="text-sm font-semibold text-slate-100">
+                  <p className="text-sm font-semibold text-foreground">
                     {line.productName}
                   </p>
-                  <p className="mt-1 text-xs text-slate-500">
+                  <p className="mt-1 text-xs text-faint">
                     Commandé {line.quantity} · Déjà reçu {line.receivedQuantity}{" "}
                     · Reste {remaining}
                   </p>
@@ -721,7 +723,7 @@ function ReceiptDialog({
                       [line.id]: Number(event.target.value) || 0,
                     }))
                   }
-                  className="h-9 w-full border-white/10 bg-[#0e141f] text-right sm:w-24"
+                  className="h-9 w-full border-border bg-muted text-right sm:w-24"
                 />
                 {remaining > 0 && (
                   <div className="grid gap-2 sm:col-span-2 sm:grid-cols-2">
@@ -737,7 +739,7 @@ function ReceiptDialog({
                           },
                         }))
                       }
-                      className="h-9 border-white/10 bg-[#0e141f]"
+                      className="h-9 border-border bg-muted"
                     />
                     <Input
                       type="date"
@@ -752,7 +754,7 @@ function ReceiptDialog({
                           },
                         }))
                       }
-                      className="h-9 border-white/10 bg-[#0e141f]"
+                      className="h-9 border-border bg-muted"
                     />
                   </div>
                 )}
@@ -761,13 +763,13 @@ function ReceiptDialog({
           })}
           {activeWarehouses.length > 1 && (
             <label className="block text-sm">
-              <span className="mb-1 block text-xs text-slate-400">
+              <span className="mb-1 block text-xs text-muted-foreground">
                 Dépôt de réception
               </span>
               <select
                 value={warehouseId}
                 onChange={event => setWarehouseId(event.target.value)}
-                className="h-10 w-full rounded-md border border-white/10 bg-[#0e141f] px-3 text-sm"
+                className="h-10 w-full rounded-md border border-border bg-muted px-3 text-sm"
               >
                 <option value="">Dépôt par défaut</option>
                 {activeWarehouses.map(item => (
@@ -817,17 +819,19 @@ function CancelDialog({
   }, [open]);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="border-white/10 bg-[#141b27] text-slate-100">
+      <DialogContent className="border-border bg-card text-foreground">
         <DialogHeader>
           <DialogTitle>Annuler le bon {order.orderNumber}</DialogTitle>
         </DialogHeader>
         <div className="py-2">
-          <Label className="text-xs text-slate-300">Motif d’annulation *</Label>
+          <Label className="text-xs text-muted-foreground">
+            Motif d’annulation *
+          </Label>
           <Textarea
             value={reason}
             onChange={event => setReason(event.target.value)}
             placeholder="Expliquez la raison de l’annulation"
-            className="mt-2 min-h-28 border-white/10 bg-[#0e141f]"
+            className="mt-2 min-h-28 border-border bg-muted"
           />
         </div>
         <DialogFooter>
@@ -837,7 +841,7 @@ function CancelDialog({
           <Button
             disabled={pending || reason.trim().length < 3}
             onClick={() => onConfirm(reason.trim())}
-            className="bg-rose-600 text-white hover:bg-rose-500"
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
             <Trash2 className="mr-2 h-4 w-4" />
             Confirmer l’annulation
@@ -860,13 +864,13 @@ function Metric({
 }) {
   const text =
     tone === "danger"
-      ? "text-rose-200"
+      ? "text-destructive"
       : tone === "success"
-        ? "text-emerald-200"
-        : "text-slate-200";
+        ? "text-success"
+        : "text-foreground";
   return (
-    <div className="rounded-xl border border-white/[0.07] bg-white/[0.025] p-3">
-      <p className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.11em] text-slate-500">
+    <div className="rounded-xl border border-border bg-muted/50 p-3">
+      <p className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.11em] text-faint">
         {icon}
         {label}
       </p>
@@ -891,10 +895,10 @@ function MissingOrder({ onBack }: { onBack: () => void }) {
         <ArrowLeft className="mr-2 h-4 w-4" />
         Retour aux fournisseurs
       </Button>
-      <Card className="border-dashed border-white/10 bg-[#111722] shadow-none">
+      <Card className="border-dashed border-border bg-card shadow-none">
         <CardContent className="py-16 text-center">
-          <ClipboardList className="mx-auto h-7 w-7 text-slate-600" />
-          <p className="mt-4 font-medium text-slate-300">
+          <ClipboardList className="mx-auto h-7 w-7 text-faint" />
+          <p className="mt-4 font-medium text-muted-foreground">
             Bon de commande introuvable
           </p>
         </CardContent>

@@ -470,10 +470,10 @@ export default function InvoiceCreate({
     <div className="mx-auto max-w-5xl space-y-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#007B8B]">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
             Documents commerciaux
           </p>
-          <h1 className="mt-2 text-2xl font-semibold text-slate-950 dark:text-white sm:text-3xl">
+          <h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">
             Créer un {documentType === "quote" ? "devis" : "facture"}
           </h1>
         </div>
@@ -486,7 +486,7 @@ export default function InvoiceCreate({
           <h2 className="font-semibold">Client et intervenants</h2>
           <div className="space-y-2">
             <Label>
-              Client <span className="text-rose-500">*</span>
+              Client <span className="text-destructive">*</span>
             </Label>
             <Select value={customerId} onValueChange={setCustomerId}>
               <SelectTrigger>
@@ -503,12 +503,12 @@ export default function InvoiceCreate({
             </Select>
             {customer && (
               <div className="flex flex-wrap items-center gap-2">
-                <Badge className="border-0 bg-[#007B8B]/10 text-[#007B8B]">
+                <Badge className="border-0 bg-primary/10 text-primary">
                   Tarif {customer.type === "wholesale" ? "grossiste" : "détail"}{" "}
                   appliqué
                 </Badge>
                 {prefilledCustomerId && (
-                  <Badge className="border-0 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300">
+                  <Badge className="border-0 bg-success-soft text-success">
                     Client prérempli depuis sa fiche
                   </Badge>
                 )}
@@ -518,7 +518,7 @@ export default function InvoiceCreate({
           {customer && (
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-[#007B8B]" />
+                <MapPin className="h-4 w-4 text-primary" />
                 Adresse de livraison
               </Label>
               <Textarea
@@ -555,9 +555,9 @@ export default function InvoiceCreate({
             </div>
           )}
           {customerContext?.suggestions.length ? (
-            <div className="rounded-xl border border-[#007B8B]/20 bg-[#007B8B]/[0.045] p-3">
+            <div className="rounded-xl border border-primary/25 bg-primary/5 p-3">
               <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-[#007B8B]" />
+                <Sparkles className="h-4 w-4 text-primary" />
                 <p className="text-sm font-semibold">
                   Produits habituellement achetés
                 </p>
@@ -568,7 +568,7 @@ export default function InvoiceCreate({
                     type="button"
                     key={item.productId}
                     onClick={() => add(item.productId)}
-                    className="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2 text-left transition hover:border-[#007B8B]/40 hover:bg-[#007B8B]/[0.05]"
+                    className="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2 text-left transition hover:border-primary/40 hover:bg-primary/5"
                   >
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-medium">
@@ -580,7 +580,7 @@ export default function InvoiceCreate({
                         {item.availableQuantity}
                       </span>
                     </span>
-                    <Plus className="h-4 w-4 shrink-0 text-[#007B8B]" />
+                    <Plus className="h-4 w-4 shrink-0 text-primary" />
                   </button>
                 ))}
               </div>
@@ -591,7 +591,7 @@ export default function InvoiceCreate({
               {showSalesAgentSelect && (
                 <div className="space-y-2">
                   <Label>
-                    Agent commercial <span className="text-rose-500">*</span>
+                    Agent commercial <span className="text-destructive">*</span>
                   </Label>
                   <Select
                     value={salesAgentId || undefined}
@@ -614,7 +614,7 @@ export default function InvoiceCreate({
               {showCashierSelect && (
                 <div className="space-y-2">
                   <Label>
-                    Caissier <span className="text-rose-500">*</span>
+                    Caissier <span className="text-destructive">*</span>
                   </Label>
                   <Select
                     value={cashierId || undefined}
@@ -663,7 +663,7 @@ export default function InvoiceCreate({
             </div>
             <Button
               onClick={() => setPickerOpen(true)}
-              className="bg-[#007B8B] text-white hover:bg-[#006976]"
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
               <Plus className="mr-2 h-4 w-4" />
               Ajouter un produit
@@ -768,7 +768,7 @@ export default function InvoiceCreate({
                         variant="ghost"
                         onClick={() => remove(line.productId)}
                       >
-                        <Trash2 className="h-4 w-4 text-rose-500" />
+                        <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
                   </div>
@@ -815,13 +815,13 @@ export default function InvoiceCreate({
                 <span>{formatCurrency(subtotalCents)}</span>
               </div>
               {lineNetCents !== subtotalCents && (
-                <div className="flex justify-between text-emerald-600">
+                <div className="flex justify-between text-success">
                   <span>Remises lignes</span>
                   <span>-{formatCurrency(subtotalCents - lineNetCents)}</span>
                 </div>
               )}
               {invoiceDiscountCents > 0 && (
-                <div className="flex justify-between text-emerald-600">
+                <div className="flex justify-between text-success">
                   <span>Remise facture</span>
                   <span>-{formatCurrency(invoiceDiscountCents)}</span>
                 </div>
@@ -894,7 +894,7 @@ export default function InvoiceCreate({
                   <Button
                     onClick={collect}
                     disabled={draft.isPending}
-                    className="bg-[#007B8B] text-white hover:bg-[#006976]"
+                    className="bg-primary text-primary-foreground hover:bg-primary/90"
                   >
                     Encaisser
                   </Button>
@@ -946,13 +946,13 @@ export default function InvoiceCreate({
               <button
                 key={product.id}
                 onClick={() => add(product.id)}
-                className="rounded-xl border border-border p-4 text-left hover:border-[#007B8B]/50 hover:bg-[#007B8B]/5"
+                className="rounded-xl border border-border p-4 text-left hover:border-primary/40 hover:bg-primary/5"
               >
                 <p className="font-medium">{product.name}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {product.reference} · Stock {product.quantity}
                 </p>
-                <p className="mt-3 font-semibold text-[#007B8B]">
+                <p className="mt-3 font-semibold text-primary">
                   {formatCurrency(product[priceType])}
                 </p>
               </button>
@@ -984,8 +984,8 @@ export default function InvoiceCreate({
 }
 function DefaultAssignment({ label, name }: { label: string; name: string }) {
   return (
-    <div className="rounded-xl border border-[#007B8B]/20 bg-[#007B8B]/[0.06] p-3">
-      <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[#007B8B]">
+    <div className="rounded-xl border border-primary/25 bg-primary/5 p-3">
+      <p className="text-xs font-semibold uppercase tracking-[0.1em] text-primary">
         {label}
       </p>
       <p className="mt-1 font-medium text-foreground">{name}</p>

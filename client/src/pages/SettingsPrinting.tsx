@@ -84,19 +84,19 @@ export default function SettingsPrinting() {
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
           Périphériques
         </p>
-        <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">
+        <h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">
           Impression et imprimante
         </h1>
       </header>
-      <Card className="border-white/[0.07] bg-[#111722]">
+      <Card className="border-border bg-card">
         <CardContent className="space-y-5 p-6">
           <div className="flex items-center gap-3">
             <ReceiptText className="h-5 w-5 text-primary" />
             <div>
-              <h2 className="font-semibold text-slate-100">
+              <h2 className="font-semibold text-foreground">
                 Tickets de caisse
               </h2>
-              <p className="mt-1 text-sm text-slate-400">
+              <p className="mt-1 text-sm text-muted-foreground">
                 Configurez le format et les textes imprimés sur les tickets.
               </p>
             </div>
@@ -131,15 +131,15 @@ export default function SettingsPrinting() {
           </Field>
         </CardContent>
       </Card>
-      <Card className="border-white/[0.07] bg-[#111722]">
+      <Card className="border-border bg-card">
         <CardContent className="space-y-5 p-6">
           <div className="flex items-center gap-3">
             <Printer className="h-5 w-5 text-primary" />
             <div>
-              <h2 className="font-semibold text-slate-100">
+              <h2 className="font-semibold text-foreground">
                 Imprimante par défaut
               </h2>
-              <p className="mt-1 text-sm text-slate-400">
+              <p className="mt-1 text-sm text-muted-foreground">
                 Choisissez le comportement d’impression utilisé par votre
                 entreprise.
               </p>
@@ -169,7 +169,7 @@ export default function SettingsPrinting() {
               </SelectContent>
             </Select>
           </Field>
-          <div className="rounded-xl border border-primary/20 bg-primary/[0.06] p-4 text-sm text-slate-400">
+          <div className="rounded-xl border border-primary/20 bg-primary/[0.06] p-4 text-sm text-muted-foreground">
             Le mode navigateur ouvre la boîte d’impression standard. Le mode
             thermique conserve la préférence pour une intégration caisse
             compatible, sans stocker d’adresse réseau ni de secret.
@@ -199,7 +199,7 @@ function Field({
 }) {
   return (
     <div className="space-y-2">
-      <Label className="text-sm text-slate-200">{label}</Label>
+      <Label className="text-sm text-foreground">{label}</Label>
       {children}
     </div>
   );

@@ -63,40 +63,40 @@ export default function SettingsFiscal() {
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
           Organisation
         </p>
-        <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">
+        <h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">
           Fiscalité
         </h1>
-        <p className="mt-2 text-sm text-slate-400">
+        <p className="mt-2 text-sm text-muted-foreground">
           Configurez la TVA appliquée aux nouveaux documents commerciaux. Le
           taux est figé dans chaque document à sa création.
         </p>
       </header>
-      <Card className="border-white/[0.07] bg-[#111722]">
+      <Card className="border-border bg-card">
         <CardContent className="space-y-6 p-6">
           <div className="flex items-start gap-3">
             <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary">
               <ReceiptText className="h-5 w-5" />
             </span>
             <div>
-              <h2 className="font-semibold text-slate-100">
+              <h2 className="font-semibold text-foreground">
                 TVA sur les documents
               </h2>
-              <p className="mt-1 text-sm text-slate-400">
+              <p className="mt-1 text-sm text-muted-foreground">
                 Le réglage s’applique aux factures et bons créés après son
                 enregistrement. Les documents déjà créés conservent leur
                 historique.
               </p>
             </div>
           </div>
-          <div className="flex items-center justify-between gap-4 rounded-xl border border-white/[0.08] bg-white/[0.03] p-4">
+          <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-muted/50 p-4">
             <div>
               <Label
                 htmlFor="vat-enabled"
-                className="text-sm font-semibold text-slate-100"
+                className="text-sm font-semibold text-foreground"
               >
                 Activer la TVA
               </Label>
-              <p className="mt-1 text-xs text-slate-400">
+              <p className="mt-1 text-xs text-muted-foreground">
                 Afficher et calculer une taxe séparée dans les totaux.
               </p>
             </div>
@@ -107,7 +107,7 @@ export default function SettingsFiscal() {
             />
           </div>
           <div className="max-w-sm space-y-2">
-            <Label htmlFor="vat-rate" className="text-sm text-slate-200">
+            <Label htmlFor="vat-rate" className="text-sm text-foreground">
               Taux de TVA (%)
             </Label>
             <div className="flex items-center gap-2">
@@ -123,13 +123,13 @@ export default function SettingsFiscal() {
                 disabled={!vatEnabled}
                 aria-describedby="vat-rate-help"
               />
-              <span className="text-sm text-slate-400">%</span>
+              <span className="text-sm text-muted-foreground">%</span>
             </div>
-            <p id="vat-rate-help" className="text-xs text-slate-400">
+            <p id="vat-rate-help" className="text-xs text-muted-foreground">
               Valeur de 0 à 100 %, avec une précision au centième.
             </p>
           </div>
-          <div className="flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/[0.05] p-4 text-sm text-slate-300">
+          <div className="flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/[0.05] p-4 text-sm text-muted-foreground">
             <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
             <p>
               La TVA est calculée sur le montant net après remises, puis les

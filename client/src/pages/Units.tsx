@@ -81,7 +81,7 @@ export default function Units() {
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
             Catalogue
           </p>
-          <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">
+          <h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">
             Unités de mesure
           </h1>
         </div>
@@ -97,14 +97,14 @@ export default function Units() {
           Nouvelle unité
         </Button>
       </header>
-      <Card className="border-white/[0.07] bg-[#111722]">
+      <Card className="border-border bg-card">
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="px-6 py-16 text-center text-sm text-slate-500">
+            <div className="px-6 py-16 text-center text-sm text-faint">
               Chargement des unités…
             </div>
           ) : units.length ? (
-            <div className="divide-y divide-white/[0.06]">
+            <div className="divide-y divide-border">
               {units.map(unit => (
                 <div
                   key={unit.id}
@@ -114,7 +114,7 @@ export default function Units() {
                     <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
                       <Ruler className="h-4 w-4" />
                     </span>
-                    <p className="truncate font-medium text-slate-100">
+                    <p className="truncate font-medium text-foreground">
                       {unit.name}
                     </p>
                   </div>
@@ -142,7 +142,7 @@ export default function Units() {
                         )
                           remove.mutate({ id: unit.id });
                       }}
-                      className="text-rose-300"
+                      className="text-destructive"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -152,9 +152,11 @@ export default function Units() {
             </div>
           ) : (
             <div className="px-6 py-16 text-center">
-              <Boxes className="mx-auto h-7 w-7 text-slate-600" />
-              <p className="mt-3 font-medium text-slate-300">Aucune unité</p>
-              <p className="mt-1 text-sm text-slate-500">
+              <Boxes className="mx-auto h-7 w-7 text-faint" />
+              <p className="mt-3 font-medium text-muted-foreground">
+                Aucune unité
+              </p>
+              <p className="mt-1 text-sm text-faint">
                 Créez une unité avant d’ajouter un produit.
               </p>
             </div>
@@ -162,14 +164,16 @@ export default function Units() {
         </CardContent>
       </Card>
       <Dialog open={open} onOpenChange={value => !value && close()}>
-        <DialogContent className="border-white/10 bg-[#141b27] text-slate-100">
+        <DialogContent className="border-border bg-card text-foreground">
           <DialogHeader>
             <DialogTitle>
               {editing ? "Modifier l’unité" : "Nouvelle unité"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-2">
-            <Label className="text-xs text-slate-300">Unité de mesure</Label>
+            <Label className="text-xs text-muted-foreground">
+              Unité de mesure
+            </Label>
             <Input
               autoFocus
               value={name}

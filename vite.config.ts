@@ -205,8 +205,8 @@ const createPlugins = (isBuild: boolean, mode: string) => [
       start_url: "/",
       scope: "/",
       display: "standalone",
-      theme_color: "#007B8B",
-      background_color: "#09111d",
+      theme_color: "#0B6E76",
+      background_color: "#F7F8FA",
     },
     workbox: {
       clientsClaim: true,

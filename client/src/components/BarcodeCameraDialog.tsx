@@ -88,7 +88,7 @@ export function BarcodeCameraDialog({
         <DialogHeader>
           <DialogTitle>Scanner un code-barres</DialogTitle>
         </DialogHeader>
-        <div className="overflow-hidden rounded-2xl bg-black">
+        <div className="overflow-hidden rounded-2xl bg-background">
           <video
             ref={videoRef}
             className="aspect-[3/4] w-full object-cover"

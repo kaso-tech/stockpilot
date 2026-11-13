@@ -92,7 +92,7 @@ export default function Suppliers() {
           <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
             Approvisionnement
           </p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
             Fournisseurs
           </h1>
         </div>
@@ -128,37 +128,37 @@ export default function Suppliers() {
                     setLocation(`/fournisseurs/${supplier.id}`);
                   }
                 }}
-                className="cursor-pointer border-white/[0.07] bg-[#111722] shadow-none transition hover:border-primary/40 hover:bg-primary/[0.04]"
+                className="cursor-pointer border-border bg-card shadow-none transition hover:border-primary/40 hover:bg-primary/[0.04]"
               >
                 <CardContent className="flex min-h-24 items-center gap-3 p-4">
                   <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
                     <Building2 className="h-5 w-5" />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-semibold text-white">
+                    <p className="truncate font-semibold text-foreground">
                       {supplier.name}
                     </p>
-                    <p className="mt-0.5 truncate text-xs text-slate-400">
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
                       {supplier.address ||
                         supplier.phone ||
                         supplier.email ||
                         "Coordonnées à compléter"}
                     </p>
-                    <p className="mt-2 flex items-center gap-1.5 text-[11px] text-slate-500">
+                    <p className="mt-2 flex items-center gap-1.5 text-[11px] text-faint">
                       <PackageCheck className="h-3.5 w-3.5 text-primary" />
                       {supplies.length} entrée{supplies.length > 1 ? "s" : ""}
                     </p>
                   </div>
-                  <ArrowUpRight className="h-4 w-4 shrink-0 text-slate-500" />
+                  <ArrowUpRight className="h-4 w-4 shrink-0 text-faint" />
                 </CardContent>
               </Card>
             );
           })
         ) : (
-          <Card className="col-span-full border-dashed border-white/10 bg-[#111722] shadow-none">
+          <Card className="col-span-full border-dashed border-border bg-card shadow-none">
             <CardContent className="py-16 text-center">
-              <Building2 className="mx-auto h-7 w-7 text-slate-600" />
-              <p className="mt-4 font-medium text-slate-300">
+              <Building2 className="mx-auto h-7 w-7 text-faint" />
+              <p className="mt-4 font-medium text-muted-foreground">
                 Aucun fournisseur enregistré
               </p>
             </CardContent>
@@ -197,7 +197,7 @@ function SupplierFormDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto border-white/10 bg-[#141b27] text-slate-100">
+      <DialogContent className="max-h-[90vh] overflow-y-auto border-border bg-card text-foreground">
         <DialogHeader>
           <DialogTitle>
             {editing ? "Modifier le fournisseur" : "Nouveau fournisseur"}
@@ -257,7 +257,7 @@ function SupplierFormDialog({
           <Button
             variant="ghost"
             onClick={() => onOpenChange(false)}
-            className="text-slate-300"
+            className="text-muted-foreground"
           >
             Annuler
           </Button>
@@ -276,7 +276,9 @@ function SupplierFormDialog({
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="space-y-2">
-      <Label className="text-xs font-medium text-slate-300">{label}</Label>
+      <Label className="text-xs font-medium text-muted-foreground">
+        {label}
+      </Label>
       {children}
     </div>
   );

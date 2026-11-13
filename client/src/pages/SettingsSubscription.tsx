@@ -72,8 +72,8 @@ export default function SettingsSubscription() {
             <span
               className={
                 data.writable
-                  ? "text-sm text-emerald-300"
-                  : "text-sm text-rose-300"
+                  ? "text-sm text-success"
+                  : "text-sm text-destructive"
               }
             >
               {data.reason === "suspended"
@@ -144,9 +144,9 @@ export default function SettingsSubscription() {
           </Button>
         </CardContent>
       </Card>
-      <Card className="border-rose-400/30 bg-card">
+      <Card className="border-destructive/25 bg-card">
         <CardContent className="space-y-3 p-6">
-          <h2 className="font-semibold text-rose-300">
+          <h2 className="font-semibold text-destructive">
             Supprimer l’entreprise
           </h2>
           <p className="text-sm text-muted-foreground">

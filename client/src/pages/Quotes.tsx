@@ -49,10 +49,10 @@ export default function Quotes() {
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
             Documents commerciaux
           </p>
-          <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">
+          <h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">
             Devis
           </h1>
-          <p className="mt-2 text-sm text-slate-400">
+          <p className="mt-2 text-sm text-muted-foreground">
             Créez des propositions commerciales avec TVA et frais de livraison
             figés.
           </p>
@@ -78,37 +78,37 @@ export default function Quotes() {
               key={quote.id}
               type="button"
               onClick={() => setSelectedId(quote.id)}
-              className="group rounded-xl border border-white/[0.07] bg-[#111722] p-4 text-left transition hover:border-primary/45"
+              className="group rounded-xl border border-border bg-card p-4 text-left transition hover:border-primary/45"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="truncate font-semibold text-white">
+                  <p className="truncate font-semibold text-foreground">
                     {quote.invoiceNumber}
                   </p>
-                  <p className="mt-1 truncate text-xs text-slate-400">
+                  <p className="mt-1 truncate text-xs text-muted-foreground">
                     {quote.customerName || "Client"} ·{" "}
                     {formatDate(quote.createdAt, true)}
                   </p>
                 </div>
-                <Badge className="border-0 bg-sky-500/10 text-sky-300">
-                  Devis
-                </Badge>
+                <Badge className="border-0 bg-info-soft text-info">Devis</Badge>
               </div>
-              <div className="mt-4 flex items-center justify-between border-t border-white/[0.07] pt-3">
-                <span className="text-sm text-slate-400">Total TTC</span>
-                <span className="font-semibold text-cyan-300">
+              <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+                <span className="text-sm text-muted-foreground">Total TTC</span>
+                <span className="font-semibold text-primary">
                   {formatCurrency(quote.totalCents)}
                 </span>
               </div>
-              <Eye className="mt-3 h-4 w-4 text-slate-600 transition group-hover:text-primary" />
+              <Eye className="mt-3 h-4 w-4 text-faint transition group-hover:text-primary" />
             </button>
           ))}
         </section>
       ) : (
-        <Card className="border-dashed border-white/10 bg-[#111722]">
+        <Card className="border-dashed border-border bg-card">
           <CardContent className="py-16 text-center">
-            <FileText className="mx-auto h-7 w-7 text-slate-600" />
-            <p className="mt-4 text-sm text-slate-300">Aucun devis créé.</p>
+            <FileText className="mx-auto h-7 w-7 text-faint" />
+            <p className="mt-4 text-sm text-muted-foreground">
+              Aucun devis créé.
+            </p>
             <Button
               onClick={() => setLocation("/devis/nouveau")}
               className="mt-5 bg-primary text-primary-foreground hover:bg-primary/90"

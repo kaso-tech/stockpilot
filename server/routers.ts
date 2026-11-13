@@ -905,6 +905,10 @@ export const appRouter = router({
       const today = dayKey(new Date(), timezone);
       const month = today.slice(0, 7);
       const paidSales = saleRows.filter(sale => sale.status === "paid");
+      // Factures émises restant à encaisser (une facture annulée n'est plus due).
+      const isReceivable = (sale: (typeof saleRows)[number]) =>
+        sale.channel === "invoice" &&
+        (sale.status === "draft" || sale.status === "partial");
       const monthlySales = paidSales.filter(
         sale => monthKey(sale.createdAt, timezone) === month
       );
@@ -1014,6 +1018,15 @@ export const appRouter = router({
           monthlyAgentPaymentCents,
           expenseBudget,
           monthlyInvoiceCount: monthlySales.length,
+          todaySaleCount: todaySales.length,
+          receivableCents: saleRows
+            .filter(isReceivable)
+            .reduce(
+              (sum, sale) =>
+                sum + Math.max(0, sale.totalCents - sale.amountPaidCents),
+              0
+            ),
+          receivableCount: saleRows.filter(isReceivable).length,
           todayRevenueCents: todaySales.reduce(
             (sum, sale) => sum + netRevenueCents(sale),
             0
@@ -1040,6 +1053,8 @@ export const appRouter = router({
             return {
               id: sale.id,
               invoiceNumber: sale.invoiceNumber,
+              channel: sale.channel,
+              status: sale.status,
               totalCents: sale.totalCents,
               netProfitCents: sale.netProfitCents,
               createdAt: sale.createdAt,
@@ -1048,7 +1063,7 @@ export const appRouter = router({
             };
           }),
         unpaidInvoices: saleRows
-          .filter(sale => sale.channel === "invoice" && sale.status !== "paid")
+          .filter(isReceivable)
           .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
           .slice(0, 5)
           .map(sale => {

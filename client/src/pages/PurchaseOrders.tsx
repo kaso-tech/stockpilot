@@ -75,19 +75,19 @@ type Product = {
 const statusMeta: Record<Status, { label: string; className: string }> = {
   draft: {
     label: "En attente",
-    className: "border-amber-400/25 bg-amber-400/10 text-amber-200",
+    className: "border-warning/25 bg-warning-soft text-warning",
   },
   sent: {
     label: "Envoyé",
-    className: "border-sky-400/25 bg-sky-400/10 text-sky-200",
+    className: "border-info/25 bg-info-soft text-info",
   },
   received: {
     label: "Reçu",
-    className: "border-emerald-400/25 bg-emerald-400/10 text-emerald-200",
+    className: "border-success/25 bg-success-soft text-success",
   },
   cancelled: {
     label: "Annulé",
-    className: "border-rose-400/25 bg-rose-400/10 text-rose-200",
+    className: "border-destructive/25 bg-destructive-soft text-destructive",
   },
 };
 
@@ -211,7 +211,7 @@ export default function PurchaseOrders() {
           <span className="grid h-11 w-11 place-items-center rounded-2xl bg-primary/10 text-primary">
             <ClipboardList className="h-5 w-5" />
           </span>
-          <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
             Bons de commande
           </h1>
         </div>
@@ -244,20 +244,20 @@ export default function PurchaseOrders() {
           tone={statusCounts.late ? "danger" : "default"}
         />
       </div>
-      <Card className="border-white/[0.07] bg-[#111722] shadow-none">
+      <Card className="border-border bg-card shadow-none">
         <CardContent className="p-4 sm:p-5">
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_minmax(180px,1fr)_minmax(160px,.8fr)]">
             <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
               <Input
                 value={search}
                 onChange={event => setSearch(event.target.value)}
                 placeholder="Rechercher une référence ou un fournisseur"
-                className="h-10 border-white/10 bg-[#0e141f] pl-9"
+                className="h-10 border-border bg-muted pl-9"
               />
             </div>
             <Select value={supplierFilter} onValueChange={setSupplierFilter}>
-              <SelectTrigger className="h-10 border-white/10 bg-[#0e141f]">
+              <SelectTrigger className="h-10 border-border bg-muted">
                 <SelectValue placeholder="Fournisseur" />
               </SelectTrigger>
               <SelectContent>
@@ -275,7 +275,7 @@ export default function PurchaseOrders() {
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="h-10 border-white/10 bg-[#0e141f]">
+              <SelectTrigger className="h-10 border-border bg-muted">
                 <SelectValue placeholder="Statut" />
               </SelectTrigger>
               <SelectContent>
@@ -291,7 +291,7 @@ export default function PurchaseOrders() {
         </CardContent>
       </Card>
       {isLoading ? (
-        <div className="py-20 text-center text-sm text-slate-500">
+        <div className="py-20 text-center text-sm text-faint">
           Chargement des bons de commande…
         </div>
       ) : filtered.length ? (
@@ -316,14 +316,16 @@ export default function PurchaseOrders() {
         />
       )}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto border-white/10 bg-[#141b27] text-slate-100 sm:max-w-3xl">
+        <DialogContent className="max-h-[90vh] overflow-y-auto border-border bg-card text-foreground sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>Créer un bon de commande</DialogTitle>
           </DialogHeader>
           <div className="grid gap-5 py-2">
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <Label className="text-xs text-slate-300">Fournisseur *</Label>
+                <Label className="text-xs text-muted-foreground">
+                  Fournisseur *
+                </Label>
                 <Select
                   value={supplierId}
                   onValueChange={value => {
@@ -331,7 +333,7 @@ export default function PurchaseOrders() {
                     setQuantities({});
                   }}
                 >
-                  <SelectTrigger className="mt-2 border-white/10 bg-[#0e141f]">
+                  <SelectTrigger className="mt-2 border-border bg-muted">
                     <SelectValue placeholder="Sélectionner un fournisseur" />
                   </SelectTrigger>
                   <SelectContent>
@@ -347,20 +349,20 @@ export default function PurchaseOrders() {
                 </Select>
               </div>
               <div>
-                <Label className="text-xs text-slate-300">
+                <Label className="text-xs text-muted-foreground">
                   Livraison attendue
                 </Label>
                 <Input
                   type="date"
                   value={expectedDate}
                   onChange={event => setExpectedDate(event.target.value)}
-                  className="mt-2 border-white/10 bg-[#0e141f]"
+                  className="mt-2 border-border bg-muted"
                 />
               </div>
               <div>
                 <Label
                   htmlFor="purchase-delivery-fee"
-                  className="text-xs text-slate-300"
+                  className="text-xs text-muted-foreground"
                 >
                   Frais de livraison
                 </Label>
@@ -374,21 +376,21 @@ export default function PurchaseOrders() {
                     value={deliveryFeeInput}
                     onChange={event => setDeliveryFeeInput(event.target.value)}
                     placeholder="0"
-                    className="border-white/10 bg-[#0e141f]"
+                    className="border-border bg-muted"
                   />
-                  <span className="text-xs text-slate-400">
+                  <span className="text-xs text-muted-foreground">
                     {settings?.currency ?? "XOF"}
                   </span>
                 </div>
               </div>
             </div>
             <div>
-              <Label className="text-xs text-slate-300">
+              <Label className="text-xs text-muted-foreground">
                 Produits rattachés *
               </Label>
-              <div className="mt-2 max-h-64 space-y-2 overflow-y-auto rounded-xl border border-white/[0.07] bg-white/[0.015] p-2">
+              <div className="mt-2 max-h-64 space-y-2 overflow-y-auto rounded-xl border border-border bg-muted/50 p-2">
                 {supplierId === "none" ? (
-                  <p className="px-2 py-6 text-center text-sm text-slate-500">
+                  <p className="px-2 py-6 text-center text-sm text-faint">
                     Sélectionnez un fournisseur pour voir ses produits.
                   </p>
                 ) : selectedSupplierProducts.length ? (
@@ -397,7 +399,7 @@ export default function PurchaseOrders() {
                     return (
                       <div
                         key={product.id}
-                        className={`flex items-center gap-3 rounded-lg border p-3 ${quantity ? "border-primary/35 bg-primary/[0.06]" : "border-white/[0.07] bg-white/[0.02]"}`}
+                        className={`flex items-center gap-3 rounded-lg border p-3 ${quantity ? "border-primary/35 bg-primary/[0.06]" : "border-border bg-muted/50"}`}
                       >
                         <Checkbox
                           checked={quantity > 0}
@@ -409,10 +411,10 @@ export default function PurchaseOrders() {
                           }
                         />
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold text-slate-100">
+                          <p className="truncate text-sm font-semibold text-foreground">
                             {product.name}
                           </p>
-                          <p className="mt-0.5 text-xs text-slate-500">
+                          <p className="mt-0.5 text-xs text-faint">
                             {product.reference} ·{" "}
                             {formatCurrency(product.purchasePriceCents)} · Stock{" "}
                             {product.quantity} {product.unit}
@@ -426,34 +428,34 @@ export default function PurchaseOrders() {
                           onChange={event =>
                             setQuantity(product.id, Number(event.target.value))
                           }
-                          className="h-9 w-20 border-white/10 bg-[#0e141f] text-right"
+                          className="h-9 w-20 border-border bg-muted text-right"
                         />
                       </div>
                     );
                   })
                 ) : (
-                  <p className="px-2 py-6 text-center text-sm text-slate-500">
+                  <p className="px-2 py-6 text-center text-sm text-faint">
                     Aucun produit n’est rattaché à ce fournisseur.
                   </p>
                 )}
               </div>
             </div>
             <div>
-              <Label className="text-xs text-slate-300">Note</Label>
+              <Label className="text-xs text-muted-foreground">Note</Label>
               <Textarea
                 value={notes}
                 onChange={event => setNotes(event.target.value)}
                 placeholder="Note à afficher sur le bon"
-                className="mt-2 min-h-24 border-white/10 bg-[#0e141f]"
+                className="mt-2 min-h-24 border-border bg-muted"
               />
             </div>
             <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-500">
+              <span className="text-faint">
                 {selectedLines.length} produit
                 {selectedLines.length > 1 ? "s" : ""} sélectionné
                 {selectedLines.length > 1 ? "s" : ""}
               </span>
-              <div className="text-right text-xs text-slate-400">
+              <div className="text-right text-xs text-muted-foreground">
                 <p>Sous-total : {formatCurrency(draftSubtotalCents)}</p>
                 {draftVatCents > 0 && (
                   <p>
@@ -464,7 +466,7 @@ export default function PurchaseOrders() {
                 {draftDeliveryFeeCents > 0 && (
                   <p>Livraison : {formatCurrency(draftDeliveryFeeCents)}</p>
                 )}
-                <p className="font-semibold text-slate-100">
+                <p className="font-semibold text-foreground">
                   Total : {formatCurrency(draftTotalCents)}
                 </p>
               </div>
@@ -501,12 +503,12 @@ function OrderCard({ order, onOpen }: { order: Order; onOpen: () => void }) {
     <button
       type="button"
       onClick={onOpen}
-      className={`rounded-2xl border p-5 text-left transition hover:-translate-y-0.5 hover:border-primary/45 hover:bg-primary/[0.045] ${overdue ? "border-rose-400/35 bg-rose-400/[0.04]" : "border-white/[0.07] bg-[#111722]"}`}
+      className={`rounded-2xl border p-5 text-left transition hover:-translate-y-0.5 hover:border-primary/45 hover:bg-primary/[0.045] ${overdue ? "border-destructive/25 bg-destructive-soft" : "border-border bg-card"}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="truncate text-base font-semibold text-white">
+            <span className="truncate text-base font-semibold text-foreground">
               {order.orderNumber}
             </span>
             <span
@@ -515,26 +517,26 @@ function OrderCard({ order, onOpen }: { order: Order; onOpen: () => void }) {
               {meta.label}
             </span>
           </div>
-          <p className="mt-2 truncate text-sm text-slate-400">
+          <p className="mt-2 truncate text-sm text-muted-foreground">
             {order.supplier?.name || "Fournisseur indisponible"}
           </p>
         </div>
-        <span className="shrink-0 text-sm font-semibold text-slate-100">
+        <span className="shrink-0 text-sm font-semibold text-foreground">
           {formatCurrency(order.totalCents)}
         </span>
       </div>
-      <div className="mt-5 grid grid-cols-2 gap-3 border-t border-white/[0.07] pt-4 text-xs">
-        <span className="flex items-center gap-2 text-slate-400">
+      <div className="mt-5 grid grid-cols-2 gap-3 border-t border-border pt-4 text-xs">
+        <span className="flex items-center gap-2 text-muted-foreground">
           <CalendarClock className="h-3.5 w-3.5 text-primary" />
           {formatDate(order.createdAt)}
         </span>
         <span
-          className={`text-right ${received ? "text-emerald-300" : "text-slate-400"}`}
+          className={`text-right ${received ? "text-success" : "text-muted-foreground"}`}
         >
           {received} / {ordered} reçu
         </span>
         <span
-          className={`col-span-2 flex items-center gap-2 ${overdue ? "font-medium text-rose-300" : "text-slate-500"}`}
+          className={`col-span-2 flex items-center gap-2 ${overdue ? "font-medium text-destructive" : "text-faint"}`}
         >
           {overdue ? (
             <AlertTriangle className="h-3.5 w-3.5" />
@@ -562,19 +564,19 @@ function Metric({
 }) {
   const style =
     tone === "success"
-      ? "text-emerald-300"
+      ? "text-success"
       : tone === "danger"
-        ? "text-rose-300"
-        : "text-slate-100";
+        ? "text-destructive"
+        : "text-foreground";
   return (
-    <Card className="border-white/[0.07] bg-[#111722] shadow-none">
+    <Card className="border-border bg-card shadow-none">
       <CardContent className="flex items-center justify-between p-4">
         <div>
-          <p className="text-xs text-slate-500">{label}</p>
+          <p className="text-xs text-faint">{label}</p>
           <p className={`mt-1 text-xl font-semibold ${style}`}>{value}</p>
         </div>
         <span
-          className={`grid h-9 w-9 place-items-center rounded-xl ${tone === "danger" ? "bg-rose-400/10 text-rose-300" : "bg-primary/10 text-primary"}`}
+          className={`grid h-9 w-9 place-items-center rounded-xl ${tone === "danger" ? "bg-destructive-soft text-destructive" : "bg-primary/10 text-primary"}`}
         >
           {icon}
         </span>
@@ -592,12 +594,12 @@ function EmptyState({
   canCreate: boolean;
 }) {
   return (
-    <Card className="border-dashed border-white/10 bg-[#111722] shadow-none">
+    <Card className="border-dashed border-border bg-card shadow-none">
       <CardContent className="py-16 text-center">
-        <span className="mx-auto grid h-11 w-11 place-items-center rounded-2xl bg-white/[0.035] text-slate-500">
+        <span className="mx-auto grid h-11 w-11 place-items-center rounded-2xl bg-muted/50 text-faint">
           <SlidersHorizontal className="h-5 w-5" />
         </span>
-        <p className="mt-4 font-medium text-slate-200">
+        <p className="mt-4 font-medium text-foreground">
           {filtered
             ? "Aucun bon ne correspond à ces critères."
             : "Aucun bon de commande enregistré."}
