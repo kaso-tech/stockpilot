@@ -1,11 +1,11 @@
 # StockPilot Pro — Dossier de continuité
 
-**Date de synthèse :** 12 novembre 2026
+**Date de synthèse :** 13 novembre 2026
 **Projet Manus :** StockPilot SaaS
 **Chemin de travail :** `/home/ubuntu/stockpilot-pro`
 **Domaine publié :** `https://stockpilot-gpaoheuz.manus.space`
 **Dernier checkpoint fonctionnel avant cette intégration GitHub :** `abc48e5e`
-**Archive source de cette livraison :** `/home/ubuntu/stockpilot-pro-novembre-2026.zip`
+**Archive source de cette livraison :** `/home/ubuntu/stockpilot-pro-latest-2026-11-13.zip`
 
 ## 1. Objectif produit
 
@@ -383,3 +383,18 @@ Les migrations `0077_dusty_scream.sql` et `0078_november_compatibility_backfill.
 Validation de livraison : typage vert, 129 fichiers / 332 tests, build PWA avec 121 entrées précachées, audit production/release et installation figée verts, 5 tests navigateur verts sur le build production avec API simulée et aucune base métier. Les tests de navigation et de cache après coupure réseau sont réellement exécutés ; ils ne certifient pas un séjour offline de plusieurs jours sur tout appareil.
 
 YengaPay reste en pause SANDBOX, offre Test inchangée, aucun paiement ni abonnement activé. SMTP et S3 externes ne sont pas configurés/validés par cette livraison. Les liens de compte nécessitent une origine `PUBLIC_APP_URL` HTTPS ; ne pas utiliser le Host fourni par le navigateur. L’envoi e-mail absent reste explicitement indisponible. Ne pas qualifier cette livraison d’ouverture commerciale large ni de clôture des prérequis externes du registre.
+
+
+## Livraison GitHub — 13 novembre 2026
+
+La source `kaso-tech/stockpilot`, branche `ccr-1f2b32f0-8cxy1l`, a été récupérée à la tête `726b79f48d766a2ebb34c16a8f518c24bfd18de7`. Les nouveautés thème `1c60472` et photos `726b79f` ont été portées sur le checkpoint `798b3429`, sans remplacement global des fonctionnalités intégrées le 12 novembre. Le pull du remote interne est bloqué par son accès ; il ne faut pas annoncer une fusion brute ni remplacer le socle par le `main` GitHub ancien. Sauvegarde : `backup/pre-pull-2026-11-13` ; branche de travail : `integrate/github-latest-2026-11-13`.
+
+Le thème clair/sombre et les classes des pages suivent des jetons sémantiques ; le bleu `#2563EB` et les préférences sont préservés. La recherche de navigation utilise les routes autorisées au rôle. Les ajouts dashboard de la source sont intégrés au calcul déjà limité à l’entreprise et à l’entrepôt autorisé ; les factures annulées/remboursées ne sont plus considérées comme créances.
+
+Les photos peuvent être choisies à la création, remplacées/retirées sur la fiche et affichées dans le catalogue et la caisse. La compression et les limites raster sont contrôlées ; le remplacement et son audit sont transactionnels. Le relais de fichiers exige une session du tenant et un pointeur encore attaché au produit. Les anciens objets détachés sont inaccessibles, même lorsque Forge ne sait pas les supprimer physiquement. Le cache photo offline est isolé par entreprise, utilisateur et entrepôt et purgé à la déconnexion ; l’envoi de photos reste indisponible hors réseau. Les mises à jour PWA ne s’activent jamais sans confirmation.
+
+La migration `0079_product_images.sql` ajoute seulement deux colonnes nullable et est appliquée. Ne pas utiliser le `0055` photo de GitHub ni rejouer les migrations historiques. Les snapshots protègent les pointeurs, mais une restauration de photo suppose aussi la conservation des octets externes.
+
+Recette : typage frais sans cache incrémental, **135 fichiers / 354 tests**, build PWA, audit/release, contrôle du diff et **7 scénarios E2E** sur API simulée réussis. Les anciens diagnostics du watcher ne doivent pas être pris pour un résultat de compilation actuel. Les fichiers de recette n’écrivent pas dans la base métier ni le stockage réel.
+
+Note détaillée : `NOTE_SYNCHRONISATION_2026-11-13.md`. Archive : `/home/ubuntu/stockpilot-pro-latest-2026-11-13.zip`. YengaPay reste en pause SANDBOX, SMTP/S3 externes restent à configurer/valider. Le checkpoint final est livré séparément ; ne pas confondre sa sauvegarde avec la publication du domaine public.

@@ -6,6 +6,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DocumentVatRateSelector } from "@/components/DocumentVatRateSelector";
+import {
+  CommandDialog,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+} from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { readNotificationIds, unreadNotificationCount, writeNotificationIds } from "@/lib/notificationReadState";
@@ -67,6 +75,7 @@ import {
   PackageSearch,
   ReceiptText,
   Ruler,
+  Search,
   ShoppingCart,
   Sun,
   UsersRound,
@@ -177,9 +186,20 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const { activeWarehouseId, activeWarehouse, warehouses, isReady: warehouseReady, setActiveWarehouseId } = useActiveWarehouse();
   const { isOnline, pendingCount, sales: offlineSales, syncNow } = useOffline();
   const [location, setLocation] = useLocation();
-  const { state } = useSidebar();
+  const { state, setOpenMobile } = useSidebar();
   const isCollapsed = state === "collapsed";
   const isMobile = useIsMobile();
+  const [navigationOpen, setNavigationOpen] = useState(false);
+  useEffect(() => {
+    const openNavigation = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setNavigationOpen(true);
+      }
+    };
+    window.addEventListener("keydown", openNavigation);
+    return () => window.removeEventListener("keydown", openNavigation);
+  }, []);
   const { data: sellerPermissions } = trpc.commerce.settings.get.useQuery(undefined, { enabled: user?.role === "seller" });
   const platformAccess = trpc.platform.access.useQuery(undefined, { enabled: Boolean(user), retry: false });
   const isDocumentCreation = location === "/factures/nouvelle" || location === "/devis/nouveau";
@@ -194,6 +214,11 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const roleMenuSections = menuSections.map(section => ({ ...section, items: section.items.filter(item => canOpenRoute(user?.role, item.path)) })).filter(section => section.items.length);
   const visibleMenuSections = user?.role === "seller" ? sellerMenuSections : roleMenuSections;
   const visibleMenuItems = visibleMenuSections.flatMap(section => section.items);
+  const navigateFromPalette = (path: string) => {
+    setNavigationOpen(false);
+    setLocation(path);
+    if (isMobile) setOpenMobile(false);
+  };
   const activeMenuItem = visibleMenuItems.find(item => item.path === location || (item.path === "/produits" && location.startsWith("/produits/")) || (item.path === "/clients" && location.startsWith("/clients/")) || (item.path === "/fournisseurs" && location.startsWith("/fournisseurs/")) || (item.path === "/bons-commande" && location.startsWith("/bons-commande/")) || (item.path === "/devis" && location.startsWith("/devis/")) || (item.path === "/tickets" && location.startsWith("/tickets/"))) ?? visibleMenuItems[0];
   const initials = (user?.name || user?.email || "U").slice(0, 2).toUpperCase();
   const isAdmin = can(user?.role, "finance.notifications");
@@ -221,8 +246,8 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
 
   return (
     <>
-      <Sidebar collapsible="icon" className="border-r border-white/[0.07] bg-[#0e141f] text-slate-300">
-        <SidebarHeader className="h-20 justify-center border-b border-white/[0.07] px-3">
+      <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
+        <SidebarHeader className="h-18 justify-center border-b border-sidebar-border px-3">
           <button
             onClick={() => setLocation("/")}
             className="flex w-full items-center gap-3 rounded-xl p-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-primary"
@@ -233,7 +258,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
             </span>
             {!isCollapsed && (
               <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold tracking-tight text-white">StockPilot</span>
+                <span className="block truncate text-sm font-semibold tracking-tight text-foreground">StockPilot</span>
                 <span className="block truncate text-[10px] font-medium uppercase tracking-[0.16em] text-primary/80">B2B Operations</span>
               </span>
             )}
@@ -241,43 +266,43 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         </SidebarHeader>
 
         <SidebarContent className="px-3 py-5">
-          <div className="space-y-5">{visibleMenuSections.map(section => <section key={section.label}>{!isCollapsed && <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">{section.label}</p>}<SidebarMenu className="gap-1">{section.items.map(item => { const isActive = location === item.path || (item.path === "/produits" && location.startsWith("/produits/")) || (item.path === "/clients" && location.startsWith("/clients/")) || (item.path === "/fournisseurs" && location.startsWith("/fournisseurs/")) || (item.path === "/bons-commande" && location.startsWith("/bons-commande/")) || (item.path === "/devis" && location.startsWith("/devis/")) || (item.path === "/tickets" && location.startsWith("/tickets/")) || (item.path === "/factures" && location.startsWith("/factures/")); return <SidebarMenuItem key={item.path}><SidebarMenuButton isActive={isActive} tooltip={item.label} onClick={() => setLocation(item.path)} className="h-10 rounded-xl px-3 text-slate-400 hover:bg-white/[0.06] hover:text-white data-[active=true]:bg-primary data-[active=true]:text-primary-foreground"><item.icon className="h-[18px] w-[18px]" /><span className="font-medium">{item.label}</span></SidebarMenuButton></SidebarMenuItem>; })}</SidebarMenu></section>)}</div>
+          <div className="space-y-4">{visibleMenuSections.map(section => <section key={section.label}>{!isCollapsed && <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-faint">{section.label}</p>}<SidebarMenu className="gap-0.5">{section.items.map(item => { const isActive = location === item.path || (item.path === "/produits" && location.startsWith("/produits/")) || (item.path === "/clients" && location.startsWith("/clients/")) || (item.path === "/fournisseurs" && location.startsWith("/fournisseurs/")) || (item.path === "/bons-commande" && location.startsWith("/bons-commande/")) || (item.path === "/devis" && location.startsWith("/devis/")) || (item.path === "/tickets" && location.startsWith("/tickets/")) || (item.path === "/factures" && location.startsWith("/factures/")); return <SidebarMenuItem key={item.path}><SidebarMenuButton isActive={isActive} tooltip={item.label} onClick={() => setLocation(item.path)} className="h-9 rounded-lg px-3 text-muted-foreground hover:bg-accent hover:text-foreground data-[active=true]:bg-primary data-[active=true]:text-primary-foreground"><item.icon className="h-[18px] w-[18px]" /><span className="font-medium">{item.label}</span></SidebarMenuButton></SidebarMenuItem>; })}</SidebarMenu></section>)}</div>
         </SidebarContent>
 
-        <SidebarFooter className="border-t border-white/[0.07] p-3">
+        <SidebarFooter className="border-t border-sidebar-border p-3">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex w-full items-center gap-3 rounded-xl p-2 text-left transition-colors hover:bg-white/[0.06] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">
-                <Avatar className="h-8 w-8 shrink-0 border border-white/10">
-                  <AvatarFallback className="bg-slate-700 text-[11px] font-semibold text-cyan-200">{initials}</AvatarFallback>
+              <button className="flex w-full items-center gap-3 rounded-xl p-2 text-left transition-colors hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <Avatar className="h-8 w-8 shrink-0 border border-border">
+                  <AvatarFallback className="bg-muted text-[11px] font-semibold text-primary">{initials}</AvatarFallback>
                 </Avatar>
                 {!isCollapsed && (
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-xs font-medium text-slate-100">{user?.name || "Utilisateur"}</span>
-                    <span className="block truncate pt-0.5 text-[11px] text-slate-500">{user?.email || "Compte membre"}</span>
+                    <span className="block truncate text-xs font-medium text-foreground">{user?.name || "Utilisateur"}</span>
+                    <span className="block truncate pt-0.5 text-[11px] text-faint">{user?.email || "Compte membre"}</span>
                   </span>
                 )}
                 {!isCollapsed && <ChevronDown className="h-3.5 w-3.5 text-slate-500" />}
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" side="top" className="w-56 border-white/10 bg-[#141b27] text-slate-200">
+            <DropdownMenuContent align="end" side="top" className="w-56 border-border bg-popover text-popover-foreground">
               <DropdownMenuLabel className="font-normal">
                 <p className="truncate text-sm font-medium">{user?.name || "Utilisateur"}</p>
-                <p className="mt-0.5 truncate text-xs text-slate-500">{user?.email}</p>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">{user?.email}</p>
               </DropdownMenuLabel>
-              <DropdownMenuSeparator className="bg-white/10" />
+              <DropdownMenuSeparator className="bg-border" />
               <DropdownMenuItem className="cursor-default focus:bg-transparent">
-                <Badge className="border-0 bg-cyan-400/10 text-cyan-300 hover:bg-cyan-400/10">{user?.role === "admin" ? "Administrateur" : "Opérateur"}</Badge>
+                <Badge className="border-0 bg-primary-soft text-primary hover:bg-primary-soft">{user?.role === "admin" ? "Administrateur" : "Opérateur"}</Badge>
               </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-white/10" />
-              <DropdownMenuItem onClick={() => setLocation("/aide")} className="cursor-pointer focus:bg-white/[0.06]"><CircleHelp className="mr-2 h-4 w-4" />Aide</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setLocation("/tarifs")} className="cursor-pointer focus:bg-white/[0.06]"><WalletCards className="mr-2 h-4 w-4" />Tarification</DropdownMenuItem>
-              {isAdmin && <DropdownMenuItem onClick={() => setLocation("/abonnement")} className="cursor-pointer focus:bg-white/[0.06]"><CreditCard className="mr-2 h-4 w-4" />Mon abonnement</DropdownMenuItem>}
-              <DropdownMenuItem onClick={() => setLocation("/politique-securite")} className="cursor-pointer focus:bg-white/[0.06]"><ShieldCheck className="mr-2 h-4 w-4" />Politique de sécurité</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setLocation("/contactez-nous")} className="cursor-pointer focus:bg-white/[0.06]"><Mail className="mr-2 h-4 w-4" />Contactez-nous</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setLocation("/conditions-utilisation")} className="cursor-pointer focus:bg-white/[0.06]"><FileText className="mr-2 h-4 w-4" />Conditions d’utilisation</DropdownMenuItem>
-              {platformAccess.data?.platformRole && <DropdownMenuItem onClick={() => setLocation("/plateforme")} className="cursor-pointer focus:bg-white/[0.06]"><MonitorCog className="mr-2 h-4 w-4" />Console plateforme</DropdownMenuItem>}
-              <DropdownMenuSeparator className="bg-white/10" />
+              <DropdownMenuSeparator className="bg-border" />
+              <DropdownMenuItem onClick={() => setLocation("/aide")} className="cursor-pointer focus:bg-accent"><CircleHelp className="mr-2 h-4 w-4" />Aide</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setLocation("/tarifs")} className="cursor-pointer focus:bg-accent"><WalletCards className="mr-2 h-4 w-4" />Tarification</DropdownMenuItem>
+              {isAdmin && <DropdownMenuItem onClick={() => setLocation("/abonnement")} className="cursor-pointer focus:bg-accent"><CreditCard className="mr-2 h-4 w-4" />Mon abonnement</DropdownMenuItem>}
+              <DropdownMenuItem onClick={() => setLocation("/politique-securite")} className="cursor-pointer focus:bg-accent"><ShieldCheck className="mr-2 h-4 w-4" />Politique de sécurité</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setLocation("/contactez-nous")} className="cursor-pointer focus:bg-accent"><Mail className="mr-2 h-4 w-4" />Contactez-nous</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setLocation("/conditions-utilisation")} className="cursor-pointer focus:bg-accent"><FileText className="mr-2 h-4 w-4" />Conditions d’utilisation</DropdownMenuItem>
+              {platformAccess.data?.platformRole && <DropdownMenuItem onClick={() => setLocation("/plateforme")} className="cursor-pointer focus:bg-accent"><MonitorCog className="mr-2 h-4 w-4" />Console plateforme</DropdownMenuItem>}
+              <DropdownMenuSeparator className="bg-border" />
               <DropdownMenuItem onClick={logout} className="cursor-pointer text-rose-300 focus:bg-rose-400/10 focus:text-rose-200">
                 <LogOut className="mr-2 h-4 w-4" /> Se déconnecter
               </DropdownMenuItem>
@@ -286,10 +311,27 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         </SidebarFooter>
       </Sidebar>
 
-      <SidebarInset className="min-w-0 bg-[#090c13] text-slate-100">
-        <header className="app-header sticky top-0 z-40 flex h-16 items-center gap-3 border-b border-slate-200 bg-white/95 px-4 text-slate-900 shadow-sm shadow-slate-950/5 backdrop-blur dark:border-white/[0.07] dark:bg-[#0e141f]/95 dark:text-slate-100 dark:shadow-black/20 sm:px-6"><div className="lg:hidden"><SidebarTrigger className="h-9 w-9 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 dark:border-white/10 dark:bg-[#111722] dark:text-slate-200 dark:hover:bg-white/[0.07]" /></div><div className="flex min-w-0 items-center gap-2"><activeMenuItem.icon className="h-4 w-4 shrink-0 text-primary" /><span className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{activeMenuItem.label}</span></div>{isAdmin && <div className="hidden min-w-0 sm:block"><Select value={activeWarehouseId ? String(activeWarehouseId) : ""} onValueChange={value => setActiveWarehouseId(Number(value))} disabled={!warehouseReady || !warehouses.length}><SelectTrigger aria-label="Entrepôt actif" className="h-9 min-w-[190px] border-slate-200 bg-white text-slate-700 dark:border-white/10 dark:bg-[#111722] dark:text-slate-200"><span className="flex min-w-0 items-center gap-2"><Warehouse className="h-4 w-4 shrink-0 text-primary" /><SelectValue placeholder="Entrepôt actif" /></span></SelectTrigger><SelectContent>{warehouses.map(warehouse => <SelectItem key={warehouse.id} value={String(warehouse.id)}>{warehouse.name}{warehouse.isDefault ? " · Principal" : ""}</SelectItem>)}</SelectContent></Select></div>}<div className="ml-auto flex items-center gap-2"><ThemeHeaderToggle /><HeaderActions canRunBackup={canRunBackup} compact={isMobile} pending={runBackup.isPending} onBackup={() => runBackup.mutate()} notifications={notifications} readNotificationIds={readNotificationIdsState} onNotification={setLocation} onMarkNotificationRead={markNotificationRead} onMarkAllNotificationsRead={markAllNotificationsRead} isOnline={isOnline} pendingOfflineSales={pendingCount} hasFailedOfflineSale={offlineSales.some(sale => sale.status === "failed")} onSync={() => void syncNow()} /></div></header>
-        <main key={currency} className="min-h-screen bg-[radial-gradient(circle_at_80%_-5%,rgba(34,211,238,0.05),transparent_24%),linear-gradient(rgba(255,255,255,0.012)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.012)_1px,transparent_1px)] bg-[size:auto,44px_44px,44px_44px] p-4 sm:p-6 lg:p-8">{children}</main>
+      <SidebarInset className="min-w-0 bg-background text-foreground">
+        <header className="app-header sticky top-0 z-40 flex h-16 items-center gap-3 border-b border-border bg-background/95 px-4 text-foreground shadow-sm backdrop-blur sm:px-6"><div className="lg:hidden"><SidebarTrigger className="h-9 w-9 rounded-lg border border-border bg-card text-muted-foreground hover:bg-accent" /></div><div className="flex min-w-0 items-center gap-2"><activeMenuItem.icon className="h-4 w-4 shrink-0 text-primary" /><span className="truncate text-sm font-semibold text-foreground">{activeMenuItem.label}</span></div><Button type="button" variant="outline" onClick={() => setNavigationOpen(true)} className="ml-2 hidden h-9 min-w-36 justify-start gap-2 border-border bg-card px-3 text-muted-foreground shadow-none sm:flex" aria-label="Rechercher une page (Ctrl+K)"><Search className="h-4 w-4" /><span className="flex-1 text-left">Rechercher…</span><kbd className="rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-faint">⌘K</kbd></Button><Button type="button" variant="outline" size="icon" onClick={() => setNavigationOpen(true)} className="ml-1 h-9 w-9 border-border bg-card text-muted-foreground sm:hidden" aria-label="Rechercher une page"><Search className="h-4 w-4" /></Button>{isAdmin && <div className="hidden min-w-0 sm:block"><Select value={activeWarehouseId ? String(activeWarehouseId) : ""} onValueChange={value => setActiveWarehouseId(Number(value))} disabled={!warehouseReady || !warehouses.length}><SelectTrigger aria-label="Entrepôt actif" className="h-9 min-w-[190px] border-border bg-card text-foreground"><span className="flex min-w-0 items-center gap-2"><Warehouse className="h-4 w-4 shrink-0 text-primary" /><SelectValue placeholder="Entrepôt actif" /></span></SelectTrigger><SelectContent>{warehouses.map(warehouse => <SelectItem key={warehouse.id} value={String(warehouse.id)}>{warehouse.name}{warehouse.isDefault ? " · Principal" : ""}</SelectItem>)}</SelectContent></Select></div>}<div className="ml-auto flex items-center gap-2"><ThemeHeaderToggle /><HeaderActions canRunBackup={canRunBackup} compact={isMobile} pending={runBackup.isPending} onBackup={() => runBackup.mutate()} notifications={notifications} readNotificationIds={readNotificationIdsState} onNotification={setLocation} onMarkNotificationRead={markNotificationRead} onMarkAllNotificationsRead={markAllNotificationsRead} isOnline={isOnline} pendingOfflineSales={pendingCount} hasFailedOfflineSale={offlineSales.some(sale => sale.status === "failed")} onSync={() => void syncNow()} /></div></header>
+        <main key={currency} className="min-h-screen bg-background p-3 sm:p-5 lg:p-6">{children}</main>
       </SidebarInset>
+      <CommandDialog open={navigationOpen} onOpenChange={setNavigationOpen} title="Rechercher dans StockPilot" description="Accéder à une page autorisée dans votre espace." className="sm:max-w-xl">
+        <CommandInput placeholder="Rechercher une page…" />
+        <CommandList className="max-h-[min(60vh,420px)] p-2">
+          <CommandEmpty>Aucune page trouvée.</CommandEmpty>
+          {visibleMenuSections.map(section => (
+            <CommandGroup key={section.label} heading={section.label}>
+              {section.items.map(item => (
+                <CommandItem key={item.path} value={`${item.label} ${item.path}`} onSelect={() => navigateFromPalette(item.path)} className="rounded-md py-2.5">
+                  <item.icon className="h-4 w-4" />
+                  <span>{item.label}</span>
+                  <span className="ml-auto text-xs text-faint">{item.path}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          ))}
+        </CommandList>
+      </CommandDialog>
     </>
   );
 }

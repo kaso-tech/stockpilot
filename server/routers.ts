@@ -120,6 +120,8 @@ import { ROLES, ROLE_LABELS, type Role } from "@shared/permissions";
 import { roleChangeRefusal } from "./userRoleRules";
 import { findPasswordHash, storePasswordHash } from "./userPasswordStorage";
 import { assertSubscriptionQuota } from "./subscriptionQuotas";
+import { productImagesRouter } from "./routers/productImages";
+import { isReceivableInvoice } from "@shared/saleReceivables";
 
 const productInput = z.object({
   reference: z.string().trim().min(2).max(80),
@@ -565,15 +567,15 @@ export const appRouter = router({
           activeAlerts: lowStock.length,
           movementCount: movements.length,
           ...(canSeeFinance ? { monthlyRevenueCents, monthlyMarginCents, monthlyExpenseCents, monthlyOperatingProfitCents, expenseBreakdown: expenseBreakdownByCategory([...expenseRows, ...agentExpenseRows], month), monthlyManualExpenseCents, monthlyAgentPaymentCents, expenseBudget, duePayrollCents } : {}),
-          ...(canSeeFinance ? { monthlyInvoiceCount: monthlySales.length, todayRevenueCents: todaySales.reduce((sum, sale) => sum + sale.totalCents, 0), averageBasketCents: monthlySales.length ? Math.round(monthlyRevenueCents / monthlySales.length) : 0 } : {}),
+          ...(canSeeFinance ? { todaySaleCount: todaySales.length, receivableCount: saleRows.filter(isReceivableInvoice).length, receivableCents: saleRows.filter(isReceivableInvoice).reduce((sum, sale) => sum + Math.max(0, sale.totalCents - sale.amountPaidCents), 0), monthlyInvoiceCount: monthlySales.length, todayRevenueCents: todaySales.reduce((sum, sale) => sum + sale.totalCents, 0), averageBasketCents: monthlySales.length ? Math.round(monthlyRevenueCents / monthlySales.length) : 0 } : {}),
           draftInventories: inventories.filter(inventory => inventory.status === "draft").length,
         },
         lowStock: lowStock.slice(0, 6),
         recentMovements: movements.slice(0, 6),
         trend,
         ...(canSeeFinance ? { salesTrend,
-        recentSales: paidSales.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 5).map(sale => { const customer = sale.customerId ? customerMap.get(sale.customerId) : undefined; return { id: sale.id, invoiceNumber: sale.invoiceNumber, totalCents: sale.totalCents, netProfitCents: sale.netProfitCents, createdAt: sale.createdAt, customerName: customer?.name ?? "Vente comptoir", customerType: customer?.type ?? "ordinary" }; }),
-        unpaidInvoices: saleRows.filter(sale => sale.channel === "invoice" && sale.status !== "paid").sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 5).map(sale => { const customer = sale.customerId ? customerMap.get(sale.customerId) : undefined; return { id: sale.id, invoiceNumber: sale.invoiceNumber, totalCents: sale.totalCents, amountPaidCents: sale.amountPaidCents, balanceCents: Math.max(0, sale.totalCents - sale.amountPaidCents), status: sale.status, createdAt: sale.createdAt, customerName: customer?.name ?? "Client" }; }) } : {}),
+        recentSales: paidSales.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 5).map(sale => { const customer = sale.customerId ? customerMap.get(sale.customerId) : undefined; return { id: sale.id, invoiceNumber: sale.invoiceNumber, channel: sale.channel, status: sale.status, totalCents: sale.totalCents, netProfitCents: sale.netProfitCents, createdAt: sale.createdAt, customerName: customer?.name ?? "Vente comptoir", customerType: customer?.type ?? "ordinary" }; }),
+        unpaidInvoices: saleRows.filter(isReceivableInvoice).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 5).map(sale => { const customer = sale.customerId ? customerMap.get(sale.customerId) : undefined; return { id: sale.id, invoiceNumber: sale.invoiceNumber, totalCents: sale.totalCents, amountPaidCents: sale.amountPaidCents, balanceCents: Math.max(0, sale.totalCents - sale.amountPaidCents), status: sale.status, createdAt: sale.createdAt, customerName: customer?.name ?? "Client" }; }) } : {}),
       };
     }),
     compareWarehouses: permissionProcedure("audit.view").input(z.object({ yearMonth: z.string().regex(/^\d{4}-\d{2}$/).optional() }).optional()).query(async ({ ctx, input }) => {
@@ -643,6 +645,7 @@ export const appRouter = router({
   }),
 
   products: router({
+    ...productImagesRouter._def.record,
     list: permissionProcedure("catalog.view").input(z.object({ warehouseId: z.number().int().positive().optional() }).optional()).query(async ({ ctx, input }) => {
       const db = await requireDb();
       if (input?.warehouseId) {
@@ -705,11 +708,17 @@ export const appRouter = router({
     }),
     remove: permissionProcedure("catalog.manage").input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
-      const product = (await db.select({ id: products.id }).from(products).where(and(eq(products.id, input.id), companyScope(products.companyId, ctx.user.companyId))).limit(1))[0];
+      const product = (await db.select({ id: products.id, imageUrl: products.imageUrl, imageThumbUrl: products.imageThumbUrl }).from(products).where(and(eq(products.id, input.id), companyScope(products.companyId, ctx.user.companyId))).limit(1))[0];
       if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Produit introuvable." });
       const movement = await db.select({ id: stockMovements.id }).from(stockMovements).where(and(eq(stockMovements.productId, input.id), companyScope(stockMovements.companyId, ctx.user.companyId))).limit(1);
       if (movement.length) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Un produit avec des mouvements ne peut pas être supprimé." });
-      await db.delete(products).where(and(eq(products.id, input.id), companyScope(products.companyId, ctx.user.companyId)));
+      await db.transaction(async (tx: any) => {
+        const locked = (await tx.select({ id: products.id, imageUrl: products.imageUrl, imageThumbUrl: products.imageThumbUrl }).from(products).where(and(eq(products.id, input.id), companyScope(products.companyId, ctx.user.companyId))).for("update").limit(1))[0];
+        if (!locked) throw new TRPCError({ code: "NOT_FOUND", message: "Produit introuvable." });
+        await tx.delete(products).where(and(eq(products.id, input.id), companyScope(products.companyId, ctx.user.companyId)));
+      });
+      const { deleteProductImageFiles } = await import("./productImages");
+      await deleteProductImageFiles([product.imageUrl, product.imageThumbUrl]);
       await createAudit(ctx.user.id, "Suppression", "Produit", input.id, "Produit supprimé");
       return { success: true };
     }),

@@ -47,13 +47,13 @@ export default function Quotes() {
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
             Documents commerciaux
           </p>
-          <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">
+          <h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">
             Devis
           </h1>
         </div>
         <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={exportFilteredQuotes}><Download className="mr-2 h-4 w-4" />Exporter CSV</Button><Button onClick={() => setLocation("/devis/nouveau")} className="bg-primary text-primary-foreground hover:bg-primary/90"><Plus className="mr-2 h-4 w-4" />Créer un devis</Button></div>
       </header>
-      <section className="rounded-2xl border border-white/[0.07] bg-[#111722] p-4"><div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_repeat(3,minmax(150px,.45fr))]"><label className="relative"><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-500" /><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Devis, client…" className="h-10 w-full rounded-xl border border-white/[0.09] bg-black/10 pl-9 pr-3 text-sm text-slate-100 outline-none focus:border-primary/70" /></label><select value={status} onChange={event => setStatus(event.target.value as typeof status)} className="h-10 rounded-xl border border-white/[0.09] bg-black/10 px-3 text-sm text-slate-200"><option value="all">Tous les statuts</option><option value="draft">En attente</option><option value="paid">Acceptés</option><option value="void">Retournés / annulés</option></select><select value={agentId} onChange={event => setAgentId(event.target.value)} className="h-10 rounded-xl border border-white/[0.09] bg-black/10 px-3 text-sm text-slate-200"><option value="all">Tous les intervenants</option>{documentParticipants.map(participant => <option key={participant.key} value={participant.key}>{documentParticipantOptionLabel(participant)}</option>)}</select><select value={period} onChange={event => setPeriod(event.target.value as typeof period)} className="h-10 rounded-xl border border-white/[0.09] bg-black/10 px-3 text-sm text-slate-200"><option value="all">Toutes les dates</option><option value="today">Aujourd’hui</option><option value="week">7 derniers jours</option><option value="month">30 derniers jours</option></select></div><p className="mt-3 text-xs text-slate-500">{filteredQuotes.length} devis affiché{filteredQuotes.length > 1 ? "s" : ""}</p></section>
+      <section className="rounded-2xl border border-border bg-card p-4"><div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_repeat(3,minmax(150px,.45fr))]"><label className="relative"><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-faint" /><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Devis, client…" className="h-10 w-full rounded-xl border border-white/[0.09] bg-black/10 pl-9 pr-3 text-sm text-foreground outline-none focus:border-primary/70" /></label><select value={status} onChange={event => setStatus(event.target.value as typeof status)} className="h-10 rounded-xl border border-white/[0.09] bg-black/10 px-3 text-sm text-foreground"><option value="all">Tous les statuts</option><option value="draft">En attente</option><option value="paid">Acceptés</option><option value="void">Retournés / annulés</option></select><select value={agentId} onChange={event => setAgentId(event.target.value)} className="h-10 rounded-xl border border-white/[0.09] bg-black/10 px-3 text-sm text-foreground"><option value="all">Tous les intervenants</option>{documentParticipants.map(participant => <option key={participant.key} value={participant.key}>{documentParticipantOptionLabel(participant)}</option>)}</select><select value={period} onChange={event => setPeriod(event.target.value as typeof period)} className="h-10 rounded-xl border border-white/[0.09] bg-black/10 px-3 text-sm text-foreground"><option value="all">Toutes les dates</option><option value="today">Aujourd’hui</option><option value="week">7 derniers jours</option><option value="month">30 derniers jours</option></select></div><p className="mt-3 text-xs text-faint">{filteredQuotes.length} devis affiché{filteredQuotes.length > 1 ? "s" : ""}</p></section>
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {isLoading ? (
           <Card className="md:col-span-2 xl:col-span-3">
@@ -67,38 +67,38 @@ export default function Quotes() {
               key={quote.id}
               type="button"
               onClick={() => setLocation(`/devis/${quote.id}`)}
-              className="group flex min-w-0 items-center gap-3 rounded-xl border border-white/[0.07] bg-[#111722] px-3 py-2.5 text-left shadow-sm transition hover:border-primary/45 hover:bg-[#141e2d]"
+              className="group flex min-w-0 items-center gap-3 rounded-xl border border-border bg-card px-3 py-2.5 text-left shadow-sm transition hover:border-primary/45 hover:bg-[#141e2d]"
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <p className="truncate text-sm font-semibold text-slate-100">
+                  <p className="truncate text-sm font-semibold text-foreground">
                     {quote.invoiceNumber}
                   </p>
                   <Badge className="border-0 bg-sky-500/10 text-sky-300">
                     Devis
                   </Badge>
                 </div>
-                <p className="mt-1 truncate text-xs text-slate-400">
+                <p className="mt-1 truncate text-xs text-muted-foreground">
                   {quote.customerName || "Client"} ·{" "}
                   {formatDate(quote.createdAt, true)}
                 </p>
               </div>
               <div className="shrink-0 text-right">
-                <p className="text-sm font-semibold text-cyan-300">
+                <p className="text-sm font-semibold text-primary">
                   {formatCurrency(quote.totalCents)}
                 </p>
-                <p className="mt-0.5 text-[11px] text-slate-500">
+                <p className="mt-0.5 text-[11px] text-faint">
                   {quote.status === "paid" ? "Accepté" : "En attente"}
                 </p>
               </div>
-              <Eye className="h-4 w-4 shrink-0 text-slate-600 transition group-hover:text-primary" />
+              <Eye className="h-4 w-4 shrink-0 text-faint transition group-hover:text-primary" />
             </button>
           ))
         ) : (
           <Card className="md:col-span-2 xl:col-span-3">
             <CardContent className="py-16 text-center">
-              <FileText className="mx-auto h-7 w-7 text-slate-600" />
-              <p className="mt-4 text-sm text-slate-300">Aucun devis ne correspond aux filtres.</p>
+              <FileText className="mx-auto h-7 w-7 text-faint" />
+              <p className="mt-4 text-sm text-muted-foreground">Aucun devis ne correspond aux filtres.</p>
               <Button
                 onClick={() => setLocation("/devis/nouveau")}
                 className="mt-5 bg-primary text-primary-foreground hover:bg-primary/90"

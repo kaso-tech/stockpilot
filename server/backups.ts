@@ -16,6 +16,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { companyScope } from "./companyScope";
 import { getDb } from "./db";
 import { storageDelete, storageGetSignedUrl, storagePut } from "./storage";
+import { parseProductImageKey } from "./productImages";
 
 type Trigger = "manual" | "scheduled";
 type SnapshotSource = { name: string; table: any };
@@ -88,6 +89,17 @@ function validateBackupTables(tables: unknown, companyId: number) {
   // Archives antérieures au catalogue par ID ne contiennent pas ces champs.
   if (rowsFor("products").some(row => row.categoryId != null && (typeof row.categoryId !== "number" || !categoryIds.has(row.categoryId)))) throw new Error("Un produit référence une catégorie absente de la sauvegarde.");
   if (rowsFor("products").some(row => row.unitId != null && (typeof row.unitId !== "number" || !unitIds.has(row.unitId)))) throw new Error("Un produit référence une unité absente de la sauvegarde.");
+  // Les archives historiques peuvent ne pas contenir ces champs nullable. Si
+  // présents, les URL doivent correspondre exactement au tenant et au produit.
+  for (const row of rowsFor("products")) {
+    for (const [field, variant] of [["imageUrl", "image"], ["imageThumbUrl", "thumb"]] as const) {
+      const url = row[field];
+      if (url == null) continue;
+      const prefix = "/manus-storage/";
+      const image = typeof url === "string" && url.startsWith(prefix) ? parseProductImageKey(url.slice(prefix.length)) : null;
+      if (!image || image.companyId !== companyId || image.productId !== row.id || image.variant !== variant) throw new Error(`Photo de produit invalide dans la sauvegarde (${field}).`);
+    }
+  }
   if (rowsFor("sellerCredentials").some(row => typeof row.userId !== "number" || !userIds.has(row.userId))) throw new Error("Une identification vendeur référence un utilisateur absent de la sauvegarde.");
   if (rowsFor("userDashboardPreferences").some(row => typeof row.userId !== "number" || !userIds.has(row.userId))) throw new Error("Une préférence de tableau de bord référence un utilisateur absent de la sauvegarde.");
   if (rowsFor("productPriceTiers").some(row => typeof row.productId !== "number" || !productIds.has(row.productId))) throw new Error("Un palier de prix référence un produit absent de la sauvegarde.");

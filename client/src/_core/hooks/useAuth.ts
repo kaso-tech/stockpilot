@@ -1,6 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import { TRPCClientError } from "@trpc/client";
 import { useCallback, useEffect, useMemo } from "react";
+import { clearProductPhotoCaches } from "@/lib/productPhotoCache";
 
 type UseAuthOptions = {
   redirectOnUnauthenticated?: boolean;
@@ -29,6 +30,7 @@ export function useAuth(options?: UseAuthOptions) {
       if (error instanceof TRPCClientError && error.data?.code === "UNAUTHORIZED") return;
       throw error;
     } finally {
+      await clearProductPhotoCaches();
       utils.auth.me.setData(undefined, null);
       await utils.auth.me.invalidate();
     }

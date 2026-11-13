@@ -12,6 +12,7 @@ import { ActiveWarehouseProvider } from "./contexts/ActiveWarehouseContext";
 import { OfflineQueryCacheBridge } from "./components/OfflineQueryCacheBridge";
 import { PwaUpdateNotice } from "./components/PwaUpdateNotice";
 import { RoleRouteBoundary } from "./components/RoleRouteBoundary";
+import { ProductPhotoCacheBridge } from "./components/ProductPhotoCacheBridge";
 // Keep route shells and global providers eager, but load each feature page on
 // demand. vite-plugin-pwa precaches the generated chunks for offline navigation.
 const Alerts = lazy(() => import("./pages/Alerts"));
@@ -152,7 +153,7 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider defaultTheme="dark" switchable>
         <TooltipProvider>
-          <PreferencesProvider><ActiveWarehouseProvider><OfflineProvider><OfflineQueryCacheBridge /><Toaster richColors closeButton position="top-right" /><PwaUpdateNotice /><Router /></OfflineProvider></ActiveWarehouseProvider></PreferencesProvider>
+          <PreferencesProvider><ActiveWarehouseProvider><OfflineProvider><OfflineQueryCacheBridge /><ProductPhotoCacheBridge /><Toaster richColors closeButton position="top-right" /><PwaUpdateNotice /><Router /></OfflineProvider></ActiveWarehouseProvider></PreferencesProvider>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

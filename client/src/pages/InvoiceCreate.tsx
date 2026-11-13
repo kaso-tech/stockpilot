@@ -528,7 +528,7 @@ export default function InvoiceCreate({
     <div className="mx-auto max-w-5xl space-y-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#007B8B]">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
             Documents commerciaux
           </p>
           <h1 className="mt-2 text-2xl font-semibold text-slate-950 dark:text-white sm:text-3xl">
@@ -542,7 +542,7 @@ export default function InvoiceCreate({
       <section className="grid gap-5 lg:grid-cols-2">
         <div className="space-y-4 rounded-2xl border border-border bg-card p-5">
           <h2 className="font-semibold">Client et intervenants</h2>
-          <div className="space-y-2"><Label>Entrepôt opérationnel</Label><Select value={selectedWarehouseId ? String(selectedWarehouseId) : "unselected"} onValueChange={value => { const nextId = value === "unselected" ? null : Number(value); if (nextId !== selectedWarehouseId && cart.length && !window.confirm("Changer d’entrepôt videra les produits ajoutés. Continuer ?")) return; if (nextId !== selectedWarehouseId) setCart([]); if (isAdmin && nextId) setActiveWarehouseId(nextId); setSelectedWarehouseId(nextId); }}><SelectTrigger><SelectValue placeholder="Sélectionner un entrepôt" /></SelectTrigger><SelectContent><SelectItem value="unselected">Sélectionner un entrepôt</SelectItem>{warehouses.filter(warehouse => warehouse.active).map(warehouse => <SelectItem key={warehouse.id} value={String(warehouse.id)}>{warehouse.name}{warehouse.isDefault ? " · Principal" : ""}</SelectItem>)}</SelectContent></Select><p className="text-xs text-slate-500">Les disponibilités et le mouvement de sortie seront enregistrés pour ce dépôt.</p></div>
+          <div className="space-y-2"><Label>Entrepôt opérationnel</Label><Select value={selectedWarehouseId ? String(selectedWarehouseId) : "unselected"} onValueChange={value => { const nextId = value === "unselected" ? null : Number(value); if (nextId !== selectedWarehouseId && cart.length && !window.confirm("Changer d’entrepôt videra les produits ajoutés. Continuer ?")) return; if (nextId !== selectedWarehouseId) setCart([]); if (isAdmin && nextId) setActiveWarehouseId(nextId); setSelectedWarehouseId(nextId); }}><SelectTrigger><SelectValue placeholder="Sélectionner un entrepôt" /></SelectTrigger><SelectContent><SelectItem value="unselected">Sélectionner un entrepôt</SelectItem>{warehouses.filter(warehouse => warehouse.active).map(warehouse => <SelectItem key={warehouse.id} value={String(warehouse.id)}>{warehouse.name}{warehouse.isDefault ? " · Principal" : ""}</SelectItem>)}</SelectContent></Select><p className="text-xs text-faint">Les disponibilités et le mouvement de sortie seront enregistrés pour ce dépôt.</p></div>
           <div className="space-y-2">
             <Label>
               Client <span className="text-rose-500">*</span>
@@ -567,7 +567,7 @@ export default function InvoiceCreate({
                   appliqué
                 </Badge>
                 {prefilledCustomerId && (
-                  <Badge className="border-0 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300">
+                  <Badge className="border-0 bg-emerald-500/10 text-emerald-600 dark:text-success">
                     Client prérempli depuis sa fiche
                   </Badge>
                 )}
@@ -935,7 +935,7 @@ export default function InvoiceCreate({
                 <p className="mt-1 text-xs text-muted-foreground">
                   {product.reference} · Stock {product.quantity}
                 </p>
-                <p className="mt-3 font-semibold text-[#007B8B]">
+                <p className="mt-3 font-semibold text-primary">
                   {formatCurrency(product[priceType])}
                 </p>
               </button>
@@ -967,8 +967,8 @@ export default function InvoiceCreate({
 }
 function DefaultAssignment({ label, name }: { label: string; name: string }) {
   return (
-    <div className="rounded-xl border border-[#007B8B]/20 bg-[#007B8B]/[0.06] p-3">
-      <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[#007B8B]">
+    <div className="rounded-xl border border-primary/20 bg-[#007B8B]/[0.06] p-3">
+      <p className="text-xs font-semibold uppercase tracking-[0.1em] text-primary">
         {label}
       </p>
       <p className="mt-1 font-medium text-foreground">{name}</p>

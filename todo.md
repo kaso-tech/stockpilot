@@ -1037,3 +1037,15 @@ Source figée : github/november, ef4ac6d793228475c3ce64653f96134af95328f1 (kaso-
 ### Preuves et limites de l’intégration de novembre
 
 Recette : 129 fichiers / 332 tests, build PWA, installation figée, audit production et release verts ; 5 tests Playwright sur build production, API simulée et aucune base métier. Les migrations 0077/0078 sont appliquées. La recette E2E de ce portage n’insère donc aucun compte ni transaction de test dans la base attachée. Les chemins e-mail réels et S3 optionnels restent soumis à configuration ; YengaPay reste en pause. Voir `NOTE_INTEGRATION_NOVEMBRE_2026.md`.
+
+
+## Synchronisation GitHub — 13 novembre 2026
+
+Source figée : branche `ccr-1f2b32f0-8cxy1l`, commit `726b79f48d766a2ebb34c16a8f518c24bfd18de7`. Nouveautés depuis `ef4ac6d` : thème `1c60472` et photos `726b79f`. `main` GitHub reste au 24 août. Le pull du remote interne nécessite un accès non disponible ; GitHub a été récupéré avec succès dans `github/november-latest`. Sauvegarde `backup/pre-pull-2026-11-13` du checkpoint `798b3429`. Portage sélectif nécessaire pour ne pas écraser les fonctionnalités actuelles.
+
+- [x] Vérifier les derniers commits, les branches et l’état local avant modification.
+- [x] Porter les surfaces et jetons visuels, la navigation et la recherche avec le bleu et les contrôles actuels.
+- [x] Porter les photos produit, la compression, les permissions et le relais privé, sans restaurer d’anciens routeurs.
+- [x] Isoler le cache des photos offline par entreprise, utilisateur et entrepôt, et purger à la déconnexion.
+- [x] Générer et appliquer la migration photo après 0078 sans toucher aux quantités ni aux données historiques.
+- [x] Exécuter typage, tests, build, audit/release et recette navigateur puis livrer checkpoint et archive sans secrets.

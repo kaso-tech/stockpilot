@@ -27,7 +27,7 @@ export default function NotFound() {
             Page Not Found
           </h2>
 
-          <p className="text-slate-600 mb-8 leading-relaxed">
+          <p className="text-faint mb-8 leading-relaxed">
             Sorry, the page you are looking for doesn't exist.
             <br />
             It may have been moved or deleted.
@@ -39,7 +39,7 @@ export default function NotFound() {
           >
             <Button
               onClick={handleGoHome}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
+              className="bg-blue-600 hover:bg-blue-700 text-foreground px-6 py-2.5 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
             >
               <Home className="w-4 h-4 mr-2" />
               Go Home

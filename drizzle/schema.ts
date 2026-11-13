@@ -363,6 +363,8 @@ export const products = mysqlTable("products", {
   /** Taux de TVA propre au produit (points de base) ; NULL reprend le taux entreprise. */
   vatRateBasisPoints: int("vatRateBasisPoints"),
   supplierId: int("supplierId"),
+  imageUrl: varchar("imageUrl", { length: 512 }),
+  imageThumbUrl: varchar("imageThumbUrl", { length: 512 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, table => [

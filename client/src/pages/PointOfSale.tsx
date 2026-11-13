@@ -1,3 +1,4 @@
+import { ProductImage } from "@/components/ProductImage";
 import { BarcodeCameraDialog } from "@/components/BarcodeCameraDialog";
 import { computeVatBreakdown, vatRatesLabel } from "@shared/pricing";
 import {
@@ -100,6 +101,7 @@ export default function PointOfSale() {
     user?.role !== "seller" ||
     Boolean(sellerDiscountPermissions?.sellerCanCartDiscount);
   const [query, setQuery] = useState("");
+  const [showPhotos, setShowPhotos] = useState(true);
   const [lowStockOnly, setLowStockOnly] = useState(false);
   const [purchaseListOpen, setPurchaseListOpen] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -420,19 +422,19 @@ export default function PointOfSale() {
     <div className={`mx-auto max-w-[1600px] space-y-5 ${bottomSpacing}`}>
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#007B8B]">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
             Vente comptoir
           </p>
           <h1 className="mt-2 text-2xl font-semibold text-slate-950 dark:text-white sm:text-3xl">
             Vente Rapide
           </h1>
-          <label className="mt-3 flex max-w-sm items-center gap-2 text-xs font-medium text-slate-500">Entrepôt opérationnel<select value={selectedWarehouseId ? String(selectedWarehouseId) : ""} onChange={event => { const nextId = Number(event.target.value); if (nextId && nextId !== selectedWarehouseId && cart.length && !window.confirm("Changer d’entrepôt videra le panier en cours. Continuer ?")) return; if (nextId !== selectedWarehouseId) clearCart(); if (isAdmin && nextId) setActiveWarehouseId(nextId); setSelectedWarehouseId(nextId || null); }} className="min-w-0 flex-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary" disabled={!warehouses.length}>{warehouses.filter(warehouse => warehouse.active).map(warehouse => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}{warehouse.isDefault ? " · Principal" : ""}</option>)}</select></label>
+          <label className="mt-3 flex max-w-sm items-center gap-2 text-xs font-medium text-faint">Entrepôt opérationnel<select value={selectedWarehouseId ? String(selectedWarehouseId) : ""} onChange={event => { const nextId = Number(event.target.value); if (nextId && nextId !== selectedWarehouseId && cart.length && !window.confirm("Changer d’entrepôt videra le panier en cours. Continuer ?")) return; if (nextId !== selectedWarehouseId) clearCart(); if (isAdmin && nextId) setActiveWarehouseId(nextId); setSelectedWarehouseId(nextId || null); }} className="min-w-0 flex-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary" disabled={!warehouses.length}>{warehouses.filter(warehouse => warehouse.active).map(warehouse => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}{warehouse.isDefault ? " · Principal" : ""}</option>)}</select></label>
         </div>
         {cart.length > 0 && (
           <button
             type="button"
             onClick={() => setCartCollapsed(false)}
-            className="inline-flex items-center gap-2 self-start rounded-xl border border-[#007B8B]/20 bg-[#007B8B]/[0.07] px-3 py-2 text-sm font-medium text-[#007B8B]"
+            className="inline-flex items-center gap-2 self-start rounded-xl border border-primary/20 bg-primary-soft px-3 py-2 text-sm font-medium text-primary"
           >
             <ShoppingCart className="h-4 w-4" />
             {cart.length} article{cart.length > 1 ? "s" : ""} au panier
@@ -451,7 +453,7 @@ export default function PointOfSale() {
               className="pl-9"
             />
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2"><Button type="button" variant="outline" aria-pressed={showPhotos} onClick={() => setShowPhotos(value => !value)}>{showPhotos ? "Masquer les photos" : "Afficher les photos"}</Button>
             <Button
               aria-label="Scanner un code-barres"
               variant="outline"
@@ -479,7 +481,7 @@ export default function PointOfSale() {
               variant="outline"
               disabled={!lowStockOnly || !purchaseItems.length}
               onClick={() => setPurchaseListOpen(true)}
-              className="border-[#007B8B]/30 text-[#007B8B] hover:bg-[#007B8B]/5"
+              className="border-primary/30 text-primary hover:bg-[#007B8B]/5"
             >
               <ClipboardList className="mr-2 h-4 w-4" />
               Liste d’achats
@@ -503,11 +505,12 @@ export default function PointOfSale() {
                 onClick={() => add(product.id)}
                 className={`rounded-xl border p-4 text-left transition hover:border-[#007B8B]/40 hover:bg-[#007B8B]/5 ${productIsLowStock ? "border-amber-500/50 bg-amber-500/[0.04]" : "border-border"}`}
               >
+                {showPhotos && <ProductImage product={product} full className="mb-3 h-28 w-full text-3xl" rounded="rounded-lg" />}
                 <p className="truncate font-medium">{product.name}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {product.reference} · {product.quantity} {product.unit}
                 </p>
-                {!isOnline && <p className="mt-1 text-[11px] font-medium text-amber-700 dark:text-amber-300">Stock estimé : {estimatedQuantity} {product.unit}{pendingQuantity ? ` · ${pendingQuantity} en attente` : ""}</p>}
+                {!isOnline && <p className="mt-1 text-[11px] font-medium text-amber-700 dark:text-warning">Stock estimé : {estimatedQuantity} {product.unit}{pendingQuantity ? ` · ${pendingQuantity} en attente` : ""}</p>}
                 {product.priceTiers?.length ? (
                   <p className="mt-2 text-[11px] font-medium text-primary">
                     Paliers dès {product.priceTiers[0].minQuantity}{" "}
@@ -515,13 +518,13 @@ export default function PointOfSale() {
                   </p>
                 ) : null}
                 {productIsLowStock && (
-                  <p className="mt-2 inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+                  <p className="mt-2 inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-medium text-amber-700 dark:text-warning">
                     <AlertTriangle className="h-3 w-3" />
                     Stock faible · seuil {product.minimumQuantity}
                   </p>
                 )}
                 <div className="mt-4 flex items-center justify-between">
-                  <span className="font-semibold text-[#007B8B]">
+                  <span className="font-semibold text-primary">
                     {formatCurrency(product.retailPriceCents)}
                   </span>
                   <Plus className="h-4 w-4" />
@@ -530,7 +533,7 @@ export default function PointOfSale() {
             );
           })}
         </div>
-        {!isOnline && <p className="mt-3 text-xs text-amber-700 dark:text-amber-300">Les quantités affichées sont une estimation locale{lastLocalSnapshotAt ? ` enregistrée le ${new Date(lastLocalSnapshotAt).toLocaleString("fr-FR")}` : ""}. La validation finale du stock est effectuée lors de la synchronisation.</p>}
+        {!isOnline && <p className="mt-3 text-xs text-amber-700 dark:text-warning">Les quantités affichées sont une estimation locale{lastLocalSnapshotAt ? ` enregistrée le ${new Date(lastLocalSnapshotAt).toLocaleString("fr-FR")}` : ""}. La validation finale du stock est effectuée lors de la synchronisation.</p>}
         {!available.length && (
           <p className="py-14 text-center text-sm text-muted-foreground">
             {lowStockOnly
@@ -545,9 +548,9 @@ export default function PointOfSale() {
         onDetected={handleCode}
       />
       {pendingTickets.length > 0 && (
-        <aside aria-label="Tickets à encaisser" className="fixed right-4 top-20 z-20 hidden w-72 rounded-2xl border border-amber-400/25 bg-[#111722]/95 p-3 shadow-2xl backdrop-blur lg:block">
-          <div className="mb-2 flex items-center justify-between"><span className="flex items-center gap-2 text-sm font-semibold text-amber-200"><TicketCheck className="h-4 w-4" />À encaisser</span><button type="button" onClick={() => setLocation("/tickets?statut=unpaid")} className="text-xs font-medium text-cyan-300 hover:text-cyan-200">Voir tout</button></div>
-          <div className="space-y-2">{pendingTickets.map(ticket => <button key={ticket.id} type="button" onClick={() => setCheckoutSale({ id: ticket.id, totalCents: ticket.totalCents, invoiceNumber: ticket.invoiceNumber, channel: "pos" })} className="flex w-full items-center justify-between rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 py-2 text-left transition hover:border-amber-400/35 hover:bg-amber-400/[0.06]"><span className="min-w-0"><span className="block truncate text-xs font-semibold text-slate-100">{ticket.invoiceNumber}</span><span className="mt-0.5 block text-[11px] text-slate-500">Reprendre l’encaissement</span></span><span className="ml-2 shrink-0 text-xs font-semibold text-amber-200">{formatCurrency(ticket.totalCents - ticket.amountPaidCents)}</span></button>)}</div>
+        <aside aria-label="Tickets à encaisser" className="fixed right-4 top-20 z-20 hidden w-72 rounded-2xl border border-amber-400/25 bg-card/95 p-3 shadow-2xl backdrop-blur lg:block">
+          <div className="mb-2 flex items-center justify-between"><span className="flex items-center gap-2 text-sm font-semibold text-amber-200"><TicketCheck className="h-4 w-4" />À encaisser</span><button type="button" onClick={() => setLocation("/tickets?statut=unpaid")} className="text-xs font-medium text-primary hover:text-primary">Voir tout</button></div>
+          <div className="space-y-2">{pendingTickets.map(ticket => <button key={ticket.id} type="button" onClick={() => setCheckoutSale({ id: ticket.id, totalCents: ticket.totalCents, invoiceNumber: ticket.invoiceNumber, channel: "pos" })} className="flex w-full items-center justify-between rounded-xl border border-border bg-muted/40 px-3 py-2 text-left transition hover:border-amber-400/35 hover:bg-amber-400/[0.06]"><span className="min-w-0"><span className="block truncate text-xs font-semibold text-foreground">{ticket.invoiceNumber}</span><span className="mt-0.5 block text-[11px] text-faint">Reprendre l’encaissement</span></span><span className="ml-2 shrink-0 text-xs font-semibold text-amber-200">{formatCurrency(ticket.totalCents - ticket.amountPaidCents)}</span></button>)}</div>
         </aside>
       )}
       <CheckoutSheet
@@ -574,7 +577,7 @@ export default function PointOfSale() {
                 className="rounded-xl border border-border"
               >
                 <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-4 py-3 font-medium">
-                  <PackagePlus className="h-4 w-4 text-[#007B8B]" />
+                  <PackagePlus className="h-4 w-4 text-primary" />
                   {group.supplierName}
                 </div>
                 <div className="divide-y divide-border">
@@ -591,7 +594,7 @@ export default function PointOfSale() {
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold text-[#007B8B]">
+                        <p className="font-semibold text-primary">
                           + {item.quantityToOrder} {item.unit}
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
@@ -610,7 +613,7 @@ export default function PointOfSale() {
             <span className="text-sm text-muted-foreground">
               Estimation des achats
             </span>
-            <span className="text-lg font-semibold text-[#007B8B]">
+            <span className="text-lg font-semibold text-primary">
               {formatCurrency(purchaseTotalCents)}
             </span>
           </div>
@@ -631,7 +634,7 @@ export default function PointOfSale() {
         >
           <div className="flex items-center justify-between border-b border-border px-5 py-4">
             <div className="flex items-center gap-3">
-              <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#007B8B]/10 text-[#007B8B]">
+              <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#007B8B]/10 text-primary">
                 <ShoppingCart className="h-5 w-5" />
               </span>
               <div>
@@ -681,7 +684,7 @@ export default function PointOfSale() {
               <button
                 type="button"
                 onClick={() => setCartCollapsed(false)}
-                className="font-semibold text-[#007B8B]"
+                className="font-semibold text-primary"
               >
                 {formatCurrency(totalCents)} · Ouvrir
               </button>
@@ -707,7 +710,7 @@ export default function PointOfSale() {
                         </p>
                       )}
                       {line.isLowStock && (
-                        <p className="mt-1 inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+                        <p className="mt-1 inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-medium text-amber-700 dark:text-warning">
                           <AlertTriangle className="h-3 w-3" />
                           Stock faible · {line.remainingAfterSale} restant ·
                           seuil {line.product.minimumQuantity}
@@ -789,7 +792,7 @@ export default function PointOfSale() {
                     {formatCurrency(totalCents)}
                   </span>
                 </div>
-                <div className="grid gap-2 sm:grid-cols-2"><Button variant="outline" onClick={holdTicket} disabled={savePendingTicket.isPending || !isOnline} className="h-12 border-amber-400/35 text-amber-700 hover:bg-amber-400/10 dark:text-amber-200"><TicketCheck className="mr-2 h-4 w-4" />{savePendingTicket.isPending ? "Enregistrement…" : "Mettre en attente"}</Button><Button onClick={openCheckout} disabled={draft.isPending} className="h-12 bg-primary text-base text-primary-foreground hover:bg-primary/90">{draft.isPending ? "Préparation…" : <><Keyboard className="mr-2 h-4 w-4" />{isOnline ? "Encaisser" : "Encaisser hors connexion"} <span className="ml-2 rounded bg-white/20 px-1.5 py-0.5 text-xs">F9</span></>}</Button></div>
+                <div className="grid gap-2 sm:grid-cols-2"><Button variant="outline" onClick={holdTicket} disabled={savePendingTicket.isPending || !isOnline} className="h-12 border-amber-400/35 text-amber-700 hover:bg-warning-soft dark:text-amber-200"><TicketCheck className="mr-2 h-4 w-4" />{savePendingTicket.isPending ? "Enregistrement…" : "Mettre en attente"}</Button><Button onClick={openCheckout} disabled={draft.isPending} className="h-12 bg-primary text-base text-primary-foreground hover:bg-primary/90">{draft.isPending ? "Préparation…" : <><Keyboard className="mr-2 h-4 w-4" />{isOnline ? "Encaisser" : "Encaisser hors connexion"} <span className="ml-2 rounded bg-white/20 px-1.5 py-0.5 text-xs">F9</span></>}</Button></div>
               </div>
             </>
           )}
