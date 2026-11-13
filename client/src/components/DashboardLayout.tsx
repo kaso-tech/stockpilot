@@ -799,6 +799,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     { staleTime: 5 * 60_000 }
   );
   const [menuSearch, setMenuSearch] = useState("");
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const focusSearch = (event: KeyboardEvent) => {
@@ -1052,9 +1053,18 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         </SidebarContent>
 
         <SidebarFooter className="border-t border-sidebar-border p-3">
-          <DropdownMenu>
+          <DropdownMenu
+            open={accountMenuOpen}
+            onOpenChange={setAccountMenuOpen}
+          >
             <DropdownMenuTrigger asChild>
-              <button className="flex w-full items-center gap-3 rounded-lg p-2 text-left transition-colors hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <button
+                // Ouverture au clic complet : un appui prolongé ne doit jamais
+                // « glisser » jusqu'à « Se déconnecter » au relâchement.
+                onPointerDown={event => event.preventDefault()}
+                onClick={() => setAccountMenuOpen(current => !current)}
+                className="flex w-full items-center gap-3 rounded-lg p-2 text-left transition-colors hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
                 <Avatar className="h-8 w-8 shrink-0 border border-border">
                   <AvatarFallback className="bg-primary-soft text-[11px] font-semibold text-primary">
                     {initials}
@@ -1075,7 +1085,12 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
                 )}
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" side="top" className="w-60">
+            <DropdownMenuContent
+              align="end"
+              side={isMobile ? "top" : "right"}
+              sideOffset={8}
+              className="w-60"
+            >
               <DropdownMenuLabel className="font-normal">
                 <p className="truncate text-sm font-medium">
                   {user?.name || "Utilisateur"}

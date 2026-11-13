@@ -90,7 +90,7 @@ const currencies: Array<{
 ];
 const primaryPresets = [
   "#0B6E76",
-  "#2563EB",
+  "#1D4ED8",
   "#6D28D9",
   "#BE123C",
   "#B45309",

@@ -59,6 +59,8 @@ describe("persistance des préférences", () => {
     expect(normalizePrimaryColor("#6d28d9")).toBe("#6D28D9");
     expect(normalizePrimaryColor("violet")).toBe("#0B6E76");
     expect(normalizePrimaryColor("#007b8b")).toBe("#0B6E76");
+    expect(normalizePrimaryColor("#2563EB")).toBe("#0B6E76");
+    expect(normalizePrimaryColor("#1D4ED8")).toBe("#1D4ED8");
     expect(primaryForeground("#FDE047")).toBe("#102030");
     expect(primaryForeground("#007B8B")).toBe("#FFFFFF");
   });

@@ -333,7 +333,7 @@ export const saleSettings = mysqlTable(
       .default("Africa/Abidjan"),
     primaryColor: varchar("primaryColor", { length: 7 })
       .notNull()
-      .default("#007B8B"),
+      .default("#0B6E76"),
     companyName: varchar("companyName", { length: 200 })
       .notNull()
       .default("StockPilot"),
