@@ -243,6 +243,7 @@ function isMenuItemActive(path: string, location: string) {
       "/devis",
       "/factures",
       "/agents",
+      "/parametres",
     ].includes(path) &&
     location.startsWith(`${path}/`)
   );

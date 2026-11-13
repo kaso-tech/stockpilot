@@ -2,8 +2,13 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { StatusPill, type StatusTone } from "@/components/StatusPill";
+import { StatusPill } from "@/components/StatusPill";
 import { ProductImage } from "@/components/ProductImage";
+import {
+  chartTooltipStyle,
+  expenseColors,
+  expenseLabels,
+} from "@/components/ExpenseDonut";
 import {
   dashboardPreferencesForRole,
   normalizeDashboardPreferences,
@@ -12,10 +17,10 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
 import {
   Activity,
-  BellRing,
+  ArrowRight,
   Boxes,
   CheckCircle2,
-  ClipboardCheck,
+  ChevronRight,
   CreditCard,
   FilePlus2,
   ReceiptText,
@@ -29,53 +34,16 @@ import {
   BarChart,
   Cell,
   LabelList,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
 } from "recharts";
 import { useEffect, useState, type ReactNode } from "react";
 import { useLocation } from "wouter";
+import type { inferRouterOutputs } from "@trpc/server";
+import type { AppRouter } from "../../../server/routers";
 
-const tooltipStyle = {
-  background: "var(--popover)",
-  border: "1px solid var(--border)",
-  borderRadius: "8px",
-  color: "var(--popover-foreground)",
-  fontSize: "12px",
-  boxShadow: "0 4px 12px rgb(var(--shadow-color) / 0.08)",
-};
-const expenseLabels: Record<string, string> = {
-  rent: "Loyer",
-  energy: "Énergie",
-  connection: "Connexion",
-  salary: "Salaire",
-  agent_payments: "Paiements agents",
-  marketing: "Marketing",
-  supplies: "Fournitures",
-  taxes: "Impôts",
-  other: "Autre",
-};
-/** Palette catégorielle sobre, lisible en clair comme en sombre. */
-const expenseColors: Record<string, string> = {
-  rent: "#0B6E76",
-  energy: "#1D4ED8",
-  connection: "#7C3AED",
-  salary: "#B54708",
-  agent_payments: "#E8853D",
-  marketing: "#C11574",
-  supplies: "#157F4F",
-  taxes: "#B42318",
-  other: "#98A2B3",
-};
-const toneIcon: Record<StatusTone, string> = {
-  success: "bg-success-soft text-success",
-  warning: "bg-warning-soft text-warning",
-  danger: "bg-destructive-soft text-destructive",
-  info: "bg-info-soft text-info",
-  neutral: "bg-muted text-muted-foreground",
-};
+type DashboardData = inferRouterOutputs<AppRouter>["dashboard"]["get"];
 
 function capitalize(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1);
@@ -93,14 +61,6 @@ export default function Home() {
     undefined,
     { staleTime: 5 * 60_000 }
   );
-  const { data: onboarding, isLoading: onboardingLoading } =
-    trpc.onboarding.status.useQuery(undefined, { enabled: isAdmin });
-  const onboardingComplete = trpc.onboarding.complete.useMutation({
-    onSuccess: () => window.location.reload(),
-  });
-  const onboardingSkip = trpc.onboarding.skip.useMutation({
-    onSuccess: () => window.location.reload(),
-  });
   const role = user?.role === "seller" ? "seller" : "admin";
   const [preferences, setPreferences] = useState(() =>
     dashboardPreferencesForRole(role)
@@ -159,48 +119,6 @@ export default function Home() {
       tone: receivableCount ? "warning" : "default",
     },
   ];
-  const priorities = [
-    {
-      label: "Stock critique",
-      count: summary?.activeAlerts ?? 0,
-      detail: "référence(s) au seuil",
-      icon: BellRing,
-      path: "/alertes",
-      tone: "warning" as StatusTone,
-      currency: false,
-    },
-    {
-      label: "Inventaires ouverts",
-      count: summary?.draftInventories ?? 0,
-      detail: "session(s) à finaliser",
-      icon: ClipboardCheck,
-      path: "/inventaires",
-      tone: "info" as StatusTone,
-      currency: false,
-    },
-    ...(isAdmin
-      ? [
-          {
-            label: "Paie à régler",
-            count: summary?.duePayrollCents ?? 0,
-            detail: "solde de la période",
-            icon: WalletCards,
-            path: "/agents",
-            tone: "neutral" as StatusTone,
-            currency: true,
-          },
-          {
-            label: "Dépenses du mois",
-            count: summary?.monthlyExpenseCents ?? 0,
-            detail: `dont paie ${formatCurrency(summary?.monthlyAgentPaymentCents ?? 0)}`,
-            icon: WalletCards,
-            path: "/depenses",
-            tone: "neutral" as StatusTone,
-            currency: true,
-          },
-        ]
-      : []),
-  ];
   const today = capitalize(
     new Intl.DateTimeFormat("fr-FR", {
       weekday: "long",
@@ -208,6 +126,8 @@ export default function Home() {
       month: "long",
     }).format(new Date())
   );
+  const showTrend = preferences.salesTrend;
+  const showTodo = preferences.todo;
 
   return (
     <div className="mx-auto flex max-w-[1440px] flex-col gap-6">
@@ -252,114 +172,10 @@ export default function Home() {
         )}
       </section>
 
-      {isAdmin && !onboardingLoading && onboarding && !onboarding.completed && (
-        <Panel>
-          <div className="flex flex-col gap-5 p-5 xl:flex-row xl:items-center xl:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-primary">
-                Démarrage guidé
-              </p>
-              <h2 className="mt-1.5 text-base font-semibold text-foreground">
-                Préparez votre espace pour la première vente
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Renseignez les trois éléments essentiels. Votre progression est
-                mémorisée automatiquement.
-              </p>
-            </div>
-            <div className="grid gap-2 sm:grid-cols-3 xl:min-w-[620px]">
-              {[
-                {
-                  key: "product",
-                  label: "Premier produit",
-                  detail: "Ajoutez une référence",
-                  icon: Boxes,
-                  path: "/produits?nouveau=1",
-                },
-                {
-                  key: "customer",
-                  label: "Premier client",
-                  detail: "Créez une fiche client",
-                  icon: UserPlus,
-                  path: "/clients?nouveau=1",
-                },
-                {
-                  key: "paymentMethod",
-                  label: "Encaissement",
-                  detail: "Activez un moyen",
-                  icon: CreditCard,
-                  path: "/parametres/pos",
-                },
-              ].map(step => {
-                const done =
-                  onboarding.steps[step.key as keyof typeof onboarding.steps];
-                const Icon = step.icon;
-                return (
-                  <button
-                    key={step.key}
-                    onClick={() => (done ? undefined : setLocation(step.path))}
-                    className={`flex items-center gap-3 rounded-lg border px-3 py-3 text-left transition ${done ? "border-success/25 bg-success-soft" : "border-border bg-card hover:border-primary/40 hover:bg-accent"}`}
-                  >
-                    <span
-                      className={`grid h-9 w-9 place-items-center rounded-lg ${done ? "bg-card text-success" : "bg-primary-soft text-primary"}`}
-                    >
-                      {done ? (
-                        <CheckCircle2 className="h-5 w-5" />
-                      ) : (
-                        <Icon className="h-5 w-5" />
-                      )}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block text-sm font-medium text-foreground">
-                        {step.label}
-                      </span>
-                      <span className="block text-xs text-muted-foreground">
-                        {done ? "Terminé" : step.detail}
-                      </span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          <div className="flex flex-col-reverse gap-2 border-t border-border px-5 py-3 sm:flex-row sm:justify-end">
-            {onboarding.steps.product &&
-              onboarding.steps.customer &&
-              onboarding.steps.paymentMethod && (
-                <Button
-                  onClick={() => onboardingComplete.mutate()}
-                  disabled={
-                    onboardingComplete.isPending || onboardingSkip.isPending
-                  }
-                >
-                  {onboardingComplete.isPending
-                    ? "Finalisation…"
-                    : "Terminer la configuration"}
-                </Button>
-              )}
-            <Button
-              variant="ghost"
-              onClick={() => {
-                if (
-                  window.confirm(
-                    "Ignorer définitivement l’assistant de démarrage pour cette entreprise ?"
-                  )
-                )
-                  onboardingSkip.mutate();
-              }}
-              disabled={
-                onboardingComplete.isPending || onboardingSkip.isPending
-              }
-              className="text-muted-foreground"
-            >
-              {onboardingSkip.isPending ? "Ignoré…" : "Ignorer définitivement"}
-            </Button>
-          </div>
-        </Panel>
-      )}
+      {isAdmin && <OnboardingStrip onNavigate={setLocation} />}
 
       {preferences.metrics && (
-        <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-[repeat(auto-fit,minmax(220px,1fr))]">
+        <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
           {metrics.map(metric => (
             <div
               key={metric.label}
@@ -385,16 +201,21 @@ export default function Home() {
         </section>
       )}
 
-      {(preferences.salesTrend || preferences.lowStock) && (
-        <section className="grid grid-cols-1 gap-4 lg:grid-cols-[repeat(auto-fit,minmax(380px,1fr))]">
-          {preferences.salesTrend && (
-            <SalesTrend data={data?.salesTrend ?? []} loading={isLoading} />
+      {(showTrend || showTodo) && (
+        <section
+          className={`grid grid-cols-1 gap-4 ${showTrend && showTodo ? "lg:grid-cols-3" : ""}`}
+        >
+          {showTrend && (
+            <div className={showTodo ? "min-w-0 lg:col-span-2" : "min-w-0"}>
+              <SalesTrend data={data?.salesTrend ?? []} loading={isLoading} />
+            </div>
           )}
-          {preferences.lowStock && (
-            <LowStock
-              products={data?.lowStock ?? []}
-              stockValue={summary?.totalValueCents ?? 0}
-              productCount={summary?.productCount ?? 0}
+          {showTodo && (
+            <TodoPanel
+              data={data}
+              loading={isLoading}
+              isAdmin={isAdmin}
+              canSeeFinance={canSeeFinance}
               onNavigate={setLocation}
             />
           )}
@@ -405,36 +226,15 @@ export default function Home() {
         <RecentSales sales={data?.recentSales ?? []} onNavigate={setLocation} />
       )}
 
-      {(preferences.unpaidInvoices || preferences.priorities) && (
-        <section className="grid grid-cols-1 gap-4 lg:grid-cols-[repeat(auto-fit,minmax(380px,1fr))]">
-          {preferences.unpaidInvoices && (
-            <OutstandingInvoices
-              invoices={data?.unpaidInvoices ?? []}
-              onNavigate={setLocation}
-            />
-          )}
-          {preferences.priorities && (
-            <PriorityList priorities={priorities} onNavigate={setLocation} />
-          )}
-        </section>
-      )}
-
-      {canSeeFinance && (preferences.expenses || preferences.budget) && (
-        <section
-          className={`grid grid-cols-1 gap-4 ${preferences.expenses && preferences.budget ? "xl:grid-cols-[minmax(0,1fr)_360px]" : ""}`}
-        >
-          {preferences.expenses && (
-            <ExpenseChart
-              breakdown={summary?.expenseBreakdown ?? []}
-              total={summary?.monthlyExpenseCents ?? 0}
-              netProfit={summary?.monthlyOperatingProfitCents ?? 0}
-              loading={isLoading}
-            />
-          )}
-          {preferences.budget && (
-            <BudgetPanel budget={summary?.expenseBudget} loading={isLoading} />
-          )}
-        </section>
+      {canSeeFinance && preferences.expenses && (
+        <ExpenseSummary
+          breakdown={summary?.expenseBreakdown ?? []}
+          total={summary?.monthlyExpenseCents ?? 0}
+          netProfit={summary?.monthlyOperatingProfitCents ?? 0}
+          budget={summary?.expenseBudget}
+          loading={isLoading}
+          onNavigate={setLocation}
+        />
       )}
     </div>
   );
@@ -496,6 +296,111 @@ function PanelLink({
   );
 }
 
+/** Démarrage guidé sur une ligne, affiché tant qu'il n'est pas terminé. */
+function OnboardingStrip({
+  onNavigate,
+}: {
+  onNavigate: (path: string) => void;
+}) {
+  const { data: onboarding } = trpc.onboarding.status.useQuery();
+  const complete = trpc.onboarding.complete.useMutation({
+    onSuccess: () => window.location.reload(),
+  });
+  const skip = trpc.onboarding.skip.useMutation({
+    onSuccess: () => window.location.reload(),
+  });
+  if (!onboarding || onboarding.completed) return null;
+  const steps = [
+    {
+      key: "product" as const,
+      label: "Premier produit",
+      icon: Boxes,
+      path: "/produits?nouveau=1",
+    },
+    {
+      key: "customer" as const,
+      label: "Premier client",
+      icon: UserPlus,
+      path: "/clients?nouveau=1",
+    },
+    {
+      key: "paymentMethod" as const,
+      label: "Moyen d’encaissement",
+      icon: CreditCard,
+      path: "/parametres/pos",
+    },
+  ];
+  const done = steps.filter(step => onboarding.steps[step.key]).length;
+  const pending = complete.isPending || skip.isPending;
+  return (
+    <Panel className="flex flex-col gap-3 px-5 py-4 lg:flex-row lg:items-center lg:gap-6">
+      <div className="min-w-0 lg:w-64">
+        <p className="text-sm font-semibold text-foreground">
+          Démarrage · {done} étape{done > 1 ? "s" : ""} sur {steps.length}
+        </p>
+        <div
+          className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={steps.length}
+          aria-valuenow={done}
+          aria-label="Progression du démarrage"
+        >
+          <div
+            className="h-full rounded-full bg-primary transition-all"
+            style={{ width: `${(done / steps.length) * 100}%` }}
+          />
+        </div>
+      </div>
+      <div className="flex flex-1 flex-wrap gap-2">
+        {steps.map(step => {
+          const finished = onboarding.steps[step.key];
+          const Icon = finished ? CheckCircle2 : step.icon;
+          return (
+            <button
+              key={step.key}
+              type="button"
+              disabled={finished}
+              onClick={() => onNavigate(step.path)}
+              className={`inline-flex h-9 items-center gap-2 rounded-full border px-3 text-[13px] font-medium transition-colors ${finished ? "border-success/25 bg-success-soft text-success" : "border-input bg-card text-foreground hover:bg-accent"}`}
+            >
+              <Icon className="h-4 w-4" />
+              {step.label}
+            </button>
+          );
+        })}
+      </div>
+      <div className="flex gap-2">
+        {done === steps.length && (
+          <Button
+            size="sm"
+            onClick={() => complete.mutate()}
+            disabled={pending}
+          >
+            {complete.isPending ? "Finalisation…" : "Terminer"}
+          </Button>
+        )}
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={pending}
+          onClick={() => {
+            if (
+              window.confirm(
+                "Ignorer définitivement l’assistant de démarrage pour cette entreprise ?"
+              )
+            )
+              skip.mutate();
+          }}
+          className="text-muted-foreground"
+        >
+          Ignorer
+        </Button>
+      </div>
+    </Panel>
+  );
+}
+
 function SalesTrend({
   data,
   loading,
@@ -508,13 +413,14 @@ function SalesTrend({
     notation: "compact",
     maximumFractionDigits: 1,
   });
+  const weekTotal = data.reduce((sum, item) => sum + item.revenueCents, 0);
   return (
-    <Panel>
+    <Panel className="h-full">
       <PanelHeader
         title="Ventes des 7 derniers jours"
-        detail="Chiffre d’affaires encaissé, par jour"
+        detail={`${formatCurrency(weekTotal)} encaissés sur la période`}
       />
-      <div className="h-[260px] px-3 pb-4 sm:px-5">
+      <div className="h-[280px] px-3 pb-4 sm:px-5">
         {loading ? (
           <Skeleton className="h-full w-full" />
         ) : data.some(item => item.revenueCents) ? (
@@ -533,11 +439,11 @@ function SalesTrend({
               />
               <Tooltip
                 cursor={{ fill: "var(--muted)" }}
-                contentStyle={tooltipStyle}
+                contentStyle={chartTooltipStyle}
                 labelFormatter={value => formatDate(String(value))}
                 formatter={value => [formatCurrency(Number(value)), "Ventes"]}
               />
-              <Bar dataKey="revenueCents" radius={[6, 6, 0, 0]} maxBarSize={40}>
+              <Bar dataKey="revenueCents" radius={[6, 6, 0, 0]} maxBarSize={44}>
                 {data.map((item, index) => (
                   <Cell
                     key={item.day}
@@ -569,71 +475,185 @@ function SalesTrend({
   );
 }
 
-function LowStock({
-  products,
-  stockValue,
-  productCount,
+function TodoSection({
+  title,
+  count,
+  tone,
+  onOpen,
+  children,
+}: {
+  title: string;
+  count: string;
+  tone: "warning" | "danger" | "info" | "neutral";
+  onOpen: () => void;
+  children?: ReactNode;
+}) {
+  const toneClass = {
+    warning: "bg-warning-soft text-warning",
+    danger: "bg-destructive-soft text-destructive",
+    info: "bg-info-soft text-info",
+    neutral: "bg-muted text-muted-foreground",
+  }[tone];
+  return (
+    <div className="border-t border-border py-3 first:border-t-0 first:pt-0">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="group flex w-full items-center gap-2 text-left"
+      >
+        <span className="flex-1 text-sm font-semibold text-foreground group-hover:text-primary">
+          {title}
+        </span>
+        <span
+          className={`rounded-full px-2 py-0.5 text-xs font-semibold ${toneClass}`}
+        >
+          {count}
+        </span>
+        <ChevronRight className="h-4 w-4 text-faint" />
+      </button>
+      {children && <div className="mt-2 space-y-1">{children}</div>}
+    </div>
+  );
+}
+
+/** Une seule liste de ce qui demande une action, chaque ligne menant à sa page. */
+function TodoPanel({
+  data,
+  loading,
+  isAdmin,
+  canSeeFinance,
   onNavigate,
 }: {
-  products: Array<{
-    id: number;
-    name: string;
-    reference: string;
-    quantity: number;
-    unit: string;
-    minimumQuantity: number;
-    imageUrl?: string | null;
-    imageThumbUrl?: string | null;
-  }>;
-  stockValue: number;
-  productCount: number;
+  data?: DashboardData;
+  loading: boolean;
+  isAdmin: boolean;
+  canSeeFinance: boolean;
   onNavigate: (path: string) => void;
 }) {
+  const summary = data?.summary;
+  const lowStock = data?.lowStock ?? [];
+  const lowStockCount = summary?.activeAlerts ?? lowStock.length;
+  const invoices = data?.unpaidInvoices ?? [];
+  const receivableCount = summary?.receivableCount ?? invoices.length;
+  const inventories = summary?.draftInventories ?? 0;
+  const payroll = isAdmin ? (summary?.duePayrollCents ?? 0) : 0;
+  const budget = canSeeFinance ? summary?.expenseBudget : undefined;
+  const budgetAlert = budget?.exceeded || budget?.warningReached;
+  const nothing =
+    !lowStockCount &&
+    !receivableCount &&
+    !inventories &&
+    !payroll &&
+    !budgetAlert;
   return (
-    <Panel>
-      <PanelHeader
-        title="Stock à surveiller"
-        detail={`Valeur du stock ${formatCurrency(stockValue)} · ${productCount} références`}
-        action={
-          products.length ? (
-            <PanelLink onClick={() => onNavigate("/bons-commande")}>
-              Préparer une commande
-            </PanelLink>
-          ) : undefined
-        }
-      />
-      {products.length ? (
-        <div className="px-5 pb-2">
-          {products.map(product => (
-            <button
-              key={product.id}
-              onClick={() => onNavigate(`/produits/${product.id}`)}
-              className="flex w-full items-center gap-3 border-t border-border py-2.5 text-left hover:bg-accent/60"
-            >
-              <ProductImage product={product} className="h-9 w-9 text-xs" />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium text-foreground">
-                  {product.name}
-                </span>
-                <span className="mt-0.5 block text-xs text-faint">
-                  {product.reference} · seuil {product.minimumQuantity}
-                </span>
-              </span>
-              <StatusPill tone={product.quantity <= 0 ? "danger" : "warning"}>
-                {product.quantity <= 0
-                  ? "Rupture"
-                  : `${product.quantity} ${product.unit}`}
-              </StatusPill>
-            </button>
-          ))}
-        </div>
-      ) : (
-        <EmptyState
-          icon={BellRing}
-          title="Aucune alerte active"
-          detail="Tous les produits sont au-dessus de leur seuil."
-        />
-      )}
+    <Panel className="h-full">
+      <PanelHeader title="À traiter" />
+      <div className="px-5 pb-4">
+        {loading ? (
+          <div className="space-y-3">
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+          </div>
+        ) : nothing ? (
+          <EmptyState
+            icon={CheckCircle2}
+            title="Tout est à jour"
+            detail="Aucun stock bas ni facture en attente."
+          />
+        ) : (
+          <>
+            {lowStockCount > 0 && (
+              <TodoSection
+                title="Stock bas"
+                count={`${lowStockCount} produit${lowStockCount > 1 ? "s" : ""}`}
+                tone="danger"
+                onOpen={() => onNavigate("/alertes")}
+              >
+                {lowStock.slice(0, 3).map(product => (
+                  <button
+                    key={product.id}
+                    type="button"
+                    onClick={() => onNavigate(`/produits/${product.id}`)}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-1 py-1 text-left hover:bg-accent"
+                  >
+                    <ProductImage
+                      product={product}
+                      className="h-8 w-8 text-xs"
+                    />
+                    <span className="min-w-0 flex-1 truncate text-[13px] text-foreground">
+                      {product.name}
+                    </span>
+                    <StatusPill
+                      tone={product.quantity <= 0 ? "danger" : "warning"}
+                    >
+                      {product.quantity <= 0
+                        ? "Rupture"
+                        : `${product.quantity} / ${product.minimumQuantity}`}
+                    </StatusPill>
+                  </button>
+                ))}
+              </TodoSection>
+            )}
+            {receivableCount > 0 && (
+              <TodoSection
+                title="Factures à encaisser"
+                count={formatCurrency(summary?.receivableCents ?? 0)}
+                tone="warning"
+                onOpen={() => onNavigate("/factures")}
+              >
+                {invoices.slice(0, 3).map(invoice => (
+                  <button
+                    key={invoice.id}
+                    type="button"
+                    onClick={() =>
+                      onNavigate(`/factures?facture=${invoice.id}`)
+                    }
+                    className="flex w-full items-center gap-2.5 rounded-lg px-1 py-1 text-left hover:bg-accent"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[13px] text-foreground">
+                        {invoice.customerName}
+                      </span>
+                      <span className="block text-xs text-faint">
+                        {invoice.invoiceNumber}
+                      </span>
+                    </span>
+                    <span className="text-[13px] font-semibold text-foreground">
+                      {formatCurrency(invoice.balanceCents)}
+                    </span>
+                  </button>
+                ))}
+              </TodoSection>
+            )}
+            {inventories > 0 && (
+              <TodoSection
+                title="Inventaires à finaliser"
+                count={String(inventories)}
+                tone="info"
+                onOpen={() => onNavigate("/inventaires")}
+              />
+            )}
+            {payroll > 0 && (
+              <TodoSection
+                title="Paie à régler"
+                count={formatCurrency(payroll)}
+                tone="neutral"
+                onOpen={() => onNavigate("/agents")}
+              />
+            )}
+            {budgetAlert && budget && (
+              <TodoSection
+                title={
+                  budget.exceeded ? "Budget dépassé" : "Seuil budget atteint"
+                }
+                count={`${budget.percentUsed} %`}
+                tone={budget.exceeded ? "danger" : "warning"}
+                onOpen={() => onNavigate("/depenses")}
+              />
+            )}
+          </>
+        )}
+      </div>
     </Panel>
   );
 }
@@ -753,296 +773,124 @@ function RecentSales({
   );
 }
 
-function OutstandingInvoices({
-  invoices,
-  onNavigate,
-}: {
-  invoices: Array<{
-    id: number;
-    invoiceNumber: string;
-    customerName: string;
-    balanceCents: number;
-    status: string;
-    createdAt: Date | string;
-  }>;
-  onNavigate: (path: string) => void;
-}) {
-  return (
-    <Panel>
-      <PanelHeader
-        title="Factures à encaisser"
-        detail="Soldes en attente de règlement"
-        action={
-          <PanelLink onClick={() => onNavigate("/factures")}>
-            Voir tout
-          </PanelLink>
-        }
-      />
-      {invoices.length ? (
-        <div className="px-5 pb-2">
-          {invoices.map(invoice => (
-            <button
-              key={invoice.id}
-              onClick={() => onNavigate(`/factures?facture=${invoice.id}`)}
-              className="flex w-full items-center gap-3 border-t border-border py-2.5 text-left hover:bg-accent/60"
-            >
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-medium text-foreground">
-                  {invoice.invoiceNumber}
-                </span>
-                <span className="mt-0.5 block truncate text-xs text-faint">
-                  {invoice.customerName} · {formatDate(invoice.createdAt)}
-                </span>
-              </span>
-              <span className="text-sm font-semibold text-foreground">
-                {formatCurrency(invoice.balanceCents)}
-              </span>
-              <StatusPill
-                tone={invoice.status === "partial" ? "warning" : "info"}
-              >
-                {invoice.status === "partial" ? "Partielle" : "À encaisser"}
-              </StatusPill>
-            </button>
-          ))}
-        </div>
-      ) : (
-        <EmptyState
-          icon={ReceiptText}
-          title="Aucune facture impayée"
-          detail="Les soldes à encaisser apparaîtront ici."
-        />
-      )}
-    </Panel>
-  );
-}
-
-function PriorityList({
-  priorities,
-  onNavigate,
-}: {
-  priorities: Array<{
-    label: string;
-    count: number;
-    detail: string;
-    icon: typeof BellRing;
-    path: string;
-    tone: StatusTone;
-    currency: boolean;
-  }>;
-  onNavigate: (path: string) => void;
-}) {
-  return (
-    <Panel>
-      <PanelHeader title="Priorités" detail="Ce qui demande une action" />
-      <div className="px-5 pb-2">
-        {priorities.map(priority => {
-          const Icon = priority.icon;
-          return (
-            <button
-              key={priority.label}
-              onClick={() => onNavigate(priority.path)}
-              className="flex w-full items-center gap-3 border-t border-border py-2.5 text-left hover:bg-accent/60"
-            >
-              <span
-                className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${toneIcon[priority.tone]}`}
-              >
-                <Icon className="h-4 w-4" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-medium text-foreground">
-                  {priority.label}
-                </span>
-                <span className="block text-xs text-faint">
-                  {priority.detail}
-                </span>
-              </span>
-              <span className="text-sm font-semibold text-foreground">
-                {priority.currency
-                  ? formatCurrency(priority.count)
-                  : priority.count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </Panel>
-  );
-}
-
-function ExpenseChart({
+/** Dépenses du mois en une carte : total, budget et premières catégories. */
+function ExpenseSummary({
   breakdown,
   total,
   netProfit,
+  budget,
   loading,
+  onNavigate,
 }: {
   breakdown: Array<{ category: string; amountCents: number }>;
   total: number;
   netProfit: number;
-  loading: boolean;
-}) {
-  return (
-    <Panel>
-      <PanelHeader
-        title="Répartition des dépenses"
-        detail="Charges d’exploitation et paiements agents du mois"
-        action={
-          <span className="text-[13px] text-muted-foreground">
-            Bénéfice net{" "}
-            <span
-              className={`font-semibold ${netProfit < 0 ? "text-destructive" : "text-success"}`}
-            >
-              {formatCurrency(netProfit)}
-            </span>
-          </span>
-        }
-      />
-      {loading ? (
-        <div className="h-[280px] p-5">
-          <Skeleton className="h-full w-full" />
-        </div>
-      ) : breakdown.length ? (
-        <div className="grid gap-5 px-5 pb-5 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-center">
-          <div className="relative h-[240px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={breakdown}
-                  dataKey="amountCents"
-                  nameKey="category"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={66}
-                  outerRadius={96}
-                  paddingAngle={2}
-                  stroke="var(--card)"
-                  strokeWidth={2}
-                >
-                  {breakdown.map(item => (
-                    <Cell
-                      key={item.category}
-                      fill={expenseColors[item.category] ?? "#98A2B3"}
-                    />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={tooltipStyle}
-                  formatter={value => formatCurrency(Number(value))}
-                  labelFormatter={label =>
-                    expenseLabels[String(label)] ?? String(label)
-                  }
-                />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="pointer-events-none absolute inset-0 grid place-items-center text-center">
-              <div>
-                <p className="text-xs text-faint">Total</p>
-                <p className="mt-0.5 text-base font-semibold text-foreground">
-                  {formatCurrency(total)}
-                </p>
-              </div>
-            </div>
-          </div>
-          <div className="grid gap-x-6 sm:grid-cols-2">
-            {breakdown.map(item => (
-              <div
-                key={item.category}
-                className="flex items-center justify-between gap-3 border-t border-border py-2.5"
-              >
-                <span className="flex min-w-0 items-center gap-2 text-sm text-foreground">
-                  <span
-                    className="h-2.5 w-2.5 shrink-0 rounded-full"
-                    style={{
-                      backgroundColor:
-                        expenseColors[item.category] ?? "#98A2B3",
-                    }}
-                  />
-                  {expenseLabels[item.category] ?? item.category}
-                </span>
-                <span className="shrink-0 text-right text-sm">
-                  <span className="font-semibold text-foreground">
-                    {formatCurrency(item.amountCents)}
-                  </span>
-                  <span className="ml-2 text-xs text-faint">
-                    {total ? Math.round((item.amountCents / total) * 100) : 0} %
-                  </span>
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <EmptyState
-          icon={WalletCards}
-          title="Aucune dépense ce mois-ci"
-          detail="Les catégories apparaîtront ici après l’enregistrement de charges."
-        />
-      )}
-    </Panel>
-  );
-}
-
-function BudgetPanel({
-  budget,
-  loading,
-}: {
   budget?: {
     configured: boolean;
     budgetCents: number;
-    spentCents: number;
-    remainingCents: number;
     percentUsed: number;
-    warningPercent: number;
     warningReached: boolean;
     exceeded: boolean;
   };
   loading: boolean;
+  onNavigate: (path: string) => void;
 }) {
-  if (loading)
-    return (
-      <Panel className="min-h-[260px] p-5">
-        <Skeleton className="h-full min-h-[220px] w-full" />
-      </Panel>
-    );
-  const configured = budget?.configured ?? false;
+  const top = [...breakdown]
+    .sort((left, right) => right.amountCents - left.amountCents)
+    .slice(0, 3);
   const percent = budget?.percentUsed ?? 0;
-  const warning = budget?.warningReached ?? false;
-  const exceeded = budget?.exceeded ?? false;
   return (
     <Panel>
-      <PanelHeader title="Budget dépenses" detail="Suivi du mois en cours" />
-      {configured ? (
+      <PanelHeader
+        title="Dépenses du mois"
+        action={
+          <PanelLink onClick={() => onNavigate("/depenses")}>
+            Voir les dépenses <ArrowRight className="inline h-3.5 w-3.5" />
+          </PanelLink>
+        }
+      />
+      {loading ? (
         <div className="px-5 pb-5">
-          <p className="text-[26px] font-bold tracking-tight text-foreground">
-            {formatCurrency(budget!.budgetCents)}
-          </p>
-          <p
-            className={`mt-1 text-[13px] font-medium ${exceeded ? "text-destructive" : warning ? "text-warning" : "text-muted-foreground"}`}
-          >
-            {exceeded
-              ? `Dépassement de ${formatCurrency(Math.abs(budget!.remainingCents))}`
-              : warning
-                ? `Seuil d’alerte (${budget!.warningPercent} %) atteint`
-                : `${formatCurrency(budget!.remainingCents)} restant`}
-          </p>
-          <div className="mt-5 h-2 overflow-hidden rounded-full bg-muted">
-            <div
-              className={`h-full rounded-full ${exceeded ? "bg-destructive" : warning ? "bg-warning" : "bg-primary"}`}
-              style={{ width: `${Math.min(percent, 100)}%` }}
-            />
-          </div>
-          <div className="mt-3 flex justify-between text-xs">
-            <span className="text-faint">
-              {formatCurrency(budget!.spentCents)} consommés
-            </span>
-            <span className="font-semibold text-foreground">{percent} %</span>
-          </div>
+          <Skeleton className="h-24 w-full" />
         </div>
       ) : (
-        <EmptyState
-          icon={Target}
-          title="Budget non défini"
-          detail="Fixez un plafond mensuel dans Dépenses."
-        />
+        <div className="grid gap-5 px-5 pb-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+              <p className="text-[26px] font-bold tracking-tight text-foreground">
+                {formatCurrency(total)}
+              </p>
+              <p className="text-[13px] text-muted-foreground">
+                Bénéfice net{" "}
+                <span
+                  className={`font-semibold ${netProfit < 0 ? "text-destructive" : "text-success"}`}
+                >
+                  {formatCurrency(netProfit)}
+                </span>
+              </p>
+            </div>
+            {budget?.configured ? (
+              <div>
+                <div className="h-2 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={`h-full rounded-full ${budget.exceeded ? "bg-destructive" : budget.warningReached ? "bg-warning" : "bg-primary"}`}
+                    style={{ width: `${Math.min(percent, 100)}%` }}
+                  />
+                </div>
+                <p className="mt-1.5 text-xs text-faint">
+                  {percent} % du budget de {formatCurrency(budget.budgetCents)}
+                </p>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onNavigate("/depenses")}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-primary"
+              >
+                <Target className="h-3.5 w-3.5" />
+                Fixer un budget mensuel
+              </button>
+            )}
+          </div>
+          {top.length ? (
+            <div className="space-y-2.5">
+              {top.map(item => (
+                <div key={item.category}>
+                  <div className="flex items-center justify-between gap-3 text-[13px]">
+                    <span className="flex items-center gap-2 text-foreground">
+                      <span
+                        className="h-2.5 w-2.5 rounded-full"
+                        style={{
+                          backgroundColor:
+                            expenseColors[item.category] ?? "#98A2B3",
+                        }}
+                      />
+                      {expenseLabels[item.category] ?? item.category}
+                    </span>
+                    <span className="font-semibold text-foreground">
+                      {formatCurrency(item.amountCents)}
+                    </span>
+                  </div>
+                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${total ? Math.round((item.amountCents / total) * 100) : 0}%`,
+                        backgroundColor:
+                          expenseColors[item.category] ?? "#98A2B3",
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 rounded-lg bg-muted/60 px-4 py-3 text-[13px] text-muted-foreground">
+              <WalletCards className="h-4 w-4 shrink-0" />
+              Aucune dépense enregistrée ce mois-ci.
+            </div>
+          )}
+        </div>
       )}
     </Panel>
   );
@@ -1053,7 +901,7 @@ function EmptyState({
   title,
   detail,
 }: {
-  icon: typeof BellRing;
+  icon: typeof Activity;
   title: string;
   detail: string;
 }) {

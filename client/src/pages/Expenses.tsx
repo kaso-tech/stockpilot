@@ -1,3 +1,4 @@
+import { ExpenseDonut, expenseColors } from "@/components/ExpenseDonut";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -494,33 +495,47 @@ function MonthlyReport({
           />
         </div>
         {report?.breakdown.length ? (
-          <div className="mt-5 grid gap-2 sm:grid-cols-2">
-            {report.breakdown.map(item => (
-              <div
-                key={item.category}
-                className="flex items-center justify-between rounded-xl border border-border bg-muted/50 px-3 py-2.5"
-              >
+          <div className="mt-5 grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)] lg:items-center">
+            <ExpenseDonut
+              breakdown={report.breakdown}
+              total={report.totalCents}
+              label={categoryLabel}
+            />
+            <div className="grid gap-2 sm:grid-cols-2">
+              {report.breakdown.map(item => (
+                <div
+                  key={item.category}
+                  className="flex items-center justify-between rounded-xl border border-border bg-muted/50 px-3 py-2.5"
+                >
+                  <span className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span
+                      className="h-2.5 w-2.5 shrink-0 rounded-full"
+                      style={{
+                        backgroundColor:
+                          expenseColors[item.category] ?? "#98A2B3",
+                      }}
+                    />
+                    {categoryLabel(item.category)}
+                  </span>
+                  <span className="text-sm font-semibold text-foreground">
+                    {formatCurrency(item.amountCents)}
+                  </span>
+                </div>
+              ))}
+              {report.agentPaymentCents > 0 && (
+                <div className="sm:col-span-2 rounded-xl border border-info/25 bg-info-soft px-3 py-2.5 text-xs text-info">
+                  Dont {formatCurrency(report.agentPaymentCents)} de salaires et
+                  commissions versés ({report.agentPaymentCount} paiement(s)).
+                </div>
+              )}
+              <div className="sm:col-span-2 mt-1 flex items-center justify-between border-t border-border pt-3">
                 <span className="text-sm text-muted-foreground">
-                  {categoryLabel(item.category)}
+                  {report.count} dépense(s)
                 </span>
-                <span className="text-sm font-semibold text-foreground">
-                  {formatCurrency(item.amountCents)}
+                <span className="text-lg font-semibold text-primary">
+                  {formatCurrency(report.totalCents)}
                 </span>
               </div>
-            ))}
-            {report.agentPaymentCents > 0 && (
-              <div className="sm:col-span-2 rounded-xl border border-info/25 bg-info-soft px-3 py-2.5 text-xs text-info">
-                Dont {formatCurrency(report.agentPaymentCents)} de salaires et
-                commissions versés ({report.agentPaymentCount} paiement(s)).
-              </div>
-            )}
-            <div className="sm:col-span-2 mt-1 flex items-center justify-between border-t border-border pt-3">
-              <span className="text-sm text-muted-foreground">
-                {report.count} dépense(s)
-              </span>
-              <span className="text-lg font-semibold text-primary">
-                {formatCurrency(report.totalCents)}
-              </span>
             </div>
           </div>
         ) : (
