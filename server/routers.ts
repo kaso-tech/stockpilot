@@ -102,6 +102,14 @@ import {
   storePasswordHash,
 } from "./authSessions";
 import { conflictOr } from "./dbErrors";
+import { storagePut } from "./storage";
+import {
+  PRODUCT_IMAGE_MAX_BYTES,
+  PRODUCT_THUMB_MAX_BYTES,
+  decodeProductImage,
+  deleteProductImageFiles,
+  productImageKey,
+} from "./productImages";
 import { ROLE_LABELS, ROLES } from "@shared/permissions";
 import { TRIAL_DAYS } from "@shared/plans";
 import { assertPlanLimit } from "./subscription";
@@ -1525,7 +1533,11 @@ export const appRouter = router({
         const db = await requireDb();
         const product = (
           await db
-            .select({ id: products.id })
+            .select({
+              id: products.id,
+              imageUrl: products.imageUrl,
+              imageThumbUrl: products.imageThumbUrl,
+            })
             .from(products)
             .where(
               and(
@@ -1564,12 +1576,148 @@ export const appRouter = router({
               companyScope(products.companyId, ctx.user.companyId)
             )
           );
+        await deleteProductImageFiles([
+          product.imageUrl,
+          product.imageThumbUrl,
+        ]);
         await createAudit(
           ctx.user,
           "Suppression",
           "Produit",
           input.id,
           "Produit supprimé"
+        );
+        return { success: true };
+      }),
+    /** Photo du produit : image principale (600 px) et miniature (320 px), compressées côté client. */
+    uploadImage: permissionProcedure("catalog.manage")
+      .input(
+        z.object({
+          productId: z.number().int().positive(),
+          image: z.string().min(30).max(900_000),
+          thumbnail: z.string().min(30).max(200_000),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const image = decodeProductImage(
+          input.image,
+          PRODUCT_IMAGE_MAX_BYTES,
+          "Photo"
+        );
+        const thumbnail = decodeProductImage(
+          input.thumbnail,
+          PRODUCT_THUMB_MAX_BYTES,
+          "Miniature"
+        );
+        const db = await requireDb();
+        const current = (
+          await db
+            .select({
+              id: products.id,
+              name: products.name,
+              imageUrl: products.imageUrl,
+              imageThumbUrl: products.imageThumbUrl,
+            })
+            .from(products)
+            .where(
+              and(
+                eq(products.id, input.productId),
+                companyScope(products.companyId, ctx.user.companyId)
+              )
+            )
+            .limit(1)
+        )[0];
+        if (!current)
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Produit introuvable.",
+          });
+        const stored = await storagePut(
+          productImageKey(
+            ctx.user.companyId,
+            input.productId,
+            "image",
+            image.extension
+          ),
+          image.buffer,
+          image.mimeType
+        );
+        const storedThumb = await storagePut(
+          productImageKey(
+            ctx.user.companyId,
+            input.productId,
+            "thumb",
+            thumbnail.extension
+          ),
+          thumbnail.buffer,
+          thumbnail.mimeType
+        );
+        await db
+          .update(products)
+          .set({ imageUrl: stored.url, imageThumbUrl: storedThumb.url })
+          .where(
+            and(
+              eq(products.id, input.productId),
+              companyScope(products.companyId, ctx.user.companyId)
+            )
+          );
+        await deleteProductImageFiles([
+          current.imageUrl,
+          current.imageThumbUrl,
+        ]);
+        await createAudit(
+          ctx.user,
+          "Modification",
+          "Produit",
+          input.productId,
+          `Photo de ${current.name} mise à jour`
+        );
+        return { imageUrl: stored.url, imageThumbUrl: storedThumb.url };
+      }),
+    removeImage: permissionProcedure("catalog.manage")
+      .input(z.object({ productId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await requireDb();
+        const current = (
+          await db
+            .select({
+              name: products.name,
+              imageUrl: products.imageUrl,
+              imageThumbUrl: products.imageThumbUrl,
+            })
+            .from(products)
+            .where(
+              and(
+                eq(products.id, input.productId),
+                companyScope(products.companyId, ctx.user.companyId)
+              )
+            )
+            .limit(1)
+        )[0];
+        if (!current)
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Produit introuvable.",
+          });
+        await db
+          .update(products)
+          .set({ imageUrl: null, imageThumbUrl: null })
+          .where(
+            and(
+              eq(products.id, input.productId),
+              companyScope(products.companyId, ctx.user.companyId)
+            )
+          );
+        await deleteProductImageFiles([
+          current.imageUrl,
+          current.imageThumbUrl,
+        ]);
+        await createAudit(
+          ctx.user,
+          "Modification",
+          "Produit",
+          input.productId,
+          `Photo de ${current.name} retirée`
         );
         return { success: true };
       }),

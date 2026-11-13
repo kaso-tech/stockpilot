@@ -41,6 +41,7 @@ import { defaultWarehouseId } from "./stockLedger";
 import { getDb } from "./db";
 import { openBuffer, parseKey, sealBuffer } from "./secretBox";
 import { storageDelete, storageGetSignedUrl, storagePut } from "./storage";
+import { storageKeyFromUrl } from "./productImages";
 
 type Trigger = "manual" | "scheduled";
 type AnyTable = any;
@@ -886,6 +887,12 @@ export async function purgeCompany(companyId: number) {
         .where(inArray(userSessions.userId, userIds));
       await tx.delete(authTokens).where(inArray(authTokens.userId, userIds));
     }
+    // Photos de produits : supprimées du stockage avec l'entreprise.
+    for (const product of current.products ?? [])
+      for (const url of [product.imageUrl, product.imageThumbUrl]) {
+        const key = storageKeyFromUrl(url as string | null | undefined);
+        if (key) storageKeys.push(key);
+      }
     const archiveRows = await tx
       .select({ storageKey: archives.storageKey })
       .from(archives)

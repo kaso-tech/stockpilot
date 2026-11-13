@@ -31,4 +31,11 @@ describe("accès aux fichiers stockés", () => {
       await canReadStorageKey("company/5/payroll/x.pdf", as(9, "admin"))
     ).toBe(false);
   });
+
+  it("réserve les photos de produits aux membres de l'entreprise", async () => {
+    const key = "company/5/products/12/thumb_ab12cd34.webp";
+    expect(await canReadStorageKey(key, anonymous)).toBe(false);
+    expect(await canReadStorageKey(key, as(6, "seller"))).toBe(false);
+    expect(await canReadStorageKey(key, as(5, "seller"))).toBe(true);
+  });
 });

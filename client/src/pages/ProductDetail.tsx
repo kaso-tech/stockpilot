@@ -1,3 +1,4 @@
+import { ProductImageField } from "@/components/ProductImage";
 import { Badge } from "@/components/ui/badge";
 import { usePermissions } from "@/hooks/usePermissions";
 import { escapeHtml } from "@/lib/html";
@@ -154,6 +155,9 @@ export default function ProductDetail() {
             <ArrowLeft className="mr-2 h-4 w-4" />
             Retour au catalogue
           </Button>
+          <div className="mb-4">
+            <ProductImageField product={product} canEdit={isAdmin} />
+          </div>
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="truncate text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
               {product.name}

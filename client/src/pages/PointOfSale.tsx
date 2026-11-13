@@ -1,3 +1,5 @@
+import { ProductImage } from "@/components/ProductImage";
+import { readPreference, writePreference } from "@/lib/preferenceStorage";
 import { BarcodeCameraDialog } from "@/components/BarcodeCameraDialog";
 import { computeVatBreakdown, vatRatesLabel } from "@shared/pricing";
 import {
@@ -34,6 +36,8 @@ import {
   ChevronDown,
   ChevronUp,
   ClipboardList,
+  Image as ImageIcon,
+  ImageOff,
   Keyboard,
   Minus,
   PackagePlus,
@@ -76,6 +80,25 @@ export default function PointOfSale() {
   const [query, setQuery] = useState("");
   const [lowStockOnly, setLowStockOnly] = useState(false);
   const [categoryId, setCategoryId] = useState<number | null>(null);
+  // Réglage propre à l'appareil : grille avec ou sans photos.
+  const [showImages, setShowImages] = useState(
+    () =>
+      readPreference(
+        typeof window === "undefined" ? undefined : localStorage,
+        "posImages",
+        ["on", "off"],
+        "on"
+      ) === "on"
+  );
+  const toggleImages = () =>
+    setShowImages(current => {
+      writePreference(
+        typeof window === "undefined" ? undefined : localStorage,
+        "posImages",
+        current ? "off" : "on"
+      );
+      return !current;
+    });
   const { data: categories = [] } = trpc.categories.list.useQuery();
   const [purchaseListOpen, setPurchaseListOpen] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -420,6 +443,23 @@ export default function PointOfSale() {
             <Button
               type="button"
               variant="outline"
+              aria-pressed={showImages}
+              aria-label={
+                showImages ? "Masquer les photos" : "Afficher les photos"
+              }
+              title={showImages ? "Masquer les photos" : "Afficher les photos"}
+              onClick={toggleImages}
+              className={`h-12 w-12 px-0 ${showImages ? "border-primary/40 text-primary" : ""}`}
+            >
+              {showImages ? (
+                <ImageIcon className="h-5 w-5" />
+              ) : (
+                <ImageOff className="h-5 w-5" />
+              )}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
               aria-pressed={lowStockOnly}
               onClick={() => setLowStockOnly(value => !value)}
               className={`h-12 ${lowStockOnly ? "border-warning bg-warning-soft text-warning hover:bg-warning-soft" : ""}`}
@@ -482,8 +522,15 @@ export default function PointOfSale() {
               <button
                 key={product.id}
                 onClick={() => add(product.id)}
-                className={`flex min-h-[112px] flex-col gap-1.5 rounded-xl border bg-card p-3.5 text-left transition-colors hover:border-primary/60 hover:bg-accent/40 ${inCart ? "border-primary ring-1 ring-primary" : "border-border"}`}
+                className={`flex min-h-[112px] flex-col gap-1.5 overflow-hidden rounded-xl border bg-card p-3.5 text-left transition-colors hover:border-primary/60 hover:bg-accent/40 ${inCart ? "border-primary ring-1 ring-primary" : "border-border"}`}
               >
+                {showImages && (
+                  <ProductImage
+                    product={product}
+                    className="-mx-3.5 -mt-3.5 mb-1 aspect-[4/3] w-[calc(100%+1.75rem)] max-w-none text-3xl"
+                    rounded="rounded-none"
+                  />
+                )}
                 <span className="line-clamp-2 text-[15px] font-semibold leading-snug text-foreground">
                   {product.name}
                 </span>

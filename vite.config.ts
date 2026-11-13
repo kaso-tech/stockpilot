@@ -215,6 +215,23 @@ const createPlugins = (isBuild: boolean, mode: string) => [
       // Les routes serveur (API, OAuth Google Drive, fichiers stockés) ne doivent jamais être servies par la coquille PWA.
       navigateFallbackDenylist: [/^\/api\//, /^\/manus-storage\//],
       cleanupOutdatedCaches: true,
+      // Photos de produits : gardées sur l'appareil pour que la caisse les affiche hors connexion.
+      // Chaque envoi a une adresse unique : une photo en cache n'est jamais périmée.
+      runtimeCaching: [
+        {
+          urlPattern:
+            /\/manus-storage\/company\/[^/]+\/products\/\d+\/(image|thumb)_[a-f0-9]{8}\.(webp|jpg|png)$/,
+          handler: "CacheFirst",
+          options: {
+            cacheName: "product-images",
+            expiration: {
+              maxEntries: 3000,
+              maxAgeSeconds: 60 * 60 * 24 * 180,
+            },
+            cacheableResponse: { statuses: [200] },
+          },
+        },
+      ],
       maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
     },
     devOptions: { enabled: true },

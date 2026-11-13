@@ -3,6 +3,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusPill, type StatusTone } from "@/components/StatusPill";
+import { ProductImage } from "@/components/ProductImage";
 import {
   dashboardPreferencesForRole,
   normalizeDashboardPreferences,
@@ -581,6 +582,8 @@ function LowStock({
     quantity: number;
     unit: string;
     minimumQuantity: number;
+    imageUrl?: string | null;
+    imageThumbUrl?: string | null;
   }>;
   stockValue: number;
   productCount: number;
@@ -607,6 +610,7 @@ function LowStock({
               onClick={() => onNavigate(`/produits/${product.id}`)}
               className="flex w-full items-center gap-3 border-t border-border py-2.5 text-left hover:bg-accent/60"
             >
+              <ProductImage product={product} className="h-9 w-9 text-xs" />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium text-foreground">
                   {product.name}

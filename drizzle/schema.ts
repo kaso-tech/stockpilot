@@ -198,6 +198,9 @@ export const products = mysqlTable(
     /** Taux de TVA propre au produit (points de base) ; NULL = taux de l'entreprise. */
     vatRateBasisPoints: int("vatRateBasisPoints"),
     supplierId: int("supplierId"),
+    /** Photo du produit (WebP/JPEG compressé côté client) et sa miniature, sous /manus-storage. */
+    imageUrl: varchar("imageUrl", { length: 512 }),
+    imageThumbUrl: varchar("imageThumbUrl", { length: 512 }),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },

@@ -1,3 +1,9 @@
+import {
+  NewProductPhotoPicker,
+  ProductImage,
+  ProductImageField,
+} from "@/components/ProductImage";
+import type { CompressedProductImage } from "@/lib/productImage";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Badge } from "@/components/ui/badge";
 import { BarcodeCameraDialog } from "@/components/BarcodeCameraDialog";
@@ -105,6 +111,14 @@ export default function Products() {
   } | null>(null);
   const [purchasePrice, setPurchasePrice] = useState("");
   const [form, setForm] = useState<ProductForm>(emptyProduct);
+  const [newPhoto, setNewPhoto] = useState<CompressedProductImage | null>(null);
+  const uploadImage = trpc.products.uploadImage.useMutation({
+    onSuccess: () => utils.products.list.invalidate(),
+    onError: error =>
+      toast.error(
+        `Produit créé, mais la photo n’a pas été envoyée : ${error.message}`
+      ),
+  });
   const canEditPurchasePrice =
     canManage || Boolean(settings?.sellerCanEditPurchasePrice);
   const catalogCategories = useMemo(
@@ -139,13 +153,26 @@ export default function Products() {
   );
   const detailProduct =
     products.find(product => product.id === detailId) ?? null;
+  const editingProduct =
+    products.find(product => product.id === editingId) ?? null;
+  const photoSlot = editingProduct ? (
+    <ProductImageField product={editingProduct} canEdit />
+  ) : (
+    <NewProductPhotoPicker
+      name={form.name}
+      value={newPhoto}
+      onChange={setNewPhoto}
+    />
+  );
   const refresh = () => {
     utils.products.list.invalidate();
     utils.movements.list.invalidate();
     utils.dashboard.get.invalidate();
   };
   const create = trpc.products.create.useMutation({
-    onSuccess: () => {
+    onSuccess: created => {
+      if (newPhoto) uploadImage.mutate({ productId: created.id, ...newPhoto });
+      setNewPhoto(null);
       refresh();
       close();
       toast.success("Produit créé.", {
@@ -442,8 +469,12 @@ export default function Products() {
         units={units}
         editing={Boolean(editingId)}
         pending={create.isPending || update.isPending}
-        onClose={close}
+        onClose={() => {
+          setNewPhoto(null);
+          close();
+        }}
         onSave={save}
+        photo={photoSlot}
       />
       <PurchasePriceDialog
         product={purchasePriceTarget}
@@ -688,8 +719,12 @@ export default function Products() {
         units={units}
         editing={Boolean(editingId)}
         pending={create.isPending || update.isPending}
-        onClose={close}
+        onClose={() => {
+          setNewPhoto(null);
+          close();
+        }}
         onSave={save}
+        photo={photoSlot}
       />
       <ProductDetailDialog
         product={detailProduct}
@@ -758,9 +793,7 @@ function ProductCards({
             }}
             className="group flex cursor-pointer items-center gap-3 rounded-xl border border-border bg-muted px-3 py-3 text-left transition hover:border-primary/35 hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:px-4"
           >
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/[0.08] text-xs font-bold text-primary">
-              {product.name.slice(0, 1).toUpperCase()}
-            </span>
+            <ProductImage product={product} className="h-11 w-11 text-sm" />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-foreground group-hover:text-primary">
                 {product.name}
@@ -823,11 +856,21 @@ function ProductDetailDialog({
   return (
     <Dialog open={Boolean(product)} onOpenChange={value => !value && onClose()}>
       <DialogContent className="max-h-[85vh] overflow-y-auto border-border bg-card text-foreground sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>{product?.name ?? "Fiche produit"}</DialogTitle>
-          <DialogDescription className="text-muted-foreground">
-            {product?.reference} · {product?.category}
-          </DialogDescription>
+        <DialogHeader className="flex-row items-center gap-4 space-y-0 text-left">
+          {product && (
+            <ProductImage
+              product={product}
+              full
+              className="h-16 w-16 text-xl"
+              rounded="rounded-xl"
+            />
+          )}
+          <div className="min-w-0">
+            <DialogTitle>{product?.name ?? "Fiche produit"}</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              {product?.reference} · {product?.category}
+            </DialogDescription>
+          </div>
         </DialogHeader>
         {product && (
           <>
@@ -972,7 +1015,9 @@ function ProductDialog({
   pending,
   onClose,
   onSave,
+  photo,
 }: {
+  photo?: ReactNode;
   open: boolean;
   form: ProductForm;
   setForm: (value: ProductForm) => void;
@@ -1048,6 +1093,11 @@ function ProductDialog({
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2 sm:grid-cols-2">
+            {photo && (
+              <div className="sm:col-span-2">
+                <Field label="Photo">{photo}</Field>
+              </div>
+            )}
             <Field label="Référence *">
               <div className="flex gap-2">
                 <Input

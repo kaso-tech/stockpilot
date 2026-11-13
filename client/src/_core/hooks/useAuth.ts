@@ -33,6 +33,9 @@ export function useAuth(options?: UseAuthOptions) {
         return;
       throw error;
     } finally {
+      // Appareil partagé : les photos de produits de l'entreprise ne restent pas en cache.
+      if (typeof caches !== "undefined")
+        await caches.delete("product-images").catch(() => false);
       utils.auth.me.setData(undefined, null);
       await utils.auth.me.invalidate();
     }
