@@ -9,6 +9,12 @@ export type RoleNotification = {
   audience: NotificationAudience;
 };
 
-export function visibleNotificationsForRole(role: "admin" | "seller" | undefined, notifications: RoleNotification[]) {
-  return notifications.filter(notification => notification.audience === "all" || notification.audience === role);
+export function visibleNotificationsForRole(
+  role: "admin" | "seller" | undefined,
+  notifications: RoleNotification[]
+) {
+  return notifications.filter(
+    notification =>
+      notification.audience === "all" || notification.audience === role
+  );
 }

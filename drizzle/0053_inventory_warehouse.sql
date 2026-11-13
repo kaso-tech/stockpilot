@@ -1,0 +1,1 @@
+ALTER TABLE `inventorySessions` ADD `warehouseId` int;

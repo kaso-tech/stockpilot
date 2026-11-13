@@ -1,4 +1,4 @@
-import { AXIOS_TIMEOUT_MS, COOKIE_NAME, ONE_YEAR_MS, decodeOAuthState } from "@shared/const";
+import { AXIOS_TIMEOUT_MS, COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { ForbiddenError } from "@shared/_core/errors";
 import axios, { type AxiosInstance } from "axios";
 import { parse as parseCookieHeader } from "cookie";
@@ -8,9 +8,6 @@ import type { User } from "../../drizzle/schema";
 import * as db from "../db";
 import { ENV } from "./env";
 import type {
-  ExchangeTokenRequest,
-  ExchangeTokenResponse,
-  GetUserInfoResponse,
   GetUserInfoWithJwtRequest,
   GetUserInfoWithJwtResponse,
 } from "./types/manusTypes";
@@ -25,56 +22,7 @@ export type SessionPayload = {
   sessionId?: string;
 };
 
-const EXCHANGE_TOKEN_PATH = `/webdev.v1.WebDevAuthPublicService/ExchangeToken`;
-const GET_USER_INFO_PATH = `/webdev.v1.WebDevAuthPublicService/GetUserInfo`;
 const GET_USER_INFO_WITH_JWT_PATH = `/webdev.v1.WebDevAuthPublicService/GetUserInfoWithJwt`;
-
-class OAuthService {
-  constructor(private client: ReturnType<typeof axios.create>) {
-    console.log("[OAuth] Initialized with baseURL:", ENV.oAuthServerUrl);
-    if (!ENV.oAuthServerUrl) {
-      console.error(
-        "[OAuth] ERROR: OAUTH_SERVER_URL is not configured! Set OAUTH_SERVER_URL environment variable."
-      );
-    }
-  }
-
-  private decodeState(state: string): string {
-    return decodeOAuthState(state).redirectUri;
-  }
-
-  async getTokenByCode(
-    code: string,
-    state: string
-  ): Promise<ExchangeTokenResponse> {
-    const payload: ExchangeTokenRequest = {
-      clientId: ENV.appId,
-      grantType: "authorization_code",
-      code,
-      redirectUri: this.decodeState(state),
-    };
-
-    const { data } = await this.client.post<ExchangeTokenResponse>(
-      EXCHANGE_TOKEN_PATH,
-      payload
-    );
-
-    return data;
-  }
-
-  async getUserInfoByToken(
-    token: ExchangeTokenResponse
-  ): Promise<GetUserInfoResponse> {
-    const { data } = await this.client.post<GetUserInfoResponse>(
-      GET_USER_INFO_PATH,
-      {
-        accessToken: token.accessToken,
-      }
-    );
-
-    return data;
-  }
-}
 
 const createOAuthHttpClient = (): AxiosInstance =>
   axios.create({
@@ -84,15 +32,9 @@ const createOAuthHttpClient = (): AxiosInstance =>
 
 class SDKServer {
   private readonly client: AxiosInstance;
-  private oauthService: OAuthService | null = null;
 
   constructor(client: AxiosInstance = createOAuthHttpClient()) {
     this.client = client;
-  }
-
-  private getOAuthService() {
-    if (!this.oauthService) this.oauthService = new OAuthService(this.client);
-    return this.oauthService;
   }
 
   private deriveLoginMethod(
@@ -117,38 +59,6 @@ class SDKServer {
     return first ? first.toLowerCase() : null;
   }
 
-  /**
-   * Exchange OAuth authorization code for access token
-   * @example
-   * const tokenResponse = await sdk.exchangeCodeForToken(code, state);
-   */
-  async exchangeCodeForToken(
-    code: string,
-    state: string
-  ): Promise<ExchangeTokenResponse> {
-    return this.getOAuthService().getTokenByCode(code, state);
-  }
-
-  /**
-   * Get user information using access token
-   * @example
-   * const userInfo = await sdk.getUserInfo(tokenResponse.accessToken);
-   */
-  async getUserInfo(accessToken: string): Promise<GetUserInfoResponse> {
-    const data = await this.getOAuthService().getUserInfoByToken({
-      accessToken,
-    } as ExchangeTokenResponse);
-    const loginMethod = this.deriveLoginMethod(
-      (data as any)?.platforms,
-      (data as any)?.platform ?? data.platform ?? null
-    );
-    return {
-      ...(data as any),
-      platform: loginMethod,
-      loginMethod,
-    } as GetUserInfoResponse;
-  }
-
   private parseCookies(cookieHeader: string | undefined) {
     if (!cookieHeader) {
       return new Map<string, string>();
@@ -160,7 +70,8 @@ class SDKServer {
 
   private getSessionSecret() {
     const secret = ENV.cookieSecret;
-    if (!secret || (ENV.isProduction && secret.length < 32)) throw new Error("Session secret is not configured securely.");
+    if (!secret || (ENV.isProduction && secret.length < 32))
+      throw new Error("Session secret is not configured securely.");
     return new TextEncoder().encode(secret);
   }
 
@@ -204,9 +115,12 @@ class SDKServer {
       .sign(secretKey);
   }
 
-  async verifySession(
-    cookieValue: string | undefined | null
-  ): Promise<{ openId: string; appId: string; name: string; sessionId?: string } | null> {
+  async verifySession(cookieValue: string | undefined | null): Promise<{
+    openId: string;
+    appId: string;
+    name: string;
+    sessionId?: string;
+  } | null> {
     if (!cookieValue) {
       console.warn("[Auth] Missing session cookie");
       return null;
@@ -219,10 +133,12 @@ class SDKServer {
       });
       const { openId, appId, name, sid } = payload as Record<string, unknown>;
 
+      // appId n'est exigé que si l'application en déclare un (hébergement Manus) :
+      // il empêche alors la réutilisation d'un jeton d'une autre application.
       if (
         !isNonEmptyString(openId) ||
-        !isNonEmptyString(appId) ||
-        !isNonEmptyString(name)
+        !isNonEmptyString(name) ||
+        (ENV.appId && appId !== ENV.appId)
       ) {
         console.warn("[Auth] Session payload missing required fields");
         return null;
@@ -230,7 +146,7 @@ class SDKServer {
 
       return {
         openId,
-        appId,
+        appId: typeof appId === "string" ? appId : "",
         name,
         ...(isNonEmptyString(sid) ? { sessionId: sid } : {}),
       };
@@ -296,7 +212,7 @@ class SDKServer {
 
     const sessionUserId = session.openId;
     const signedInAt = new Date();
-    let user = await db.getUserByOpenId(sessionUserId);
+    const user = await db.getUserByOpenId(sessionUserId);
 
     if (!user) {
       throw ForbiddenError("User not found");
@@ -306,24 +222,35 @@ class SDKServer {
       throw ForbiddenError("User account is inactive");
     }
 
-    if (session.sessionId) {
-      const trackedSession = await db.getUserSessionById(session.sessionId);
-      if (!trackedSession || trackedSession.userId !== user.id || trackedSession.revokedAt || trackedSession.expiresAt <= new Date()) {
-        throw ForbiddenError("Session revoked or expired");
-      }
-      await db.touchUserSession(session.sessionId);
+    // Toute session utilisateur doit être suivie en base pour pouvoir être
+    // révoquée (déconnexion, changement de mot de passe, désactivation).
+    if (!session.sessionId) {
+      throw ForbiddenError("Untracked session");
+    }
+    const trackedSession = await db.getUserSessionById(session.sessionId);
+    if (
+      !trackedSession ||
+      trackedSession.userId !== user.id ||
+      trackedSession.revokedAt ||
+      trackedSession.expiresAt <= new Date()
+    ) {
+      throw ForbiddenError("Session revoked or expired");
+    }
+    // Activité enregistrée au plus toutes les 5 minutes (P2) au lieu de deux
+    // écritures en base à chaque requête.
+    if (
+      signedInAt.getTime() - trackedSession.lastSeenAt.getTime() >=
+      ACTIVITY_WRITE_INTERVAL_MS
+    ) {
+      await db.recordUserActivity(session.sessionId, user.id, signedInAt);
     }
 
-    await db.upsertUser({
-      openId: user.openId,
-      lastSignedIn: signedInAt,
-    });
-
-    return { ...user, ...(session.sessionId ? { sessionId: session.sessionId } : {}) };
+    return { ...user, sessionId: session.sessionId };
   }
 }
 
 const CRON_OPEN_ID_PREFIX = "cron_";
+const ACTIVITY_WRITE_INTERVAL_MS = 5 * 60 * 1000;
 
 /** Result of `sdk.authenticateRequest`. Cron callbacks set `isCron=true` and `taskUid`; see `/home/ubuntu/skills/webdev-periodic-updates/SKILL.md`. */
 export type AuthenticatedUser = User & {

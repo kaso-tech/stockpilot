@@ -1,65 +1,919 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { Badge } from "@/components/ui/badge";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { dashboardPreferencesForRole, normalizeDashboardPreferences } from "@/lib/dashboardPreferences";
+import { StatusPill } from "@/components/StatusPill";
+import { ProductImage } from "@/components/ProductImage";
+import {
+  chartTooltipStyle,
+  expenseColors,
+  expenseLabels,
+} from "@/components/ExpenseDonut";
+import {
+  dashboardPreferencesForRole,
+  normalizeDashboardPreferences,
+} from "@/lib/dashboardPreferences";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
-import { Activity, ArrowRight, BellRing, Boxes, CheckCircle2, CircleDollarSign, ClipboardCheck, CreditCard, FilePlus2, ReceiptText, ShoppingCart, Target, TrendingUp, UserPlus, WalletCards } from "lucide-react";
-import { Area, AreaChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { useEffect, useState } from "react";
+import {
+  Activity,
+  ArrowRight,
+  Boxes,
+  CheckCircle2,
+  ChevronRight,
+  CreditCard,
+  FilePlus2,
+  ReceiptText,
+  ShoppingCart,
+  Target,
+  UserPlus,
+  WalletCards,
+} from "lucide-react";
+import {
+  Bar,
+  BarChart,
+  Cell,
+  LabelList,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+} from "recharts";
+import { useEffect, useState, type ReactNode } from "react";
 import { useLocation } from "wouter";
+import type { inferRouterOutputs } from "@trpc/server";
+import type { AppRouter } from "../../../server/routers";
 
-const tooltipStyle = { background: "#131a26", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", color: "#e2e8f0", fontSize: "12px" };
-const expenseLabels: Record<string, string> = { rent: "Loyer", energy: "Énergie", connection: "Connexion", salary: "Salaire", agent_payments: "Paiements agents", marketing: "Marketing", supplies: "Fournitures", taxes: "Impôts", other: "Autre" };
-const expenseColors: Record<string, string> = { rent: "#2563EB", energy: "#0D9488", connection: "#7C3AED", salary: "#D97706", agent_payments: "#F97316", marketing: "#DB2777", supplies: "#059669", taxes: "#DC2626", other: "#64748B" };
+type DashboardData = inferRouterOutputs<AppRouter>["dashboard"]["get"];
+
+function capitalize(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
 
 export default function Home() {
   const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const { can } = usePermissions();
+  const isAdmin = can("settings.manage");
+  const canSeeFinance = can("expenses.manage");
   const [, setLocation] = useLocation();
   const { data, isLoading } = trpc.dashboard.get.useQuery();
   const { data: savedPreferences } = trpc.dashboardPreferences.get.useQuery();
-  const { data: onboarding, isLoading: onboardingLoading } = trpc.onboarding.status.useQuery(undefined, { enabled: isAdmin });
-  const onboardingComplete = trpc.onboarding.complete.useMutation({ onSuccess: () => window.location.reload() });
-  const onboardingSkip = trpc.onboarding.skip.useMutation({ onSuccess: () => window.location.reload() });
+  const { data: companySettings } = trpc.commerce.settings.get.useQuery(
+    undefined,
+    { staleTime: 5 * 60_000 }
+  );
   const role = user?.role === "seller" ? "seller" : "admin";
-  const [preferences, setPreferences] = useState(() => dashboardPreferencesForRole(role));
-  useEffect(() => { try { setPreferences(savedPreferences?.preferencesJson ? normalizeDashboardPreferences(JSON.parse(savedPreferences.preferencesJson), role) : dashboardPreferencesForRole(role)); } catch { setPreferences(dashboardPreferencesForRole(role)); } }, [savedPreferences?.preferencesJson, role]);
+  const [preferences, setPreferences] = useState(() =>
+    dashboardPreferencesForRole(role)
+  );
+  useEffect(() => {
+    try {
+      setPreferences(
+        savedPreferences?.preferencesJson
+          ? normalizeDashboardPreferences(
+              JSON.parse(savedPreferences.preferencesJson),
+              role
+            )
+          : dashboardPreferencesForRole(role)
+      );
+    } catch {
+      setPreferences(dashboardPreferencesForRole(role));
+    }
+  }, [savedPreferences?.preferencesJson, role]);
   const summary = data?.summary;
-  const metrics = [
-    { label: "Chiffre d’affaires", value: formatCurrency(summary?.monthlyRevenueCents ?? 0), detail: "Cumul sur le mois", icon: TrendingUp, tone: "cyan" },
-    { label: "Bénéfice net", value: formatCurrency(summary?.monthlyOperatingProfitCents ?? 0), detail: `Marge − dépenses (${formatCurrency(summary?.monthlyExpenseCents ?? 0)}, dont paie ${formatCurrency(summary?.monthlyAgentPaymentCents ?? 0)})`, icon: CircleDollarSign, tone: "emerald" },
-    { label: "Factures émises", value: String(summary?.monthlyInvoiceCount ?? 0), detail: `Panier moyen ${formatCurrency(summary?.averageBasketCents ?? 0)}`, icon: ReceiptText, tone: "violet" },
-    { label: "Valeur de stock", value: formatCurrency(summary?.totalValueCents ?? 0), detail: `${summary?.productCount ?? 0} références actives`, icon: Boxes, tone: "amber" },
+  const revenue = summary?.monthlyRevenueCents ?? 0;
+  const marginRate = revenue
+    ? Math.round(((summary?.monthlyMarginCents ?? 0) / revenue) * 1000) / 10
+    : 0;
+  const todayCount = summary?.todaySaleCount ?? 0;
+  const receivableCount = summary?.receivableCount ?? 0;
+  const metrics: Array<{
+    label: string;
+    value: string;
+    note: string;
+    tone: "default" | "success" | "warning";
+  }> = [
+    {
+      label: "Ventes du jour",
+      value: formatCurrency(summary?.todayRevenueCents ?? 0),
+      note: `${todayCount} vente${todayCount > 1 ? "s" : ""} encaissée${todayCount > 1 ? "s" : ""} aujourd’hui`,
+      tone: "default",
+    },
+    {
+      label: "Chiffre d’affaires du mois",
+      value: formatCurrency(revenue),
+      note: `${summary?.monthlyInvoiceCount ?? 0} ventes · panier moyen ${formatCurrency(summary?.averageBasketCents ?? 0)}`,
+      tone: "default",
+    },
+    {
+      label: "Marge du mois",
+      value: formatCurrency(summary?.monthlyMarginCents ?? 0),
+      note: `${marginRate.toLocaleString("fr-FR")} % du chiffre d’affaires`,
+      tone: marginRate > 0 ? "success" : "default",
+    },
+    {
+      label: "À encaisser",
+      value: formatCurrency(summary?.receivableCents ?? 0),
+      note: receivableCount
+        ? `${receivableCount} facture${receivableCount > 1 ? "s" : ""} en attente de règlement`
+        : "Aucune facture en attente",
+      tone: receivableCount ? "warning" : "default",
+    },
   ];
-  const priorities = [
-    { label: "Stock critique", count: summary?.activeAlerts ?? 0, detail: "référence(s) au seuil", icon: BellRing, path: "/alertes", tone: "amber", currency: false },
-    { label: "Inventaires ouverts", count: summary?.draftInventories ?? 0, detail: "session(s) à finaliser", icon: ClipboardCheck, path: "/inventaires", tone: "violet", currency: false },
-    ...(isAdmin ? [{ label: "Paie à régler", count: summary?.duePayrollCents ?? 0, detail: "solde de la période", icon: WalletCards, path: "/agents", tone: "cyan", currency: true }, { label: "Dépenses du mois", count: summary?.monthlyExpenseCents ?? 0, detail: `dont paie ${formatCurrency(summary?.monthlyAgentPaymentCents ?? 0)}`, icon: WalletCards, path: "/depenses", tone: "amber", currency: true }] : []),
-  ];
-  const tones: Record<string, string> = { cyan: "bg-cyan-400/10 text-cyan-300 ring-cyan-400/15", emerald: "bg-emerald-400/10 text-emerald-300 ring-emerald-400/15", violet: "bg-violet-400/10 text-violet-300 ring-violet-400/15", amber: "bg-amber-400/10 text-amber-300 ring-amber-400/15" };
+  const today = capitalize(
+    new Intl.DateTimeFormat("fr-FR", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    }).format(new Date())
+  );
+  const showTrend = preferences.salesTrend;
+  const showTodo = preferences.todo;
 
-  return <div className="mx-auto max-w-[1500px] space-y-6">
-    {isAdmin && !onboardingLoading && onboarding && !onboarding.completed && <section className="onboarding-hero overflow-hidden rounded-2xl border border-blue-400/20 bg-[linear-gradient(115deg,rgba(37,99,235,0.16),rgba(20,27,40,0.95)_45%,rgba(20,27,40,1))] shadow-lg shadow-blue-950/10"><div className="flex flex-col gap-5 p-5 sm:p-6 xl:flex-row xl:items-center xl:justify-between"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-300">Démarrage guidé</p><h2 className="mt-2 text-xl font-semibold tracking-tight text-white">Préparez votre espace pour la première vente</h2><p className="mt-1 text-sm text-slate-400">Renseignez les trois éléments essentiels. Votre progression est mémorisée automatiquement.</p></div><div className="grid gap-2 sm:grid-cols-3 xl:min-w-[650px]">{[{ key: "product", label: "Premier produit", detail: "Ajoutez une référence", icon: Boxes, path: "/produits?nouveau=1" }, { key: "customer", label: "Premier client", detail: "Créez une fiche client", icon: UserPlus, path: "/clients?nouveau=1" }, { key: "paymentMethod", label: "Encaissement", detail: "Activez un moyen", icon: CreditCard, path: "/parametres/pos" }].map(step => { const done = onboarding.steps[step.key as keyof typeof onboarding.steps]; const Icon = step.icon; return <button key={step.key} onClick={() => done ? undefined : setLocation(step.path)} className={`onboarding-step group flex items-center gap-3 rounded-xl border px-3 py-3 text-left transition ${done ? "is-complete border-emerald-400/20 bg-emerald-400/[0.08]" : "border-white/[0.08] bg-white/[0.035] hover:border-blue-400/35 hover:bg-white/[0.06]"}`}><span className={`grid h-9 w-9 place-items-center rounded-lg ${done ? "bg-emerald-400/15 text-emerald-300" : "bg-blue-500/10 text-blue-500"}`}>{done ? <CheckCircle2 className="h-5 w-5" /> : <Icon className="h-5 w-5" />}</span><span className="min-w-0"><span className="block text-sm font-medium text-slate-100">{step.label}</span><span className="block text-xs text-slate-400">{done ? "Terminé" : step.detail}</span></span></button>; })}</div></div><div className="flex flex-col-reverse gap-2 border-t border-white/[0.08] px-5 py-3 sm:flex-row sm:justify-end sm:px-6">{onboarding.steps.product && onboarding.steps.customer && onboarding.steps.paymentMethod && <Button onClick={() => onboardingComplete.mutate()} disabled={onboardingComplete.isPending || onboardingSkip.isPending} className="bg-emerald-400 text-slate-950 hover:bg-emerald-300">{onboardingComplete.isPending ? "Finalisation…" : "Terminer la configuration"}</Button>}<Button variant="ghost" onClick={() => { if (window.confirm("Ignorer définitivement l’assistant de démarrage pour cette entreprise ?")) onboardingSkip.mutate(); }} disabled={onboardingComplete.isPending || onboardingSkip.isPending} className="text-slate-400 hover:text-white">{onboardingSkip.isPending ? "Ignoré…" : "Ignorer définitivement"}</Button></div></section>}
-    {preferences.hero && <section className="flex justify-end"><div className="flex flex-wrap gap-2"><Button onClick={() => setLocation("/pos")} className="quick-action quick-action-sale h-11 rounded-xl bg-[#007B8B] px-4 text-white shadow-lg shadow-[#007B8B]/25 hover:bg-[#006b79]"><ShoppingCart className="mr-2 h-4 w-4" />Vente Rapide</Button><Button onClick={() => setLocation("/factures/nouvelle")} variant="outline" className="quick-action quick-action-invoice h-11 rounded-xl border-violet-400/35 bg-violet-400/10 px-4 text-violet-200 shadow-lg shadow-violet-950/15 hover:bg-violet-400/20 hover:text-violet-100"><FilePlus2 className="mr-2 h-4 w-4" />Nouvelle Facture</Button><Button onClick={() => setLocation("/clients?nouveau=1")} variant="outline" className="quick-action quick-action-client h-11 rounded-xl border-emerald-400/35 bg-emerald-400/10 px-4 text-emerald-200 shadow-lg shadow-emerald-950/15 hover:bg-emerald-400/20 hover:text-emerald-100"><UserPlus className="mr-2 h-4 w-4" />Nouveau Client</Button></div></section>}
-    {preferences.hero && <section className="commercial-hero overflow-hidden rounded-2xl border border-primary/20 bg-[radial-gradient(ellipse_at_10%_0%,color-mix(in_srgb,var(--primary)_18%,transparent),transparent_43%),linear-gradient(105deg,#141d2a,#101722)]"><div className="grid gap-6 p-6 md:grid-cols-[1.35fr_1fr] md:p-7"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Performance du mois</p>{isLoading ? <Skeleton className="mt-4 h-11 w-48 bg-white/10" /> : <p className="mt-3 text-4xl font-semibold tracking-tight text-white sm:text-5xl">{formatCurrency(summary?.monthlyRevenueCents ?? 0)}</p>}<p className="mt-2 text-sm text-slate-400">Chiffre d’affaires facturé depuis le début du mois.</p><Button onClick={() => setLocation("/factures")} variant="ghost" className="mt-4 -ml-3 text-primary">Voir les factures <ArrowRight className="ml-2 h-4 w-4" /></Button></div><div className="grid grid-cols-2 gap-3 self-end"><MiniStat label="Aujourd’hui" value={formatCurrency(summary?.todayRevenueCents ?? 0)} /><MiniStat label="Marge du mois" value={formatCurrency(summary?.monthlyMarginCents ?? 0)} accent /></div></div></section>}
-    {preferences.metrics && <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{metrics.map(metric => <MetricCard key={metric.label} metric={metric} loading={isLoading} colorClass={tones[metric.tone]} />)}</section>}
-    {isAdmin && (preferences.expenses || preferences.budget) && <section className={`grid gap-6 ${preferences.expenses && preferences.budget ? "xl:grid-cols-[minmax(0,1fr)_360px]" : ""}`}>{preferences.expenses && <ExpenseChart breakdown={summary?.expenseBreakdown ?? []} total={summary?.monthlyExpenseCents ?? 0} loading={isLoading} />}{preferences.budget && <BudgetPanel budget={summary?.expenseBudget} loading={isLoading} />}</section>}
-    {(preferences.salesTrend || preferences.priorities) && <section className={`grid gap-6 ${preferences.salesTrend && preferences.priorities ? "xl:grid-cols-[minmax(0,1fr)_360px]" : ""}`}>{preferences.salesTrend && <SalesTrend data={data?.salesTrend ?? []} />}{preferences.priorities && <PriorityList priorities={priorities} tones={tones} onNavigate={setLocation} />}</section>}
-    {preferences.unpaidInvoices && <OutstandingInvoices invoices={data?.unpaidInvoices ?? []} onNavigate={setLocation} />}
-    {(preferences.recentSales || preferences.lowStock) && <section className={`grid gap-6 ${preferences.recentSales && preferences.lowStock ? "xl:grid-cols-[minmax(0,1fr)_360px]" : ""}`}>{preferences.recentSales && <RecentSales sales={data?.recentSales ?? []} onNavigate={setLocation} />}{preferences.lowStock && <LowStock products={data?.lowStock ?? []} onNavigate={setLocation} />}</section>}
-  </div>;
+  return (
+    <div className="mx-auto flex max-w-[1440px] flex-col gap-6">
+      <section className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-[22px] font-bold tracking-tight text-foreground">
+            Bonjour{user?.name ? ` ${user.name.split(" ")[0]}` : ""}
+          </h1>
+          <p className="mt-0.5 text-[13px] text-muted-foreground">
+            {today}
+            {companySettings?.companyName
+              ? ` · ${companySettings.companyName}`
+              : ""}
+          </p>
+        </div>
+        {preferences.hero && (
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
+            <Button
+              variant="outline"
+              onClick={() => setLocation("/clients?nouveau=1")}
+            >
+              <UserPlus className="h-4 w-4" />
+              Nouveau client
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setLocation("/factures/nouvelle")}
+            >
+              <FilePlus2 className="h-4 w-4" />
+              Nouvelle facture
+            </Button>
+            {can("sales.create") && (
+              <Button
+                onClick={() => setLocation("/pos")}
+                className="col-span-2 h-11 sm:h-10"
+              >
+                <ShoppingCart className="h-4 w-4" />
+                Vente rapide
+              </Button>
+            )}
+          </div>
+        )}
+      </section>
+
+      {isAdmin && <OnboardingStrip onNavigate={setLocation} />}
+
+      {preferences.metrics && (
+        <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+          {metrics.map(metric => (
+            <div
+              key={metric.label}
+              className="flex min-w-0 flex-col gap-1 rounded-xl border border-border bg-card px-3.5 py-3.5 sm:gap-1.5 sm:px-5 sm:py-[18px]"
+            >
+              <p className="truncate text-xs font-medium text-muted-foreground sm:text-[13px]">
+                {metric.label}
+              </p>
+              {isLoading ? (
+                <Skeleton className="h-8 w-36" />
+              ) : (
+                <p className="truncate text-lg font-bold leading-tight tracking-tight text-foreground sm:text-[26px]">
+                  {metric.value}
+                </p>
+              )}
+              <p
+                className={`text-xs font-medium sm:text-[13px] ${metric.tone === "success" ? "text-success" : metric.tone === "warning" ? "text-warning" : "text-muted-foreground"}`}
+              >
+                {metric.note}
+              </p>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {(showTrend || showTodo) && (
+        <section
+          className={`grid grid-cols-1 gap-4 ${showTrend && showTodo ? "lg:grid-cols-3" : ""}`}
+        >
+          {showTrend && (
+            <div className={showTodo ? "min-w-0 lg:col-span-2" : "min-w-0"}>
+              <SalesTrend data={data?.salesTrend ?? []} loading={isLoading} />
+            </div>
+          )}
+          {showTodo && (
+            <TodoPanel
+              data={data}
+              loading={isLoading}
+              isAdmin={isAdmin}
+              canSeeFinance={canSeeFinance}
+              onNavigate={setLocation}
+            />
+          )}
+        </section>
+      )}
+
+      {preferences.recentSales && (
+        <RecentSales sales={data?.recentSales ?? []} onNavigate={setLocation} />
+      )}
+
+      {canSeeFinance && preferences.expenses && (
+        <ExpenseSummary
+          breakdown={summary?.expenseBreakdown ?? []}
+          total={summary?.monthlyExpenseCents ?? 0}
+          netProfit={summary?.monthlyOperatingProfitCents ?? 0}
+          budget={summary?.expenseBudget}
+          loading={isLoading}
+          onNavigate={setLocation}
+        />
+      )}
+    </div>
+  );
 }
 
-function MiniStat({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) { return <div className="rounded-xl border border-white/[0.08] bg-black/10 p-4"><p className="text-xs text-slate-400">{label}</p><p className={`mt-2 text-lg font-semibold ${accent ? "text-emerald-300" : "text-white"}`}>{value}</p></div>; }
-function MetricCard({ metric, loading, colorClass }: { metric: { label: string; value: string; detail: string; icon: typeof TrendingUp }; loading: boolean; colorClass: string }) { const Icon = metric.icon; return <Card className="border-white/[0.07] bg-[#111722] shadow-none"><CardContent className="p-5"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-medium text-slate-400">{metric.label}</p>{loading ? <Skeleton className="mt-3 h-8 w-24 bg-white/10" /> : <p className="mt-2 text-2xl font-semibold tracking-tight text-white">{metric.value}</p>}</div><span className={`grid h-10 w-10 place-items-center rounded-xl ring-1 ${colorClass}`}><Icon className="h-5 w-5" /></span></div><p className="mt-4 text-xs text-slate-500">{metric.detail}</p></CardContent></Card>; }
-function ExpenseChart({ breakdown, total, loading }: { breakdown: Array<{ category: string; amountCents: number }>; total: number; loading: boolean }) { return <Card className="border-white/[0.07] bg-[#111722] shadow-none"><CardContent className="p-0"><div className="flex items-center justify-between border-b border-white/[0.07] px-5 py-5 sm:px-6"><div><p className="text-sm font-semibold text-white">Répartition des dépenses</p><p className="mt-1 text-xs text-slate-500">Charges d’exploitation et paiements agents du mois</p></div><Badge className="border border-amber-400/15 bg-amber-400/10 text-amber-300">Mois en cours</Badge></div>{loading ? <div className="h-[300px] p-6"><Skeleton className="h-full w-full bg-white/10" /></div> : breakdown.length ? <div className="grid gap-5 p-5 lg:grid-cols-[320px_minmax(0,1fr)] lg:items-center"><div className="relative h-[260px]"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={breakdown} dataKey="amountCents" nameKey="category" cx="50%" cy="50%" innerRadius={68} outerRadius={100} paddingAngle={3} stroke="none">{breakdown.map(item => <Cell key={item.category} fill={expenseColors[item.category] ?? "#64748B"} />)}</Pie><Tooltip contentStyle={tooltipStyle} formatter={value => formatCurrency(Number(value))} labelFormatter={label => expenseLabels[String(label)] ?? String(label)} /></PieChart></ResponsiveContainer><div className="pointer-events-none absolute inset-0 grid place-items-center text-center"><div><p className="text-[10px] uppercase tracking-[0.12em] text-slate-500">Total</p><p className="mt-1 text-lg font-semibold text-white">{formatCurrency(total)}</p></div></div></div><div className="grid gap-2 sm:grid-cols-2">{breakdown.map(item => <div key={item.category} className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.07] bg-white/[0.025] px-3 py-2.5"><span className="flex min-w-0 items-center gap-2 text-sm text-slate-300"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: expenseColors[item.category] ?? "#64748B" }} />{expenseLabels[item.category] ?? item.category}</span><span className="shrink-0 text-right"><span className="block text-sm font-semibold text-white">{formatCurrency(item.amountCents)}</span><span className="text-[10px] text-slate-500">{total ? Math.round((item.amountCents / total) * 100) : 0}%</span></span></div>)}</div></div> : <EmptyState icon={WalletCards} title="Aucune dépense ce mois-ci" detail="Les catégories apparaîtront ici après l’enregistrement de charges." />}</CardContent></Card>; }
-function BudgetPanel({ budget, loading }: { budget?: { configured: boolean; budgetCents: number; spentCents: number; remainingCents: number; percentUsed: number; warningPercent: number; warningReached: boolean; exceeded: boolean }; loading: boolean }) { if (loading) return <Card className="border-white/[0.07] bg-[#111722]"><CardContent className="min-h-[260px] p-5"><Skeleton className="h-full w-full bg-white/10" /></CardContent></Card>; const configured = budget?.configured ?? false; const percent = budget?.percentUsed ?? 0; const warning = budget?.warningReached ?? false; const exceeded = budget?.exceeded ?? false; return <Card className="border-white/[0.07] bg-[#111722]"><CardContent className="p-5"><div className="flex items-start justify-between"><div><p className="text-sm font-semibold text-white">Budget dépenses</p><p className="mt-1 text-xs text-slate-500">Suivi du mois en cours</p></div><span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary"><Target className="h-5 w-5" /></span></div>{configured ? <div className="mt-6"><p className="text-3xl font-semibold text-white">{formatCurrency(budget!.budgetCents)}</p><p className={`mt-2 text-sm ${exceeded ? "text-rose-300" : warning ? "text-amber-300" : "text-slate-400"}`}>{exceeded ? `Dépassement de ${formatCurrency(Math.abs(budget!.remainingCents))}` : warning ? `Seuil d’alerte (${budget!.warningPercent} %) atteint` : `${formatCurrency(budget!.remainingCents)} restant`}</p><div className="mt-5 h-2 overflow-hidden rounded-full bg-white/[0.07]"><div className={`h-full rounded-full ${exceeded ? "bg-rose-400" : warning ? "bg-amber-400" : "bg-primary"}`} style={{ width: `${Math.min(percent, 100)}%` }} /></div><div className="mt-3 flex justify-between text-xs"><span className="text-slate-500">{formatCurrency(budget!.spentCents)} consommés</span><span className="font-semibold text-slate-300">{percent}%</span></div></div> : <div className="mt-8 text-center"><Target className="mx-auto h-7 w-7 text-slate-600" /><p className="mt-3 text-sm font-medium text-slate-300">Budget non défini</p></div>}</CardContent></Card>; }
-function SalesTrend({ data }: { data: Array<{ day: string; revenueCents: number }> }) { return <Card className="overflow-hidden border-white/[0.07] bg-[#111722] shadow-none"><CardContent className="p-0"><div className="border-b border-white/[0.07] px-5 py-5"><p className="text-sm font-semibold text-white">Dynamique des ventes</p><p className="mt-1 text-xs text-slate-500">Chiffre d’affaires facturé sur les sept derniers jours</p></div><div className="h-[290px] p-4 sm:p-6">{data.some(item => item.revenueCents) ? <ResponsiveContainer width="100%" height="100%"><AreaChart data={data}><defs><linearGradient id="sales-revenue" x1="0" x2="0" y1="0" y2="1"><stop offset="5%" stopColor="var(--primary)" stopOpacity={0.38} /><stop offset="95%" stopColor="var(--primary)" stopOpacity={0} /></linearGradient></defs><CartesianGrid vertical={false} stroke="rgba(255,255,255,0.07)" /><XAxis dataKey="day" tickFormatter={value => new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "short" }).format(new Date(value))} tick={{ fill: "#64748b", fontSize: 11 }} axisLine={false} tickLine={false} /><YAxis tickFormatter={value => formatCurrency(Number(value))} tick={{ fill: "#64748b", fontSize: 10 }} axisLine={false} tickLine={false} width={72} /><Tooltip contentStyle={tooltipStyle} labelFormatter={value => formatDate(String(value))} formatter={value => formatCurrency(Number(value))} /><Area type="monotone" dataKey="revenueCents" name="CA" stroke="var(--primary)" strokeWidth={2.5} fill="url(#sales-revenue)" /></AreaChart></ResponsiveContainer> : <EmptyState icon={Activity} title="Ventes en attente de signal" detail="Créez une première facture pour visualiser la tendance." />}</div></CardContent></Card>; }
-function PriorityList({ priorities, tones, onNavigate }: { priorities: Array<{ label: string; count: number; detail: string; icon: any; path: string; tone: string; currency: boolean }>; tones: Record<string, string>; onNavigate: (path: string) => void }) { return <Card className="border-white/[0.07] bg-[#111722]"><CardContent className="p-0"><div className="border-b border-white/[0.07] px-5 py-5"><p className="text-sm font-semibold text-white">Priorités opérationnelles</p></div><div className="divide-y divide-white/[0.06]">{priorities.map(priority => { const Icon = priority.icon; return <button key={priority.label} onClick={() => onNavigate(priority.path)} className="flex w-full items-center gap-3 px-5 py-4 text-left hover:bg-white/[0.025]"><span className={`grid h-9 w-9 place-items-center rounded-xl ${tones[priority.tone]}`}><Icon className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block text-sm font-medium text-slate-200">{priority.label}</span><span className="block text-xs text-slate-500">{priority.detail}</span></span><span className="text-sm font-semibold text-white">{priority.currency ? formatCurrency(priority.count) : priority.count}</span></button>; })}</div></CardContent></Card>; }
-function RecentSales({ sales, onNavigate }: { sales: Array<{ id: number; invoiceNumber: string; customerName: string; totalCents: number; netProfitCents: number; createdAt: Date | string; customerType: string }>; onNavigate: (path: string) => void }) { return <Card className="border-white/[0.07] bg-[#111722]"><CardContent className="p-0"><div className="flex justify-between border-b border-white/[0.07] px-5 py-5"><p className="text-sm font-semibold text-white">Dernières factures</p><Button variant="ghost" onClick={() => onNavigate("/factures")} className="text-primary">Ouvrir le registre</Button></div>{sales.length ? <div className="divide-y divide-white/[0.06]">{sales.map(sale => <button key={sale.id} onClick={() => onNavigate("/factures")} className="flex w-full items-center justify-between gap-3 px-5 py-3 text-left hover:bg-white/[0.025]"><span><span className="block text-sm font-medium text-slate-200">{sale.invoiceNumber}</span><span className="block text-xs text-slate-500">{sale.customerName} · {formatDate(sale.createdAt)}</span></span><span className="text-right"><span className="block text-sm font-semibold text-white">{formatCurrency(sale.totalCents)}</span><span className="text-xs text-emerald-300">{formatCurrency(sale.netProfitCents)}</span></span></button>)}</div> : <EmptyState icon={ReceiptText} title="Aucune facture ce mois-ci" detail="Les dernières transactions apparaîtront ici." />}</CardContent></Card>; }
-function OutstandingInvoices({ invoices, onNavigate }: { invoices: Array<{ id: number; invoiceNumber: string; customerName: string; totalCents: number; balanceCents: number; status: string; createdAt: Date | string }>; onNavigate: (path: string) => void }) { return <Card className="border-white/[0.07] bg-[#111722]"><CardContent className="p-0"><div className="flex items-center justify-between border-b border-white/[0.07] px-5 py-5"><div><p className="text-sm font-semibold text-white">Factures à encaisser</p><p className="mt-1 text-xs text-slate-500">Soldes en attente de règlement</p></div><Button variant="ghost" onClick={() => onNavigate("/factures")} className="text-primary">Voir tout</Button></div>{invoices.length ? <div className="grid divide-y divide-white/[0.06] md:grid-cols-2 md:divide-x md:divide-y-0">{invoices.map(invoice => <button key={invoice.id} onClick={() => onNavigate(`/factures?facture=${invoice.id}`)} className="flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-white/[0.025]"><span><span className="block text-sm font-medium text-slate-200">{invoice.invoiceNumber}</span><span className="block text-xs text-slate-500">{invoice.customerName} · {formatDate(invoice.createdAt)}</span></span><span className="text-right"><span className="block text-sm font-semibold text-amber-300">{formatCurrency(invoice.balanceCents)}</span><span className="text-[11px] text-slate-500">{invoice.status === "partial" ? "Solde partiel" : "À encaisser"}</span></span></button>)}</div> : <EmptyState icon={ReceiptText} title="Aucune facture impayée" detail="Les soldes à encaisser apparaîtront ici." />}</CardContent></Card>; }
-function LowStock({ products, onNavigate }: { products: Array<{ id: number; name: string; reference: string; quantity: number; unit: string; minimumQuantity: number }>; onNavigate: (path: string) => void }) { return <Card className="border-amber-400/15 bg-[#111722]"><CardContent className="p-0"><div className="flex items-center justify-between border-b border-white/[0.07] px-5 py-5"><div><p className="text-sm font-semibold text-white">Disponibilité critique</p><p className="mt-1 text-xs text-slate-500">Réapprovisionnez avant une rupture.</p></div><Badge className="border-0 bg-amber-400/10 text-amber-300">{products.length} alerte{products.length > 1 ? "s" : ""}</Badge></div>{products.length ? <div className="divide-y divide-white/[0.06]">{products.map(product => <button key={product.id} onClick={() => onNavigate("/mouvements")} className="flex w-full justify-between gap-3 px-5 py-4 text-left hover:bg-amber-400/[0.035]"><span><span className="block text-sm font-medium text-slate-200">{product.name}</span><span className="mt-1 flex items-center gap-1 text-xs text-primary">Réapprovisionner <ArrowRight className="h-3 w-3" /></span></span><span className="text-right text-sm font-semibold text-amber-300">{product.quantity} {product.unit}<span className="block text-[11px] font-normal text-slate-500">Seuil {product.minimumQuantity}</span></span></button>)}</div> : <EmptyState icon={BellRing} title="Aucune alerte active" detail="Les seuils critiques sont sous contrôle." />}</CardContent></Card>; }
-function EmptyState({ icon: Icon, title, detail }: { icon: any; title: string; detail: string }) { return <div className="grid min-h-[180px] place-items-center px-6 text-center"><div><Icon className="mx-auto h-7 w-7 text-slate-600" /><p className="mt-3 text-sm font-medium text-slate-300">{title}</p><p className="mt-1 text-xs text-slate-500">{detail}</p></div></div>; }
+function Panel({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section
+      className={`overflow-hidden rounded-xl border border-border bg-card ${className}`}
+    >
+      {children}
+    </section>
+  );
+}
+
+function PanelHeader({
+  title,
+  detail,
+  action,
+}: {
+  title: string;
+  detail?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-wrap items-baseline justify-between gap-2 px-5 pt-[18px] pb-3">
+      <div className="min-w-0">
+        <h2 className="text-base font-semibold text-foreground">{title}</h2>
+        {detail && (
+          <p className="mt-0.5 text-[13px] text-muted-foreground">{detail}</p>
+        )}
+      </div>
+      {action}
+    </div>
+  );
+}
+
+function PanelLink({
+  children,
+  onClick,
+}: {
+  children: ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="text-[13px] font-semibold text-primary hover:underline"
+    >
+      {children}
+    </button>
+  );
+}
+
+/** Démarrage guidé sur une ligne, affiché tant qu'il n'est pas terminé. */
+function OnboardingStrip({
+  onNavigate,
+}: {
+  onNavigate: (path: string) => void;
+}) {
+  const { data: onboarding } = trpc.onboarding.status.useQuery();
+  const complete = trpc.onboarding.complete.useMutation({
+    onSuccess: () => window.location.reload(),
+  });
+  const skip = trpc.onboarding.skip.useMutation({
+    onSuccess: () => window.location.reload(),
+  });
+  if (!onboarding || onboarding.completed) return null;
+  const steps = [
+    {
+      key: "product" as const,
+      label: "Premier produit",
+      icon: Boxes,
+      path: "/produits?nouveau=1",
+    },
+    {
+      key: "customer" as const,
+      label: "Premier client",
+      icon: UserPlus,
+      path: "/clients?nouveau=1",
+    },
+    {
+      key: "paymentMethod" as const,
+      label: "Moyen d’encaissement",
+      icon: CreditCard,
+      path: "/parametres/pos",
+    },
+  ];
+  const done = steps.filter(step => onboarding.steps[step.key]).length;
+  const pending = complete.isPending || skip.isPending;
+  return (
+    <Panel className="flex flex-col gap-3 px-5 py-4 lg:flex-row lg:items-center lg:gap-6">
+      <div className="min-w-0 lg:w-64">
+        <p className="text-sm font-semibold text-foreground">
+          Démarrage · {done} étape{done > 1 ? "s" : ""} sur {steps.length}
+        </p>
+        <div
+          className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={steps.length}
+          aria-valuenow={done}
+          aria-label="Progression du démarrage"
+        >
+          <div
+            className="h-full rounded-full bg-primary transition-all"
+            style={{ width: `${(done / steps.length) * 100}%` }}
+          />
+        </div>
+      </div>
+      <div className="flex flex-1 flex-wrap gap-2">
+        {steps.map(step => {
+          const finished = onboarding.steps[step.key];
+          const Icon = finished ? CheckCircle2 : step.icon;
+          return (
+            <button
+              key={step.key}
+              type="button"
+              disabled={finished}
+              onClick={() => onNavigate(step.path)}
+              className={`inline-flex h-9 items-center gap-2 rounded-full border px-3 text-[13px] font-medium transition-colors ${finished ? "border-success/25 bg-success-soft text-success" : "border-input bg-card text-foreground hover:bg-accent"}`}
+            >
+              <Icon className="h-4 w-4" />
+              {step.label}
+            </button>
+          );
+        })}
+      </div>
+      <div className="flex gap-2">
+        {done === steps.length && (
+          <Button
+            size="sm"
+            onClick={() => complete.mutate()}
+            disabled={pending}
+          >
+            {complete.isPending ? "Finalisation…" : "Terminer"}
+          </Button>
+        )}
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={pending}
+          onClick={() => {
+            if (
+              window.confirm(
+                "Ignorer définitivement l’assistant de démarrage pour cette entreprise ?"
+              )
+            )
+              skip.mutate();
+          }}
+          className="text-muted-foreground"
+        >
+          Ignorer
+        </Button>
+      </div>
+    </Panel>
+  );
+}
+
+function SalesTrend({
+  data,
+  loading,
+}: {
+  data: Array<{ day: string; revenueCents: number }>;
+  loading: boolean;
+}) {
+  const lastIndex = data.length - 1;
+  const compact = new Intl.NumberFormat("fr-FR", {
+    notation: "compact",
+    maximumFractionDigits: 1,
+  });
+  const weekTotal = data.reduce((sum, item) => sum + item.revenueCents, 0);
+  return (
+    <Panel className="h-full">
+      <PanelHeader
+        title="Ventes des 7 derniers jours"
+        detail={`${formatCurrency(weekTotal)} encaissés sur la période`}
+      />
+      <div className="h-[280px] px-3 pb-4 sm:px-5">
+        {loading ? (
+          <Skeleton className="h-full w-full" />
+        ) : data.some(item => item.revenueCents) ? (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={data} margin={{ top: 22, right: 4, left: 4 }}>
+              <XAxis
+                dataKey="day"
+                tickFormatter={value =>
+                  new Intl.DateTimeFormat("fr-FR", { weekday: "short" }).format(
+                    new Date(value)
+                  )
+                }
+                tick={{ fill: "var(--faint)", fontSize: 12 }}
+                axisLine={{ stroke: "var(--border)" }}
+                tickLine={false}
+              />
+              <Tooltip
+                cursor={{ fill: "var(--muted)" }}
+                contentStyle={chartTooltipStyle}
+                labelFormatter={value => formatDate(String(value))}
+                formatter={value => [formatCurrency(Number(value)), "Ventes"]}
+              />
+              <Bar dataKey="revenueCents" radius={[6, 6, 0, 0]} maxBarSize={44}>
+                {data.map((item, index) => (
+                  <Cell
+                    key={item.day}
+                    fill={
+                      index === lastIndex ? "var(--primary)" : "var(--chart-2)"
+                    }
+                  />
+                ))}
+                <LabelList
+                  dataKey="revenueCents"
+                  position="top"
+                  formatter={(value: unknown) =>
+                    Number(value) ? compact.format(Number(value) / 100) : ""
+                  }
+                  style={{ fill: "var(--muted-foreground)", fontSize: 12 }}
+                />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
+          <EmptyState
+            icon={Activity}
+            title="Aucune vente sur la période"
+            detail="Encaissez une première vente pour voir la tendance."
+          />
+        )}
+      </div>
+    </Panel>
+  );
+}
+
+function TodoSection({
+  title,
+  count,
+  tone,
+  onOpen,
+  children,
+}: {
+  title: string;
+  count: string;
+  tone: "warning" | "danger" | "info" | "neutral";
+  onOpen: () => void;
+  children?: ReactNode;
+}) {
+  const toneClass = {
+    warning: "bg-warning-soft text-warning",
+    danger: "bg-destructive-soft text-destructive",
+    info: "bg-info-soft text-info",
+    neutral: "bg-muted text-muted-foreground",
+  }[tone];
+  return (
+    <div className="border-t border-border py-3 first:border-t-0 first:pt-0">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="group flex w-full items-center gap-2 text-left"
+      >
+        <span className="flex-1 text-sm font-semibold text-foreground group-hover:text-primary">
+          {title}
+        </span>
+        <span
+          className={`rounded-full px-2 py-0.5 text-xs font-semibold ${toneClass}`}
+        >
+          {count}
+        </span>
+        <ChevronRight className="h-4 w-4 text-faint" />
+      </button>
+      {children && <div className="mt-2 space-y-1">{children}</div>}
+    </div>
+  );
+}
+
+/** Une seule liste de ce qui demande une action, chaque ligne menant à sa page. */
+function TodoPanel({
+  data,
+  loading,
+  isAdmin,
+  canSeeFinance,
+  onNavigate,
+}: {
+  data?: DashboardData;
+  loading: boolean;
+  isAdmin: boolean;
+  canSeeFinance: boolean;
+  onNavigate: (path: string) => void;
+}) {
+  const summary = data?.summary;
+  const lowStock = data?.lowStock ?? [];
+  const lowStockCount = summary?.activeAlerts ?? lowStock.length;
+  const invoices = data?.unpaidInvoices ?? [];
+  const receivableCount = summary?.receivableCount ?? invoices.length;
+  const inventories = summary?.draftInventories ?? 0;
+  const payroll = isAdmin ? (summary?.duePayrollCents ?? 0) : 0;
+  const budget = canSeeFinance ? summary?.expenseBudget : undefined;
+  const budgetAlert = budget?.exceeded || budget?.warningReached;
+  const nothing =
+    !lowStockCount &&
+    !receivableCount &&
+    !inventories &&
+    !payroll &&
+    !budgetAlert;
+  return (
+    <Panel className="h-full">
+      <PanelHeader title="À traiter" />
+      <div className="px-5 pb-4">
+        {loading ? (
+          <div className="space-y-3">
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+          </div>
+        ) : nothing ? (
+          <EmptyState
+            icon={CheckCircle2}
+            title="Tout est à jour"
+            detail="Aucun stock bas ni facture en attente."
+          />
+        ) : (
+          <>
+            {lowStockCount > 0 && (
+              <TodoSection
+                title="Stock bas"
+                count={`${lowStockCount} produit${lowStockCount > 1 ? "s" : ""}`}
+                tone="danger"
+                onOpen={() => onNavigate("/alertes")}
+              >
+                {lowStock.slice(0, 3).map(product => (
+                  <button
+                    key={product.id}
+                    type="button"
+                    onClick={() => onNavigate(`/produits/${product.id}`)}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-1 py-1 text-left hover:bg-accent"
+                  >
+                    <ProductImage
+                      product={product}
+                      className="h-8 w-8 text-xs"
+                    />
+                    <span className="min-w-0 flex-1 truncate text-[13px] text-foreground">
+                      {product.name}
+                    </span>
+                    <StatusPill
+                      tone={product.quantity <= 0 ? "danger" : "warning"}
+                    >
+                      {product.quantity <= 0
+                        ? "Rupture"
+                        : `${product.quantity} / ${product.minimumQuantity}`}
+                    </StatusPill>
+                  </button>
+                ))}
+              </TodoSection>
+            )}
+            {receivableCount > 0 && (
+              <TodoSection
+                title="Factures à encaisser"
+                count={formatCurrency(summary?.receivableCents ?? 0)}
+                tone="warning"
+                onOpen={() => onNavigate("/factures")}
+              >
+                {invoices.slice(0, 3).map(invoice => (
+                  <button
+                    key={invoice.id}
+                    type="button"
+                    onClick={() =>
+                      onNavigate(`/factures?facture=${invoice.id}`)
+                    }
+                    className="flex w-full items-center gap-2.5 rounded-lg px-1 py-1 text-left hover:bg-accent"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[13px] text-foreground">
+                        {invoice.customerName}
+                      </span>
+                      <span className="block text-xs text-faint">
+                        {invoice.invoiceNumber}
+                      </span>
+                    </span>
+                    <span className="text-[13px] font-semibold text-foreground">
+                      {formatCurrency(invoice.balanceCents)}
+                    </span>
+                  </button>
+                ))}
+              </TodoSection>
+            )}
+            {inventories > 0 && (
+              <TodoSection
+                title="Inventaires à finaliser"
+                count={String(inventories)}
+                tone="info"
+                onOpen={() => onNavigate("/inventaires")}
+              />
+            )}
+            {payroll > 0 && (
+              <TodoSection
+                title="Paie à régler"
+                count={formatCurrency(payroll)}
+                tone="neutral"
+                onOpen={() => onNavigate("/agents")}
+              />
+            )}
+            {budgetAlert && budget && (
+              <TodoSection
+                title={
+                  budget.exceeded ? "Budget dépassé" : "Seuil budget atteint"
+                }
+                count={`${budget.percentUsed} %`}
+                tone={budget.exceeded ? "danger" : "warning"}
+                onOpen={() => onNavigate("/depenses")}
+              />
+            )}
+          </>
+        )}
+      </div>
+    </Panel>
+  );
+}
+
+function RecentSales({
+  sales,
+  onNavigate,
+}: {
+  sales: Array<{
+    id: number;
+    invoiceNumber: string;
+    customerName: string;
+    totalCents: number;
+    createdAt: Date | string;
+    channel?: string;
+  }>;
+  onNavigate: (path: string) => void;
+}) {
+  return (
+    <Panel>
+      <PanelHeader
+        title="Dernières ventes"
+        action={
+          <PanelLink onClick={() => onNavigate("/factures")}>
+            Toutes les factures
+          </PanelLink>
+        }
+      />
+      {sales.length ? (
+        <>
+          <div className="px-4 pb-2 sm:hidden">
+            {sales.map(sale => (
+              <button
+                key={sale.id}
+                onClick={() => onNavigate(`/factures/${sale.id}`)}
+                className="flex w-full items-center gap-3 border-t border-border py-3 text-left"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold text-primary">
+                    {sale.invoiceNumber}
+                  </span>
+                  <span className="mt-0.5 block truncate text-xs text-faint">
+                    {sale.customerName} · {formatDate(sale.createdAt)}
+                  </span>
+                </span>
+                <span className="flex shrink-0 flex-col items-end gap-1">
+                  <span className="text-sm font-semibold text-foreground">
+                    {formatCurrency(sale.totalCents)}
+                  </span>
+                  <StatusPill tone="success">Payée</StatusPill>
+                </span>
+              </button>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto sm:block">
+            <table className="w-full min-w-[640px] border-collapse text-sm">
+              <thead>
+                <tr className="bg-muted text-left text-xs text-muted-foreground">
+                  <th scope="col" className="px-5 py-2.5 font-semibold">
+                    Numéro
+                  </th>
+                  <th scope="col" className="px-5 py-2.5 font-semibold">
+                    Client
+                  </th>
+                  <th scope="col" className="px-5 py-2.5 font-semibold">
+                    Date
+                  </th>
+                  <th scope="col" className="px-5 py-2.5 font-semibold">
+                    Statut
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-5 py-2.5 text-right font-semibold"
+                  >
+                    Montant TTC
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {sales.map(sale => (
+                  <tr
+                    key={sale.id}
+                    onClick={() => onNavigate(`/factures/${sale.id}`)}
+                    className="cursor-pointer border-t border-border hover:bg-accent/60"
+                  >
+                    <td className="px-5 py-3 font-semibold text-primary">
+                      {sale.invoiceNumber}
+                    </td>
+                    <td className="px-5 py-3 text-foreground">
+                      {sale.customerName}
+                    </td>
+                    <td className="px-5 py-3 text-muted-foreground">
+                      {formatDate(sale.createdAt)}
+                    </td>
+                    <td className="px-5 py-3">
+                      <StatusPill tone="success">
+                        {sale.channel === "pos" ? "Payée · caisse" : "Payée"}
+                      </StatusPill>
+                    </td>
+                    <td className="px-5 py-3 text-right font-semibold text-foreground">
+                      {formatCurrency(sale.totalCents)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      ) : (
+        <EmptyState
+          icon={ReceiptText}
+          title="Aucune vente pour le moment"
+          detail="Les dernières transactions apparaîtront ici."
+        />
+      )}
+    </Panel>
+  );
+}
+
+/** Dépenses du mois en une carte : total, budget et premières catégories. */
+function ExpenseSummary({
+  breakdown,
+  total,
+  netProfit,
+  budget,
+  loading,
+  onNavigate,
+}: {
+  breakdown: Array<{ category: string; amountCents: number }>;
+  total: number;
+  netProfit: number;
+  budget?: {
+    configured: boolean;
+    budgetCents: number;
+    percentUsed: number;
+    warningReached: boolean;
+    exceeded: boolean;
+  };
+  loading: boolean;
+  onNavigate: (path: string) => void;
+}) {
+  const top = [...breakdown]
+    .sort((left, right) => right.amountCents - left.amountCents)
+    .slice(0, 3);
+  const percent = budget?.percentUsed ?? 0;
+  return (
+    <Panel>
+      <PanelHeader
+        title="Dépenses du mois"
+        action={
+          <PanelLink onClick={() => onNavigate("/depenses")}>
+            Voir les dépenses <ArrowRight className="inline h-3.5 w-3.5" />
+          </PanelLink>
+        }
+      />
+      {loading ? (
+        <div className="px-5 pb-5">
+          <Skeleton className="h-24 w-full" />
+        </div>
+      ) : (
+        <div className="grid gap-5 px-5 pb-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+              <p className="text-[26px] font-bold tracking-tight text-foreground">
+                {formatCurrency(total)}
+              </p>
+              <p className="text-[13px] text-muted-foreground">
+                Bénéfice net{" "}
+                <span
+                  className={`font-semibold ${netProfit < 0 ? "text-destructive" : "text-success"}`}
+                >
+                  {formatCurrency(netProfit)}
+                </span>
+              </p>
+            </div>
+            {budget?.configured ? (
+              <div>
+                <div className="h-2 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={`h-full rounded-full ${budget.exceeded ? "bg-destructive" : budget.warningReached ? "bg-warning" : "bg-primary"}`}
+                    style={{ width: `${Math.min(percent, 100)}%` }}
+                  />
+                </div>
+                <p className="mt-1.5 text-xs text-faint">
+                  {percent} % du budget de {formatCurrency(budget.budgetCents)}
+                </p>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onNavigate("/depenses")}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-primary"
+              >
+                <Target className="h-3.5 w-3.5" />
+                Fixer un budget mensuel
+              </button>
+            )}
+          </div>
+          {top.length ? (
+            <div className="space-y-2.5">
+              {top.map(item => (
+                <div key={item.category}>
+                  <div className="flex items-center justify-between gap-3 text-[13px]">
+                    <span className="flex items-center gap-2 text-foreground">
+                      <span
+                        className="h-2.5 w-2.5 rounded-full"
+                        style={{
+                          backgroundColor:
+                            expenseColors[item.category] ?? "#98A2B3",
+                        }}
+                      />
+                      {expenseLabels[item.category] ?? item.category}
+                    </span>
+                    <span className="font-semibold text-foreground">
+                      {formatCurrency(item.amountCents)}
+                    </span>
+                  </div>
+                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${total ? Math.round((item.amountCents / total) * 100) : 0}%`,
+                        backgroundColor:
+                          expenseColors[item.category] ?? "#98A2B3",
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 rounded-lg bg-muted/60 px-4 py-3 text-[13px] text-muted-foreground">
+              <WalletCards className="h-4 w-4 shrink-0" />
+              Aucune dépense enregistrée ce mois-ci.
+            </div>
+          )}
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+function EmptyState({
+  icon: Icon,
+  title,
+  detail,
+}: {
+  icon: typeof Activity;
+  title: string;
+  detail: string;
+}) {
+  return (
+    <div className="grid min-h-[180px] place-items-center px-6 pb-6 text-center">
+      <div>
+        <span className="mx-auto grid h-10 w-10 place-items-center rounded-full bg-muted text-faint">
+          <Icon className="h-5 w-5" />
+        </span>
+        <p className="mt-3 text-sm font-medium text-foreground">{title}</p>
+        <p className="mt-1 text-[13px] text-muted-foreground">{detail}</p>
+      </div>
+    </div>
+  );
+}

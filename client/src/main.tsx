@@ -1,5 +1,5 @@
 import { trpc } from "@/lib/trpc";
-import { COOKIE_NAME, UNAUTHED_ERR_MSG } from '@shared/const';
+import { COOKIE_NAME, UNAUTHED_ERR_MSG } from "@shared/const";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
@@ -33,7 +33,9 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
     // DashboardLayout exposes the local sign-in screen, which now includes the
     // administrator fallback form. Redirecting here would make that option
     // unreachable whenever a session expires.
-    console.info("[Auth] Session absente ou expirée ; affichage de l’écran de connexion.");
+    console.info(
+      "[Auth] Session absente ou expirée ; affichage de l’écran de connexion."
+    );
   }
 };
 

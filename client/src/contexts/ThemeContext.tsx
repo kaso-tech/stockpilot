@@ -25,7 +25,12 @@ export function ThemeProvider({
 }: ThemeProviderProps) {
   const [theme, setThemeState] = useState<Theme>(() => {
     if (switchable) {
-      return readPreference(typeof window === "undefined" ? undefined : localStorage, "theme", ["light", "dark"], defaultTheme);
+      return readPreference(
+        typeof window === "undefined" ? undefined : localStorage,
+        "theme",
+        ["light", "dark"],
+        defaultTheme
+      );
     }
     return defaultTheme;
   });
@@ -39,7 +44,11 @@ export function ThemeProvider({
     }
 
     if (switchable) {
-      writePreference(typeof window === "undefined" ? undefined : localStorage, "theme", theme);
+      writePreference(
+        typeof window === "undefined" ? undefined : localStorage,
+        "theme",
+        theme
+      );
     }
   }, [theme, switchable]);
 
@@ -50,7 +59,9 @@ export function ThemeProvider({
     : undefined;
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme: setThemeState, toggleTheme, switchable }}>
+    <ThemeContext.Provider
+      value={{ theme, setTheme: setThemeState, toggleTheme, switchable }}
+    >
       {children}
     </ThemeContext.Provider>
   );

@@ -10,11 +10,19 @@ describe("limites d’intégrité métier", () => {
   });
 
   it("refuse les montants non sûrs ou hors capacité", () => {
-    expect(() => settlementResult(MAX_CENTS + 1, "full", [MAX_CENTS + 1])).toThrow();
-    expect(() => settlementResult(100, "full", [Number.MAX_SAFE_INTEGER])).toThrow();
+    expect(() =>
+      settlementResult(MAX_CENTS + 1, "full", [MAX_CENTS + 1])
+    ).toThrow();
+    expect(() =>
+      settlementResult(100, "full", [Number.MAX_SAFE_INTEGER])
+    ).toThrow();
   });
 
   it("conserve les invariants d’un règlement intégral valide", () => {
-    expect(settlementResult(1_000, "full", [600, 400])).toEqual({ paidCents: 1_000, balanceCents: 0, status: "paid" });
+    expect(settlementResult(1_000, "full", [600, 400])).toEqual({
+      paidCents: 1_000,
+      balanceCents: 0,
+      status: "paid",
+    });
   });
 });

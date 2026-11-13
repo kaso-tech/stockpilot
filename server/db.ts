@@ -1,8 +1,8 @@
-import { desc, eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { desc, eq, inArray, sql } from "drizzle-orm";
+import mysql, { type Pool } from "mysql2/promise";
+import { drizzle, type MySql2Database } from "drizzle-orm/mysql2";
 import {
   auditLogs,
-  InsertUser,
   products,
   productPriceTiers,
   stockMovements,
@@ -10,87 +10,149 @@ import {
   userSessions,
   users,
 } from "../drizzle/schema";
-import { ENV } from "./_core/env";
 import { companyScope } from "./companyScope";
 
-let _db: ReturnType<typeof drizzle> | null = null;
+let _db: (MySql2Database & { $client: Pool }) | null = null;
 
+/**
+ * Pool MySQL partagé (P5). Taille réglable par DB_POOL_SIZE ; connexions maintenues
+ * actives pour éviter les coupures silencieuses derrière un équilibreur.
+ */
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      const pool = mysql.createPool({
+        uri: process.env.DATABASE_URL,
+        connectionLimit: Number(process.env.DB_POOL_SIZE) || 10,
+        waitForConnections: true,
+        enableKeepAlive: true,
+        keepAliveInitialDelay: 10_000,
+        connectTimeout: 10_000,
+      });
+      _db = drizzle(pool);
     } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
+      console.error(
+        "[Database] Configuration de connexion invalide :",
+        error instanceof Error ? error.message : error
+      );
       _db = null;
     }
   }
   return _db;
 }
 
-export async function upsertUser(user: InsertUser): Promise<void> {
-  if (!user.openId) throw new Error("User openId is required for upsert");
+/** Variante stricte pour les lectures : une base indisponible doit produire une erreur, jamais une liste vide trompeuse. */
+async function requireDb() {
   const db = await getDb();
-  if (!db) return;
+  if (!db) throw new Error("Base de données indisponible.");
+  return db;
+}
 
-  const values: InsertUser = { openId: user.openId, lastSignedIn: new Date() };
-  const updateSet: Record<string, unknown> = { lastSignedIn: new Date() };
-  (["name", "email", "loginMethod"] as const).forEach(field => {
-    if (user[field] !== undefined) {
-      values[field] = user[field] ?? null;
-      updateSet[field] = user[field] ?? null;
-    }
-  });
-  if (user.role !== undefined) {
-    values.role = user.role;
-    updateSet.role = user.role;
-  } else if (user.openId === ENV.ownerOpenId) {
-    values.role = "admin";
-    updateSet.role = "admin";
+export async function pingDatabase() {
+  const db = await getDb();
+  if (!db) return false;
+  try {
+    await db.execute(sql`SELECT 1`);
+    return true;
+  } catch {
+    return false;
   }
-
-  await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
 }
 
 export async function getUserByOpenId(openId: string) {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+  const result = await db
+    .select()
+    .from(users)
+    .where(eq(users.openId, openId))
+    .limit(1);
   return result[0];
 }
 
 export async function getUserSessionById(sessionId: string) {
   const db = await getDb();
   if (!db) return undefined;
-  return (await db.select().from(userSessions).where(eq(userSessions.id, sessionId)).limit(1))[0];
+  return (
+    await db
+      .select()
+      .from(userSessions)
+      .where(eq(userSessions.id, sessionId))
+      .limit(1)
+  )[0];
 }
 
-export async function touchUserSession(sessionId: string) {
+export async function recordUserActivity(
+  sessionId: string,
+  userId: number,
+  at = new Date()
+) {
   const db = await getDb();
   if (!db) return;
-  await db.update(userSessions).set({ lastSeenAt: new Date() }).where(eq(userSessions.id, sessionId));
+  await Promise.all([
+    db
+      .update(userSessions)
+      .set({ lastSeenAt: at })
+      .where(eq(userSessions.id, sessionId)),
+    db.update(users).set({ lastSignedIn: at }).where(eq(users.id, userId)), // tenant-scope-ok: utilisateur authentifié
+  ]);
 }
 
 export async function listProducts(companyId: number | null) {
-  const db = await getDb();
-  if (!db) return [];
-  const [rows, tiers] = await Promise.all([db.select().from(products).where(companyScope(products.companyId, companyId)).orderBy(products.name), db.select().from(productPriceTiers)]);
+  const db = await requireDb();
+  const rows = await db
+    .select()
+    .from(products)
+    .where(companyScope(products.companyId, companyId))
+    .orderBy(products.name);
+  // Seuls les paliers des produits de l'entreprise sont chargés (P3), puis indexés par produit.
+  const tiers = rows.length
+    ? await db
+        .select()
+        .from(productPriceTiers)
+        .where(
+          inArray(
+            productPriceTiers.productId,
+            rows.map(product => product.id)
+          )
+        )
+    : [];
+  const tiersByProduct = new Map<number, typeof tiers>();
+  for (const tier of tiers)
+    tiersByProduct.set(tier.productId, [
+      ...(tiersByProduct.get(tier.productId) ?? []),
+      tier,
+    ]);
   return rows.map(product => {
-    const productTiers = tiers.filter(tier => tier.productId === product.id).sort((left, right) => left.minQuantity - right.minQuantity);
-    const retailPriceTiers = productTiers.filter(tier => tier.customerType === "retail");
-    const wholesalePriceTiers = productTiers.filter(tier => tier.customerType === "wholesale");
-    return { ...product, priceTiers: retailPriceTiers, retailPriceTiers, wholesalePriceTiers };
+    const productTiers = (tiersByProduct.get(product.id) ?? []).sort(
+      (left, right) => left.minQuantity - right.minQuantity
+    );
+    const retailPriceTiers = productTiers.filter(
+      tier => tier.customerType === "retail"
+    );
+    const wholesalePriceTiers = productTiers.filter(
+      tier => tier.customerType === "wholesale"
+    );
+    return {
+      ...product,
+      priceTiers: retailPriceTiers,
+      retailPriceTiers,
+      wholesalePriceTiers,
+    };
   });
 }
 
 export async function listSuppliers(companyId: number | null) {
-  const db = await getDb();
-  if (!db) return [];
-  return db.select().from(suppliers).where(companyScope(suppliers.companyId, companyId)).orderBy(suppliers.name);
+  const db = await requireDb();
+  return db
+    .select()
+    .from(suppliers)
+    .where(companyScope(suppliers.companyId, companyId))
+    .orderBy(suppliers.name);
 }
 
 export async function listMovements(companyId: number | null, limit = 100) {
-  const db = await getDb();
-  if (!db) return [];
+  const db = await requireDb();
   return db
     .select({
       id: stockMovements.id,
@@ -117,8 +179,7 @@ export async function listMovements(companyId: number | null, limit = 100) {
 }
 
 export async function listAuditLogs(companyId: number | null, limit = 100) {
-  const db = await getDb();
-  if (!db) return [];
+  const db = await requireDb();
   return db
     .select({
       id: auditLogs.id,
@@ -135,21 +196,4 @@ export async function listAuditLogs(companyId: number | null, limit = 100) {
     .where(companyScope(auditLogs.companyId, companyId))
     .orderBy(desc(auditLogs.createdAt))
     .limit(limit);
-}
-
-export async function listUsers(companyId: number | null) {
-  const db = await getDb();
-  if (!db) return [];
-  return db
-    .select({
-      id: users.id,
-      name: users.name,
-      email: users.email,
-      role: users.role,
-      lastSignedIn: users.lastSignedIn,
-      createdAt: users.createdAt,
-    })
-    .from(users)
-    .where(companyScope(users.companyId, companyId))
-    .orderBy(users.name);
 }

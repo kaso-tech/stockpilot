@@ -1,31 +1,109 @@
 import { chromium } from "playwright";
 
 const now = new Date().toISOString();
-const admin = { id: 1, openId: "sales-mobile-admin", name: "Admin", email: "admin@example.test", role: "admin", active: true, createdAt: now, updatedAt: now, lastSignedIn: now };
-const products = [{ id: 10, name: "Produit mobile", reference: "MOB-001", unit: "unité", quantity: 10, retailPriceCents: 4500000, wholesalePriceCents: 3800000 }];
+const admin = {
+  id: 1,
+  openId: "sales-mobile-admin",
+  name: "Admin",
+  email: "admin@example.test",
+  role: "admin",
+  active: true,
+  createdAt: now,
+  updatedAt: now,
+  lastSignedIn: now,
+};
+const products = [
+  {
+    id: 10,
+    name: "Produit mobile",
+    reference: "MOB-001",
+    unit: "unité",
+    quantity: 10,
+    retailPriceCents: 4500000,
+    wholesalePriceCents: 3800000,
+  },
+];
 const customers = [{ id: 4, name: "Client mobile", type: "ordinary" }];
-const agents = [{ id: 7, name: "Agent mobile", type: "sales_agent", active: true }, { id: 8, name: "Caissier mobile", type: "cashier", active: true }];
-const partialInvoice = { id: 303, invoiceNumber: "FAC-MOB-303", channel: "invoice", status: "partial", totalCents: 855000, amountPaidCents: 300000, createdAt: now, customerName: "Client mobile" };
-const invoiceDetail = { sale: { ...partialInvoice, subtotalCents: 1000000, invoiceDiscountCents: 45000 }, customer: customers[0], items: [{ id: 1, productName: "Produit mobile", quantity: 1, unitPriceCents: 1000000, discountCents: 100000, lineTotalCents: 900000 }], commissions: [], participants: {} };
+const agents = [
+  { id: 7, name: "Agent mobile", type: "sales_agent", active: true },
+  { id: 8, name: "Caissier mobile", type: "cashier", active: true },
+];
+const partialInvoice = {
+  id: 303,
+  invoiceNumber: "FAC-MOB-303",
+  channel: "invoice",
+  status: "partial",
+  totalCents: 855000,
+  amountPaidCents: 300000,
+  createdAt: now,
+  customerName: "Client mobile",
+};
+const invoiceDetail = {
+  sale: {
+    ...partialInvoice,
+    subtotalCents: 1000000,
+    invoiceDiscountCents: 45000,
+  },
+  customer: customers[0],
+  items: [
+    {
+      id: 1,
+      productName: "Produit mobile",
+      quantity: 1,
+      unitPriceCents: 1000000,
+      discountCents: 100000,
+      lineTotalCents: 900000,
+    },
+  ],
+  commissions: [],
+  participants: {},
+};
 let saleId = 201;
-const browser = await chromium.launch({ headless: true, executablePath: "/usr/bin/chromium", args: ["--no-sandbox"] });
+const browser = await chromium.launch({
+  headless: true,
+  executablePath: "/usr/bin/chromium",
+  args: ["--no-sandbox"],
+});
 const page = await browser.newPage({ viewport: { width: 375, height: 812 } });
 await page.route("**/api/trpc/**", async route => {
-  const paths = route.request().url().split("/api/trpc/")[1].split("?")[0].split(",");
+  const paths = route
+    .request()
+    .url()
+    .split("/api/trpc/")[1]
+    .split("?")[0]
+    .split(",");
   const value = path => {
     if (path === "auth.me") return admin;
     if (path === "products.list") return products;
     if (path === "commerce.customers.list") return customers;
     if (path === "commerce.agents.list") return agents;
-    if (path === "commerce.settings.get") return { defaultSalesAgentId: null, defaultCashierId: null, requireSalesAgent: false, requireCashier: false, currency: "XOF" };
-    if (path === "transactions.createDraft") return { id: saleId++, invoiceNumber: `MOB-${saleId}`, totalCents: 4500000 };
-    if (path === "transactions.checkout") return { status: "paid", amountPaidCents: 4500000, balanceCents: 0 };
+    if (path === "commerce.settings.get")
+      return {
+        defaultSalesAgentId: null,
+        defaultCashierId: null,
+        requireSalesAgent: false,
+        requireCashier: false,
+        currency: "XOF",
+      };
+    if (path === "transactions.createDraft")
+      return {
+        id: saleId++,
+        invoiceNumber: `MOB-${saleId}`,
+        totalCents: 4500000,
+      };
+    if (path === "transactions.checkout")
+      return { status: "paid", amountPaidCents: 4500000, balanceCents: 0 };
     if (path === "transactions.list") return [partialInvoice];
     if (path === "commerce.sales.detail") return invoiceDetail;
     if (path === "dashboard.get") return [];
     return [];
   };
-  await route.fulfill({ contentType: "application/json", body: JSON.stringify(paths.map(path => ({ result: { data: { json: value(path) } } }))) });
+  await route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify(
+      paths.map(path => ({ result: { data: { json: value(path) } } }))
+    ),
+  });
 });
 await page.goto("http://localhost:3000/pos", { waitUntil: "domcontentloaded" });
 await page.getByText("Produit mobile", { exact: true }).click();
@@ -33,18 +111,39 @@ await page.getByRole("button", { name: /Panier · 1/ }).click();
 await page.getByRole("button", { name: "Encaisser", exact: true }).click();
 await page.getByRole("heading", { name: "Encaissement" }).waitFor();
 await page.getByRole("button", { name: "Valider l’encaissement" }).click();
-await page.goto("http://localhost:3000/factures/nouvelle", { waitUntil: "domcontentloaded" });
+await page.goto("http://localhost:3000/factures/nouvelle", {
+  waitUntil: "domcontentloaded",
+});
 await page.getByText("Sélectionner un client", { exact: true }).click();
 await page.getByText("Client mobile · Ordinaire", { exact: true }).click();
 await page.getByRole("button", { name: "Ajouter un produit" }).click();
-await page.getByPlaceholder("Rechercher par nom ou référence").fill("Produit mobile");
+await page
+  .getByPlaceholder("Rechercher par nom ou référence")
+  .fill("Produit mobile");
 await page.getByRole("button", { name: /Produit mobile MOB-001/ }).waitFor();
 await page.getByPlaceholder("Code scanné").fill("MOB-001");
 await page.getByRole("button", { name: "Scan", exact: true }).click();
-await page.locator("div.rounded-xl.border.border-border.p-3").getByText("Produit mobile", { exact: true }).waitFor();
-await page.goto("http://localhost:3000/factures", { waitUntil: "domcontentloaded" });
-await page.getByText("FAC-MOB-303", { exact: true }).locator("xpath=ancestor::tr").getByRole("button").first().click();
-const preview = (await page.locator("#invoice-print").innerText()).replace(/\s+/g, " ");
-for (const expected of ["-1 000 FCFA", "-450 FCFA", "8 550 FCFA"]) if (!preview.includes(expected)) throw new Error(`Montant remisé absent de l’aperçu mobile : ${expected}`);
+await page
+  .locator("div.rounded-xl.border.border-border.p-3")
+  .getByText("Produit mobile", { exact: true })
+  .waitFor();
+await page.goto("http://localhost:3000/factures", {
+  waitUntil: "domcontentloaded",
+});
+await page
+  .getByText("FAC-MOB-303", { exact: true })
+  .locator("xpath=ancestor::tr")
+  .getByRole("button")
+  .first()
+  .click();
+const preview = (await page.locator("#invoice-print").innerText()).replace(
+  /\s+/g,
+  " "
+);
+for (const expected of ["-1 000 FCFA", "-450 FCFA", "8 550 FCFA"])
+  if (!preview.includes(expected))
+    throw new Error(`Montant remisé absent de l’aperçu mobile : ${expected}`);
 await browser.close();
-console.log("Parcours E2E mobile POS, encaissement et facture par scan validé.");
+console.log(
+  "Parcours E2E mobile POS, encaissement et facture par scan validé."
+);

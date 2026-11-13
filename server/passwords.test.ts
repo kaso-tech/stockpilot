@@ -6,6 +6,8 @@ describe("identifiants vendeur", () => {
     const hash = await hashPassword("Vendeur!2026");
     expect(hash).not.toContain("Vendeur!2026");
     await expect(verifyPassword("Vendeur!2026", hash)).resolves.toBe(true);
-    await expect(verifyPassword("mauvais-mot-de-passe", hash)).resolves.toBe(false);
+    await expect(verifyPassword("mauvais-mot-de-passe", hash)).resolves.toBe(
+      false
+    );
   });
 });
