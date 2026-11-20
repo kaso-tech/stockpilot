@@ -37,7 +37,7 @@ test("la PWA conserve ses pages déjà chargées après coupure réseau sans rec
 test("une mise à jour est reportable et ne s’active qu’après confirmation explicite", async ({ page }) => {
   await mockApi(page);
   await page.goto("/");
-  await expect(page.getByText("Performance du mois", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Bonjour Compte" })).toBeVisible();
   await page.evaluate(() => {
     (window as any).__updateActivated = 0;
     window.dispatchEvent(new CustomEvent("stockpilot-pwa-update", { detail: async () => { (window as any).__updateActivated++; } }));

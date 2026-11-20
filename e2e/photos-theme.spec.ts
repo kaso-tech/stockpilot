@@ -10,7 +10,7 @@ test("la photo déjà chargée reste décodable hors réseau dans son périmètr
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
   await page.reload();
   await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
-  await expect(page.getByText("Performance du mois", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Bonjour Compte" })).toBeVisible();
   await page.evaluate(() => navigator.serviceWorker.controller?.postMessage({ type: "STOCKPILOT_PHOTO_SCOPE", scope: { companyId: 101, userId: 1001, warehouseId: 99 } }));
   await pushRoute(page, "/produits");
   const image = page.locator('img[src*="thumb_1234abcd.png"]').first();
@@ -33,7 +33,7 @@ test("la photo déjà chargée reste décodable hors réseau dans son périmètr
 test("la recherche Ctrl+K utilise les routes autorisées sans nouveau document et le bleu reste personnalisable", async ({ page }) => {
   await mockApi(page, "viewer");
   await page.goto("/");
-  await expect(page.getByText("Performance du mois", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Bonjour Compte" })).toBeVisible();
   await page.keyboard.press("Control+k");
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();

@@ -190,6 +190,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const isCollapsed = state === "collapsed";
   const isMobile = useIsMobile();
   const [navigationOpen, setNavigationOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   useEffect(() => {
     const openNavigation = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
@@ -270,9 +271,13 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         </SidebarContent>
 
         <SidebarFooter className="border-t border-sidebar-border p-3">
-          <DropdownMenu>
+          <DropdownMenu open={accountMenuOpen} onOpenChange={setAccountMenuOpen}>
             <DropdownMenuTrigger asChild>
-              <button className="flex w-full items-center gap-3 rounded-xl p-2 text-left transition-colors hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <button
+                onPointerDown={event => event.preventDefault()}
+                onClick={() => setAccountMenuOpen(current => !current)}
+                className="flex w-full items-center gap-3 rounded-xl p-2 text-left transition-colors hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
                 <Avatar className="h-8 w-8 shrink-0 border border-border">
                   <AvatarFallback className="bg-muted text-[11px] font-semibold text-primary">{initials}</AvatarFallback>
                 </Avatar>
@@ -285,7 +290,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
                 {!isCollapsed && <ChevronDown className="h-3.5 w-3.5 text-slate-500" />}
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" side="top" className="w-56 border-border bg-popover text-popover-foreground">
+            <DropdownMenuContent align="end" side={isMobile ? "top" : "right"} sideOffset={8} className="w-56 border-border bg-popover text-popover-foreground">
               <DropdownMenuLabel className="font-normal">
                 <p className="truncate text-sm font-medium">{user?.name || "Utilisateur"}</p>
                 <p className="mt-0.5 truncate text-xs text-muted-foreground">{user?.email}</p>

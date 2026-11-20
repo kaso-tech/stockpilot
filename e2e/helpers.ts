@@ -2,7 +2,7 @@ import { type Page } from "@playwright/test";
 import superjson from "superjson";
 export const warehouse = { id: 99, companyId: 101, name: "Entrepôt de recette", code: "TEST", active: true, isDefault: true };
 export const product = { id: 42, companyId: 101, reference: "TEST-42", name: "Produit de recette", category: "Recette", unit: "pièce", quantity: 10, minimumQuantity: 2, purchasePriceCents: 100, retailPriceCents: 200, wholesalePriceCents: 180, supplierId: null };
-export async function mockApi(page: Page, role = "admin", authenticated = true, withPhoto = false) {
+export async function mockApi(page: Page, role = "admin", authenticated = true, withPhoto = false, overrides: Record<string, unknown> = {}) {
   const user = authenticated ? { id: 1001, openId: "e2e-synthetic", companyId: 101, name: "Compte de recette", role, active: true, email: "test@example.test", createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() } : null;
   await page.route("**/api/trpc/**", async route => {
     const names = new URL(route.request().url()).pathname.split("/api/trpc/")[1]!.split(",");
@@ -17,6 +17,7 @@ export async function mockApi(page: Page, role = "admin", authenticated = true, 
       "backups.get": { settings: {}, archives: [] },
       "auth.requestPasswordReset": { success: true }, "auth.resetPassword": { success: true },
       "emailVerification.status": { verifiedAt: null, available: false },
+      ...overrides,
     };
     const results = names.map(name => {
       const data = Object.hasOwn(known, name) ? known[name] : (name.endsWith(".list") || name.endsWith(".notifications") || name.endsWith(".managerAlerts") ? [] : {});

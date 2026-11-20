@@ -1049,3 +1049,17 @@ Source figée : branche `ccr-1f2b32f0-8cxy1l`, commit `726b79f48d766a2ebb34c16a8
 - [x] Isoler le cache des photos offline par entreprise, utilisateur et entrepôt, et purger à la déconnexion.
 - [x] Générer et appliquer la migration photo après 0078 sans toucher aux quantités ni aux données historiques.
 - [x] Exécuter typage, tests, build, audit/release et recette navigateur puis livrer checkpoint et archive sans secrets.
+
+## Synchronisation GitHub — 20 novembre 2026
+
+Source récupérée et revérifiée : `52dd44a010c4e8a53cefac40395dc0935523024c`, branche `ccr-1f2b32f0-8cxy1l`. Portage sélectif sur `b5ccfb22` ; sauvegarde `backup/pre-pull-2026-11-20`. Le `main` ancien et la migration distante de changement de couleur ne remplacent pas le socle actuel. Aucune migration ni modification de données métier pour cette livraison. Les cases ouvertes du lot I restent inchangées : YengaPay en pause SANDBOX.
+
+- [x] Vérifier les dernières têtes GitHub et préserver l’état local avant intégration.
+- [x] Porter le menu de compte desktop/mobile en conservant les entrées et permissions actuelles.
+- [x] Réorganiser la vue d’ensemble en cinq blocs sans perdre les indicateurs financiers ni la portée entreprise/entrepôt.
+- [x] Préserver les anciennes préférences dashboard et l’accès financier limité aux rôles autorisés.
+- [x] Porter l’anneau et sa légende au rapport mensuel des dépenses, avec les catégories et totaux locaux.
+- [x] Conserver le bleu `#2563EB` ; exclure la migration distante `0056` incompatible.
+- [x] Valider TypeScript frais/standard, 356 tests, build PWA, audit/release, diff et 9 E2E, dont le rapport mobile/offline et la conservation des dépenses dans les priorités sans divulgation au vendeur.
+- [x] Actualiser la note de synchronisation et le dossier de continuité en distinguant aperçu, checkpoint et publication.
+- [x] Préparer la livraison source sans secrets, contrôler le ZIP et les SHA-256, puis figer l’état validé dans le checkpoint de remise.

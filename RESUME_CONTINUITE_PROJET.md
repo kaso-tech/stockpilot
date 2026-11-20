@@ -1,11 +1,11 @@
 # StockPilot Pro — Dossier de continuité
 
-**Date de synthèse :** 13 novembre 2026
+**Date de synthèse :** 20 novembre 2026
 **Projet Manus :** StockPilot SaaS
 **Chemin de travail :** `/home/ubuntu/stockpilot-pro`
 **Domaine publié :** `https://stockpilot-gpaoheuz.manus.space`
-**Dernier checkpoint fonctionnel avant cette intégration GitHub :** `abc48e5e`
-**Archive source de cette livraison :** `/home/ubuntu/stockpilot-pro-latest-2026-11-13.zip`
+**Dernier checkpoint fonctionnel avant cette synchronisation :** `b5ccfb22`
+**Archive source de cette livraison :** `/home/ubuntu/stockpilot-pro-latest-2026-11-20.zip`
 
 ## 1. Objectif produit
 
@@ -398,3 +398,13 @@ La migration `0079_product_images.sql` ajoute seulement deux colonnes nullable e
 Recette : typage frais sans cache incrémental, **135 fichiers / 354 tests**, build PWA, audit/release, contrôle du diff et **7 scénarios E2E** sur API simulée réussis. Les anciens diagnostics du watcher ne doivent pas être pris pour un résultat de compilation actuel. Les fichiers de recette n’écrivent pas dans la base métier ni le stockage réel.
 
 Note détaillée : `NOTE_SYNCHRONISATION_2026-11-13.md`. Archive : `/home/ubuntu/stockpilot-pro-latest-2026-11-13.zip`. YengaPay reste en pause SANDBOX, SMTP/S3 externes restent à configurer/valider. Le checkpoint final est livré séparément ; ne pas confondre sa sauvegarde avec la publication du domaine public.
+
+## Livraison GitHub — 20 novembre 2026
+
+La branche de collaboration `kaso-tech/stockpilot:ccr-1f2b32f0-8cxy1l` est récupérée et revérifiée à la tête `52dd44a010c4e8a53cefac40395dc0935523024c`. `main` reste sur l’ancien `81833c5`. Les apports des commits `3272f92` et `52dd44a` sont portés sélectivement sur le checkpoint `b5ccfb22` : menu de compte adapté, vue d’ensemble réorganisée en cinq blocs et anneau/légende du rapport mensuel des dépenses. Les calculs financiers locaux, les paramètres historiques, les catégories incluant la paie agents, les permissions et le contexte entreprise/entrepôt sont conservés. La nouvelle préférence `todo` respecte les anciennes clés et un choix explicite reste prioritaire.
+
+Sauvegarde : `backup/pre-pull-2026-11-20`. Branche : `integrate/github-latest-2026-11-13`. Ne pas annoncer un pull/rebase global ni une restauration d’une ancienne version. La migration distante `0056_default_primary_color.sql` est exclue : elle remplacerait le bleu demandé `#2563EB` par `#0B6E76` et entrerait en conflit avec l’historique local. Aucune migration supplémentaire, aucune suppression ni écriture de données métier n’est effectuée pour cette livraison ; le schéma reste à `0079`.
+
+Recette finale : TypeScript frais réussi, puis `pnpm check` réussi après suppression du seul cache incrémental TypeScript périmé ; **135 fichiers / 356 tests Vitest**, build PWA (**124 entrées**), audit production/release, `git diff --check` et **9 E2E** sur build production avec API simulée réussis. Les scénarios supplémentaires vérifient le rapport des dépenses alimenté, la portée d’entrepôt, la lecture mobile/offline et la conservation des dépenses/paie dans les priorités quand les autres blocs sont masqués, sans les divulguer au vendeur. L’aperçu desktop/mobile a été inspecté sans écriture dans les données. Le watcher peut encore afficher d’anciens diagnostics ; ne pas les confondre avec le contrôle frais validé. La CI distante était en échec `quality` sans journal exploitable ; aucun succès distant n’est revendiqué.
+
+Note : `NOTE_SYNCHRONISATION_2026-11-20.md`. Archive source : `/home/ubuntu/stockpilot-pro-latest-2026-11-20.zip`, avec continuité, tests et migrations, sans secrets ni données métier. Le checkpoint final est livré séparément. Aucun push GitHub ni publication du domaine n’est effectué. YengaPay reste en pause SANDBOX ; les 12 cases ouvertes du lot I ne sont pas clôturées par cette synchronisation. SMTP/S3 externes et prérequis commerciaux restent à valider. Les limites offline décrites dans la note restent applicables.
