@@ -199,6 +199,7 @@ export function CheckoutSheet({
   agents,
   settings,
   onComplete,
+  onAbandon,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -215,6 +216,8 @@ export function CheckoutSheet({
   agents: Agent[];
   settings?: PaymentSettings;
   onComplete: (saleId: number | null, receiptWindow?: Window | null) => void;
+  /** Fermeture sans encaissement (bouton, Échap, clic hors du panneau). */
+  onAbandon?: () => void;
 }) {
   const utils = trpc.useUtils();
   const { isOnline, queuePosSale, queueInvoiceSale } = useOffline();
@@ -460,8 +463,15 @@ export function CheckoutSheet({
   );
   const difference = remaining - paidCents;
 
+  // Fermeture par l'utilisateur (bouton, Échap, clic hors du panneau) : abandon.
+  // Après un encaissement réussi, le panneau est fermé directement par
+  // onOpenChange(false), sans passer par ici.
+  const handleOpenChange = (next: boolean) => {
+    if (!next) onAbandon?.();
+    onOpenChange(next);
+  };
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent
         side="right"
         className="w-full overflow-y-auto border-border bg-card p-0 text-foreground sm:!inset-y-auto sm:!left-1/2 sm:!right-auto sm:!top-1/2 sm:!h-auto sm:!max-h-[88vh] sm:!w-[min(94vw,620px)] sm:!max-w-none sm:!-translate-x-1/2 sm:!-translate-y-1/2 sm:!rounded-xl"
@@ -625,7 +635,7 @@ export function CheckoutSheet({
           <div className="flex gap-3 border-t border-border pt-4">
             <Button
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={() => handleOpenChange(false)}
               className="flex-1 border-border text-foreground"
             >
               <X className="mr-2 h-4 w-4" />

@@ -323,7 +323,9 @@ export default function InvoiceDetail() {
               onClick={() => setConfirmDelete(true)}
             >
               <Trash2 className="mr-2 h-4 w-4" />
-              Annuler la facture
+              {sale.channel === "pos"
+                ? "Annuler la vente"
+                : "Annuler la facture"}
             </Button>
           )}
           {(sale.status === "paid" || sale.status === "partial") && (
@@ -405,11 +407,16 @@ export default function InvoiceDetail() {
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Annuler cette facture ?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {sale.channel === "pos"
+                ? "Annuler cette vente ?"
+                : "Annuler cette facture ?"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              La facture restera visible avec le statut « annulée » afin de
-              préserver la continuité de la numérotation. Seules les factures
-              non encaissées peuvent être annulées.
+              {sale.channel === "pos" ? "La vente" : "La facture"} restera
+              visible avec le statut « annulée » afin de préserver la continuité
+              de la numérotation. Le stock n’est pas modifié : il n’est décompté
+              qu’à l’encaissement.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -418,7 +425,9 @@ export default function InvoiceDetail() {
               className="bg-destructive text-destructive-foreground"
               onClick={() => removeDraft.mutate({ saleId: sale.id })}
             >
-              Annuler la facture
+              {sale.channel === "pos"
+                ? "Annuler la vente"
+                : "Annuler la facture"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

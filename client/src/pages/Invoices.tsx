@@ -512,7 +512,9 @@ export default function Invoices() {
                     onClick={() => setDeleteTarget(detail.sale)}
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
-                    Annuler la facture
+                    {detail.sale.channel === "pos"
+                      ? "Annuler la vente"
+                      : "Annuler la facture"}
                   </Button>
                 )}
                 {(detail.sale.status === "paid" ||

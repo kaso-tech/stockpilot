@@ -245,7 +245,12 @@ export const transactionsRouter = router({
             .limit(1)
             .for("update")
         )[0];
-        if (!sale || (sale.channel !== "invoice" && sale.channel !== "quote"))
+        if (
+          !sale ||
+          (sale.channel !== "invoice" &&
+            sale.channel !== "quote" &&
+            sale.channel !== "pos")
+        )
           throw new TRPCError({
             code: "NOT_FOUND",
             message: "Document introuvable.",
@@ -275,9 +280,9 @@ export const transactionsRouter = router({
             });
           }
         }
-        if (sale.channel === "invoice") {
-          // Une facture numérotée n'est jamais supprimée : elle est annulée pour
-          // préserver la continuité de la numérotation (E5).
+        if (sale.channel === "invoice" || sale.channel === "pos") {
+          // Une facture ou une vente de caisse numérotée n'est jamais supprimée :
+          // elle est annulée pour préserver la continuité de la numérotation (E5).
           await tx
             .update(sales)
             .set({ status: "void", voidedAt: new Date() })
@@ -291,9 +296,9 @@ export const transactionsRouter = router({
             companyId: ctx.user.companyId,
             actorUserId: ctx.user.id,
             action: "Annulation",
-            entityType: "Facture",
+            entityType: sale.channel === "pos" ? "Vente" : "Facture",
             entityId: String(sale.id),
-            detail: `Facture ${sale.invoiceNumber} annulée avant encaissement`,
+            detail: `${sale.channel === "pos" ? "Vente de caisse" : "Facture"} ${sale.invoiceNumber} annulée avant encaissement`,
           });
         } else {
           await tx.delete(saleItems).where(eq(saleItems.saleId, sale.id));

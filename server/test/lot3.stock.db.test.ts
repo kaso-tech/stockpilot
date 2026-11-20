@@ -63,6 +63,34 @@ describe.skipIf(!realDbUrl)(
       a = await seedTenant("a");
     });
 
+    it("une vente de caisse non encaissée s'annule sans toucher au stock ; une vente encaissée ne s'annule pas", async () => {
+      const admin = appRouter.createCaller(ctx(a.admin));
+      const { id: productId } = await admin.products.create(
+        productInput({ quantity: 10 })
+      );
+      const pending = await admin.transactions.createDraft(draft(productId, 2));
+      await admin.transactions.removeDraft({ saleId: pending.id });
+      const db = await realDb();
+      const { sales } = await import("../../drizzle/schema");
+      const voided = (
+        await db.select().from(sales).where(eq(sales.id, pending.id))
+      )[0];
+      expect(voided?.status).toBe("void");
+      expect(voided?.invoiceNumber).toBe(pending.invoiceNumber);
+      expect(await stockOf(productId)).toBe(10);
+
+      const paid = await admin.transactions.createDraft(draft(productId, 1));
+      await admin.transactions.checkout({
+        saleId: paid.id,
+        settlementMode: "full",
+        payments: [{ method: "cash", amountCents: paid.totalCents }],
+        ...agents,
+      });
+      await expect(
+        admin.transactions.removeDraft({ saleId: paid.id })
+      ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    });
+
     it("E1 — deux encaissements simultanés d'une même vente ne décrémentent le stock qu'une fois", async () => {
       const admin = appRouter.createCaller(ctx(a.admin));
       const { id: productId } = await admin.products.create(

@@ -1,3 +1,4 @@
+import { useSidebar } from "@/components/ui/sidebar";
 import { ProductImage } from "@/components/ProductImage";
 import { readPreference, writePreference } from "@/lib/preferenceStorage";
 import { BarcodeCameraDialog } from "@/components/BarcodeCameraDialog";
@@ -33,8 +34,6 @@ import { useOffline, type OfflinePosDraft } from "@/contexts/OfflineContext";
 import {
   AlertTriangle,
   Camera,
-  ChevronDown,
-  ChevronUp,
   ClipboardList,
   Image as ImageIcon,
   ImageOff,
@@ -45,8 +44,9 @@ import {
   Search,
   ShoppingCart,
   Trash2,
+  X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 type CartItem = { productId: number; quantity: number; discount: DiscountForm };
@@ -292,6 +292,24 @@ export default function PointOfSale() {
     setInvoiceDiscount(noDiscount);
     setCartCollapsed(false);
   };
+  // Comme sur les caisses professionnelles, l'écran de vente prend toute la largeur
+  // sur tablette : le menu de l'application se replie en icônes, puis revient en sortant.
+  const { open: sidebarOpen, setOpen: setSidebarOpen, isMobile } = useSidebar();
+  const sidebarWasOpen = useRef(sidebarOpen);
+  useEffect(() => {
+    if (isMobile || window.innerWidth >= 1280) return;
+    const wasOpen = sidebarWasOpen.current;
+    if (wasOpen) setSidebarOpen(false);
+    return () => {
+      if (wasOpen) setSidebarOpen(true);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMobile]);
+  const abandonDraft = trpc.transactions.removeDraft.useMutation({
+    onSuccess: () => utils.transactions.list.invalidate(),
+    // Échec silencieux : la vente reste annulable depuis les factures.
+    onError: () => undefined,
+  });
   const draft = trpc.transactions.createDraft.useMutation({
     onSuccess: result => {
       utils.transactions.list.invalidate();
@@ -382,15 +400,11 @@ export default function PointOfSale() {
   const usedCategories = categories.filter(category =>
     products.some(product => product.categoryId === category.id)
   );
-  const bottomSpacing = cart.length
-    ? cartCollapsed
-      ? "pb-36 sm:pb-40 lg:pb-0"
-      : "pb-[27rem] sm:pb-[31rem] lg:pb-0"
-    : "";
+  const bottomSpacing = cart.length ? "pb-24 md:pb-0" : "";
   const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   return (
     <div
-      className={`mx-auto grid max-w-[1600px] gap-6 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_420px] ${bottomSpacing}`}
+      className={`mx-auto grid max-w-[1600px] gap-6 md:grid-cols-[minmax(0,1fr)_320px] lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_400px] ${bottomSpacing}`}
     >
       <section className="min-w-0 space-y-[18px]">
         <header className="flex flex-wrap items-center gap-3">
@@ -512,41 +526,49 @@ export default function PointOfSale() {
             quantité suffisante pour dépasser le seuil de sécurité.
           </p>
         )}
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-3">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
           {available.map(product => {
             const productIsLowStock = isLowStock(product);
-            const inCart = cart.some(item => item.productId === product.id);
+            const quantityInCart =
+              cart.find(item => item.productId === product.id)?.quantity ?? 0;
+            const inCart = quantityInCart > 0;
             const remaining =
               product.quantity - (pendingProductQuantities[product.id] ?? 0);
             return (
               <button
                 key={product.id}
                 onClick={() => add(product.id)}
-                className={`flex min-h-[112px] flex-col gap-1.5 overflow-hidden rounded-xl border bg-card p-3.5 text-left transition-colors hover:border-primary/60 hover:bg-accent/40 ${inCart ? "border-primary ring-1 ring-primary" : "border-border"}`}
+                aria-label={`${product.name}${quantityInCart ? `, ${quantityInCart} au panier` : ""}`}
+                className={`relative flex min-h-[112px] flex-col gap-1.5 rounded-xl border bg-card p-2.5 text-left transition-colors hover:border-primary/60 active:scale-[0.98] ${inCart ? "border-primary ring-1 ring-primary" : "border-border"}`}
               >
+                {quantityInCart > 0 && (
+                  <span className="absolute right-2 top-2 z-10 grid h-7 min-w-7 place-items-center rounded-full bg-primary px-2 text-sm font-bold text-primary-foreground shadow-sm">
+                    {quantityInCart}
+                  </span>
+                )}
                 {showImages && (
                   <ProductImage
                     product={product}
-                    className="-mx-3.5 -mt-3.5 mb-1 aspect-[4/3] w-[calc(100%+1.75rem)] max-w-none text-3xl"
-                    rounded="rounded-none"
+                    className="mb-1 aspect-square w-full text-3xl"
+                    rounded="rounded-lg"
                   />
                 )}
-                <span className="line-clamp-2 text-[15px] font-semibold leading-snug text-foreground">
+                <span className="line-clamp-2 px-1 text-[15px] font-semibold leading-snug text-foreground">
                   {product.name}
                 </span>
                 <span
-                  className={`text-xs font-medium ${productIsLowStock ? "text-warning" : "text-faint"}`}
+                  className={`px-1 text-xs font-medium ${productIsLowStock ? "text-warning" : "text-faint"}`}
                 >
                   {productIsLowStock ? "Stock bas" : "En stock"} · {remaining}{" "}
                   {product.unit}
                 </span>
                 {product.priceTiers?.length ? (
-                  <span className="text-[11px] font-medium text-primary">
+                  <span className="px-1 text-[11px] font-medium text-primary">
                     Paliers dès {product.priceTiers[0].minQuantity}{" "}
                     {product.unit}
                   </span>
                 ) : null}
-                <span className="mt-auto text-base font-bold text-foreground">
+                <span className="mt-auto px-1 text-base font-bold text-foreground">
                   {formatCurrency(product.retailPriceCents)}
                 </span>
               </button>
@@ -571,6 +593,12 @@ export default function PointOfSale() {
       <CheckoutSheet
         open={Boolean(checkoutSale)}
         onOpenChange={open => !open && setCheckoutSale(null)}
+        onAbandon={() => {
+          // Encaissement abandonné : la vente numérotée en attente est annulée
+          // (elle reste tracée), le panier est conservé pour reprendre la vente.
+          if (checkoutSale?.id)
+            abandonDraft.mutate({ saleId: checkoutSale.id });
+        }}
         sale={checkoutSale}
         agents={agents}
         settings={settings}
@@ -644,13 +672,21 @@ export default function PointOfSale() {
       </Dialog>
       <aside
         aria-label="Panier de vente"
-        className={`fixed inset-x-0 bottom-0 z-30 mx-auto w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl border border-border bg-card shadow-2xl sm:bottom-5 sm:rounded-2xl lg:sticky lg:top-[5.5rem] lg:bottom-auto lg:z-0 lg:mx-0 lg:max-h-[calc(100vh-7.5rem)] lg:max-w-none lg:self-start lg:rounded-xl lg:shadow-none ${cart.length > 0 && !checkoutSale ? "flex" : "hidden lg:flex"}`}
+        // Téléphone : barre de total fixe, panier en plein écran à la demande.
+        // Tablette et ordinateur : panneau latéral toujours visible.
+        className={`flex-col overflow-hidden bg-card md:sticky md:inset-auto md:top-[5.5rem] md:z-0 md:flex md:max-h-[calc(100vh-7.5rem)] md:self-start md:rounded-xl md:border md:border-border md:shadow-none ${
+          cart.length === 0 || checkoutSale
+            ? "hidden"
+            : cartCollapsed
+              ? "fixed inset-x-0 bottom-0 z-30 flex border-t border-border shadow-[0_-8px_24px_rgb(var(--shadow-color)/0.12)]"
+              : "fixed inset-0 z-50 flex"
+        }`}
       >
         <div
-          className={`flex flex-col gap-2.5 border-b border-border px-5 lg:px-6 lg:py-5 ${cartCollapsed ? "py-2.5" : "py-4"}`}
+          className={`flex-col gap-2.5 border-b border-border px-5 py-4 md:flex md:px-6 md:py-5 ${cartCollapsed ? "hidden" : "flex"}`}
         >
           <div className="flex items-center justify-between gap-2">
-            <h2 className="text-[17px] font-semibold text-foreground">
+            <h2 className="min-w-0 truncate text-base font-semibold text-foreground md:text-[17px]">
               Panier · {itemCount} article{itemCount > 1 ? "s" : ""}
             </h2>
             <div className="flex items-center gap-1">
@@ -667,36 +703,39 @@ export default function PointOfSale() {
               )}
               <Button
                 type="button"
-                variant="ghost"
-                size="icon"
-                className="lg:hidden"
-                aria-label={
-                  cartCollapsed ? "Ouvrir le panier" : "Réduire le panier"
-                }
-                title={cartCollapsed ? "Ouvrir le panier" : "Réduire le panier"}
-                onClick={() => setCartCollapsed(value => !value)}
+                variant="outline"
+                size="sm"
+                className="md:hidden"
+                aria-label="Continuer la vente"
+                onClick={() => setCartCollapsed(true)}
               >
-                {cartCollapsed ? (
-                  <ChevronUp className="h-4 w-4" />
-                ) : (
-                  <ChevronDown className="h-4 w-4" />
-                )}
+                <X className="h-4 w-4" />
+                Continuer
               </Button>
             </div>
           </div>
         </div>
         {cartCollapsed && (
-          <div className="flex items-center gap-3 px-5 py-3 lg:hidden">
+          <div className="flex items-center gap-3 px-4 py-3 md:hidden">
             <button
               type="button"
               onClick={() => setCartCollapsed(false)}
-              className="min-w-0 flex-1 text-left"
+              className="flex min-w-0 flex-1 items-center gap-3 text-left"
+              aria-label="Voir le panier"
             >
-              <span className="block text-xs text-muted-foreground">
-                Total TTC · voir le détail
+              <span className="relative grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">
+                <ShoppingCart className="h-5 w-5" />
+                <span className="absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[11px] font-bold text-primary-foreground">
+                  {itemCount}
+                </span>
               </span>
-              <span className="block truncate text-xl font-bold tracking-tight text-foreground">
-                {formatCurrency(totalCents)}
+              <span className="min-w-0">
+                <span className="block truncate text-lg font-bold leading-tight tracking-tight text-foreground">
+                  {formatCurrency(totalCents)}
+                </span>
+                <span className="block text-xs font-medium text-primary">
+                  Voir le panier
+                </span>
               </span>
             </button>
             <Button
@@ -709,73 +748,77 @@ export default function PointOfSale() {
           </div>
         )}
         <div
-          className={`min-h-0 flex-1 flex-col ${cartCollapsed ? "hidden lg:flex" : "flex"}`}
+          className={`min-h-0 flex-1 flex-col md:flex ${cartCollapsed ? "hidden" : "flex"}`}
         >
           {lines.length ? (
-            <div className="max-h-[16.75rem] min-h-0 flex-1 overflow-y-auto px-5 sm:max-h-[20rem] lg:max-h-none lg:px-6">
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 md:px-6">
               {lines.map(line => (
                 <div
                   key={line.productId}
-                  className="flex items-center gap-3 border-b border-border py-3.5 last:border-b-0"
+                  className="border-b border-border py-3 last:border-b-0"
                 >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[15px] font-medium text-foreground">
-                      {line.product.name}
-                    </p>
-                    <p className="mt-0.5 text-[13px] text-faint">
-                      {formatCurrency(line.unitPriceCents)} × {line.quantity}
-                    </p>
-                    {line.tierMinQuantity && (
-                      <p className="mt-0.5 text-[11px] font-medium text-primary">
-                        Palier {line.tierMinQuantity}+ retenu
+                  <div className="flex items-start gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="line-clamp-2 text-[15px] font-medium leading-snug text-foreground">
+                        {line.product.name}
                       </p>
-                    )}
-                    {line.isLowStock && (
-                      <p className="mt-1 inline-flex items-center gap-1 rounded-md bg-warning-soft px-1.5 py-0.5 text-[11px] font-medium text-warning">
-                        <AlertTriangle className="h-3 w-3" />
-                        {line.remainingAfterSale} restant · seuil{" "}
-                        {line.product.minimumQuantity}
+                      <p className="mt-0.5 text-[13px] text-faint">
+                        {formatCurrency(line.unitPriceCents)} l’unité
+                        {line.tierMinQuantity
+                          ? ` · palier ${line.tierMinQuantity}+`
+                          : ""}
                       </p>
-                    )}
-                    <div className="mt-1 hidden sm:block">
-                      <DiscountEditor
-                        compact
-                        label="Remise"
-                        value={line.discount}
-                        onChange={discount =>
-                          setLineDiscount(line.productId, discount)
-                        }
-                      />
                     </div>
+                    <p className="shrink-0 text-right text-[15px] font-semibold text-foreground">
+                      {formatCurrency(line.totalCents)}
+                    </p>
                   </div>
-                  <div className="flex shrink-0 items-center overflow-hidden rounded-[10px] border border-input">
-                    <button
-                      type="button"
-                      aria-label={`Retirer une unité de ${line.product.name}`}
-                      className="grid h-11 w-11 place-items-center text-muted-foreground hover:bg-accent"
-                      onClick={() =>
-                        quantity(line.productId, line.quantity - 1)
+                  {line.isLowStock && (
+                    <p className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-warning-soft px-1.5 py-0.5 text-[11px] font-medium text-warning">
+                      <AlertTriangle className="h-3 w-3" />
+                      {line.remainingAfterSale} restant après la vente · seuil{" "}
+                      {line.product.minimumQuantity}
+                    </p>
+                  )}
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <div className="flex shrink-0 items-center overflow-hidden rounded-[10px] border border-input">
+                      <button
+                        type="button"
+                        aria-label={`Retirer une unité de ${line.product.name}`}
+                        className="grid h-11 w-11 place-items-center text-muted-foreground hover:bg-accent"
+                        onClick={() =>
+                          quantity(line.productId, line.quantity - 1)
+                        }
+                      >
+                        {line.quantity === 1 ? (
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        ) : (
+                          <Minus className="h-4 w-4" />
+                        )}
+                      </button>
+                      <span className="w-10 text-center text-[15px] font-semibold">
+                        {line.quantity}
+                      </span>
+                      <button
+                        type="button"
+                        aria-label={`Ajouter une unité de ${line.product.name}`}
+                        className="grid h-11 w-11 place-items-center text-muted-foreground hover:bg-accent"
+                        onClick={() =>
+                          quantity(line.productId, line.quantity + 1)
+                        }
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <DiscountEditor
+                      compact
+                      label="Remise"
+                      value={line.discount}
+                      onChange={discount =>
+                        setLineDiscount(line.productId, discount)
                       }
-                    >
-                      <Minus className="h-4 w-4" />
-                    </button>
-                    <span className="w-9 text-center text-[15px] font-semibold">
-                      {line.quantity}
-                    </span>
-                    <button
-                      type="button"
-                      aria-label={`Ajouter une unité de ${line.product.name}`}
-                      className="grid h-11 w-11 place-items-center text-muted-foreground hover:bg-accent"
-                      onClick={() =>
-                        quantity(line.productId, line.quantity + 1)
-                      }
-                    >
-                      <Plus className="h-4 w-4" />
-                    </button>
+                    />
                   </div>
-                  <p className="w-24 shrink-0 text-right text-[15px] font-semibold text-foreground">
-                    {formatCurrency(line.totalCents)}
-                  </p>
                 </div>
               ))}
             </div>
@@ -794,7 +837,7 @@ export default function PointOfSale() {
               </div>
             </div>
           )}
-          <div className="space-y-2.5 border-t border-border bg-muted/40 px-5 py-5 lg:px-6">
+          <div className="space-y-2.5 border-t border-border bg-muted/40 px-5 py-5 md:px-6">
             <DiscountEditor
               compact
               label="Remise sur le panier"

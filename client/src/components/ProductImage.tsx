@@ -26,6 +26,7 @@ export function ProductImage({
 }: {
   product: ImageSource;
   full?: boolean;
+  /** Dimensions de la vignette : toujours carrée (largeur = hauteur). */
   className?: string;
   rounded?: string;
 }) {
@@ -34,15 +35,21 @@ export function ProductImage({
     ? (product.imageUrl ?? product.imageThumbUrl)
     : (product.imageThumbUrl ?? product.imageUrl);
   if (src && !failed)
+    // Vignette carrée, photo entière sur fond blanc (comme les catalogues
+    // e-commerce) : le produit n'est jamais recadré.
     return (
-      <img
-        src={src}
-        alt=""
-        loading="lazy"
-        decoding="async"
-        onError={() => setFailed(true)}
-        className={`${className} ${rounded} shrink-0 bg-muted object-cover`}
-      />
+      <span
+        className={`${className} ${rounded} block shrink-0 overflow-hidden border border-border bg-white`}
+      >
+        <img
+          src={src}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          onError={() => setFailed(true)}
+          className="h-full w-full object-contain p-[8%]"
+        />
+      </span>
     );
   return (
     <span
