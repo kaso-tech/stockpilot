@@ -1,3 +1,4 @@
+import { PageSkeleton } from "@/components/page";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -71,14 +72,7 @@ const TermsOfUse = lazy(() => import("./pages/TermsOfUse"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 
 function PageFallback() {
-  return (
-    <div
-      className="grid min-h-[40vh] place-items-center text-sm text-muted-foreground"
-      role="status"
-    >
-      Chargement…
-    </div>
-  );
+  return <PageSkeleton />;
 }
 
 function DashboardRouter() {

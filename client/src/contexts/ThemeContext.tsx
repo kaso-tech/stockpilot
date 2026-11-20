@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { readPreference, writePreference } from "@/lib/preferenceStorage";
 
 type Theme = "light" | "dark";
@@ -35,13 +41,19 @@ export function ThemeProvider({
     return defaultTheme;
   });
 
+  const firstApply = useRef(true);
   useEffect(() => {
     const root = document.documentElement;
-    if (theme === "dark") {
-      root.classList.add("dark");
-    } else {
-      root.classList.remove("dark");
-    }
+    const apply = () => root.classList.toggle("dark", theme === "dark");
+    // Passage clair/sombre en fondu, sauf au premier affichage et si l'appareil
+    // demande de réduire les animations.
+    const animate =
+      !firstApply.current &&
+      typeof document.startViewTransition === "function" &&
+      !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    firstApply.current = false;
+    if (animate) document.startViewTransition(apply);
+    else apply();
 
     if (switchable) {
       writePreference(

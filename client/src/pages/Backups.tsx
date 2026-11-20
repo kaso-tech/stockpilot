@@ -1,3 +1,4 @@
+import { ListSkeleton } from "@/components/page";
 import { StatCard } from "@/components/page";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Badge } from "@/components/ui/badge";
@@ -424,7 +425,7 @@ export default function Backups() {
             </Badge>
           </div>
           {isLoading ? (
-            <div className="py-6 text-sm text-faint">Chargement…</div>
+            <ListSkeleton rows={3} />
           ) : sellerManualArchives.length ? (
             <div className="grid gap-3 md:grid-cols-2">
               {sellerManualArchives.map(archive => (
@@ -487,7 +488,7 @@ export default function Backups() {
             </Badge>
           </div>
           {isLoading ? (
-            <div className="py-6 text-sm text-faint">Chargement…</div>
+            <ListSkeleton rows={3} />
           ) : data?.archives.length ? (
             <div className="divide-y divide-border">
               {data.archives.map(archive => (

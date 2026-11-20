@@ -1,3 +1,4 @@
+import { ListSkeleton } from "@/components/page";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { LoadMore, usePagedLimit } from "@/components/LoadMore";
 import { Badge } from "@/components/ui/badge";
@@ -63,10 +64,8 @@ export default function Quotes() {
         </Button>
       </header>
       {isLoading ? (
-        <Card>
-          <CardContent className="py-12 text-center text-sm text-muted-foreground">
-            Chargement…
-          </CardContent>
+        <Card className="gap-0 py-0">
+          <ListSkeleton rows={4} />
         </Card>
       ) : quotes.length ? (
         <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">

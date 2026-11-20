@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusPill } from "@/components/StatusPill";
 import { ProductImage } from "@/components/ProductImage";
+import { AnimatedNumber } from "@/components/AnimatedNumber";
 import {
   chartTooltipStyle,
   expenseColors,
@@ -17,6 +18,9 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
 import {
   Activity,
+  Percent,
+  TrendingUp,
+  Wallet,
   ArrowRight,
   Boxes,
   CheckCircle2,
@@ -88,31 +92,41 @@ export default function Home() {
   const receivableCount = summary?.receivableCount ?? 0;
   const metrics: Array<{
     label: string;
-    value: string;
+    cents: number;
     note: string;
     tone: "default" | "success" | "warning";
+    icon: typeof Activity;
+    iconTone: string;
   }> = [
     {
       label: "Ventes du jour",
-      value: formatCurrency(summary?.todayRevenueCents ?? 0),
+      cents: summary?.todayRevenueCents ?? 0,
+      icon: ShoppingCart,
+      iconTone: "bg-primary-soft text-primary",
       note: `${todayCount} vente${todayCount > 1 ? "s" : ""} encaissée${todayCount > 1 ? "s" : ""} aujourd’hui`,
       tone: "default",
     },
     {
       label: "Chiffre d’affaires du mois",
-      value: formatCurrency(revenue),
+      cents: revenue,
+      icon: TrendingUp,
+      iconTone: "bg-info-soft text-info",
       note: `${summary?.monthlyInvoiceCount ?? 0} ventes · panier moyen ${formatCurrency(summary?.averageBasketCents ?? 0)}`,
       tone: "default",
     },
     {
       label: "Marge du mois",
-      value: formatCurrency(summary?.monthlyMarginCents ?? 0),
+      cents: summary?.monthlyMarginCents ?? 0,
+      icon: Percent,
+      iconTone: "bg-success-soft text-success",
       note: `${marginRate.toLocaleString("fr-FR")} % du chiffre d’affaires`,
       tone: marginRate > 0 ? "success" : "default",
     },
     {
       label: "À encaisser",
-      value: formatCurrency(summary?.receivableCents ?? 0),
+      cents: summary?.receivableCents ?? 0,
+      icon: Wallet,
+      iconTone: "bg-warning-soft text-warning",
       note: receivableCount
         ? `${receivableCount} facture${receivableCount > 1 ? "s" : ""} en attente de règlement`
         : "Aucune facture en attente",
@@ -130,7 +144,7 @@ export default function Home() {
   const showTodo = preferences.todo;
 
   return (
-    <div className="mx-auto flex max-w-[1440px] flex-col gap-6">
+    <div className="stagger mx-auto flex max-w-[1440px] flex-col gap-6">
       <section className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-[22px] font-bold tracking-tight text-foreground">
@@ -175,29 +189,42 @@ export default function Home() {
       {isAdmin && <OnboardingStrip onNavigate={setLocation} />}
 
       {preferences.metrics && (
-        <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-          {metrics.map(metric => (
-            <div
-              key={metric.label}
-              className="flex min-w-0 flex-col gap-1 rounded-xl border border-border bg-card px-3.5 py-3.5 sm:gap-1.5 sm:px-5 sm:py-[18px]"
-            >
-              <p className="truncate text-xs font-medium text-muted-foreground sm:text-[13px]">
-                {metric.label}
-              </p>
-              {isLoading ? (
-                <Skeleton className="h-8 w-36" />
-              ) : (
-                <p className="truncate text-lg font-bold leading-tight tracking-tight text-foreground sm:text-[26px]">
-                  {metric.value}
-                </p>
-              )}
-              <p
-                className={`text-xs font-medium sm:text-[13px] ${metric.tone === "success" ? "text-success" : metric.tone === "warning" ? "text-warning" : "text-muted-foreground"}`}
+        <section className="stagger grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+          {metrics.map(metric => {
+            const Icon = metric.icon;
+            return (
+              <div
+                key={metric.label}
+                className="surface flex min-w-0 flex-col gap-1 rounded-xl border border-border bg-card px-3.5 py-3.5 sm:gap-1.5 sm:px-5 sm:py-[18px]"
               >
-                {metric.note}
-              </p>
-            </div>
-          ))}
+                <div className="flex items-start justify-between gap-2">
+                  <p className="truncate pt-1 text-xs font-medium text-muted-foreground sm:text-[13px]">
+                    {metric.label}
+                  </p>
+                  <span
+                    className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg sm:h-9 sm:w-9 ${metric.iconTone}`}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </span>
+                </div>
+                {isLoading ? (
+                  <Skeleton className="h-8 w-36" />
+                ) : (
+                  <p className="truncate text-lg font-bold leading-tight tracking-tight text-foreground sm:text-[26px]">
+                    <AnimatedNumber
+                      value={metric.cents}
+                      format={formatCurrency}
+                    />
+                  </p>
+                )}
+                <p
+                  className={`text-xs font-medium sm:text-[13px] ${metric.tone === "success" ? "text-success" : metric.tone === "warning" ? "text-warning" : "text-muted-foreground"}`}
+                >
+                  {metric.note}
+                </p>
+              </div>
+            );
+          })}
         </section>
       )}
 
@@ -249,7 +276,7 @@ function Panel({
 }) {
   return (
     <section
-      className={`overflow-hidden rounded-xl border border-border bg-card ${className}`}
+      className={`surface overflow-hidden rounded-xl border border-border bg-card ${className}`}
     >
       {children}
     </section>
@@ -443,7 +470,13 @@ function SalesTrend({
                 labelFormatter={value => formatDate(String(value))}
                 formatter={value => [formatCurrency(Number(value)), "Ventes"]}
               />
-              <Bar dataKey="revenueCents" radius={[6, 6, 0, 0]} maxBarSize={44}>
+              <Bar
+                dataKey="revenueCents"
+                radius={[6, 6, 0, 0]}
+                maxBarSize={44}
+                animationDuration={700}
+                animationEasing="ease-out"
+              >
                 {data.map((item, index) => (
                   <Cell
                     key={item.day}

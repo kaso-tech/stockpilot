@@ -1,4 +1,10 @@
-import { EmptyState, PageHeader, Panel, table } from "@/components/page";
+import {
+  EmptyState,
+  ListSkeleton,
+  PageHeader,
+  Panel,
+  table,
+} from "@/components/page";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
 import { vatRatesLabel } from "@shared/pricing";
@@ -224,9 +230,7 @@ export default function Invoices() {
 
       <Panel>
         {isLoading ? (
-          <div className="py-12 text-center text-sm text-muted-foreground">
-            Chargement…
-          </div>
+          <ListSkeleton rows={6} />
         ) : invoices.length ? (
           <>
             <div className="divide-y divide-border sm:hidden">

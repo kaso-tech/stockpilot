@@ -539,10 +539,13 @@ export default function PointOfSale() {
                 key={product.id}
                 onClick={() => add(product.id)}
                 aria-label={`${product.name}${quantityInCart ? `, ${quantityInCart} au panier` : ""}`}
-                className={`relative flex min-h-[112px] flex-col gap-1.5 rounded-xl border bg-card p-2.5 text-left transition-colors hover:border-primary/60 active:scale-[0.98] ${inCart ? "border-primary ring-1 ring-primary" : "border-border"}`}
+                className={`lift surface relative flex min-h-[112px] flex-col gap-1.5 rounded-xl border bg-card p-2.5 text-left hover:border-primary/60 ${inCart ? "border-primary ring-1 ring-primary" : "border-border"}`}
               >
                 {quantityInCart > 0 && (
-                  <span className="absolute right-2 top-2 z-10 grid h-7 min-w-7 place-items-center rounded-full bg-primary px-2 text-sm font-bold text-primary-foreground shadow-sm">
+                  <span
+                    key={quantityInCart}
+                    className="animate-pop absolute right-2 top-2 z-10 grid h-7 min-w-7 place-items-center rounded-full bg-primary px-2 text-sm font-bold text-primary-foreground shadow-sm"
+                  >
                     {quantityInCart}
                   </span>
                 )}
@@ -674,7 +677,7 @@ export default function PointOfSale() {
         aria-label="Panier de vente"
         // Téléphone : barre de total fixe, panier en plein écran à la demande.
         // Tablette et ordinateur : panneau latéral toujours visible.
-        className={`flex-col overflow-hidden bg-card md:sticky md:inset-auto md:top-[5.5rem] md:z-0 md:flex md:max-h-[calc(100vh-7.5rem)] md:self-start md:rounded-xl md:border md:border-border md:shadow-none ${
+        className={`flex-col overflow-hidden bg-card md:sticky md:inset-auto md:top-[5.5rem] md:z-0 md:flex md:max-h-[calc(100vh-7.5rem)] md:self-start md:rounded-xl md:border md:border-border md:shadow-sm ${
           cart.length === 0 || checkoutSale
             ? "hidden"
             : cartCollapsed
@@ -725,7 +728,10 @@ export default function PointOfSale() {
             >
               <span className="relative grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">
                 <ShoppingCart className="h-5 w-5" />
-                <span className="absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[11px] font-bold text-primary-foreground">
+                <span
+                  key={itemCount}
+                  className="animate-pop absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[11px] font-bold text-primary-foreground"
+                >
                   {itemCount}
                 </span>
               </span>
@@ -755,7 +761,7 @@ export default function PointOfSale() {
               {lines.map(line => (
                 <div
                   key={line.productId}
-                  className="border-b border-border py-3 last:border-b-0"
+                  className="animate-slide-in border-b border-border py-3 last:border-b-0"
                 >
                   <div className="flex items-start gap-3">
                     <div className="min-w-0 flex-1">
@@ -868,7 +874,10 @@ export default function PointOfSale() {
               <span className="text-base font-semibold text-foreground">
                 Total TTC
               </span>
-              <span className="text-[28px] font-bold tracking-tight text-foreground">
+              <span
+                key={totalCents}
+                className="animate-pop inline-block text-[28px] font-bold tracking-tight text-foreground"
+              >
                 {formatCurrency(totalCents)}
               </span>
             </div>

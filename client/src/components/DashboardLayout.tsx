@@ -1030,7 +1030,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
                         isActive={isActive}
                         tooltip={item.label}
                         onClick={() => goTo(item.path)}
-                        className="h-[34px] rounded-lg px-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground data-[active=true]:bg-primary-soft data-[active=true]:font-semibold data-[active=true]:text-primary"
+                        className="h-[34px] rounded-lg px-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground relative data-[active=true]:bg-primary-soft data-[active=true]:font-semibold data-[active=true]:text-primary data-[active=true]:before:absolute data-[active=true]:before:inset-y-2 data-[active=true]:before:left-0 data-[active=true]:before:w-[3px] data-[active=true]:before:rounded-r-full data-[active=true]:before:bg-primary"
                       >
                         <item.icon className="h-[17px] w-[17px]" />
                         <span>{item.label}</span>
@@ -1184,7 +1184,10 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
             </div>
           )}
           {user && !user.emailVerifiedAt && <EmailVerificationBanner />}
-          {children}
+          {/* Le contenu de chaque page arrive en fondu, avec une légère montée. */}
+          <div key={location} className="animate-enter">
+            {children}
+          </div>
         </div>
       </SidebarInset>
     </>

@@ -1,3 +1,4 @@
+import { ListSkeleton } from "@/components/page";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -49,8 +50,7 @@ export default function SettingsSubscription() {
         description="L’abonnement est géré par les administrateurs de l’espace."
       />
     );
-  if (!data)
-    return <p className="text-sm text-muted-foreground">Chargement…</p>;
+  if (!data) return <ListSkeleton rows={3} />;
   return (
     <div className="max-w-4xl space-y-6">
       <Link

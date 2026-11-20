@@ -1,3 +1,4 @@
+import { ListSkeleton } from "@/components/page";
 import { Card, CardContent } from "@/components/ui/card";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -65,7 +66,7 @@ export default function SettingsUsers() {
       <Card className="border-border bg-card">
         <CardContent className="divide-y divide-border p-0">
           {isLoading ? (
-            <p className="p-6 text-sm text-muted-foreground">Chargement…</p>
+            <ListSkeleton rows={3} />
           ) : (
             members.map(member => (
               <div

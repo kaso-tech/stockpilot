@@ -1,3 +1,4 @@
+import { ListSkeleton } from "@/components/page";
 import { usePermissions } from "@/hooks/usePermissions";
 import { LoadMore, usePagedLimit } from "@/components/LoadMore";
 import { Badge } from "@/components/ui/badge";
@@ -47,7 +48,7 @@ export default function SettingsHistory() {
       <Card className="border-border bg-card gap-0 py-0">
         <CardContent className="p-0">
           {isLoading ? (
-            <p className="p-8 text-center text-sm text-faint">Chargement…</p>
+            <ListSkeleton rows={5} />
           ) : settingsLogs.length ? (
             <div className="divide-y divide-border">
               {settingsLogs.map(log => (

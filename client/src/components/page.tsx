@@ -65,7 +65,7 @@ export function Panel({
 }) {
   return (
     <section
-      className={`overflow-hidden rounded-xl border border-border bg-card ${className}`}
+      className={`surface overflow-hidden rounded-xl border border-border bg-card ${className}`}
     >
       {children}
     </section>
@@ -131,7 +131,7 @@ export function StatCard({
 }) {
   return (
     <div
-      className={`flex min-w-0 flex-col gap-1 rounded-xl border border-border bg-card ${compact ? "px-4 py-3" : "px-4 py-3.5 sm:px-5 sm:py-[18px]"}`}
+      className={`surface flex min-w-0 flex-col gap-1 rounded-xl border border-border bg-card ${compact ? "px-4 py-3" : "px-4 py-3.5 sm:px-5 sm:py-[18px]"}`}
     >
       <p className="truncate text-xs font-medium text-muted-foreground sm:text-[13px]">
         {label}
@@ -167,7 +167,7 @@ export function StatGrid({
         ? "lg:grid-cols-3"
         : "lg:grid-cols-4";
   return (
-    <section className={`grid grid-cols-2 gap-3 sm:gap-4 ${large}`}>
+    <section className={`stagger grid grid-cols-2 gap-3 sm:gap-4 ${large}`}>
       {children}
     </section>
   );
@@ -211,3 +211,45 @@ export const table = {
   row: "border-t border-border hover:bg-accent/60",
   td: "px-5 py-3",
 };
+
+/** Lignes grises qui scintillent, à la place d'un texte « Chargement… ». */
+export function ListSkeleton({ rows = 4 }: { rows?: number }) {
+  return (
+    <div
+      className="divide-y divide-border"
+      role="status"
+      aria-label="Chargement"
+    >
+      {Array.from({ length: rows }, (_, index) => (
+        <div key={index} className="flex items-center gap-3 px-5 py-3.5">
+          <span className="shimmer h-9 w-9 shrink-0 rounded-lg" />
+          <span className="flex-1 space-y-2">
+            <span className="shimmer block h-3 w-2/5 rounded" />
+            <span className="shimmer block h-2.5 w-1/4 rounded" />
+          </span>
+          <span className="shimmer h-3 w-16 rounded" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Silhouette d'une page pendant son téléchargement : titre, indicateurs, liste. */
+export function PageSkeleton() {
+  return (
+    <div className="space-y-6" role="status" aria-label="Chargement de la page">
+      <div className="space-y-2">
+        <span className="shimmer block h-6 w-48 rounded-md" />
+        <span className="shimmer block h-3.5 w-72 max-w-full rounded" />
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        {Array.from({ length: 4 }, (_, index) => (
+          <span key={index} className="shimmer block h-[104px] rounded-xl" />
+        ))}
+      </div>
+      <div className="surface overflow-hidden rounded-xl border border-border bg-card">
+        <ListSkeleton rows={5} />
+      </div>
+    </div>
+  );
+}
