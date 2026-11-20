@@ -1,17 +1,122 @@
 # StockPilot Pro — Dossier de continuité
 
-**Date de synthèse :** 23 août 2026  
-**Projet Manus :** StockPilot SaaS  
-**Chemin de travail :** `/home/ubuntu/stockpilot-pro`  
-**Domaine publié :** `https://stockpilot-gpaoheuz.manus.space`  
-**Dernier checkpoint fonctionnel :** `ef3f69fd`  
-**Dernière archive source fournie :** `/home/ubuntu/stockpilot-pro-current.zip`
+**Date de synthèse :** 20 novembre 2026
+**Projet Manus :** StockPilot SaaS
+**Chemin de travail :** `/home/ubuntu/stockpilot-pro`
+**Domaine publié :** `https://stockpilot-gpaoheuz.manus.space`
+**Dernier checkpoint fonctionnel avant ce portage :** `651bd0f9`
+**Archive source de cette livraison :** `/home/ubuntu/stockpilot-pro-selective-0184f30-2026-11-20.zip`
+**Note actuelle :** `NOTE_PORTAGE_MAIN_0184f30_2026-11-20.md` (les sections antérieures restent historiques).
 
 ## 1. Objectif produit
 
 StockPilot Pro est un SaaS de gestion commerciale pour petites et moyennes entreprises. Il couvre le stock, les produits, fournisseurs, clients, ventes rapides POS, factures, encaissements, dépenses, achats, inventaires, agents, commissions, paie et sauvegardes. L’objectif actuel est de le rendre vendable à plusieurs entreprises avec une isolation stricte des données et un mode hors connexion réellement durable.
 
 > La priorité technique est désormais d’avoir une plateforme **multi-entreprise sûre**, puis un fonctionnement **offline-first** capable de supporter plusieurs jours sans réseau.
+
+## Mise à jour — multi-entrepôts et transferts
+
+Le lot multi-entrepôts est désormais implémenté. Les tables `warehouses`, `warehouseStocks`, `stockTransfers` et `stockTransferItems` portent le périmètre entreprise et la migration `0048_outgoing_rage.sql` a été appliquée sans suppression de données. Un entrepôt principal est créé pour chaque entreprise existante, pour les comptes historiques legacy et lors de chaque nouvelle inscription; le stock historique a été initialisé dans ce dépôt sans double comptage.
+
+Les transferts disposent des statuts brouillon, en transit, réceptionné et annulé. L’expédition vérifie atomiquement le stock source; réception et annulation sont idempotentes, et les opérations sont consignées dans l’audit. Les accès **Entrepôts** et **Transferts** sont présents dans la navigation administrateur. Les ventes rapides, factures, devis, mouvements manuels, inventaires, réceptions fournisseurs et chemin de vente hérité utilisent le dépôt sélectionné ou le dépôt principal. Les opérations POS et facture hors connexion conservent aussi `warehouseId`, avec réservations locales segmentées par entrepôt.
+
+Les validations du lot sont : `pnpm check`, **206 tests Vitest** et `pnpm build` réussis. La vérification visuelle a confirmé le dépôt principal et les sélecteurs d’entrepôt dans la vente rapide et les documents commerciaux. Le warning PWA relatif au bundle principal d’environ 2,8 Mo reste non bloquant.
+
+## Incident résolu sous réserve de reconnexion — données non visibles
+
+Après le lot multi-entrepôts, un administrateur historique s’est retrouvé dans le périmètre legacy tandis que les données métier restaient intégralement dans l’entreprise `companyId = 1`. L’inventaire non destructif a confirmé la conservation des produits, clients, fournisseurs, ventes, mouvements, achats, inventaires, dépenses et stocks localisés. Après confirmation explicite de l’utilisateur, le compte administrateur legacy récemment connecté a été rattaché transactionnellement à l’entreprise concernée, avec une trace d’audit. Les données n’ont été ni supprimées, ni déplacées, ni dupliquées. Une reconnexion est nécessaire pour renouveler la session et recharger le nouveau périmètre.
+
+Le compte vendeur actif, encore dans le périmètre legacy après le rétablissement administrateur, a ensuite été rattaché à la même entreprise après signalement de l’utilisateur. Son rôle vendeur et son statut actif ont été conservés; le rattachement est également audité. Une reconnexion du vendeur est nécessaire pour actualiser sa session.
+
+## Ajustements d’interface récents
+
+La connexion ne présente plus qu’une seule action d’inscription : celle située sous le bouton de connexion. Les agents appliqués automatiquement par les réglages POS sont désormais cachés complètement dans l’écran d’encaissement, tout en restant appliqués côté serveur. Les filtres et exports CSV des factures, devis et tickets proposent maintenant les vendeurs, agents commerciaux et caissiers, avec des clés de filtre distinctes pour éviter toute collision d’identifiants.
+
+## Suppression en masse sécurisée
+
+La page « Import & export » comporte un espace réservé aux administrateurs permettant de sélectionner en masse des produits, fournisseurs ou clients. L’aperçu vérifie les dépendances avant la suppression : les produits avec mouvements, les fournisseurs liés à des produits ou bons de commande, et les clients liés à des documents commerciaux restent protégés. Une suppression ne peut être exécutée que si toute la sélection est admissible, après saisie exacte de `SUPPRIMER`. Toute opération utilise le périmètre `companyId`, est réévaluée dans une transaction et crée une entrée de journal d’audit.
+
+## Entrepôt actif de l’administrateur
+
+Un sélecteur global d’entrepôt est disponible dans l’en-tête pour les administrateurs. Le choix est persistant par couple utilisateur/entreprise dans `userWarehousePreferences`, validé contre les entrepôts actifs du périmètre courant et tracé dans l’audit. Les produits, alertes de stock, mouvements et inventaires affichent désormais les quantités et historiques de l’entrepôt actif. La création d’un produit depuis cette gestion affecte son stock initial à ce même entrepôt. Les flux POS et facture conservent leur propre sélection opérationnelle afin de ne pas modifier les ventes en cours.
+
+## Vue d’exploitation complète par entrepôt
+
+Le changement de dépôt administratif pilote désormais les données opérationnelles : tableau de bord, chiffre d’affaires, marges, stock, alertes, tendances, factures, devis, tickets, mouvements, inventaires, produits, dépenses, paiements agents et commissions. Les pages POS et création de documents commerciaux synchronisent aussi leur entrepôt opérationnel avec ce choix, en vidant le panier local lors d’un basculement afin d’éviter un mélange de stocks. Les budgets mensuels, dépenses et paiements agents disposent maintenant d’un `warehouseId`; les migrations `0050` et `0051` ont rattaché les écritures historiques au dépôt principal. Les entités de référence de l’entreprise — clients, fournisseurs, catalogue maître, coordonnées, paramètres et profils agents — restent volontairement partagées, tandis que leurs historiques et performances suivent l’entrepôt actif.
+
+## Pilotage consolidé et accès vendeur aux dépôts
+
+La migration `0052` crée `sellerWarehouseAssignments`, avec unicité par entreprise, vendeur et entrepôt. Les vendeurs historiques sont rattachés aux dépôts actifs de leur entreprise pour préserver leur capacité opérationnelle; les nouveaux vendeurs et agents convertis en vendeurs reçoivent le dépôt principal par défaut, puis l’administrateur peut ajuster la liste depuis « Agents & paie ». La création et la consultation de documents, de produits et de stocks vérifient désormais cette affectation côté serveur, y compris lorsque le dépôt par défaut aurait été résolu implicitement.
+
+La route « Pilotage consolidé » compare les entrepôts actifs d’une entreprise sur une période mensuelle : chiffre d’affaires encaissé, marge, dépenses incluant la paie, résultat opérationnel, nombre de documents, panier moyen, valeur de stock, alertes de seuil et budget. Elle reste réservée aux administrateurs; chaque ligne permet de basculer vers la vue opérationnelle du dépôt sélectionné.
+
+## Correctif de la fenêtre d’affectation vendeur
+
+La fenêtre « Gérer les dépôts » des vendeurs utilise désormais une valeur de repli stable lorsque la requête d’affectations est en attente. L’état des cases à cocher n’est synchronisé qu’à la réception des données ou à la fermeture de la fenêtre, ce qui évite une boucle de rendu React. La normalisation dédoublonne aussi les identifiants d’entrepôt avant affichage; aucune affectation persistée n’est modifiée par ce correctif.
+
+## Recherche de vendeur dans les affectations
+
+La zone « Affectations des vendeurs » comporte une recherche instantanée par nom, identifiant interne ou e-mail. La recherche ne modifie aucune affectation et affiche un état vide explicite lorsqu’aucun vendeur actif ne correspond. La logique de recherche est couverte par les tests unitaires des utilitaires d’affectation.
+
+## Portée multi-entrepôts des agents commerciaux
+
+La migration `0053` ajoute le mode `warehouseScope` aux agents et la table `salesAgentWarehouseAssignments`. Les agents commerciaux peuvent être configurés depuis « Agents & paie » en trois modes : `all` pour coordonner des ventes dans tous les dépôts, `selected` pour n’être sélectionnables que dans les entrepôts attribués, et `attribution_only` pour rester attachables commercialement aux ventes de tous les dépôts sans accès opérationnel aux stocks. La validation est effectuée côté serveur lors de la création de brouillons, de l’encaissement et du chemin de vente hérité. Les sélecteurs POS et facture/devis ne présentent que les agents admissibles au dépôt opérationnel choisi; un agent par défaut devenu non admissible force une nouvelle sélection plutôt que de contourner la portée.
+
+## Tableau de commissions par agent et entrepôt
+
+La migration `0054` ajoute `paymentKind` à `agentPayments`, avec les valeurs `commission`, `salary` et `mixed`; les écritures existantes restent `mixed` pour préserver leur signification historique. La section « Commissions par agent et entrepôt » d’« Agents & rémunérations » filtre la période, l’entrepôt et le bénéficiaire. Elle compare les commissions générées à partir des ventes, les paiements explicitement qualifiés de commission et le solde de commission restant. Les versements mixtes et salariaux restent visibles séparément et ne diminuent jamais artificiellement le solde de commission. Les nouveaux paiements peuvent être catégorisés depuis la fiche de l’agent.
+
+## Exploitation multi-entrepôts : rôles, transferts et alertes locales
+
+La migration `0055` ajoute un rôle local à chaque affectation opérationnelle (`manager`, `cashier`, `seller`), les seuils `warehouseReorderThresholds` et les alertes `warehouseStockAlerts` par produit et entrepôt. Les affectations existantes restent au rôle vendeur pour conserver les accès actuels. Le responsable peut suivre le stock, encaisser, gérer les transferts et régler les seuils; le caissier peut vendre et encaisser; le vendeur peut préparer les ventes. Les contrôles sont centralisés côté serveur et les modifications sont journalisées.
+
+Les transferts disposent maintenant d’un cycle brouillon → en transit → réceptionné, avec annulation traçable et retour automatique du stock source pour les transferts annulés en transit. Les responsables concernés peuvent traiter les transferts de leurs dépôts; les autres utilisateurs ne voient que les mouvements portant sur leurs entrepôts attribués. L’écran Entrepôts permet d’attribuer le rôle local de chaque utilisateur opérationnel et de saisir les seuils de chaque produit. Toute entrée ou sortie de stock synchronise l’alerte locale, et la page Alertes ainsi que le bon de commande de réapprovisionnement utilisent exclusivement le dépôt actif.
+
+## Notifications ciblées de rupture
+
+Le centre de notifications de l’application reçoit désormais les alertes stock locales persistées dans `warehouseStockAlerts`. Un administrateur voit les alertes de tous les dépôts, tandis qu’un utilisateur opérationnel ne reçoit que celles des entrepôts où son rôle local est `manager`. Chaque notification porte l’état actif ou résolu, le produit, la quantité observée, le seuil et le dépôt concerné. L’identifiant contient l’horodatage de mise à jour : une alerte déjà lue n’est pas répétée tant qu’elle reste active, mais une nouvelle rupture après résolution est signalée à nouveau. Les alertes résolues restent visibles sept jours pour confirmer la remise à niveau.
+
+## Urgence et accusé de réception des ruptures
+
+La migration `0056` complète les alertes locales avec les champs de couverture estimée, urgence et accusé de réception. La couverture est calculée à partir des ventes encaissées ou partielles des trente derniers jours dans le dépôt concerné. Une rupture est `critical` si le stock est nul ou si la couverture est inférieure ou égale à un jour, `high` jusqu’à trois jours, puis `medium`. Un responsable d’entrepôt ou un administrateur peut accuser réception de l’alerte; cette action est tracée. L’envoi e-mail optionnel reste volontairement en attente d’une configuration de fournisseur transactionnel, conformément au choix de l’utilisateur.
+
+## Pages d’information publiques
+
+Les routes publiques `/aide`, `/conditions-utilisation`, `/politique-securite` et `/contactez-nous` sont disponibles sans connexion. Les liens Aide, Politique de sécurité, Contactez-nous et Conditions d’utilisation sont aussi disponibles dans le menu utilisateur de l’application. Les contenus légaux constituent des modèles à adapter à l’offre commerciale et à la juridiction applicables avant mise en service.
+
+## Demandes d’assistance sécurisées
+
+La migration `0057` ajoute la table multi-entreprise `supportRequests`. Les utilisateurs authentifiés créent une demande avec sujet, message et capture facultative; la capture est limitée à PNG, JPEG ou WEBP de 3 Mo, validée côté client puis côté serveur par type, taille et signature binaire avant stockage S3 sous une clé propre à l’entreprise et à l’utilisateur. Les demandes sont limitées à six créations par quart d’heure et inscrites dans l’audit. Chaque utilisateur consulte seulement ses demandes, tandis que les administrateurs disposent du registre `/support`, filtrent les statuts et les mettent à jour. Les liens des fichiers ne sont affichés qu’aux auteurs ou aux administrateurs de la même entreprise.
+
+## Expérience, exports et tarification
+
+Les actions critiques renforcées affichent désormais un état de chargement clair et bloquent les doubles actions pendant l’exécution : création et validation d’inventaire, encaissement et suppression en masse. Les exports CSV signalent également leur réussite. L’inventaire sélectionné peut être exporté avec les quantités théoriques, comptées et écarts; « Import & export » fournit un rapport des ventes du dépôt actif, avec total, encaissé et solde. Les cellules CSV sont protégées contre l’interprétation de formules.
+
+La route publique `/tarifs` présente les offres Pilote accompagné, Pro opérationnel et Entreprise. Elle est volontairement informative : les prix restent sur devis tant qu’un véritable système d’abonnement et de paiement n’est pas mis en production. La barre latérale est organisée en sections Pilotage, Ventes, Stocks & logistique, Équipe & finance et Administration; le vendeur voit une version limitée et son propre groupe Mon compte.
+
+## Correctifs TVA et thèmes
+
+La création d’un taux TVA prédéfini ne vérifie désormais que les taux actifs de la même entreprise. Un taux retiré ou archivé avec la même valeur ne bloque plus la création d’un nouveau taux de 5 % ou 10 %. La couleur principale de repli est `#2563EB`; l’ancien bleu-vert historique est interprété comme une valeur héritée afin que les installations existantes adoptent ce nouveau défaut sans remplacer les autres couleurs personnalisées.
+
+Les contrôles prioritaires, dont l’encaissement, la création de facture, les boutons d’action, les états actifs de navigation et la page tarifaire, utilisent les tokens `primary` et `primary-foreground` pour garder un texte contrasté sur toute couleur choisie. Le code de l’entrepôt n’est plus affiché sous le sélecteur de l’en-tête. Un bouton clair/sombre est présent dans le header, et les réglages Apparence proposent les modes manuel, suivant le système et automatique selon une plage horaire locale (sombre à 19:00, clair à 07:00 par défaut).
+
+## Correctif final de contraste
+
+Les actions « Ajouter un produit » et « Encaisser » de facture/devis, ainsi que l’encaissement POS, utilisent maintenant uniquement les tokens `primary` et `primary-foreground`. Le menu actif applique ces mêmes tokens de manière forcée sur le bouton et son icône afin d’empêcher une règle héritée de rendre le texte sombre. Les alertes de seuil utilisent des variantes ambre, orange et rouge avec texte foncé en thème clair et texte clair en thème sombre; l’action « Créer une entrée » conserve la couleur principale pour éviter une combinaison jaune sur jaune.
+
+## P0 — Console d’administration plateforme
+
+La migration `0058` ajoute le rôle séparé `platformAdminUsers`, le journal append-only `platformAuditLogs` et `companyLifecycleEvents`. Le propriétaire configuré peut amorcer uniquement son propre rôle `super_admin`; les autres opérateurs doivent être explicitement ajoutés à la liste blanche. Les routes plateforme utilisent `authenticatedProcedure`, distincte des procédures client, et la console `/plateforme` est hors du layout métier. Elle ne présente que les métadonnées opérationnelles des entreprises (statut, activité, administrateur, support ouvert) et ne donne aucun accès direct aux ventes, stocks, clients ou documents métier.
+
+La suspension exige un motif, est réversible, crée un événement de cycle de vie et une trace plateforme. Les procédures ordinaires de l’entreprise bloquent les comptes d’une entreprise suspendue en production. Le lien vers la console n’est affiché que lorsqu’un compte reçoit un rôle plateforme actif; les comptes clients reçoivent une réponse d’accès neutre sans erreur de réseau visible.
+
+## P1 — Console SaaS d’exploitation enrichie
+
+Les migrations `0059` à `0062` étendent la console plateforme sans exposer les lignes métier clientes. Elle présente désormais un tableau de bord agrégé des entreprises, une santé par entreprise (statut, activité, sauvegarde, synchronisation agrégée et support), une fiche entreprise limitée aux contacts administratifs autorisés, au cycle de vie et à l’audit plateforme. La synchronisation offline remonte seulement des compteurs d’état par entreprise — jamais les contenus d’opérations.
+
+Le registre support plateforme permet de filtrer et trier les demandes par statut et priorité, de prendre une demande en charge, fixer une échéance et consulter un journal de triage. Les messages et captures des clients ne sont pas inclus dans ce contrat. Les super administrateurs peuvent désigner des opérateurs existants avec des rôles séparés `operations`, `support` et `billing`, révoquer leur accès ou modifier leur rôle; toute action est auditée côté plateforme.
+
+Le socle abonnement ajoute les tables `subscriptionPlans` et `companySubscriptions`, un catalogue administrable et une gestion manuelle de plan, statut, essai, période et délai de grâce dans la fiche entreprise. Aucun prestataire de paiement ni prélèvement n’est activé. Les listes d’entreprises disposent de recherche, filtres par statut/santé, pagination et export CSV administratif protégé contre les formules. La publication P1 a été validée par TypeScript, Vitest, build PWA et recette visuelle de la console; le warning historique de gros bundle PWA reste non bloquant.
 
 ## 2. Environnement et exploitation
 
@@ -98,6 +203,7 @@ Les conventions permanentes sont les suivantes : interface professionnelle et re
 | `server/companyScope.ts` | Filtre de périmètre entreprise |
 | `server/routers.ts` | Routeur principal, inscription, auth, dashboard |
 | `server/routers/commerce.ts` | Clients, agents, vendeurs, réglages, factures, rémunérations |
+| `server/routers/printingSettings.ts` | Réglages multi-entreprises des tickets et de l’imprimante par défaut |
 | `server/routers/transactions.ts` | POS, brouillons, encaissements, remboursements |
 | `server/routers/inventory.ts` | Inventaires et mouvements |
 | `server/backups.ts` | Création et restauration sélective d’archives |
@@ -112,7 +218,7 @@ Les conventions permanentes sont les suivantes : interface professionnelle et re
 
 ## 8. Tests et état de validation
 
-Le dernier état validé avant ce document comprend **155 tests Vitest**, `pnpm check` et `pnpm build` réussis. Les warnings de chunks PWA volumineux et d’options PNPM anciennes sont non bloquants, mais une future optimisation du découpage du bundle est recommandée.
+Le dernier état validé comprend **190 tests Vitest**, `pnpm check` et `pnpm build` réussis. La synchronisation GitHub récente ajoute une page dédiée « Impression et imprimante », des préférences de ticket et d’imprimante isolées par entreprise, une trace d’audit et la migration Drizzle `0043_loving_boom_boom.sql`, déjà appliquée. Les warnings de chunks PWA volumineux sont non bloquants, mais une future optimisation du découpage du bundle est recommandée.
 
 Les commandes à exécuter après chaque lot significatif sont :
 
@@ -137,4 +243,181 @@ La prochaine conversation doit démarrer par le point critique offline suivant :
 
 ## 10. Instruction de reprise prête à copier
 
-> Reprendre StockPilot Pro dans `/home/ubuntu/stockpilot-pro`. Lire d’abord `RESUME_CONTINUITE_PROJET.md`, `tenant-isolation-audit.md`, `offline-architecture.md` et `todo.md`. Le dernier checkpoint publié est `ef3f69fd` ; un document de continuité a ensuite été ajouté. Le projet est un SaaS React/tRPC/Drizzle multi-entreprise avec auth interne e-mail/mot de passe. Priorité immédiate : terminer la migration du mode hors connexion de `localStorage` vers IndexedDB par entreprise/utilisateur dans `client/src/contexts/OfflineContext.tsx`, sans régression sur les ventes POS et encaissements idempotents. Exécuter `pnpm check`, `pnpm test` et `pnpm build` après les modifications ; relire `todo.md` avant tout checkpoint. Ne jamais exposer les secrets, hashes ou identifiants sensibles.
+> Reprendre StockPilot Pro dans `/home/ubuntu/stockpilot-pro`. Lire d’abord `RESUME_CONTINUITE_PROJET.md`, `tenant-isolation-audit.md`, `offline-architecture.md` et `todo.md`. Le projet est un SaaS React/tRPC/Drizzle multi-entreprise avec auth interne e-mail/mot de passe. La mise à jour GitHub `81833c5` a été intégrée fonctionnellement avec les réglages d’impression multi-entreprises et la migration `0043_loving_boom_boom.sql`. Priorité immédiate : terminer la migration du mode hors connexion de `localStorage` vers IndexedDB par entreprise/utilisateur dans `client/src/contexts/OfflineContext.tsx`, sans régression sur les ventes POS et encaissements idempotents. Exécuter `pnpm check`, `pnpm test` et `pnpm build` après les modifications ; relire `todo.md` avant tout checkpoint. Ne jamais exposer les secrets, hashes ou identifiants sensibles.
+
+## 11. Échéances de salaires et dépenses
+
+La migration `0063_lyrical_chronomancer.sql` ajoute des échéanciers d’entreprise (`paymentDueSchedules`), leurs occurrences, règlements rattachés, rappels idempotents et configuration de tâche planifiée. Les dépenses réglées créent exclusivement une écriture `expenses`; les salaires créent exclusivement un `agentPayments`. `paymentDueSettlements` relie ensuite la pièce réelle à l’échéance, ce qui évite tout double comptage dans les rapports.
+
+La page `/echeances`, accessible dans « Équipe & finance », permet de programmer une dépense ou un salaire ponctuel/mensuel, de choisir les rappels avant échéance, de filtrer les états et d’enregistrer un règlement partiel ou complet. Les alertes sont internes : administrateurs pour leur entreprise, responsables locaux uniquement pour les entrepôts dont ils ont la responsabilité. Les vendeurs et caissiers n’y accèdent pas.
+
+Le traitement quotidien authentifié `/api/scheduled/payment-due-reminders` est actif à 06:00 UTC. Il prépare les échéances à venir, recalcule les retards et écrit un journal de rappel dédupliqué par occurrence, type et jour. Il ne doit pas être remplacé par un minuteur de processus. L’e-mail reste volontairement désactivé tant qu’un fournisseur n’est pas configuré.
+
+## 12. Liaisons professionnelles entre échéances, dépenses et paie
+
+La migration `0064_colorful_amphibian.sql` ajoute les modèles réutilisables d’échéance et les groupes de bénéficiaires, tous deux isolés par entreprise et, le cas échéant, par entrepôt. Un modèle préremplit le montant, la nature, la catégorie, le jour mensuel et les rappels ; il ne crée jamais de dépense ni de paiement seul. Une échéance de groupe crée un échéancier distinct pour chaque membre autorisé afin de préserver le règlement individuel et l’audit.
+
+La page `/echeances` gère les modèles, groupes, échéanciers individuels ou collectifs et règlements. Une échéance mensuelle demande désormais un **jour du mois** entre 1 et 31 ; pour février et les mois courts, le dernier jour disponible est retenu. Une échéance ponctuelle conserve une date précise. La création d’un agent ou vendeur à salaire fixe peut relier un modèle salarial et un jour mensuel. Depuis Dépenses, l’utilisateur peut soit enregistrer une dépense déjà réglée et la lier à une occurrence existante, soit programmer une dépense mensuelle à partir d’un modèle, sans double comptage.
+
+## 13. Gestion avancée des échéances et prévision de trésorerie
+
+Les modèles et groupes d’échéance peuvent désormais être modifiés puis archivés ou réactivés sans suppression destructive. L’archivage retire un modèle des nouveaux choix sans rompre les échéanciers et règlements historiques ; chaque opération est journalisée dans l’audit de l’entreprise.
+
+La migration `0065_zippy_siren.sql` ajoute les références de justificatif aux règlements d’échéance. Le dialogue de règlement accepte uniquement un PDF, PNG, JPEG ou WEBP de 5 Mo maximum. Le fichier est contrôlé côté serveur, enregistré sous le périmètre de l’entreprise et de l’occurrence, puis son URL de stockage est refusée lors du règlement si elle ne correspond pas à cette portée.
+
+L’espace `/echeances` propose aussi une prévision de trésorerie engagée à 3, 6 ou 12 mois, filtrée par l’entrepôt actif. Elle sépare les dépenses programmées et les salaires, affiche les montants déjà réglés, le solde restant et les retards. Il s’agit d’une prévision de sorties engagées : les encaissements futurs non programmés ne sont volontairement pas estimés.
+
+## 14. Shell de la console plateforme
+
+La console `/plateforme` utilise désormais le composant dédié `client/src/components/PlatformConsoleShell.tsx`, distinct du layout des entreprises clientes. Sur ordinateur, une barre latérale fixe organise les sections Vue d’ensemble, Entreprises, Support, Opérateurs, Abonnements et Journal d’audit. Sur mobile, les mêmes raccourcis deviennent une navigation horizontale défilante sous le header. Les sections interdites à un rôle ne sont pas rendues ; les contrôles serveur restent la source d’autorité.
+
+Le header plateforme affiche le périmètre d’administration restreint et une sortie explicite vers l’espace entreprise. La navigation fait défiler vers les sections internes de la console, sans créer de routes supplémentaires ni exposer de données métier. Les surfaces et textes utilisent les tokens de thème, avec une couverture de test de non-régression incluant le nouveau shell.
+
+## 15. Centre de notifications de paiement plateforme
+
+La migration `0066_typical_raider.sql` ajoute `platformNotificationReads`, qui mémorise individuellement la lecture d’une alerte par opérateur plateforme. Le centre de notifications du header est proposé aux rôles Facturation, Opérations historiques et Super administrateur. Il ne lit que les métadonnées de souscription : statut, dates de fin d’essai/période/délai de grâce et nom d’entreprise. Il ne retourne ni ventes, ni stock, ni données de clients.
+
+Les alertes comprennent les paiements à régulariser, fins de délai de grâce, fins d’essai et échéances de souscription proches. Un opérateur peut marquer une alerte ou toutes les alertes comme lues ; seule une clé d’alerte encore active est acceptée côté serveur. Le compteur est limité à `9+` à partir de dix alertes non lues. Cliquer sur une alerte rejoint la section Abonnements sans modifier l’abonnement.
+
+## 16. Pages dédiées de la console plateforme
+
+La console ne rassemble plus tous les outils dans une même vue. Le tableau de bord reste disponible à `/plateforme` et se limite aux indicateurs de synthèse. Les domaines opérationnels sont répartis sur les routes dédiées `/plateforme/entreprises`, `/plateforme/support`, `/plateforme/operateurs`, `/plateforme/abonnements` et `/plateforme/audit`.
+
+Le menu latéral gauche utilise ces routes au lieu d’un défilement interne. Sur mobile, la seconde ligne du header a été supprimée et le même menu est ouvert dans un panneau latéral via le bouton de navigation. Ce panneau comprend une déconnexion réelle et ne propose pas de retour direct vers l’application. La visibilité des entrées reste filtrée par rôle, et les validations serveur restent inchangées.
+
+## 17. Lot A — baseline de sécurité et release
+
+Les dépendances de production signalées par l’audit ont été mises à jour de façon ciblée, notamment tRPC, Drizzle ORM, AWS SDK, Express, Streamdown et Recharts. L’audit des dépendances de production ne remonte désormais plus de vulnérabilité connue. La mise à niveau vers Express 5 a nécessité l’adaptation des routes joker du proxy de stockage et des fallbacks Vite à la syntaxe `/{*splat}`.
+
+Le script `verify:release` exécute désormais `pnpm audit --prod` avant sa recette HTTP. Après une mise à jour de dépendances, utiliser l’ordre `pnpm check`, `pnpm test`, `pnpm build`, `pnpm verify:release`, puis redémarrer le serveur de développement. Les contrôles du lot ont confirmé le typage, 252 tests, le build PWA, la recette HTTP et le chargement visuel de l’application et de la console plateforme.
+
+## 18. Lot B — isolation structurelle multi-entreprises
+
+La migration `0067_glossy_leader.sql` renforce les tables métier prioritaires : les clés `companyId` des journaux, réglages, produits, ventes, stocks, commandes, partenaires, support, inventaires et entrepôts sont désormais obligatoires. Les unicités qui devaient être locales à une entreprise sont définies à partir de la clé entreprise. Les procédures métier reçoivent également un contexte entreprise explicitement typé ; les procédures plateforme restent séparées.
+
+Le rattachement historique a été exécuté après confirmation explicite : deux entrepôts, un réglage commercial et un réglage de sauvegarde ont été affectés à l’unique entreprise alors présente. Une collision de code d’entrepôt a été résolue en conservant le code déjà local à l’entreprise et en ajoutant un suffixe technique stable à l’enregistrement historique concerné ; les relations métier par identifiant n’ont pas changé. La base confirme qu’aucune clé `companyId` du périmètre visé n’est désormais nullable.
+
+Les doubles de tests ont été rendus cohérents avec cette garantie de périmètre, sans replier la protection en production. Le lot doit être validé avec `pnpm check`, `pnpm test` et `pnpm build` avant son checkpoint ; la suite doit être entièrement verte avant de continuer vers le lot C.
+
+## 19. Lot C — sauvegarde, restauration et continuité
+
+La politique validée est une sauvegarde automatique toutes les 6 heures, une conservation minimale de 30 archives, un RPO de 6 heures et un RTO cible de 8 heures. Les réglages existants ont été alignés puis consolidés : une contrainte unique ajoutée par la migration `0069_complete_warstar.sql` garantit désormais une seule configuration de sauvegarde par entreprise.
+
+Les snapshots couvrent les données métier, multi-entrepôts et financières nécessaires à la reprise. Avant une restauration, la simulation valide strictement le format, la version, le périmètre d’entreprise et les références du fichier sans effectuer d’écriture. Les archives produites portent une empreinte SHA-256. La restauration supprime d’abord les relations enfants du seul périmètre concerné, puis réinsère le snapshot dans une transaction. L’essai de restauration réel reste à effectuer sur une archive de recette, jamais comme premier test sur les données de production.
+
+## 20. Lot D — authentification, sessions et fichiers
+
+Les comptes disposent désormais d’un e-mail normalisé, indexé et unique. Les connexions par mot de passe, l’inscription et le contrôle de disponibilité interrogent cette valeur sans charger la liste complète des utilisateurs. Les sessions créées par les connexions locales historiques et de secours sont maintenant enregistrées : elles respectent donc la révocation et la liste des appareils, comme les connexions ordinaires. Des limites de tentative restent appliquées à l’adresse et à l’adresse réseau fournie par le serveur, sans faire confiance à un en-tête contrôlable par le navigateur.
+
+Le proxy de stockage impose maintenant une session valide et n’autorise que les objets du préfixe `company/<companyId>/` correspondant à l’entreprise de la session. Les liens de fichiers existants restent compatibles, mais ne donnent plus accès sans authentification ni entre entreprises. Les justificatifs de règlement transmis par le client utilisent désormais une clé de stockage strictement validée sur l’entreprise et l’occurrence, puis le serveur construit lui-même l’URL de lecture. Les redirections conservent `Cache-Control: no-store` ; la durée effective du lien signé dépend du service de stockage géré et ne doit pas être présentée comme une garantie de rétention ou d’expiration configurée localement.
+
+La limitation de débit reste locale au processus dans cette version. Une limite partagée entre instances, une politique antimalware et une stratégie d’archivage immuable des journaux restent des sujets de durcissement à traiter dans les lots opérationnels suivants.
+
+## 21. Lot E — automatisations, santé et supervision
+
+Les sauvegardes automatiques et les rappels d’échéance produisent désormais un journal d’exécution tenant-scopé, limité aux métadonnées de supervision : type de tâche, période d’idempotence, statut, durée, corrélation et code d’erreur technique sans message interne. La migration `0071_whole_kate_bishop.sql` impose une unicité par entreprise, type de tâche et période : un second déclenchement de la même période est ignoré avant toute seconde exécution métier.
+
+Le traitement des rappels est séparé par entreprise. Une erreur locale est enregistrée, ne bloque pas les autres entreprises et laisse au planificateur une réponse agrégée de succès partiel plutôt qu’une reprise globale qui risquerait de dupliquer les traitements déjà réussis. La console plateforme affiche uniquement des compteurs agrégés d’exécutions réussies, en erreur, en cours ou ignorées sur les dernières 24 heures ; elle ne retourne aucune échéance, vente, montant ou contenu client.
+
+Les tâches restent conçues pour des exécutions brèves et idempotentes. En cas d’augmentation durable du nombre d’entreprises ou d’un temps de traitement proche de la limite d’exécution, mesurer les volumes et la latence avant de choisir un traitement par lots plus petit ou une capacité d’hébergement adaptée ; ne pas introduire de minuterie en mémoire.
+
+## 22. Lot F — mode offline-first par entreprise et entrepôt
+
+Les opérations hors connexion, leurs journaux et les caches de requêtes sont maintenant séparés par entreprise, utilisateur et entrepôt actif. Un changement de compte, d’entreprise ou de dépôt vide le cache mémoire du contexte précédent, puis restaure uniquement le cache IndexedDB du nouveau périmètre. Les archives locales des autres entrepôts sont préservées, mais ne sont jamais chargées dans le périmètre actif.
+
+Les anciennes files locales sont migrées vers leur entrepôt déclaré ; lorsqu’une archive historique ne possède pas cette information, elle est rattachée explicitement à l’entrepôt actif pendant la migration, plutôt qu’à une clé globale. Toute mise en file et toute reprise vérifient que l’entrepôt de l’opération correspond toujours à l’entrepôt actif. Le serveur reste l’autorité finale : une opération hors périmètre ou un stock devenu insuffisant est refusé au retour réseau et apparaît comme une erreur à reprendre.
+
+Le journal de synchronisation indique désormais la dernière sauvegarde locale du périmètre actif. En l’absence de réseau, le POS signale que les quantités sont estimées localement et comptabilise les sorties en attente. Les données déjà disponibles peuvent être restaurées après redémarrage, dans la limite du stockage navigateur persistant accordé par l’appareil. Le chiffrement au repos dans IndexedDB, la gestion de quota et une stratégie de résolution de conflit plus avancée restent des limites à traiter avant de présenter l’usage offline prolongé comme une garantie absolue.
+
+## 23. Lot G — intégrité métier, stock et finance
+
+La migration `0072_blushing_mephistopheles.sql` ajoute des clés d’opération et des contraintes uniques aux règlements d’échéance et paiements agents. Un même envoi peut ainsi être rejoué sans créer une seconde écriture financière. Une dépense réelle ou un paiement agent ne peut plus être rattaché à plusieurs règlements d’échéance. Les bénéficiaires de paie sont validés côté serveur : ils doivent être actifs, appartenir à l’entreprise et, pour un compte utilisateur, avoir le rôle vendeur.
+
+Les encaissements et remboursements verrouillent désormais l’état et le montant de la vente avant de créer les mouvements de stock, paiements ou commissions. Une requête concurrente ou devenue obsolète est refusée avec un conflit plutôt que de réappliquer les effets de bord. Les transferts inter-entrepôts conservent leur verrouillage de statut, leur débit atomique de stock source et leur réintégration à l’annulation.
+
+Les tests de règles couvrent les montants complets et partiels, les clés d’opération obligatoires et le refus des transitions concurrentes. La validation complète a confirmé TypeScript, 114 fichiers de test / 272 tests, le build PWA et la recette de release. Les outils de production doivent toujours conserver une revue comptable et des rapprochements périodiques : l’idempotence applicative réduit les doubles écritures techniques, sans remplacer les contrôles métier de clôture.
+
+## 24. Lot H — qualité, accessibilité et recette de release
+
+Les sélecteurs d’agent, de caissier et d’entrepôt restent désormais contrôlés pendant leur chargement, ce qui élimine la transition contrôlé/non contrôlé observée dans les parcours de vente et de mouvements. Le script `check-controlled-selects.mjs` empêche le retour de ce motif dans le code client. Les déclencheurs possèdent également un libellé accessible lorsque le contexte ne suffit pas.
+
+La recette de release contrôle maintenant, en plus de l’audit des dépendances, que tous les artefacts de migrations du journal sont présents et non vides. Elle teste sans session les routes protégées du tableau de bord, des sauvegardes, transactions, échéances, console plateforme et proxy de fichiers. Le workflow CI exécute les mêmes contrôles statiques de migration et de sélecteur, l’audit de portée tenant, l’audit production, le typage, les tests et le build.
+
+La vérification visuelle desktop a couvert le tableau de bord, les mouvements de stock, la création de facture, le journal de synchronisation et la console plateforme. Les états de chargement, les contrastes et la navigation restent à rejuger lors de chaque nouvelle interface ; les essais clavier et lecteur d’écran avec des utilisateurs réels sont une étape de recette manuelle complémentaire, non simulée par ces contrôles automatisés.
+
+## 25. Lot J — préparation de gouvernance et lancement encadré
+
+Le fichier `REGISTRE_PREPARATION_LANCEMENT.md` centralise les preuves techniques, les rôles opérationnels, le runbook incident, la procédure de lancement pilote et la liste de vérification go/no-go. Le script `check-launch-readiness.mjs` confirme la présence des documents de référence et expose séparément les prérequis externes non résolus, sans les faire passer pour une validation automatique.
+
+Au 29 août 2026, le projet est préparé pour un **pilote encadré**, non pour une ouverture commerciale large sans conditions. Restent notamment à réaliser : une restauration témoin en recette, une revue indépendante ciblée de sécurité, la validation des juridictions et durées de rétention, l’attribution des responsables de support et d’incident, puis la décision de paiement, fiscalité et remboursement avant toute activation du lot I. Ne pas présenter l’application comme juridiquement conforme, certifiée ou sans risque tant que ces décisions et revues ne sont pas formalisées.
+
+## 26. Lot I — préparation webhook YengaPay SANDBOX
+
+YengaPay a été retenu pour le paiement SaaS. La documentation fournie confirme l’usage d’un projet `SANDBOX`, d’une clé API distincte, d’un checkout hébergé et d’une signature HMAC-SHA256 portée par `x-webhook-hash`. L’endpoint `POST /api/webhooks/yengapay` reçoit exclusivement un corps JSON brut de taille limitée, vérifie cette signature avant parsing, extrait le type d’événement (`x-yengapay-event`) et conserve uniquement des métadonnées minimales dans un journal idempotent par empreinte. Les signatures invalides sont rejetées et aucun corps complet, numéro de client ou secret n’est enregistré.
+
+L’endpoint ne crée pas de paiement et n’active aucun abonnement ; même un événement `payment.success` est seulement conservé à l’état reçu, en attente d’une réconciliation PayIn future. La clé API SANDBOX manque encore : tant qu’elle n’est pas fournie, les chemins exacts de création/lecture PayIn, les identifiants organisation/projet et les scénarios de paiement réels ne doivent pas être inventés ni activés.
+
+## 27. Lot I — tarification des offres et PayIn SANDBOX en attente
+
+L’offre historique a été convertie, après confirmation explicite, en **Test** à **1 000 XOF**, en modalité **mensuelle** et avec **un jour d’essai**. La migration `0076_same_blackheart.sql` ajoute un prix général aux offres et étend les modalités à `monthly`, `annual` et `lifetime`, sans supprimer la compatibilité du champ mensuel historique. La console plateforme permet maintenant de créer une offre avec un prix en FCFA, une modalité et une période d’essai. Les montants, la devise XOF et les trois modalités sont contrôlés côté serveur.
+
+L’espace propriétaire `/abonnement` et l’intention PayIn tenant-scopée sont préparés : le checkout est réservé au propriétaire, une référence unique est créée côté serveur et l’activation reste liée à une notification signée et à la réconciliation. Toutefois, le fournisseur retourne un refus d’authentification lors du test de création PayIn SANDBOX. Un verrou explicite empêche donc toute ouverture de checkout tant qu’une clé SANDBOX reconnue, liée au bon projet et autorisée pour « Créer un paiement entrant », n’a pas été validée. Aucun paiement, abonnement ou changement de souscription n’a été déclenché par ces essais.
+
+
+## Mise à jour — stabilité offline et pause YengaPay (13 octobre 2026)
+
+Le collecteur de diagnostic de prévisualisation, dont le rythme de rapport était de deux secondes, est désormais désactivé par défaut. Il ne peut être réactivé qu’en développement avec `MANUS_DEBUG_COLLECTOR=true`. Le client React Query applique une politique offline-first : aucune revalidation lors d’un changement de fenêtre ou d’un retour réseau, aucun polling global, cache conservé une journée et nouvelles requêtes traitées en mode compatible offline.
+
+La PWA ne force plus l’activation d’un service worker ni un rechargement automatique. Une version disponible est annoncée à l’utilisateur, qui peut choisir de l’appliquer après avoir terminé ses saisies. La navigation après connexion, inscription et finalisation de l’assistant de démarrage utilise désormais des invalidations tRPC ciblées et le routeur SPA plutôt qu’un rechargement de document.
+
+YengaPay demeure en **pause SANDBOX** : `YENGAPAY_PAYIN_ENABLED` est requis et reste désactivé ; l’écran d’abonnement interdit toute création de checkout tant que le verrou est fermé. Ne pas modifier ce statut, relancer la sonde PayIn ni activer un paiement sans la validation technique et l’accord explicite prévus au lot I.
+
+
+## Mise à jour — intégration GitHub novembre (12 novembre 2026)
+
+À la demande de l’utilisateur, les nouveautés du commit GitHub `ef4ac6d793228475c3ce64653f96134af95328f1`, branche `ccr-1f2b32f0-8cxy1l` de `kaso-tech/stockpilot`, ont été portées sélectivement sur le socle actuel. Il ne s’agit pas d’un remplacement par l’ancienne branche GitHub `main`. La sauvegarde locale `backup/pre-github-integration-2026-11-12` conserve l’état initial ; les fusions/rebases exploratoires ont été annulées. Le checkpoint `4cc686f9` avait déjà sécurisé l’installation et les dépendances avant portage.
+
+La livraison intègre récupération et vérification e-mail facultative, envoi serveur des PDF, retours partiels/avoirs, TVA par produit, références de catalogue tenant-scopées, cinq rôles métier, caisse/clôtures/exports, lots/péremption et coûts moyens, limites/consommation SaaS et pilote S3 optionnel. Les pages sont chargées à la demande et précachées par la PWA. La notification de mise à jour personnalisée est reportable et exige une confirmation explicite avant rechargement, avec avertissement sur les saisies non enregistrées.
+
+Les migrations `0077_dusty_scream.sql` et `0078_november_compatibility_backfill.sql` sont appliquées à la base attachée ; ne pas les rejouer aveuglément, en particulier la reprise des coûts après de nouvelles opérations. Les noms, quantités et totaux historiques sont conservés. Le dossier `NOTE_INTEGRATION_NOVEMBRE_2026.md` détaille la portée et les précautions.
+
+Validation de livraison : typage vert, 129 fichiers / 332 tests, build PWA avec 121 entrées précachées, audit production/release et installation figée verts, 5 tests navigateur verts sur le build production avec API simulée et aucune base métier. Les tests de navigation et de cache après coupure réseau sont réellement exécutés ; ils ne certifient pas un séjour offline de plusieurs jours sur tout appareil.
+
+YengaPay reste en pause SANDBOX, offre Test inchangée, aucun paiement ni abonnement activé. SMTP et S3 externes ne sont pas configurés/validés par cette livraison. Les liens de compte nécessitent une origine `PUBLIC_APP_URL` HTTPS ; ne pas utiliser le Host fourni par le navigateur. L’envoi e-mail absent reste explicitement indisponible. Ne pas qualifier cette livraison d’ouverture commerciale large ni de clôture des prérequis externes du registre.
+
+
+## Livraison GitHub — 13 novembre 2026
+
+La source `kaso-tech/stockpilot`, branche `ccr-1f2b32f0-8cxy1l`, a été récupérée à la tête `726b79f48d766a2ebb34c16a8f518c24bfd18de7`. Les nouveautés thème `1c60472` et photos `726b79f` ont été portées sur le checkpoint `798b3429`, sans remplacement global des fonctionnalités intégrées le 12 novembre. Le pull du remote interne est bloqué par son accès ; il ne faut pas annoncer une fusion brute ni remplacer le socle par le `main` GitHub ancien. Sauvegarde : `backup/pre-pull-2026-11-13` ; branche de travail : `integrate/github-latest-2026-11-13`.
+
+Le thème clair/sombre et les classes des pages suivent des jetons sémantiques ; le bleu `#2563EB` et les préférences sont préservés. La recherche de navigation utilise les routes autorisées au rôle. Les ajouts dashboard de la source sont intégrés au calcul déjà limité à l’entreprise et à l’entrepôt autorisé ; les factures annulées/remboursées ne sont plus considérées comme créances.
+
+Les photos peuvent être choisies à la création, remplacées/retirées sur la fiche et affichées dans le catalogue et la caisse. La compression et les limites raster sont contrôlées ; le remplacement et son audit sont transactionnels. Le relais de fichiers exige une session du tenant et un pointeur encore attaché au produit. Les anciens objets détachés sont inaccessibles, même lorsque Forge ne sait pas les supprimer physiquement. Le cache photo offline est isolé par entreprise, utilisateur et entrepôt et purgé à la déconnexion ; l’envoi de photos reste indisponible hors réseau. Les mises à jour PWA ne s’activent jamais sans confirmation.
+
+La migration `0079_product_images.sql` ajoute seulement deux colonnes nullable et est appliquée. Ne pas utiliser le `0055` photo de GitHub ni rejouer les migrations historiques. Les snapshots protègent les pointeurs, mais une restauration de photo suppose aussi la conservation des octets externes.
+
+Recette : typage frais sans cache incrémental, **135 fichiers / 354 tests**, build PWA, audit/release, contrôle du diff et **7 scénarios E2E** sur API simulée réussis. Les anciens diagnostics du watcher ne doivent pas être pris pour un résultat de compilation actuel. Les fichiers de recette n’écrivent pas dans la base métier ni le stockage réel.
+
+Note détaillée : `NOTE_SYNCHRONISATION_2026-11-13.md`. Archive : `/home/ubuntu/stockpilot-pro-latest-2026-11-13.zip`. YengaPay reste en pause SANDBOX, SMTP/S3 externes restent à configurer/valider. Le checkpoint final est livré séparément ; ne pas confondre sa sauvegarde avec la publication du domaine public.
+
+## Livraison GitHub — 20 novembre 2026
+
+La branche de collaboration `kaso-tech/stockpilot:ccr-1f2b32f0-8cxy1l` est récupérée et revérifiée à la tête `52dd44a010c4e8a53cefac40395dc0935523024c`. `main` reste sur l’ancien `81833c5`. Les apports des commits `3272f92` et `52dd44a` sont portés sélectivement sur le checkpoint `b5ccfb22` : menu de compte adapté, vue d’ensemble réorganisée en cinq blocs et anneau/légende du rapport mensuel des dépenses. Les calculs financiers locaux, les paramètres historiques, les catégories incluant la paie agents, les permissions et le contexte entreprise/entrepôt sont conservés. La nouvelle préférence `todo` respecte les anciennes clés et un choix explicite reste prioritaire.
+
+Sauvegarde : `backup/pre-pull-2026-11-20`. Branche : `integrate/github-latest-2026-11-13`. Ne pas annoncer un pull/rebase global ni une restauration d’une ancienne version. La migration distante `0056_default_primary_color.sql` est exclue : elle remplacerait le bleu demandé `#2563EB` par `#0B6E76` et entrerait en conflit avec l’historique local. Aucune migration supplémentaire, aucune suppression ni écriture de données métier n’est effectuée pour cette livraison ; le schéma reste à `0079`.
+
+Recette finale : TypeScript frais réussi, puis `pnpm check` réussi après suppression du seul cache incrémental TypeScript périmé ; **135 fichiers / 356 tests Vitest**, build PWA (**124 entrées**), audit production/release, `git diff --check` et **9 E2E** sur build production avec API simulée réussis. Les scénarios supplémentaires vérifient le rapport des dépenses alimenté, la portée d’entrepôt, la lecture mobile/offline et la conservation des dépenses/paie dans les priorités quand les autres blocs sont masqués, sans les divulguer au vendeur. L’aperçu desktop/mobile a été inspecté sans écriture dans les données. Le watcher peut encore afficher d’anciens diagnostics ; ne pas les confondre avec le contrôle frais validé. La CI distante était en échec `quality` sans journal exploitable ; aucun succès distant n’est revendiqué.
+
+Note : `NOTE_SYNCHRONISATION_2026-11-20.md`. Archive source : `/home/ubuntu/stockpilot-pro-latest-2026-11-20.zip`, avec continuité, tests et migrations, sans secrets ni données métier. Le checkpoint final est livré séparément. Aucun push GitHub ni publication du domaine n’est effectué. YengaPay reste en pause SANDBOX ; les 12 cases ouvertes du lot I ne sont pas clôturées par cette synchronisation. SMTP/S3 externes et prérequis commerciaux restent à valider. Les limites offline décrites dans la note restent applicables.
+
+## Livraison complémentaire — portage sélectif de main `0184f30` (20 novembre 2026, soirée)
+
+Après correction du choix de remplacement intégral par l’utilisateur, le projet est revenu au socle `651bd0f9`, branche `integrate/github-latest-2026-11-13`. GitHub `main` est désormais revérifié à `0184f30428349de4629a04948142f1548c7fdbd2` (20:20 UTC). Le remote interne `origin` demeure inchangé et inaccessible depuis le terminal ; la source GitHub est séparée sous `github`. Aucun pull réussi depuis `origin`, push GitHub ou publication n’est revendiqué.
+
+Les styles compatibles de `5f32871` et `0184f30` sont portés seulement sous forme de transitions courtes et de relief sur sept boutons-cartes existants. Bleu `#2563EB`, thèmes, dimensions, permissions, chargements, cache offline et portées entreprise/entrepôt sont conservés. Les cartes Agents et Devis adoptent un fond de survol sémantique pour rester lisibles en clair. Le shell, le POS et les ancêtres de leurs éléments fixes ne sont pas animés. Le mode mouvement réduit est vérifié sur CSS compilé ; les anciens déplacements Tailwind doublés sont retirés.
+
+Les refontes complètes `a460482`, les nouvelles annulations POS `347726f`, l’import distant de photos `574df54` et la suppression/réinitialisation d’entrepôt `840e767` ne sont pas copiés en bloc. Ils présentent des incompatibilités de conservation, de portée vendeur/entrepôt, de SSRF/correspondance ou de suppression destructive. Les effets d’entrée/stagger globaux, palette distante et shimmer sont également exclus. Aucun ajout métier n’est présenté comme livré par ce portage.
+
+Aucune migration ni écriture métier ; schéma local `0079` inchangé. Installation figée sans changement de manifeste/lockfile, typage frais, **136 fichiers / 359 tests Vitest**, build PWA (**124 ressources**), audit production sans vulnérabilité connue, recette de release, diff et **12 E2E** avec API simulée/base vide réussis. Trois nouvelles gardes unitaires et trois scénarios navigateur couvrent motion réduite, contraste de titre, absence de transform sur shell, et placement du panier fixe en desktop/mobile. Le test historique Dépenses offline attend maintenant le contrôle PWA et le chargement des deux pages avant coupure, sans masquer les erreurs. Captures Devis clair/sombre et POS desktop/mobile inspectées.
+
+Note : `NOTE_PORTAGE_MAIN_0184f30_2026-11-20.md`. Archive : `/home/ubuntu/stockpilot-pro-selective-0184f30-2026-11-20.zip`, sans secrets, base, objets externes, dépendances installées, build ou traces de recette. Le checkpoint WebDev final est communiqué séparément ; il ne faut pas confondre sauvegarde et publication. YengaPay reste en pause SANDBOX, les 12 tâches ouvertes ne sont pas clôturées ; SMTP/S3 externes et prérequis commerciaux restent à valider. La recette ne garantit pas le fonctionnement offline de plusieurs jours pour toutes les actions/appareils.

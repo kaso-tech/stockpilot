@@ -1,5 +1,3 @@
-export function shouldPromptForAssignment(
-  defaultAgentId: number | null | undefined
-) {
+export function shouldPromptForAssignment(defaultAgentId: number | null | undefined) {
   return !defaultAgentId;
 }

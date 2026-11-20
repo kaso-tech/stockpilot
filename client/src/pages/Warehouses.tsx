@@ -1,429 +1,73 @@
+import { can } from "@shared/permissions";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { usePermissions } from "@/hooks/usePermissions";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
-import {
-  ArrowRightLeft,
-  CalendarClock,
-  MoreHorizontal,
-  Plus,
-  RotateCcw,
-  Trash2,
-  Warehouse,
-} from "lucide-react";
-import { PageHeader, Panel, PanelHeader } from "@/components/page";
-import { StatusPill } from "@/components/StatusPill";
-import {
-  WarehouseDangerDialog,
-  type WarehouseDangerAction,
-} from "@/components/WarehouseDangerDialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { WarehouseDangerDialog, type WarehouseDangerAction } from "@/components/WarehouseDangerDialog";
+import { Archive, CheckCircle2, RotateCcw, Trash2, MapPin, PackagePlus, Pencil, ShieldCheck, SlidersHorizontal, UsersRound, Warehouse as WarehouseIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { Restricted } from "./AuditLog";
 
-/** Dépôts, stock par dépôt, transferts et lots à péremption proche (9.7). */
+type WarehouseRecord = { id: number; name: string; code: string; address: string | null; active: boolean; isDefault: boolean; productCount: number; totalQuantity: number };
+
+const emptyForm = { name: "", code: "", address: "", isDefault: false };
+
 export default function Warehouses() {
-  const { can } = usePermissions();
-  const canManage = can("inventory.manage");
-  // Réinitialisation et suppression : actions irréversibles, réservées aux administrateurs.
-  const canDestroy = can("settings.manage");
-  const [danger, setDanger] = useState<{
-    warehouse: { id: number; name: string; isDefault: boolean };
-    action: WarehouseDangerAction;
-  } | null>(null);
+  const { user } = useAuth();
+  const isAdmin = can(user?.role, "catalog.manage");
   const utils = trpc.useUtils();
-  const { data: warehouses = [] } = trpc.warehouses.list.useQuery();
-  const { data: stock = [] } = trpc.warehouses.stock.useQuery();
-  const { data: expiring = [] } = trpc.warehouses.expiringLots.useQuery({
-    days: 30,
-  });
-  const [newName, setNewName] = useState("");
-  const [search, setSearch] = useState("");
-  const [transfer, setTransfer] = useState({
-    productId: "",
-    from: "",
-    to: "",
-    quantity: "",
-  });
-  const refresh = () =>
-    Promise.all([
-      utils.warehouses.list.invalidate(),
-      utils.warehouses.stock.invalidate(),
-      utils.products.list.invalidate(),
-    ]);
-  const create = trpc.warehouses.create.useMutation({
-    onSuccess: () => {
-      setNewName("");
-      refresh();
-      toast.success("Dépôt créé.");
-    },
-    onError: error => toast.error(error.message),
-  });
-  const update = trpc.warehouses.update.useMutation({
-    onSuccess: () => {
-      refresh();
-      toast.success("Dépôt mis à jour.");
-    },
-    onError: error => toast.error(error.message),
-  });
-  const move = trpc.warehouses.transfer.useMutation({
-    onSuccess: () => {
-      setTransfer({ productId: "", from: "", to: "", quantity: "" });
-      refresh();
-      toast.success("Transfert enregistré.");
-    },
-    onError: error => toast.error(error.message),
-  });
-  const active = warehouses.filter(item => item.active);
-  const rows = useMemo(
-    () =>
-      stock.filter(product =>
-        `${product.name} ${product.reference}`
-          .toLowerCase()
-          .includes(search.trim().toLowerCase())
-      ),
-    [stock, search]
-  );
-  const unitsByWarehouse = useMemo(() => {
-    const totals = new Map<number, number>();
-    for (const product of stock)
-      for (const item of product.stocks)
-        totals.set(
-          item.warehouseId,
-          (totals.get(item.warehouseId) ?? 0) + item.quantity
-        );
-    return totals;
-  }, [stock]);
-  const nameOf = (id: number) =>
-    warehouses.find(item => item.id === id)?.name ?? "—";
-  return (
-    <div className="mx-auto max-w-[1440px] space-y-6">
-      <PageHeader
-        title="Dépôts"
-        description="Ventes, réceptions et corrections utilisent le dépôt par défaut, sauf choix contraire. La valorisation se fait au coût moyen pondéré, mis à jour à chaque réception."
-      />
-      <Panel>
-        <PanelHeader
-          title="Dépôts et magasins"
-          detail={`${warehouses.length} dépôt${warehouses.length > 1 ? "s" : ""}`}
-        />
-        <div className="divide-y divide-border border-t border-border">
-          {warehouses.map(item => (
-            <div
-              key={item.id}
-              className="flex flex-wrap items-center gap-3 px-5 py-3"
-            >
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary-soft text-primary">
-                <Warehouse className="h-4 w-4" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="truncate text-sm font-semibold text-foreground">
-                    {item.name}
-                  </span>
-                  {item.isDefault && (
-                    <StatusPill tone="info">Par défaut</StatusPill>
-                  )}
-                  {!item.active && (
-                    <StatusPill tone="neutral">Inactif</StatusPill>
-                  )}
-                </div>
-                <p className="mt-0.5 text-xs text-faint">
-                  {(unitsByWarehouse.get(item.id) ?? 0).toLocaleString("fr-FR")}{" "}
-                  unité(s) en stock
-                </p>
-              </div>
-              {canManage && (
-                <div className="flex items-center gap-1.5">
-                  {!item.isDefault && item.active && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() =>
-                        update.mutate({
-                          id: item.id,
-                          name: item.name,
-                          active: true,
-                          isDefault: true,
-                        })
-                      }
-                    >
-                      Définir par défaut
-                    </Button>
-                  )}
-                  {!item.isDefault && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() =>
-                        update.mutate({
-                          id: item.id,
-                          name: item.name,
-                          active: !item.active,
-                          isDefault: false,
-                        })
-                      }
-                    >
-                      {item.active ? "Désactiver" : "Réactiver"}
-                    </Button>
-                  )}
-                  {canDestroy && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          size="icon-sm"
-                          variant="ghost"
-                          aria-label={`Autres actions pour ${item.name}`}
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-64">
-                        <DropdownMenuItem
-                          onClick={() =>
-                            setDanger({ warehouse: item, action: "reset" })
-                          }
-                          className="cursor-pointer"
-                        >
-                          <RotateCcw className="mr-2 h-4 w-4" />
-                          Réinitialiser (vider toutes les données)
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          disabled={item.isDefault}
-                          onClick={() =>
-                            setDanger({ warehouse: item, action: "remove" })
-                          }
-                          className="cursor-pointer text-destructive focus:bg-destructive-soft focus:text-destructive"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          {item.isDefault
-                            ? "Suppression impossible (dépôt par défaut)"
-                            : "Supprimer définitivement"}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-        {canManage && (
-          <form
-            className="flex gap-2 border-t border-border p-4"
-            onSubmit={event => {
-              event.preventDefault();
-              create.mutate({ name: newName });
-            }}
-          >
-            <Input
-              placeholder="Nom du nouveau dépôt"
-              value={newName}
-              onChange={event => setNewName(event.target.value)}
-            />
-            <Button
-              type="submit"
-              disabled={newName.trim().length < 2 || create.isPending}
-            >
-              <Plus className="h-4 w-4" />
-              Ajouter
-            </Button>
-          </form>
-        )}
-      </Panel>
-      <WarehouseDangerDialog
-        warehouse={danger?.warehouse ?? null}
-        action={danger?.action ?? "reset"}
-        onClose={() => setDanger(null)}
-        onDone={() => {
-          setDanger(null);
-          void Promise.all([
-            refresh(),
-            utils.warehouses.expiringLots.invalidate(),
-            utils.movements.list.invalidate(),
-            utils.dashboard.get.invalidate(),
-          ]);
-        }}
-      />
-      {canManage && active.length > 1 && (
-        <Card className="border-border bg-card gap-0 py-0">
-          <CardContent className="space-y-3 p-6">
-            <h2 className="flex items-center gap-2 font-semibold">
-              <ArrowRightLeft className="h-4 w-4" />
-              Transfert entre dépôts
-            </h2>
-            <form
-              className="grid gap-2 sm:grid-cols-5"
-              onSubmit={event => {
-                event.preventDefault();
-                move.mutate({
-                  productId: Number(transfer.productId),
-                  fromWarehouseId: Number(transfer.from),
-                  toWarehouseId: Number(transfer.to),
-                  quantity: Number(transfer.quantity),
-                });
-              }}
-            >
-              <select
-                aria-label="Produit"
-                value={transfer.productId}
-                onChange={event =>
-                  setTransfer({ ...transfer, productId: event.target.value })
-                }
-                className="h-10 rounded-md border border-border bg-background px-3 text-sm sm:col-span-2"
-              >
-                <option value="">Produit…</option>
-                {stock.map(product => (
-                  <option key={product.id} value={product.id}>
-                    {product.name} ({product.reference})
-                  </option>
-                ))}
-              </select>
-              <select
-                aria-label="Depuis"
-                value={transfer.from}
-                onChange={event =>
-                  setTransfer({ ...transfer, from: event.target.value })
-                }
-                className="h-10 rounded-md border border-border bg-background px-3 text-sm"
-              >
-                <option value="">Depuis…</option>
-                {active.map(item => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
-              <select
-                aria-label="Vers"
-                value={transfer.to}
-                onChange={event =>
-                  setTransfer({ ...transfer, to: event.target.value })
-                }
-                className="h-10 rounded-md border border-border bg-background px-3 text-sm"
-              >
-                <option value="">Vers…</option>
-                {active.map(item => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
-              <div className="flex gap-2">
-                <Input
-                  type="number"
-                  min={1}
-                  placeholder="Qté"
-                  value={transfer.quantity}
-                  onChange={event =>
-                    setTransfer({ ...transfer, quantity: event.target.value })
-                  }
-                />
-                <Button
-                  type="submit"
-                  disabled={
-                    !transfer.productId ||
-                    !transfer.from ||
-                    !transfer.to ||
-                    !Number(transfer.quantity) ||
-                    move.isPending
-                  }
-                >
-                  OK
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      )}
-      <Card className="border-border bg-card gap-0 py-0">
-        <CardContent className="space-y-3 p-6">
-          <h2 className="flex items-center gap-2 font-semibold">
-            <CalendarClock className="h-4 w-4" />
-            Lots périmés ou à péremption sous 30 jours
-          </h2>
-          {expiring.length ? (
-            <ul className="space-y-1 text-sm">
-              {expiring.map(lot => (
-                <li
-                  key={lot.id}
-                  className="flex flex-wrap justify-between gap-2"
-                >
-                  <span>
-                    {lot.productName} · lot {lot.lotNumber} ·{" "}
-                    {nameOf(lot.warehouseId)}
-                  </span>
-                  <span
-                    className={
-                      lot.expired ? "text-destructive" : "text-warning"
-                    }
-                  >
-                    {lot.quantity} {lot.unit} ·{" "}
-                    {lot.expired ? "périmé le" : "expire le"} {lot.expiryDate}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-muted-foreground">Aucun lot concerné.</p>
-          )}
-        </CardContent>
-      </Card>
-      <Card className="border-border bg-card gap-0 py-0">
-        <CardContent className="overflow-x-auto p-6">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="font-semibold">Stock par dépôt</h2>
-            <Input
-              className="w-64"
-              placeholder="Rechercher un produit"
-              value={search}
-              onChange={event => setSearch(event.target.value)}
-            />
-          </div>
-          <table className="w-full min-w-[560px] text-sm">
-            <thead>
-              <tr className="text-left text-xs text-muted-foreground">
-                <th className="py-2 pr-3 font-medium">Produit</th>
-                {active.map(item => (
-                  <th
-                    key={item.id}
-                    className="px-2 py-2 text-right font-medium"
-                  >
-                    {item.name}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(product => (
-                <tr key={product.id} className="border-t border-border">
-                  <td className="py-2 pr-3">
-                    {product.name}{" "}
-                    <span className="text-xs text-muted-foreground">
-                      {product.reference}
-                    </span>
-                  </td>
-                  {active.map(item => (
-                    <td key={item.id} className="px-2 py-2 text-right">
-                      {product.stocks.find(
-                        entry => entry.warehouseId === item.id
-                      )?.quantity ?? 0}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </CardContent>
-      </Card>
-    </div>
-  );
+  const { data: warehouses = [], isLoading } = trpc.warehouses.list.useQuery(undefined, { enabled: isAdmin });
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<WarehouseRecord | null>(null);
+  const [form, setForm] = useState(emptyForm);
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | null>(null);
+  const [danger, setDanger] = useState<{ warehouse: WarehouseRecord; action: WarehouseDangerAction } | null>(null);
+  const isCompanyAdmin = user?.role === "admin";
+  const selectedWarehouse = useMemo(() => warehouses.find(warehouse => warehouse.id === selectedWarehouseId) ?? warehouses.find(warehouse => warehouse.isDefault) ?? null, [warehouses, selectedWarehouseId]);
+  const stock = trpc.warehouses.stocks.useQuery({ warehouseId: selectedWarehouse?.id ?? 0 }, { enabled: Boolean(selectedWarehouse?.id) && isAdmin });
+  const lots = trpc.warehouses.lots.useQuery({ warehouseId: selectedWarehouse?.id ?? 0 }, { enabled: Boolean(selectedWarehouse?.id) && isAdmin });
+  const thresholds = trpc.warehouses.thresholds.list.useQuery({ warehouseId: selectedWarehouse?.id ?? 0 }, { enabled: Boolean(selectedWarehouse?.id) && isAdmin });
+  const team = trpc.warehouses.team.list.useQuery({ warehouseId: selectedWarehouse?.id ?? 0 }, { enabled: Boolean(selectedWarehouse?.id) && isAdmin });
+  const refresh = () => { void utils.warehouses.list.invalidate(); if (selectedWarehouse?.id) void utils.warehouses.stocks.invalidate({ warehouseId: selectedWarehouse.id }); };
+  const create = trpc.warehouses.create.useMutation({ onSuccess: result => { refresh(); setSelectedWarehouseId(result.id); closeDialog(); toast.success("Entrepôt créé."); }, onError: error => toast.error(error.message) });
+  const update = trpc.warehouses.update.useMutation({ onSuccess: () => { refresh(); closeDialog(); toast.success("Entrepôt mis à jour."); }, onError: error => toast.error(error.message) });
+  const setDefault = trpc.warehouses.setDefault.useMutation({ onSuccess: () => { refresh(); toast.success("Entrepôt principal mis à jour."); }, onError: error => toast.error(error.message) });
+  const archive = trpc.warehouses.archive.useMutation({ onSuccess: () => { refresh(); toast.success("Entrepôt désactivé."); }, onError: error => toast.error(error.message) });
+  const saveThreshold = trpc.warehouses.thresholds.set.useMutation({ onSuccess: () => { if (selectedWarehouse?.id) { void utils.warehouses.thresholds.list.invalidate({ warehouseId: selectedWarehouse.id }); void utils.warehouses.stocks.invalidate({ warehouseId: selectedWarehouse.id }); } toast.success("Seuil local enregistré."); }, onError: error => toast.error(error.message) });
+  const setTeamRole = trpc.warehouses.team.setRole.useMutation({ onSuccess: () => { if (selectedWarehouse?.id) void utils.warehouses.team.list.invalidate({ warehouseId: selectedWarehouse.id }); toast.success("Rôle d’entrepôt mis à jour."); }, onError: error => toast.error(error.message) });
+  const removeTeamMember = trpc.warehouses.team.remove.useMutation({ onSuccess: () => { if (selectedWarehouse?.id) void utils.warehouses.team.list.invalidate({ warehouseId: selectedWarehouse.id }); toast.success("Accès entrepôt retiré."); }, onError: error => toast.error(error.message) });
+  const closeDialog = () => { setDialogOpen(false); setEditing(null); setForm(emptyForm); };
+  const openCreate = () => { setEditing(null); setForm({ ...emptyForm, isDefault: warehouses.length === 0 }); setDialogOpen(true); };
+  const openEdit = (warehouse: WarehouseRecord) => { setEditing(warehouse); setForm({ name: warehouse.name, code: warehouse.code, address: warehouse.address ?? "", isDefault: warehouse.isDefault }); setDialogOpen(true); };
+  const save = () => {
+    const payload = { name: form.name.trim(), code: form.code.trim().toUpperCase(), address: form.address.trim() || null, isDefault: form.isDefault };
+    if (payload.name.length < 2 || payload.code.length < 2) return toast.error("Renseignez un nom et un code d’au moins deux caractères.");
+    if (editing) update.mutate({ id: editing.id, ...payload }); else create.mutate(payload);
+  };
+
+  if (!isAdmin) return <Restricted title="Entrepôts" description="La gestion des entrepôts et transferts est réservée aux administrateurs." />;
+
+  return <div className="mx-auto max-w-7xl space-y-6">
+    <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><h1 className="text-[22px] font-bold tracking-tight text-foreground">Entrepôts</h1><p className="mt-2 max-w-2xl text-sm text-muted-foreground">Répartissez le stock par site, désignez un dépôt principal et consultez le niveau de chaque produit sans mélanger les entreprises.</p></div><Button onClick={openCreate} className="bg-primary text-primary-foreground hover:bg-primary/90"><PackagePlus className="mr-2 h-4 w-4" />Nouvel entrepôt</Button></header>
+
+    <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(340px,0.85fr)]">
+      <Card className="border-border bg-card gap-0 py-0"><CardContent className="p-0">{isLoading ? <div className="px-6 py-16 text-center text-sm text-faint">Chargement des entrepôts…</div> : warehouses.length ? <div className="divide-y divide-border">{warehouses.map(warehouse => <button key={warehouse.id} type="button" onClick={() => setSelectedWarehouseId(warehouse.id)} className={`flex w-full items-center gap-4 px-5 py-4 text-left transition hover:bg-accent ${selectedWarehouse?.id === warehouse.id ? "bg-primary/10" : ""}`}><span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${warehouse.active ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}><WarehouseIcon className="h-5 w-5" /></span><span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-2"><span className="truncate font-medium text-foreground">{warehouse.name}</span>{warehouse.isDefault && <Badge className="border-0 bg-success-soft text-success">Principal</Badge>}{!warehouse.active && <Badge className="border-0 bg-muted text-muted-foreground">Inactif</Badge>}</span><span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-faint"><span className="font-mono text-muted-foreground">{warehouse.code}</span>{warehouse.address && <span className="inline-flex min-w-0 items-center gap-1 truncate"><MapPin className="h-3 w-3" />{warehouse.address}</span>}</span></span><span className="hidden shrink-0 text-right sm:block"><span className="block text-sm font-semibold text-foreground">{warehouse.totalQuantity} unités</span><span className="mt-1 block text-xs text-faint">{warehouse.productCount} référence{warehouse.productCount > 1 ? "s" : ""}</span></span><span className="flex shrink-0 gap-1" onClick={event => event.stopPropagation()}><Button size="icon" variant="ghost" onClick={() => openEdit(warehouse)} aria-label={`Modifier ${warehouse.name}`} className="text-primary"><Pencil className="h-4 w-4" /></Button>{!warehouse.isDefault && warehouse.active && <Button size="icon" variant="ghost" onClick={() => setDefault.mutate({ id: warehouse.id })} disabled={setDefault.isPending} aria-label={`Définir ${warehouse.name} comme principal`} className="text-success"><CheckCircle2 className="h-4 w-4" /></Button>}{!warehouse.isDefault && warehouse.active && <Button size="icon" variant="ghost" onClick={() => { if (window.confirm(`Désactiver ${warehouse.name} ?`)) archive.mutate({ id: warehouse.id }); }} disabled={archive.isPending} aria-label={`Désactiver ${warehouse.name}`} className="text-destructive"><Archive className="h-4 w-4" /></Button>}{isCompanyAdmin && <Button size="icon" variant="ghost" onClick={event => { event.stopPropagation(); setDanger({ warehouse, action: "reset" }); }} aria-label={`Réinitialiser ${warehouse.name}`} title="Réinitialiser (vider toutes les données de stock)" className="text-warning"><RotateCcw className="h-4 w-4" /></Button>}{isCompanyAdmin && !warehouse.isDefault && <Button size="icon" variant="ghost" onClick={event => { event.stopPropagation(); setDanger({ warehouse, action: "remove" }); }} aria-label={`Supprimer définitivement ${warehouse.name}`} title="Supprimer définitivement" className="text-destructive"><Trash2 className="h-4 w-4" /></Button>}</span></button>)}</div> : <div className="px-6 py-16 text-center"><WarehouseIcon className="mx-auto h-8 w-8 text-faint" /><p className="mt-3 font-medium text-muted-foreground">Aucun entrepôt</p><p className="mt-1 text-sm text-faint">Créez votre premier dépôt pour répartir vos stocks.</p></div>}</CardContent></Card>
+      <Card className="border-border bg-card gap-0 py-0"><CardContent className="p-5"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-semibold text-primary">Stock localisé</p><h2 className="mt-2 text-lg font-semibold text-foreground">{selectedWarehouse?.name ?? "Sélectionnez un entrepôt"}</h2>{selectedWarehouse && <p className="mt-1 text-xs text-faint">{selectedWarehouse.code} · {selectedWarehouse.totalQuantity} unités disponibles</p>}</div>{selectedWarehouse?.isDefault && <Badge className="border-0 bg-success-soft text-success">Dépôt principal</Badge>}</div><div className="mt-5 max-h-[430px] overflow-y-auto pr-1">{stock.isLoading ? <p className="py-10 text-center text-sm text-faint">Chargement du stock…</p> : stock.data?.products?.length ? <div className="space-y-2">{stock.data.products.map(product => { const low = product.quantity <= product.minimumQuantity; return <div key={product.productId} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/30 px-3 py-2.5"><span className="min-w-0"><span className="block truncate text-sm font-medium text-foreground">{product.name}</span><span className="mt-0.5 block font-mono text-xs text-faint">{product.reference}</span></span><span className={`shrink-0 text-right text-sm font-semibold ${low ? "text-warning" : "text-foreground"}`}>{product.quantity} <span className="text-xs font-normal text-faint">{product.unit}</span></span></div>; })}</div> : <p className="py-10 text-center text-sm text-faint">Aucun produit à afficher dans cet entrepôt.</p>}</div></CardContent></Card>
+    </section>
+    {selectedWarehouse && <Card className="border-border bg-card gap-0 py-0"><CardContent className="p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-semibold text-primary">Traçabilité</p><h2 className="mt-1 text-lg font-semibold text-foreground">Lots et péremption</h2><p className="mt-1 text-sm text-muted-foreground">Quantités rattachées au stock de {selectedWarehouse.name} · sorties FEFO.</p></div><Badge className="border-0 bg-primary/10 text-primary">{lots.data?.length ?? 0} lot(s) actif(s)</Badge></div><div className="mt-4 overflow-x-auto rounded-xl border border-border"><table className="w-full min-w-[620px] text-left text-sm"><thead className="bg-muted/40 text-xs text-muted-foreground"><tr><th className="px-4 py-3">Produit / lot</th><th className="px-4 py-3">Péremption</th><th className="px-4 py-3 text-right">Disponible</th><th className="px-4 py-3 text-right">Coût unité</th></tr></thead><tbody className="divide-y divide-border">{lots.isLoading ? <tr><td colSpan={4} className="px-4 py-8 text-center text-faint">Chargement des lots…</td></tr> : lots.data?.length ? lots.data.map(lot => <tr key={lot.id}><td className="px-4 py-3"><span className="block font-medium text-foreground">{lot.productName}</span><span className="mt-1 block text-xs text-muted-foreground">{lot.reference} · {lot.lotNumber}</span></td><td className="px-4 py-3 text-muted-foreground">{lot.expiryDate ?? "Non renseignée"}</td><td className="px-4 py-3 text-right font-semibold text-foreground">{lot.quantity} {lot.unit}</td><td className="px-4 py-3 text-right text-muted-foreground">{lot.unitCostCents.toLocaleString("fr-FR")} centimes</td></tr>) : <tr><td colSpan={4} className="px-4 py-8 text-center text-faint">Aucun lot suivi dans cet entrepôt.</td></tr>}</tbody></table></div></CardContent></Card>}
+
+    {selectedWarehouse && <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+      <Card className="border-border bg-card gap-0 py-0"><CardContent className="p-5"><div className="flex items-start gap-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-warning-soft text-warning"><SlidersHorizontal className="h-4 w-4" /></span><div><p className="text-xs font-semibold text-primary">Réapprovisionnement local</p><h2 className="mt-1 text-lg font-semibold text-foreground">Seuils de {selectedWarehouse.name}</h2></div></div><p className="mt-3 text-sm text-muted-foreground">Chaque seuil s’applique uniquement à ce dépôt. Une alerte est mise à jour automatiquement à chaque mouvement de stock.</p><div className="mt-4 max-h-80 divide-y divide-border overflow-y-auto rounded-xl border border-border">{thresholds.isLoading ? <p className="p-5 text-center text-sm text-faint">Chargement des seuils…</p> : thresholds.data?.map(item => <div key={item.productId} className="grid items-center gap-3 px-4 py-3 sm:grid-cols-[1fr_130px_100px]"><span className="min-w-0"><span className="block truncate text-sm font-medium text-foreground">{item.name}</span><span className="font-mono text-xs text-faint">{item.reference} · {item.quantity} {item.unit}</span></span><Input type="number" min="0" defaultValue={item.threshold} aria-label={`Seuil ${item.name}`} onBlur={event => { const value = Math.max(0, Number.parseInt(event.target.value || "0", 10) || 0); if (value !== item.threshold) saveThreshold.mutate({ warehouseId: selectedWarehouse.id, productId: item.productId, threshold: value }); }} className="h-9 border-border bg-muted/40 text-foreground" />{item.alert ? <Badge className="justify-center border-0 bg-destructive-soft text-destructive">Alerte active</Badge> : <Badge className="justify-center border-0 bg-success-soft text-success">Conforme</Badge>}</div>)}</div></CardContent></Card>
+      <Card className="border-border bg-card gap-0 py-0"><CardContent className="p-5"><div className="flex items-start gap-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary"><UsersRound className="h-4 w-4" /></span><div><p className="text-xs font-semibold text-primary">Équipe du dépôt</p><h2 className="mt-1 text-lg font-semibold text-foreground">Rôles opérationnels</h2></div></div><div className="mt-3 rounded-xl border border-primary/15 bg-primary/[0.05] p-3 text-xs text-muted-foreground"><span className="font-semibold text-primary">Responsable</span> : stock, transferts et seuils · <span className="font-semibold text-primary">Caissier</span> : ventes et encaissements · <span className="font-semibold text-primary">Vendeur</span> : ventes préparées.</div><div className="mt-4 max-h-80 divide-y divide-border overflow-y-auto rounded-xl border border-border">{team.isLoading ? <p className="p-5 text-center text-sm text-faint">Chargement de l’équipe…</p> : team.data?.map(member => <div key={member.id} className="flex items-center gap-3 px-4 py-3"><span className="grid h-8 w-8 place-items-center rounded-lg bg-muted text-xs font-semibold text-muted-foreground">{(member.name ?? member.username ?? "U").slice(0, 1).toUpperCase()}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-foreground">{member.name ?? member.username}</span><span className="block truncate text-xs text-faint">{member.username ?? member.email}</span></span><select value={member.warehouseRole ?? "unassigned"} onChange={event => { const value = event.target.value; if (value === "unassigned") removeTeamMember.mutate({ warehouseId: selectedWarehouse.id, sellerUserId: member.id }); else setTeamRole.mutate({ warehouseId: selectedWarehouse.id, sellerUserId: member.id, warehouseRole: value as "manager" | "cashier" | "seller" }); }} className="h-9 rounded-lg border border-border bg-muted/50 px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"><option value="unassigned">Sans accès</option><option value="manager">Responsable</option><option value="cashier">Caissier</option><option value="seller">Vendeur</option></select></div>)}</div></CardContent></Card>
+    </section>}
+
+    <Dialog open={dialogOpen} onOpenChange={value => !value && closeDialog()}><DialogContent className="border-border bg-popover text-foreground"><DialogHeader><DialogTitle>{editing ? "Modifier l’entrepôt" : "Nouvel entrepôt"}</DialogTitle></DialogHeader><div className="space-y-4"><div className="grid gap-4 sm:grid-cols-[1fr_150px]"><div className="space-y-2"><Label>Nom</Label><Input autoFocus value={form.name} onChange={event => setForm(current => ({ ...current, name: event.target.value }))} placeholder="Ex. Dépôt central" /></div><div className="space-y-2"><Label>Code</Label><Input value={form.code} onChange={event => setForm(current => ({ ...current, code: event.target.value.toUpperCase() }))} placeholder="CENTRAL" /></div></div><div className="space-y-2"><Label>Adresse ou repère</Label><Textarea value={form.address} onChange={event => setForm(current => ({ ...current, address: event.target.value }))} placeholder="Adresse, quartier ou contact du site (facultatif)" className="min-h-20" /></div><label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-border bg-accent/40 px-4 py-3"><span><span className="block text-sm font-medium text-foreground">Entrepôt principal</span><span className="mt-0.5 block text-xs text-faint">Les nouveaux documents utiliseront ce dépôt par défaut.</span></span><Switch checked={form.isDefault} onCheckedChange={checked => setForm(current => ({ ...current, isDefault: checked }))} /></label></div><DialogFooter><Button variant="ghost" onClick={closeDialog}>Annuler</Button><Button onClick={save} disabled={create.isPending || update.isPending} className="bg-primary text-primary-foreground hover:bg-primary/90">{editing ? "Enregistrer" : "Créer l’entrepôt"}</Button></DialogFooter></DialogContent></Dialog>
+  <WarehouseDangerDialog warehouse={danger?.warehouse ?? null} action={danger?.action ?? "reset"} onClose={() => setDanger(null)} onDone={() => { if (danger?.action === "remove" && selectedWarehouseId === danger.warehouse.id) setSelectedWarehouseId(null); setDanger(null); refresh(); void utils.products.list.invalidate(); }} /></div>;
 }

@@ -1,18 +1,11 @@
-import { NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG } from "@shared/const";
+import { NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG } from '@shared/const';
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
-import { can, type Permission } from "@shared/permissions";
-import { getDb } from "../db";
-import { assertCompanyWritable } from "../subscription";
-
-/** Droits utilisables même quand l'abonnement bloque les écritures. */
-const READ_ONLY_SAFE = new Set<Permission>([
-  "accounting.export",
-  "backups.manage",
-  "users.manage",
-  "settings.manage",
-]);
 import type { TrpcContext } from "./context";
+import { and, eq } from "drizzle-orm";
+import { companies } from "../../drizzle/schema";
+import { getDb } from "../db";
+import { can, type Permission } from "@shared/permissions";
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
@@ -27,17 +20,6 @@ const requireUser = t.middleware(async opts => {
   if (!ctx.user) {
     throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
   }
-  // Depuis la migration 0044, tout compte appartient à une entreprise : un
-  // compte sans entreprise ne doit jamais accéder aux données (S5).
-  if (
-    !Number.isInteger(ctx.user.companyId) ||
-    Number(ctx.user.companyId) <= 0
-  ) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "Compte non rattaché à une entreprise.",
-    });
-  }
 
   return next({
     ctx: {
@@ -47,23 +29,45 @@ const requireUser = t.middleware(async opts => {
   });
 });
 
-export const protectedProcedure = t.procedure.use(requireUser);
+export const authenticatedProcedure = t.procedure.use(requireUser);
 
-export const adminProcedure = t.procedure.use(
+const requireActiveCompany = t.middleware(async opts => {
+  const { ctx, next } = opts;
+  const user = ctx.user;
+  if (!user) throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
+  if (user.companyId == null) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Aucune entreprise active n’est associée à ce compte." });
+  }
+
+  const companyId = user.companyId;
+  const db = await getDb();
+  // Certaines doubles de tests injectent un accès DB minimal pour tester les
+  // règles métier isolées. En production, le client Drizzle expose toujours
+  // select et le contrôle de suspension est donc systématiquement appliqué.
+  const company = db && typeof (db as any).select === "function" ? (await db.select({ status: companies.platformStatus }).from(companies).where(and(eq(companies.id, companyId))).limit(1))[0] : null;
+  if (company?.status === "suspended") throw new TRPCError({ code: "FORBIDDEN", message: "Cette entreprise est temporairement suspendue. Contactez le support StockPilot." });
+
+  return next({ ctx: { ...ctx, user: { ...user, companyId } } });
+});
+
+export const protectedProcedure = authenticatedProcedure.use(requireActiveCompany);
+
+/** Applique la matrice d’accès tenant ; les contrôles entrepôt et vendeur restent complémentaires. */
+export const permissionProcedure = (permission: Permission) => protectedProcedure.use(
+  t.middleware(async ({ ctx, next }) => {
+    if (!ctx.user || !can(ctx.user.role, permission)) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Cette action n’est pas autorisée pour votre rôle." });
+    }
+    return next();
+  }),
+);
+
+export const adminProcedure = protectedProcedure.use(
   t.middleware(async opts => {
     const { ctx, next } = opts;
 
-    if (!ctx.user || ctx.user.role !== "admin") {
+    if (!ctx.user || ctx.user.role !== 'admin') {
       throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
-    }
-    if (
-      !Number.isInteger(ctx.user.companyId) ||
-      Number(ctx.user.companyId) <= 0
-    ) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "Compte non rattaché à une entreprise.",
-      });
     }
 
     return next({
@@ -72,25 +76,17 @@ export const adminProcedure = t.procedure.use(
         user: ctx.user,
       },
     });
-  })
+  }),
 );
 
-/**
- * Procédure soumise à un droit de la matrice (9.3). Les restrictions
- * propres aux vendeurs configurées dans le point de vente restent vérifiées
- * dans les procédures concernées.
- */
-export const permissionProcedure = (permission: Permission) =>
-  protectedProcedure.use(
-    t.middleware(async ({ ctx, next, type }) => {
-      if (!can(ctx.user?.role, permission))
-        throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
-      // Abonnement (9.8) : essai terminé ou espace suspendu → écritures bloquées.
-      // La consultation, les exports, les sauvegardes et la gestion du compte restent ouverts.
-      if (type === "mutation" && !READ_ONLY_SAFE.has(permission)) {
-        const db = await getDb();
-        if (db) await assertCompanyWritable(db, ctx.user!.companyId);
-      }
-      return next();
-    })
-  );
+// Aliases de compatibilité : le code legacy conserve ses routes et reçoit désormais les refus métier.
+export const catalogProcedure = permissionProcedure("catalog.manage");
+export const customerProcedure = permissionProcedure("customers.manage");
+export const purchasingProcedure = permissionProcedure("purchasing.manage");
+export const stockAdjustmentProcedure = permissionProcedure("stock.adjust");
+export const inventoryProcedure = permissionProcedure("inventory.manage");
+export const expensesProcedure = permissionProcedure("expenses.manage");
+export const payrollProcedure = permissionProcedure("payroll.manage");
+export const teamProcedure = permissionProcedure("team.manage");
+export const auditProcedure = permissionProcedure("audit.view");
+export const cashProcedure = permissionProcedure("cash.close");

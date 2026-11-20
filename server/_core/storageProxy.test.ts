@@ -1,41 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { canReadStorageKey } from "./storageProxy";
+import { canReadCompanyStorageKey } from "./storageProxy";
 
-const as =
-  (companyId: number | null, role = "admin") =>
-  async () => ({ companyId, role });
-const anonymous = async () => {
-  throw new Error("no session");
-};
-
-describe("accès aux fichiers stockés", () => {
-  it("laisse publics les logos et signatures", async () => {
-    expect(await canReadStorageKey("company/5/logo_ab12.png", anonymous)).toBe(
-      true
-    );
+describe("canReadCompanyStorageKey", () => {
+  it("autorise un objet valide du seul périmètre entreprise courant", () => {
+    expect(canReadCompanyStorageKey("company/41/support/12/capture.png", 41)).toBe(true);
   });
 
-  it("réserve les sauvegardes aux administrateurs de l'entreprise", async () => {
-    const key = "company/5/backups/stockpilot-backup_ab12.json";
-    expect(await canReadStorageKey(key, anonymous)).toBe(false);
-    expect(await canReadStorageKey(key, as(6))).toBe(false);
-    expect(await canReadStorageKey(key, as(5, "seller"))).toBe(false);
-    expect(await canReadStorageKey(key, as(5))).toBe(true);
-  });
-
-  it("réserve les justificatifs aux membres de l'entreprise", async () => {
-    expect(
-      await canReadStorageKey("company/5/expenses/x.pdf", as(5, "seller"))
-    ).toBe(true);
-    expect(
-      await canReadStorageKey("company/5/payroll/x.pdf", as(9, "admin"))
-    ).toBe(false);
-  });
-
-  it("réserve les photos de produits aux membres de l'entreprise", async () => {
-    const key = "company/5/products/12/thumb_ab12cd34.webp";
-    expect(await canReadStorageKey(key, anonymous)).toBe(false);
-    expect(await canReadStorageKey(key, as(6, "seller"))).toBe(false);
-    expect(await canReadStorageKey(key, as(5, "seller"))).toBe(true);
+  it("refuse les objets d’une autre entreprise, les clés globales et les chemins ambigus", () => {
+    expect(canReadCompanyStorageKey("company/42/support/12/capture.png", 41)).toBe(false);
+    expect(canReadCompanyStorageKey("support/12/capture.png", 41)).toBe(false);
+    expect(canReadCompanyStorageKey("company/41/support/../42/capture.png", 41)).toBe(false);
   });
 });

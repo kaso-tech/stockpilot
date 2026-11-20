@@ -1,225 +1,91 @@
 import { StatCard } from "@/components/page";
-import { usePermissions } from "@/hooks/usePermissions";
+import { can } from "@shared/permissions";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatCurrency } from "@/lib/format";
+import { matchesSellerAssignmentSearch, normalizeSellerWarehouseIds } from "@/lib/sellerAssignments";
 import { trpc } from "@/lib/trpc";
-import {
-  Banknote,
-  BriefcaseBusiness,
-  ChevronRight,
-  Pencil,
-  Plus,
-  UserRoundCheck,
-} from "lucide-react";
-import { useState } from "react";
+import { useActiveWarehouse } from "@/contexts/ActiveWarehouseContext";
+import { Banknote, BriefcaseBusiness, ChevronRight, Plus, Search, UserRoundCheck } from "lucide-react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 import { Restricted } from "./AuditLog";
 
 type AgentKind = "seller" | "sales_agent" | "cashier";
-export type Beneficiary = {
-  type: "user" | "agent";
-  id: number;
-  name: string;
-  role: string;
-  kind: AgentKind;
-  username?: string | null;
-  email?: string | null;
-  phone?: string | null;
-};
-export type AgentForm = {
-  name: string;
-  type: AgentKind;
-  email: string;
-  phone: string;
-  username: string;
-  password: string;
-  remunerationMode: "fixed" | "commission" | "fixed_plus_commission";
-  fixed: string;
-  basis: "revenue" | "net_profit";
-  rate: string;
-};
+export type Beneficiary = { type: "user" | "agent"; id: number; name: string; role: string; kind: AgentKind; username?: string | null; email?: string | null; phone?: string | null };
+export type AgentForm = { name: string; type: AgentKind; email: string; phone: string; username: string; password: string; remunerationMode: "fixed" | "commission" | "fixed_plus_commission"; fixed: string; basis: "revenue" | "net_profit"; rate: string; salaryTemplateId: string; salaryDueDay: string };
 
-export const blankAgentForm: AgentForm = {
-  name: "",
-  type: "seller",
-  email: "",
-  phone: "",
-  username: "",
-  password: "",
-  remunerationMode: "commission",
-  fixed: "0",
-  basis: "revenue",
-  rate: "0",
-};
-const remunerationPayload = (form: AgentForm) => ({
-  remunerationMode: form.remunerationMode,
-  fixedMonthlyCents:
-    form.remunerationMode === "commission"
-      ? 0
-      : Math.round(Number(form.fixed || 0) * 100),
-  commissionBasis: form.basis,
-  rateBasisPoints:
-    form.remunerationMode === "fixed"
-      ? 0
-      : Math.round(Number(form.rate || 0) * 100),
-  active: true,
-});
+export const blankAgentForm: AgentForm = { name: "", type: "seller", email: "", phone: "", username: "", password: "", remunerationMode: "commission", fixed: "0", basis: "revenue", rate: "0", salaryTemplateId: "", salaryDueDay: String(new Date().getDate()) };
+const emptyAssignments: Array<{ warehouseId: number }> = [];
+const emptyCommercialScope = { warehouseScope: "all" as const, warehouseIds: [] as number[] };
+const currentCommissionPeriod = new Date().toISOString().slice(0, 7);
+const remunerationPayload = (form: AgentForm) => ({ remunerationMode: form.remunerationMode, fixedMonthlyCents: form.remunerationMode === "commission" ? 0 : Math.round(Number(form.fixed || 0) * 100), commissionBasis: form.basis, rateBasisPoints: form.remunerationMode === "fixed" ? 0 : Math.round(Number(form.rate || 0) * 100), active: true });
 
 export default function Agents() {
-  const { can } = usePermissions();
+  const { user } = useAuth();
   const [, setLocation] = useLocation();
-  const isAdmin = can("team.view") || can("payroll.manage");
-  const canManageTeam = can("team.manage");
+  const isAdmin = can(user?.role, "team.view");
+  const { activeWarehouseId, activeWarehouse } = useActiveWarehouse();
   const utils = trpc.useUtils();
-  const { data: payroll } = trpc.payroll.overview.useQuery(undefined, {
-    enabled: isAdmin,
-  });
-  const { data: sellers = [] } = trpc.commerce.sellers.list.useQuery(
-    undefined,
-    { enabled: isAdmin }
-  );
+  const { data: payroll } = trpc.payroll.overview.useQuery(activeWarehouseId ? { warehouseId: activeWarehouseId } : undefined, { enabled: isAdmin });
+  const { data: sellers = [] } = trpc.commerce.sellers.list.useQuery(undefined, { enabled: isAdmin });
+  const { data: warehouses = [] } = trpc.warehouses.list.useQuery(undefined, { enabled: isAdmin });
+  const { data: salaryTemplates = [] } = trpc.paymentDues.templates.list.useQuery({ scheduleType: "salary", ...(activeWarehouseId ? { warehouseId: activeWarehouseId } : {}) }, { enabled: isAdmin });
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Beneficiary | null>(null);
   const [form, setForm] = useState<AgentForm>(blankAgentForm);
-  const refresh = () => {
-    utils.payroll.overview.invalidate();
-    utils.commerce.agents.list.invalidate();
-    utils.commerce.sellers.list.invalidate();
-  };
-  const closeForm = () => {
-    setOpen(false);
-    setEditing(null);
-    setForm(blankAgentForm);
-  };
-  const createAgent = trpc.commerce.agents.create.useMutation({
-    onSuccess: () => {
-      refresh();
-      closeForm();
-      toast.success("Agent créé avec sa rémunération.");
-    },
-    onError: error => toast.error(error.message),
-  });
-  const updateAgent = trpc.commerce.agents.update.useMutation({
-    onSuccess: () => {
-      refresh();
-      closeForm();
-      toast.success("Agent modifié.");
-    },
-    onError: error => toast.error(error.message),
-  });
-  const createSeller = trpc.commerce.sellers.create.useMutation({
-    onSuccess: () => {
-      refresh();
-      closeForm();
-      toast.success("Vendeur et accès créés.");
-    },
-    onError: error => toast.error(error.message),
-  });
-  const updateSeller = trpc.commerce.sellers.update.useMutation({
-    onSuccess: () => {
-      refresh();
-      closeForm();
-      toast.success("Vendeur modifié.");
-    },
-    onError: error => toast.error(error.message),
-  });
-  const convertToSeller = trpc.commerce.agents.convertToSeller.useMutation({
-    onSuccess: () => {
-      refresh();
-      closeForm();
-      toast.success("Agent converti en vendeur.");
-    },
-    onError: error => toast.error(error.message),
-  });
-  const convertSellerToAgent =
-    trpc.commerce.agents.convertSellerToAgent.useMutation({
-      onSuccess: () => {
-        refresh();
-        closeForm();
-        toast.success("Vendeur converti en agent.");
-      },
-      onError: error => toast.error(error.message),
-    });
+  const [assignmentSellerId, setAssignmentSellerId] = useState<number | null>(null);
+  const [sellerAssignmentSearch, setSellerAssignmentSearch] = useState("");
+  const [commercialScopeAgentId, setCommercialScopeAgentId] = useState<number | null>(null);
+  const [commissionPeriod, setCommissionPeriod] = useState(currentCommissionPeriod);
+  const [commissionWarehouseId, setCommissionWarehouseId] = useState("all");
+  const [commissionBeneficiaryKey, setCommissionBeneficiaryKey] = useState("all");
+  const assignmentQuery = trpc.commerce.sellers.assignments.get.useQuery({ sellerId: assignmentSellerId ?? 0 }, { enabled: Boolean(assignmentSellerId) });
+  const commercialScopeQuery = trpc.commerce.agents.scope.get.useQuery({ agentId: commercialScopeAgentId ?? 0 }, { enabled: Boolean(commercialScopeAgentId) });
+  const assignmentRows = assignmentQuery.data ?? emptyAssignments;
+  const [assignmentIds, setAssignmentIds] = useState<number[]>([]);
+  const [commercialScope, setCommercialScope] = useState<"all" | "selected" | "attribution_only">("all");
+  const [commercialScopeWarehouseIds, setCommercialScopeWarehouseIds] = useState<number[]>([]);
+  const commissionReport = trpc.payroll.commissionReport.useQuery({ periodLabel: commissionPeriod, warehouseId: commissionWarehouseId === "all" ? undefined : Number(commissionWarehouseId), beneficiaryKey: commissionBeneficiaryKey }, { enabled: isAdmin });
+  useEffect(() => {
+    if (assignmentSellerId === null) { setAssignmentIds([]); return; }
+    if (assignmentQuery.data) setAssignmentIds(normalizeSellerWarehouseIds(assignmentRows));
+  }, [assignmentSellerId, assignmentQuery.data, assignmentRows]);
+  useEffect(() => {
+    if (commercialScopeAgentId === null) { setCommercialScope("all"); setCommercialScopeWarehouseIds([]); return; }
+    const scope = commercialScopeQuery.data ?? emptyCommercialScope;
+    if (commercialScopeQuery.data) { setCommercialScope(scope.warehouseScope); setCommercialScopeWarehouseIds(normalizeSellerWarehouseIds(scope.warehouseIds.map(warehouseId => ({ warehouseId })))); }
+  }, [commercialScopeAgentId, commercialScopeQuery.data]);
+  const refresh = () => { utils.payroll.overview.invalidate(); utils.commerce.agents.list.invalidate(); utils.commerce.sellers.list.invalidate(); };
+  const closeForm = () => { setOpen(false); setEditing(null); setForm(blankAgentForm); };
+  const createAgent = trpc.commerce.agents.create.useMutation({ onSuccess: () => { refresh(); closeForm(); toast.success("Agent créé avec sa rémunération."); }, onError: error => toast.error(error.message) });
+  const updateAgent = trpc.commerce.agents.update.useMutation({ onSuccess: () => { refresh(); closeForm(); toast.success("Agent modifié."); }, onError: error => toast.error(error.message) });
+  const createSeller = trpc.commerce.sellers.create.useMutation({ onSuccess: () => { refresh(); closeForm(); toast.success("Vendeur et accès créés."); }, onError: error => toast.error(error.message) });
+  const updateSeller = trpc.commerce.sellers.update.useMutation({ onSuccess: () => { refresh(); closeForm(); toast.success("Vendeur modifié."); }, onError: error => toast.error(error.message) });
+  const convertToSeller = trpc.commerce.agents.convertToSeller.useMutation({ onSuccess: () => { refresh(); closeForm(); toast.success("Agent converti en vendeur."); }, onError: error => toast.error(error.message) });
+  const convertSellerToAgent = trpc.commerce.agents.convertSellerToAgent.useMutation({ onSuccess: () => { refresh(); closeForm(); toast.success("Vendeur converti en agent."); }, onError: error => toast.error(error.message) });
+  const saveAssignments = trpc.commerce.sellers.assignments.save.useMutation({ onSuccess: () => { utils.commerce.sellers.list.invalidate(); setAssignmentSellerId(null); toast.success("Affectations d’entrepôts mises à jour."); }, onError: error => toast.error(error.message) });
+  const saveCommercialScope = trpc.commerce.agents.scope.save.useMutation({ onSuccess: () => { utils.commerce.agents.list.invalidate(); setCommercialScopeAgentId(null); toast.success("Portée commerciale mise à jour."); }, onError: error => toast.error(error.message) });
 
-  if (!isAdmin)
-    return (
-      <Restricted
-        title="Agents & rémunérations"
-        description="La gestion des agents et paiements est réservée aux administrateurs."
-      />
-    );
+  if (!isAdmin) return <Restricted title="Agents & rémunérations" description="La gestion des agents et paiements est réservée aux administrateurs." />;
 
-  const profileFor = (beneficiary: Beneficiary) =>
-    payroll?.profiles.find(
-      item =>
-        item.beneficiaryType === beneficiary.type &&
-        item.beneficiaryId === beneficiary.id
-    );
-  const balanceFor = (beneficiary: Beneficiary) =>
-    payroll?.balances.find(
-      item =>
-        item.beneficiaryType === beneficiary.type &&
-        item.beneficiaryId === beneficiary.id
-    );
+  const profileFor = (beneficiary: Beneficiary) => payroll?.profiles.find(item => item.beneficiaryType === beneficiary.type && item.beneficiaryId === beneficiary.id);
+  const balanceFor = (beneficiary: Beneficiary) => payroll?.balances.find(item => item.beneficiaryType === beneficiary.type && item.beneficiaryId === beneficiary.id);
   const beneficiaries: Beneficiary[] = [
-    ...sellers
-      .filter(item => item.active)
-      .map(item => ({
-        type: "user" as const,
-        id: item.id,
-        name: item.name || "Vendeur",
-        role: "Vendeur",
-        kind: "seller" as const,
-        username: item.username,
-        email: item.email,
-        phone: item.phone,
-      })),
-    ...(payroll?.agents ?? [])
-      .filter(item => item.active)
-      .map(item => ({
-        type: "agent" as const,
-        id: item.id,
-        name: item.name,
-        role: item.type === "cashier" ? "Caissier" : "Agent commercial",
-        kind: item.type,
-        email: item.email,
-        phone: item.phone,
-      })),
+    ...sellers.filter(item => item.active).map(item => ({ type: "user" as const, id: item.id, name: item.name || "Vendeur", role: "Vendeur", kind: "seller" as const, username: item.username, email: item.email, phone: item.phone })),
+    ...(payroll?.agents ?? []).filter(item => item.active).map(item => ({ type: "agent" as const, id: item.id, name: item.name, role: item.type === "cashier" ? "Caissier" : "Agent commercial", kind: item.type, email: item.email, phone: item.phone })),
   ];
   const edit = (beneficiary: Beneficiary) => {
     const profile = profileFor(beneficiary);
     setEditing(beneficiary);
-    setForm({
-      name: beneficiary.name,
-      type: beneficiary.kind,
-      email: beneficiary.email || "",
-      phone: beneficiary.phone || "",
-      username: beneficiary.username || "",
-      password: "",
-      remunerationMode: profile?.remunerationMode ?? "commission",
-      fixed: String((profile?.fixedMonthlyCents ?? 0) / 100),
-      basis: profile?.commissionBasis ?? "revenue",
-      rate: String((profile?.rateBasisPoints ?? 0) / 100),
-    });
+    setForm({ name: beneficiary.name, type: beneficiary.kind, email: beneficiary.email || "", phone: beneficiary.phone || "", username: beneficiary.username || "", password: "", remunerationMode: profile?.remunerationMode ?? "commission", fixed: String((profile?.fixedMonthlyCents ?? 0) / 100), basis: profile?.commissionBasis ?? "revenue", rate: String((profile?.rateBasisPoints ?? 0) / 100), salaryTemplateId: "", salaryDueDay: String(new Date().getDate()) });
     setOpen(true);
   };
   const submit = () => {
@@ -227,416 +93,43 @@ export default function Agents() {
     const remuneration = remunerationPayload(form);
     if (editing && editing.kind !== form.type) {
       if (form.type === "seller") {
-        if (
-          !form.email.trim() ||
-          !form.username.trim() ||
-          form.password.length < 8
-        )
-          return toast.error(
-            "Un e-mail, un identifiant et un mot de passe de 8 caractères sont requis pour convertir en vendeur."
-          );
-        return convertToSeller.mutate({
-          id: editing.id,
-          email: form.email.trim(),
-          username: form.username.trim(),
-          password: form.password,
-          remuneration,
-        });
+        if (!form.email.trim() || !form.username.trim() || form.password.length < 8) return toast.error("Un e-mail, un identifiant et un mot de passe de 8 caractères sont requis pour convertir en vendeur.");
+        return convertToSeller.mutate({ id: editing.id, email: form.email.trim(), username: form.username.trim(), password: form.password, remuneration });
       }
-      if (editing.kind === "seller")
-        return convertSellerToAgent.mutate({
-          id: editing.id,
-          type: form.type,
-          phone: form.phone.trim() || null,
-          remuneration,
-        });
+      if (editing.kind === "seller") return convertSellerToAgent.mutate({ id: editing.id, type: form.type, phone: form.phone.trim() || null, remuneration });
     }
     if (form.type === "seller") {
-      if (
-        !form.email.trim() ||
-        !form.username.trim() ||
-        (!editing && form.password.length < 8)
-      )
-        return toast.error(
-          "L’e-mail, le nom d’utilisateur et un mot de passe de 8 caractères sont requis."
-        );
-      const payload = {
-        name: form.name.trim(),
-        email: form.email.trim(),
-        phone: form.phone.trim() || null,
-        username: form.username.trim(),
-        remuneration,
-      };
-      return editing
-        ? updateSeller.mutate({
-            id: editing.id,
-            ...payload,
-            ...(form.password ? { password: form.password } : {}),
-          })
-        : createSeller.mutate({ ...payload, password: form.password });
+      if (!form.email.trim() || !form.username.trim() || (!editing && form.password.length < 8)) return toast.error("L’e-mail, le nom d’utilisateur et un mot de passe de 8 caractères sont requis.");
+      const payload = { name: form.name.trim(), email: form.email.trim(), phone: form.phone.trim() || null, username: form.username.trim(), remuneration, salarySchedule: form.salaryTemplateId ? { templateId: Number(form.salaryTemplateId), dueDay: Number(form.salaryDueDay) } : null };
+      return editing ? updateSeller.mutate({ id: editing.id, ...payload, ...(form.password ? { password: form.password } : {}) }) : createSeller.mutate({ ...payload, password: form.password });
     }
-    const payload = {
-      name: form.name.trim(),
-      type: form.type,
-      email: form.email.trim() || null,
-      phone: form.phone.trim() || null,
-      active: true,
-      remuneration,
-    };
-    return editing
-      ? updateAgent.mutate({ id: editing.id, ...payload })
-      : createAgent.mutate(payload);
+    const payload = { name: form.name.trim(), type: form.type, email: form.email.trim() || null, phone: form.phone.trim() || null, active: true, remuneration, salarySchedule: form.salaryTemplateId ? { templateId: Number(form.salaryTemplateId), dueDay: Number(form.salaryDueDay) } : null };
+    return editing ? updateAgent.mutate({ id: editing.id, ...payload }) : createAgent.mutate(payload);
   };
 
-  const totalDue = (payroll?.balances ?? []).reduce(
-    (sum, item) => sum + Math.max(0, item.dueCents),
-    0
-  );
-  return (
-    <div className="mx-auto max-w-[1440px] space-y-6">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-[22px] font-bold tracking-tight text-foreground">
-            Agents & rémunérations
-          </h1>
-        </div>
-        {canManageTeam && (
-          <Button
-            onClick={() => {
-              setEditing(null);
-              setForm(blankAgentForm);
-              setOpen(true);
-            }}
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Nouvel agent
-          </Button>
-        )}
-      </header>
-      <section className="stagger grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
-        <Metric
-          label="Solde total dû"
-          value={formatCurrency(totalDue)}
-          icon={Banknote}
-        />
-        <Metric
-          label="Bénéficiaires actifs"
-          value={beneficiaries.length}
-          icon={UserRoundCheck}
-        />
-        <Metric
-          label="Paiements période"
-          value={formatCurrency(
-            (payroll?.balances ?? []).reduce(
-              (sum, item) => sum + item.paidCents,
-              0
-            )
-          )}
-          icon={BriefcaseBusiness}
-        />
-      </section>
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {beneficiaries.map(beneficiary => {
-          const balance = balanceFor(beneficiary);
-          return (
-            <div
-              key={`${beneficiary.type}-${beneficiary.id}`}
-              className="lift surface group flex min-w-0 items-center gap-2 rounded-xl border border-border bg-card p-4  hover:border-primary/25 hover:bg-card"
-            >
-              <button
-                type="button"
-                onClick={() =>
-                  setLocation(`/agents/${beneficiary.type}/${beneficiary.id}`)
-                }
-                className="flex min-w-0 flex-1 items-center gap-3 text-left"
-              >
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-sm font-semibold text-primary">
-                  {beneficiary.name.slice(0, 2).toUpperCase()}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-2">
-                    <span className="truncate font-semibold text-foreground">
-                      {beneficiary.name}
-                    </span>
-                    <Badge className="shrink-0 border-0 bg-muted text-xs text-muted-foreground">
-                      {beneficiary.role}
-                    </Badge>
-                  </span>
-                  <span className="mt-1 flex items-center justify-between gap-2 text-xs">
-                    <span className="truncate text-faint">
-                      {beneficiary.email ||
-                        beneficiary.phone ||
-                        "Coordonnées non renseignées"}
-                    </span>
-                    <span className="shrink-0 font-medium text-warning">
-                      {formatCurrency(Math.max(0, balance?.dueCents ?? 0))}
-                    </span>
-                  </span>
-                </span>
-                <ChevronRight className="h-4 w-4 shrink-0 text-faint transition group-hover:text-primary" />
-              </button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary"
-                aria-label={`Modifier ou convertir ${beneficiary.name}`}
-                title="Modifier ou convertir"
-                hidden={!canManageTeam}
-                onClick={() => edit(beneficiary)}
-              >
-                <Pencil className="h-4 w-4" />
-              </Button>
-            </div>
-          );
-        })}
-      </section>
-      {!beneficiaries.length && (
-        <Card className="border-dashed border-border bg-card">
-          <CardContent className="py-12 text-center text-sm text-faint">
-            Aucun agent actif.
-          </CardContent>
-        </Card>
-      )}
-      <AgentDialog
-        open={open}
-        editing={editing}
-        form={form}
-        setForm={setForm}
-        onClose={closeForm}
-        onSubmit={submit}
-        pending={
-          createAgent.isPending ||
-          updateAgent.isPending ||
-          createSeller.isPending ||
-          updateSeller.isPending ||
-          convertToSeller.isPending ||
-          convertSellerToAgent.isPending
-        }
-      />
-    </div>
-  );
+  const totalDue = (payroll?.balances ?? []).reduce((sum, item) => sum + Math.max(0, item.dueCents), 0);
+  const activeSellers = sellers.filter(seller => seller.active);
+  const matchingSellers = activeSellers.filter(seller => matchesSellerAssignmentSearch(seller, sellerAssignmentSearch));
+  const activeSalesAgents = (payroll?.agents ?? []).filter(agent => agent.active && agent.type === "sales_agent");
+  const commercialScopeLabel = (scope: "all" | "selected" | "attribution_only") => scope === "all" ? "Tous les entrepôts" : scope === "selected" ? "Entrepôts sélectionnés" : "Attribution commerciale seule";
+  return <div className="mx-auto max-w-[1320px] space-y-6">
+    <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h1 className="text-[22px] font-bold tracking-tight text-foreground">Agents & rémunérations</h1></div><Button disabled={!can(user?.role, "team.manage")} onClick={() => { setEditing(null); setForm(blankAgentForm); setOpen(true); }} className="bg-primary text-primary-foreground hover:bg-primary/90"><Plus className="mr-2 h-4 w-4" />Nouvel agent</Button></header>
+    <section className="grid gap-4 sm:grid-cols-3"><Metric label="Solde total dû" value={formatCurrency(totalDue)} icon={Banknote} /><Metric label="Bénéficiaires actifs" value={beneficiaries.length} icon={UserRoundCheck} /><Metric label="Paiements période" value={formatCurrency((payroll?.balances ?? []).reduce((sum, item) => sum + item.paidCents, 0))} icon={BriefcaseBusiness} /></section>
+    <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{beneficiaries.map(beneficiary => { const balance = balanceFor(beneficiary); return <button key={`${beneficiary.type}-${beneficiary.id}`} type="button" onClick={() => setLocation(`/agents/${beneficiary.type}/${beneficiary.id}`)} className="lift surface group flex min-w-0 items-center gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-sm transition hover:border-primary/25 hover:bg-accent"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-sm font-semibold text-primary">{beneficiary.name.slice(0, 2).toUpperCase()}</span><span className="min-w-0 flex-1"><span className="flex items-center gap-2"><span className="truncate font-semibold text-foreground">{beneficiary.name}</span><Badge className="shrink-0 border-0 bg-accent text-xs text-muted-foreground">{beneficiary.role}</Badge></span><span className="mt-1 flex items-center justify-between gap-2 text-xs"><span className="truncate text-faint">{beneficiary.email || beneficiary.phone || "Coordonnées non renseignées"}</span><span className="shrink-0 font-medium text-warning">{formatCurrency(Math.max(0, balance?.dueCents ?? 0))}</span></span></span><ChevronRight className="h-4 w-4 shrink-0 text-faint transition group-hover:text-primary" /></button>; })}</section>
+    <section className="rounded-xl border border-border bg-card"><div className="flex flex-col gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center justify-between gap-3"><p className="font-semibold text-foreground">Affectations des vendeurs</p><Badge className="border-0 bg-primary/10 text-primary">{activeSellers.length}</Badge></div><div className="relative w-full sm:max-w-xs"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" /><Input value={sellerAssignmentSearch} onChange={event => setSellerAssignmentSearch(event.target.value)} placeholder="Rechercher un vendeur" aria-label="Rechercher un vendeur à affecter" className="h-9 border-border bg-muted/40 pl-9 text-sm text-foreground placeholder:text-faint" /></div></div><div className="divide-y divide-border">{matchingSellers.map(seller => <div key={seller.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-medium text-foreground">{seller.name || "Vendeur"}</p><p className="mt-1 text-xs text-faint">{seller.warehouseIds.length} entrepôt(s) attribué(s)</p></div><Button variant="outline" size="sm" disabled={!can(user?.role, "team.manage")} onClick={() => setAssignmentSellerId(seller.id)} className="border-primary/30 text-primary hover:bg-primary/10">Gérer les dépôts</Button></div>)}{!matchingSellers.length && <div className="px-5 py-8 text-center text-sm text-faint">Aucun vendeur ne correspond à votre recherche.</div>}</div></section>
+    <section className="rounded-xl border border-border bg-card"><div className="flex items-center justify-between border-b border-border px-5 py-4"><p className="font-semibold text-foreground">Portée des agents commerciaux</p><Badge className="border-0 bg-primary/10 text-primary">{activeSalesAgents.length}</Badge></div><div className="divide-y divide-border">{activeSalesAgents.map(agent => <div key={agent.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-medium text-foreground">{agent.name}</p><p className="mt-1 text-xs text-faint">{commercialScopeLabel(agent.warehouseScope)}</p></div><Button variant="outline" size="sm" disabled={!can(user?.role, "team.manage")} onClick={() => setCommercialScopeAgentId(agent.id)} className="border-primary/25 text-primary hover:bg-primary/10">Gérer la portée</Button></div>)}{!activeSalesAgents.length && <div className="px-5 py-8 text-center text-sm text-faint">Aucun agent commercial actif.</div>}</div></section>
+    <section className="overflow-hidden rounded-xl border border-border bg-card"><div className="flex flex-col gap-3 border-b border-border px-5 py-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-semibold text-foreground">Commissions par agent et entrepôt</p><p className="mt-1 text-xs text-faint">Période, commissions générées, paiements dédiés et solde à régler.</p></div><Badge className="border-0 bg-success-soft text-success">Solde : {formatCurrency(commissionReport.data?.summary.dueCents ?? 0)}</Badge></div><div className="grid gap-2 sm:grid-cols-3"><Input type="month" value={commissionPeriod} onChange={event => setCommissionPeriod(event.target.value || currentCommissionPeriod)} className="border-border bg-muted/40" /><select value={commissionWarehouseId} onChange={event => setCommissionWarehouseId(event.target.value)} className="h-10 rounded-lg border border-border bg-muted/40 px-3 text-sm text-foreground"><option value="all">Tous les entrepôts</option>{warehouses.map(warehouse => <option key={warehouse.id} value={String(warehouse.id)}>{warehouse.name}</option>)}</select><select value={commissionBeneficiaryKey} onChange={event => setCommissionBeneficiaryKey(event.target.value)} className="h-10 rounded-lg border border-border bg-muted/40 px-3 text-sm text-foreground"><option value="all">Tous les agents et vendeurs</option>{beneficiaries.map(beneficiary => <option key={`${beneficiary.type}:${beneficiary.id}`} value={`${beneficiary.type}:${beneficiary.id}`}>{beneficiary.name} · {beneficiary.role}</option>)}</select></div></div><div className="overflow-x-auto"><table className="min-w-[960px] w-full text-left text-sm"><thead className="border-b border-border bg-muted/30 text-xs text-faint"><tr><th className="px-5 py-3 font-medium">Bénéficiaire</th><th className="px-5 py-3 font-medium">Entrepôt</th><th className="px-5 py-3 text-right font-medium">Ventes</th><th className="px-5 py-3 text-right font-medium">Générées</th><th className="px-5 py-3 text-right font-medium">Payées · commission</th><th className="px-5 py-3 text-right font-medium">Solde commission</th><th className="px-5 py-3 text-right font-medium">Versements mixtes</th></tr></thead><tbody className="divide-y divide-border">{commissionReport.isLoading ? <tr><td colSpan={7} className="px-5 py-10 text-center text-faint">Chargement du rapport financier…</td></tr> : commissionReport.data?.rows.length ? commissionReport.data.rows.map(row => <tr key={`${row.beneficiaryType}:${row.beneficiaryId}:${row.warehouseId}`} className="hover:bg-muted/30"><td className="px-5 py-3"><p className="font-medium text-foreground">{row.beneficiaryName}</p><p className="mt-1 text-xs text-faint">{row.beneficiaryType === "agent" ? "Agent commercial / caissier" : "Vendeur"}</p></td><td className="px-5 py-3 text-muted-foreground">{row.warehouseName}</td><td className="px-5 py-3 text-right text-muted-foreground">{row.saleCount}</td><td className="px-5 py-3 text-right font-medium text-success">{formatCurrency(row.generatedCents)}</td><td className="px-5 py-3 text-right text-primary">{formatCurrency(row.commissionPaidCents)}</td><td className="px-5 py-3 text-right font-semibold text-warning">{formatCurrency(row.dueCents)}</td><td className="px-5 py-3 text-right text-muted-foreground">{formatCurrency(row.mixedPaidCents)}</td></tr>) : <tr><td colSpan={7} className="px-5 py-10 text-center text-faint">Aucune commission ni paiement sur cette période.</td></tr>}</tbody></table></div><div className="border-t border-border px-5 py-3 text-xs text-faint">Les versements mixtes et salariaux sont affichés séparément afin de ne pas réduire artificiellement le solde de commission.</div></section>
+    {!beneficiaries.length && <Card className="border-dashed border-border bg-card"><CardContent className="py-12 text-center text-sm text-faint">Aucun agent actif.</CardContent></Card>}
+    <AgentDialog open={open} editing={editing} form={form} setForm={setForm} salaryTemplates={salaryTemplates} onClose={closeForm} onSubmit={submit} pending={createAgent.isPending || updateAgent.isPending || createSeller.isPending || updateSeller.isPending || convertToSeller.isPending || convertSellerToAgent.isPending} />
+    <Dialog open={Boolean(assignmentSellerId)} onOpenChange={value => !value && setAssignmentSellerId(null)}><DialogContent className="border-border bg-popover text-foreground"><DialogHeader><DialogTitle>Entrepôts autorisés</DialogTitle></DialogHeader><div className="space-y-2">{warehouses.filter(warehouse => warehouse.active).map(warehouse => <label key={warehouse.id} className="flex cursor-pointer items-center gap-3 rounded-xl border border-border px-3 py-3 hover:bg-accent/40"><input type="checkbox" checked={assignmentIds.includes(warehouse.id)} onChange={event => setAssignmentIds(current => event.target.checked ? [...current, warehouse.id] : current.filter(id => id !== warehouse.id))} className="h-4 w-4 accent-[#007B8B]" /><span className="min-w-0 flex-1"><span className="block text-sm font-medium">{warehouse.name}</span><span className="text-xs text-faint">{warehouse.code}{warehouse.isDefault ? " · Principal" : ""}</span></span></label>)}</div><DialogFooter><Button variant="ghost" onClick={() => setAssignmentSellerId(null)}>Annuler</Button><Button disabled={!assignmentSellerId || saveAssignments.isPending} onClick={() => assignmentSellerId && saveAssignments.mutate({ sellerId: assignmentSellerId, warehouseIds: assignmentIds })} className="bg-primary text-primary-foreground hover:bg-primary/90">{saveAssignments.isPending ? "Enregistrement…" : "Enregistrer"}</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={Boolean(commercialScopeAgentId)} onOpenChange={value => !value && setCommercialScopeAgentId(null)}><DialogContent className="border-border bg-popover text-foreground"><DialogHeader><DialogTitle>Portée commerciale</DialogTitle></DialogHeader><div className="space-y-4"><Field label="Mode de portée"><Select value={commercialScope} onValueChange={value => setCommercialScope(value as typeof commercialScope)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Tous les entrepôts</SelectItem><SelectItem value="selected">Entrepôts sélectionnés</SelectItem><SelectItem value="attribution_only">Attribution commerciale seule</SelectItem></SelectContent></Select></Field>{commercialScope === "selected" && <div className="space-y-2">{warehouses.filter(warehouse => warehouse.active).map(warehouse => <label key={warehouse.id} className="flex cursor-pointer items-center gap-3 rounded-xl border border-border px-3 py-3 hover:bg-accent/40"><input type="checkbox" checked={commercialScopeWarehouseIds.includes(warehouse.id)} onChange={event => setCommercialScopeWarehouseIds(current => event.target.checked ? [...current, warehouse.id] : current.filter(id => id !== warehouse.id))} className="h-4 w-4 accent-[#007B8B]" /><span className="min-w-0 flex-1"><span className="block text-sm font-medium">{warehouse.name}</span><span className="text-xs text-faint">{warehouse.code}{warehouse.isDefault ? " · Principal" : ""}</span></span></label>)}</div>}{commercialScope === "attribution_only" && <p className="rounded-xl border border-primary/25 bg-primary/10 p-3 text-xs text-primary">L’agent peut être associé commercialement aux ventes de tous les dépôts, sans droit d’accès opérationnel aux stocks.</p>}</div><DialogFooter><Button variant="ghost" onClick={() => setCommercialScopeAgentId(null)}>Annuler</Button><Button disabled={!commercialScopeAgentId || saveCommercialScope.isPending || (commercialScope === "selected" && !commercialScopeWarehouseIds.length)} onClick={() => commercialScopeAgentId && saveCommercialScope.mutate({ agentId: commercialScopeAgentId, warehouseScope: commercialScope, warehouseIds: commercialScopeWarehouseIds })} className="bg-primary text-primary-foreground hover:bg-primary/90">{saveCommercialScope.isPending ? "Enregistrement…" : "Enregistrer"}</Button></DialogFooter></DialogContent></Dialog>
+  </div>;
 }
 
-export function AgentDialog({
-  open,
-  editing,
-  form,
-  setForm,
-  onClose,
-  onSubmit,
-  pending,
-}: {
-  open: boolean;
-  editing: Beneficiary | null;
-  form: AgentForm;
-  setForm: (form: AgentForm) => void;
-  onClose: () => void;
-  onSubmit: () => void;
-  pending: boolean;
-}) {
-  const seller = form.type === "seller";
-  const commission = form.remunerationMode !== "fixed";
-  const fixed = form.remunerationMode !== "commission";
-  const typeChanged = Boolean(editing && editing.kind !== form.type);
-  return (
-    <Dialog open={open} onOpenChange={value => !value && onClose()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto border-border bg-card text-foreground">
-        <DialogHeader>
-          <DialogTitle>
-            {editing ? "Modifier l’agent" : "Créer un agent"}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="grid gap-4">
-          <Field label="Type">
-            <Select
-              value={form.type}
-              onValueChange={value =>
-                setForm({
-                  ...form,
-                  type: value as AgentKind,
-                  password: value === "seller" ? form.password : "",
-                })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="seller">Vendeur</SelectItem>
-                <SelectItem value="sales_agent">Agent commercial</SelectItem>
-                <SelectItem value="cashier">Caissier</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
-          {typeChanged && (
-            <p className="rounded-lg border border-warning/25 bg-warning-soft p-3 text-xs text-warning">
-              Le changement de type préserve l’historique et crée un nouveau
-              profil actif.
-            </p>
-          )}
-          <Field label={seller ? "E-mail de connexion *" : "E-mail"}>
-            <Input
-              type="email"
-              value={form.email}
-              onChange={event =>
-                setForm({ ...form, email: event.target.value })
-              }
-            />
-          </Field>
-          <Field label="Nom complet *">
-            <Input
-              value={form.name}
-              onChange={event => setForm({ ...form, name: event.target.value })}
-            />
-          </Field>
-          <Field label="Téléphone">
-            <Input
-              value={form.phone}
-              onChange={event =>
-                setForm({ ...form, phone: event.target.value })
-              }
-            />
-          </Field>
-          {seller && (
-            <>
-              <Field label="Identifiant interne *">
-                <Input
-                  value={form.username}
-                  onChange={event =>
-                    setForm({ ...form, username: event.target.value })
-                  }
-                />
-              </Field>
-              <Field
-                label={
-                  typeChanged || !editing
-                    ? "Mot de passe *"
-                    : "Nouveau mot de passe (facultatif)"
-                }
-              >
-                <Input
-                  type="password"
-                  value={form.password}
-                  onChange={event =>
-                    setForm({ ...form, password: event.target.value })
-                  }
-                />
-              </Field>
-            </>
-          )}
-          <div className="space-y-4 rounded-xl border border-border p-4">
-            <p className="text-xs font-semibold text-primary">Rémunération</p>
-            <Field label="Système">
-              <Select
-                value={form.remunerationMode}
-                onValueChange={value =>
-                  setForm({
-                    ...form,
-                    remunerationMode: value as AgentForm["remunerationMode"],
-                  })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="fixed">Salaire fixe</SelectItem>
-                  <SelectItem value="commission">Commission</SelectItem>
-                  <SelectItem value="fixed_plus_commission">
-                    Fixe + commission
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-            {fixed && (
-              <Field label="Salaire fixe mensuel">
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.fixed}
-                  onChange={event =>
-                    setForm({ ...form, fixed: event.target.value })
-                  }
-                />
-              </Field>
-            )}
-            {commission && (
-              <>
-                <Field label="Base de commission">
-                  <Select
-                    value={form.basis}
-                    onValueChange={value =>
-                      setForm({ ...form, basis: value as AgentForm["basis"] })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="revenue">
-                        Chiffre d’affaires
-                      </SelectItem>
-                      <SelectItem value="net_profit">Bénéfice net</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field label="Taux de commission (%)">
-                  <Input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value={form.rate}
-                    onChange={event =>
-                      setForm({ ...form, rate: event.target.value })
-                    }
-                  />
-                </Field>
-              </>
-            )}
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>
-            Annuler
-          </Button>
-          <Button
-            onClick={onSubmit}
-            disabled={pending}
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
-          >
-            {editing ? "Enregistrer" : "Créer l’agent"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+export function AgentDialog({ open, editing, form, setForm, salaryTemplates, onClose, onSubmit, pending }: { open: boolean; editing: Beneficiary | null; form: AgentForm; setForm: (form: AgentForm) => void; salaryTemplates: Array<{ id: number; name: string; dueDay: number | null; amountCents: number }>; onClose: () => void; onSubmit: () => void; pending: boolean }) {
+  const seller = form.type === "seller"; const commission = form.remunerationMode !== "fixed"; const fixed = form.remunerationMode !== "commission"; const typeChanged = Boolean(editing && editing.kind !== form.type);
+  return <Dialog open={open} onOpenChange={value => !value && onClose()}><DialogContent className="max-h-[90vh] overflow-y-auto border-border bg-popover text-foreground"><DialogHeader><DialogTitle>{editing ? "Modifier l’agent" : "Créer un agent"}</DialogTitle></DialogHeader><div className="grid gap-4"><Field label="Type"><Select value={form.type} onValueChange={value => setForm({ ...form, type: value as AgentKind, password: value === "seller" ? form.password : "" })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="seller">Vendeur</SelectItem><SelectItem value="sales_agent">Agent commercial</SelectItem><SelectItem value="cashier">Caissier</SelectItem></SelectContent></Select></Field>{typeChanged && <p className="rounded-lg border border-warning/25 bg-warning-soft p-3 text-xs text-warning">Le changement de type préserve l’historique et crée un nouveau profil actif.</p>}<Field label={seller ? "E-mail de connexion *" : "E-mail"}><Input type="email" value={form.email} onChange={event => setForm({ ...form, email: event.target.value })} /></Field><Field label="Nom complet *"><Input value={form.name} onChange={event => setForm({ ...form, name: event.target.value })} /></Field><Field label="Téléphone"><Input value={form.phone} onChange={event => setForm({ ...form, phone: event.target.value })} /></Field>{seller && <><Field label="Identifiant interne *"><Input value={form.username} onChange={event => setForm({ ...form, username: event.target.value })} /></Field><Field label={typeChanged || !editing ? "Mot de passe *" : "Nouveau mot de passe (facultatif)"}><Input type="password" value={form.password} onChange={event => setForm({ ...form, password: event.target.value })} /></Field></>}<div className="space-y-4 rounded-xl border border-border p-4"><p className="text-xs font-semibold text-primary">Rémunération</p><Field label="Système"><Select value={form.remunerationMode} onValueChange={value => setForm({ ...form, remunerationMode: value as AgentForm["remunerationMode"] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="fixed">Salaire fixe</SelectItem><SelectItem value="commission">Commission</SelectItem><SelectItem value="fixed_plus_commission">Fixe + commission</SelectItem></SelectContent></Select></Field>{fixed && <Field label="Salaire fixe mensuel"><Input type="number" min="0" step="0.01" value={form.fixed} onChange={event => setForm({ ...form, fixed: event.target.value })} /></Field>}{commission && <><Field label="Base de commission"><Select value={form.basis} onValueChange={value => setForm({ ...form, basis: value as AgentForm["basis"] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="revenue">Chiffre d’affaires</SelectItem><SelectItem value="net_profit">Bénéfice net</SelectItem></SelectContent></Select></Field><Field label="Taux de commission (%)"><Input type="number" min="0" max="100" step="0.01" value={form.rate} onChange={event => setForm({ ...form, rate: event.target.value })} /></Field></>} {!editing && fixed && <div className="space-y-3 rounded-lg border border-primary/25 bg-primary/[0.05] p-3"><p className="text-sm font-medium text-foreground">Échéance salariale</p><Field label="Modèle salarial (facultatif)"><select value={form.salaryTemplateId} onChange={event => { const template = salaryTemplates.find(item => item.id === Number(event.target.value)); setForm({ ...form, salaryTemplateId: event.target.value, salaryDueDay: String(template?.dueDay ?? form.salaryDueDay) }); }} className="h-10 w-full rounded-md border border-border bg-muted/50 px-3 text-sm text-foreground"><option value="" className="bg-background">Ne pas programmer maintenant</option>{salaryTemplates.map(template => <option key={template.id} value={String(template.id)} className="bg-background">{template.name} · {(template.amountCents / 100).toLocaleString("fr-FR")} FCFA</option>)}</select></Field>{form.salaryTemplateId && <Field label="Jour du mois"><Input type="number" min="1" max="31" value={form.salaryDueDay} onChange={event => setForm({ ...form, salaryDueDay: event.target.value })} /></Field>}</div>}</div></div><DialogFooter><Button variant="ghost" onClick={onClose}>Annuler</Button><Button onClick={onSubmit} disabled={pending} className="bg-primary text-primary-foreground hover:bg-primary/90">{editing ? "Enregistrer" : "Créer l’agent"}</Button></DialogFooter></DialogContent></Dialog>;
 }
 
-function Metric({
-  label,
-  value,
-}: {
-  label: string;
-  value: string | number;
-  icon?: typeof Banknote;
-}) {
-  return <StatCard label={label} value={value} />;
-}
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="space-y-2">
-      <Label className="text-xs text-muted-foreground">{label}</Label>
-      {children}
-    </div>
-  );
-}
+function Metric({ label, value }: { label: string; value: string | number; icon?: typeof Banknote }) { return <StatCard label={label} value={value} />; }
+function Field({ label, children }: { label: string; children: React.ReactNode }) { return <div className="space-y-2"><Label className="text-xs text-muted-foreground">{label}</Label>{children}</div>; }

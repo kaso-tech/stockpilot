@@ -1,60 +1,33 @@
-import { createHash, randomBytes } from "crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { and, eq, gt, isNull } from "drizzle-orm";
-import { authTokens } from "../drizzle/schema";
+import { authTokens, users } from "../drizzle/schema";
 
-type TokenType = "password_reset" | "email_verification";
-const LIFETIME_MS: Record<TokenType, number> = {
-  password_reset: 60 * 60 * 1000,
-  email_verification: 7 * 24 * 60 * 60 * 1000,
-};
+export const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000;
+export const PASSWORD_RESET_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 
-export function hashToken(token: string) {
-  return createHash("sha256").update(token).digest("hex");
+export function hashAuthToken(token: string): string {
+  return createHash("sha256").update(token, "utf8").digest("hex");
 }
 
-/** Crée un jeton à usage unique ; les jetons précédents du même type sont invalidés. */
-export async function issueToken(db: any, userId: number, type: TokenType) {
-  const token = randomBytes(32).toString("base64url");
-  await db
-    .update(authTokens)
-    .set({ usedAt: new Date() })
-    .where(
-      and(
-        eq(authTokens.userId, userId),
-        eq(authTokens.type, type),
-        isNull(authTokens.usedAt)
-      )
-    );
-  await db.insert(authTokens).values({
-    userId,
-    type,
-    tokenHash: hashToken(token),
-    expiresAt: new Date(Date.now() + LIFETIME_MS[type]),
+export function generateAuthToken(): string {
+  return randomBytes(32).toString("base64url");
+}
+
+/** Stocke uniquement le SHA-256 du jeton et invalide les demandes antérieures. */
+export async function issuePasswordResetToken(db: any, userId: number, now = new Date()): Promise<string> {
+  const token = generateAuthToken();
+  await db.transaction(async (tx: any) => {
+    await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).limit(1).for("update");
+    await tx.update(authTokens).set({ usedAt: now }).where(and(eq(authTokens.userId, userId), eq(authTokens.type, "password_reset"), isNull(authTokens.usedAt)));
+    await tx.insert(authTokens).values({ userId, type: "password_reset", tokenHash: hashAuthToken(token), expiresAt: new Date(now.getTime() + PASSWORD_RESET_TTL_MS) });
   });
   return token;
 }
 
-/** Consomme un jeton valide (non utilisé, non expiré) et renvoie l'identifiant de l'utilisateur. */
-export async function consumeToken(tx: any, token: string, type: TokenType) {
-  const row = (
-    await tx
-      .select()
-      .from(authTokens)
-      .where(
-        and(
-          eq(authTokens.tokenHash, hashToken(token)),
-          eq(authTokens.type, type),
-          isNull(authTokens.usedAt),
-          gt(authTokens.expiresAt, new Date())
-        )
-      )
-      .limit(1)
-      .for("update")
-  )[0];
+/** À appeler dans une transaction : verrouille et consomme atomiquement un jeton valable. */
+export async function consumePasswordResetToken(tx: any, token: string, now = new Date()): Promise<number | null> {
+  const row = (await tx.select().from(authTokens).where(and(eq(authTokens.tokenHash, hashAuthToken(token)), eq(authTokens.type, "password_reset"), isNull(authTokens.usedAt), gt(authTokens.expiresAt, now))).limit(1).for("update"))[0];
   if (!row) return null;
-  await tx
-    .update(authTokens)
-    .set({ usedAt: new Date() })
-    .where(eq(authTokens.id, row.id));
+  await tx.update(authTokens).set({ usedAt: now }).where(eq(authTokens.id, row.id));
   return row.userId as number;
 }

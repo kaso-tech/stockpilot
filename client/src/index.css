@@ -6,9 +6,7 @@
 @theme inline {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --shadow-xs: 0 1px 2px rgb(var(--shadow-color) / 0.05);
-  --shadow-sm:
-    0 1px 2px rgb(var(--shadow-color) / 0.06),
-    0 1px 3px rgb(var(--shadow-color) / 0.04);
+  --shadow-sm: 0 1px 2px rgb(var(--shadow-color) / 0.06), 0 1px 3px rgb(var(--shadow-color) / 0.04);
   --shadow-md: 0 4px 12px rgb(var(--shadow-color) / 0.08);
   --shadow-lg: 0 12px 28px rgb(var(--shadow-color) / 0.12);
   --shadow-xl: 0 18px 40px rgb(var(--shadow-color) / 0.14);
@@ -25,10 +23,12 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-soft: var(--primary-soft);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
+  --color-faint: var(--faint);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
@@ -43,8 +43,6 @@
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
   --color-info-soft: var(--info-soft);
-  --color-faint: var(--faint);
-  --color-primary-soft: var(--primary-soft);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -63,31 +61,27 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
-/*
- * Thème « Ardoise & Pétrole ».
- * Toutes les couleurs de l'interface viennent de ces jetons : ne pas écrire de couleur en dur dans les composants.
- * --app-primary est la couleur de marque choisie par l'entreprise (Paramètres › Apparence).
- */
+/* Thème Ardoise & Pétrole : le pétrole est la couleur principale par défaut. */
 :root {
-  --app-primary: #0b6e76;
-  --app-primary-foreground: #ffffff;
+  --app-primary: #0B6E76;
+  --app-primary-foreground: #FFFFFF;
   --primary: var(--app-primary);
   --primary-foreground: var(--app-primary-foreground);
   --primary-soft: color-mix(in srgb, var(--app-primary), white 90%);
   --radius: 0.625rem;
   --background: #f2f4f7;
-  --foreground: #0f172a;
+  --foreground: #101828;
   --card: #ffffff;
-  --card-foreground: #0f172a;
+  --card-foreground: #101828;
   --popover: #ffffff;
-  --popover-foreground: #0f172a;
+  --popover-foreground: #101828;
   --secondary: #f1f3f6;
-  --secondary-foreground: #0f172a;
+  --secondary-foreground: #101828;
   --muted: #f1f3f6;
   --muted-foreground: #475467;
   --faint: #667085;
   --accent: #eef1f4;
-  --accent-foreground: #0f172a;
+  --accent-foreground: #101828;
   --destructive: #b42318;
   --destructive-foreground: #ffffff;
   --destructive-soft: #fdecea;
@@ -102,8 +96,8 @@
   --info-soft: #eef2ff;
   --border: #e3e7ec;
   --input: #d0d5dd;
-  --ring: var(--primary);
-  --chart-1: var(--primary);
+  --ring: var(--app-primary);
+  --chart-1: var(--app-primary);
   --chart-2: color-mix(in srgb, var(--app-primary), white 55%);
   --chart-3: #1d4ed8;
   --chart-4: #b54708;
@@ -111,19 +105,19 @@
   --chart-grid: #e3e7ec;
   --sidebar: #ffffff;
   --sidebar-foreground: #475467;
-  --sidebar-primary: var(--primary);
-  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-primary: var(--app-primary);
+  --sidebar-primary-foreground: var(--app-primary-foreground);
   --sidebar-accent: var(--primary-soft);
-  --sidebar-accent-foreground: var(--primary);
+  --sidebar-accent-foreground: var(--app-primary);
   --sidebar-border: #e3e7ec;
-  --sidebar-ring: var(--primary);
+  --sidebar-ring: var(--app-primary);
   --shadow-color: 15 23 42;
   color-scheme: light;
 }
-
 .dark {
-  --primary: color-mix(in srgb, var(--app-primary), white 32%);
-  --primary-foreground: #0b0f14;
+  /* --primary remains the user-selected brand color in both themes. */
+  --primary: var(--app-primary);
+  --primary-foreground: var(--app-primary-foreground);
   --primary-soft: color-mix(in srgb, var(--app-primary), #0b0f14 72%);
   --background: #0b0f14;
   --foreground: #e6eaf0;
@@ -152,6 +146,7 @@
   --info-soft: #1a2440;
   --border: #263040;
   --input: #334155;
+  --ring: var(--app-primary);
   --chart-2: color-mix(in srgb, var(--app-primary), #0b0f14 40%);
   --chart-3: #7aa2f7;
   --chart-4: #f2b04b;
@@ -159,302 +154,198 @@
   --chart-grid: #263040;
   --sidebar: #12171e;
   --sidebar-foreground: #a7b1bf;
+  --sidebar-primary: var(--app-primary);
+  --sidebar-primary-foreground: var(--app-primary-foreground);
+  --sidebar-accent: color-mix(in srgb, var(--app-primary), #0b0f14 72%);
+  --sidebar-accent-foreground: #e6eaf0;
   --sidebar-border: #263040;
+  --sidebar-ring: var(--app-primary);
   --shadow-color: 0 0 0;
   color-scheme: dark;
 }
 
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
+  * { @apply border-border outline-ring/50; }
   body {
     @apply bg-background text-foreground antialiased;
     font-family: var(--font-sans);
-    /* Chiffres à chasse fixe : montants et quantités restent alignés. */
-    font-feature-settings:
-      "tnum" 1,
-      "cv11" 1;
+    font-feature-settings: "tnum" 1, "cv11" 1;
   }
-  h1,
-  h2,
-  h3 {
-    letter-spacing: -0.015em;
-  }
-  /* Survol en douceur des lignes, liens et boutons (les cartes « lift » ont leur propre transition). */
-  a,
-  button,
-  [role="button"],
-  tr {
-    transition-property: color, background-color, border-color;
-    transition-duration: 150ms;
-    transition-timing-function: ease;
-  }
-  button:not(:disabled),
-  [role="button"]:not([aria-disabled="true"]),
-  [type="button"]:not(:disabled),
-  [type="submit"]:not(:disabled),
-  [type="reset"]:not(:disabled),
-  a[href],
-  select:not(:disabled),
-  input[type="checkbox"]:not(:disabled),
-  input[type="radio"]:not(:disabled) {
+  h1, h2, h3 { letter-spacing: -0.015em; }
+  button:not(:disabled), [role="button"]:not([aria-disabled="true"]),
+  [type="button"]:not(:disabled), [type="submit"]:not(:disabled),
+  [type="reset"]:not(:disabled), a[href], select:not(:disabled),
+  input[type="checkbox"]:not(:disabled), input[type="radio"]:not(:disabled) {
     @apply cursor-pointer;
   }
 }
-
 @layer components {
-  /**
-   * Custom container utility that centers content and adds responsive padding.
-   *
-   * This overrides Tailwind's default container behavior to:
-   * - Auto-center content (mx-auto)
-   * - Add responsive horizontal padding
-   * - Set max-width for large screens
-   *
-   * Usage: <div className="container">...</div>
-   *
-   * For custom widths, use max-w-* utilities directly:
-   * <div className="max-w-6xl mx-auto px-4">...</div>
-   */
-  .container {
-    width: 100%;
-    margin-left: auto;
-    margin-right: auto;
-    padding-left: 1rem; /* 16px - mobile padding */
-    padding-right: 1rem;
-  }
-
-  .flex {
-    min-height: 0;
-    min-width: 0;
-  }
-
-  @media (min-width: 640px) {
-    .container {
-      padding-left: 1.5rem; /* 24px - tablet padding */
-      padding-right: 1.5rem;
-    }
-  }
-
-  @media (min-width: 1024px) {
-    .container {
-      padding-left: 2rem; /* 32px - desktop padding */
-      padding-right: 2rem;
-      max-width: 1280px; /* Standard content width */
-    }
-  }
+  .container { width: 100%; margin-left: auto; margin-right: auto; padding-left: 1rem; padding-right: 1rem; }
+  .flex { min-height: 0; min-width: 0; }
+  @media (min-width: 640px) { .container { padding-left: 1.5rem; padding-right: 1.5rem; } }
+  @media (min-width: 1024px) { .container { padding-left: 2rem; padding-right: 2rem; max-width: 1280px; } }
 }
 
-/*
- * Relief et mouvement : ombres douces, élévation au survol et animations courtes
- * (150–250 ms, transparence et déplacement uniquement, fluides sur téléphone).
- * Tout est désactivé quand l'appareil demande de réduire les animations.
- */
-@layer utilities {
-  .surface {
-    box-shadow:
-      0 1px 2px rgb(var(--shadow-color) / 0.05),
-      0 1px 3px rgb(var(--shadow-color) / 0.04);
-  }
-  .dark .surface {
-    box-shadow:
-      0 1px 0 rgb(255 255 255 / 0.03) inset,
-      0 1px 3px rgb(0 0 0 / 0.35);
-  }
-  .lift {
-    transition:
-      transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1),
-      box-shadow 160ms cubic-bezier(0.2, 0.8, 0.2, 1),
-      border-color 160ms ease,
-      background-color 160ms ease;
-  }
-  @media (hover: hover) {
-    .lift:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 20px rgb(var(--shadow-color) / 0.1);
-    }
-    .dark .lift:hover {
-      box-shadow: 0 8px 20px rgb(0 0 0 / 0.45);
-    }
-  }
-  .lift:active {
-    transform: translateY(0) scale(0.98);
-  }
-  .animate-enter {
-    animation: sp-enter 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  }
-  /* Les enfants arrivent l'un après l'autre (cartes d'indicateurs, panneaux). */
-  .stagger > * {
-    animation: sp-enter 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  }
-  .stagger > :nth-child(2) {
-    animation-delay: 40ms;
-  }
-  .stagger > :nth-child(3) {
-    animation-delay: 80ms;
-  }
-  .stagger > :nth-child(4) {
-    animation-delay: 120ms;
-  }
-  .stagger > :nth-child(5) {
-    animation-delay: 160ms;
-  }
-  .stagger > :nth-child(n + 6) {
-    animation-delay: 200ms;
-  }
-  .animate-pop {
-    animation: sp-pop 260ms cubic-bezier(0.3, 1.5, 0.5, 1) both;
-  }
-  .animate-slide-in {
-    animation: sp-slide-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  }
-  .shimmer {
-    background: linear-gradient(
-        90deg,
-        transparent 0%,
-        color-mix(in srgb, var(--card) 70%, transparent) 50%,
-        transparent 100%
-      )
-      var(--accent);
-    background-size: 200% 100%;
-    animation: sp-shimmer 1.3s ease-in-out infinite;
-  }
+/* Mapping de compatibilité: les vues métier gardent leurs classes historiques sans figer les nouveaux tons. */
+:is([class~="bg-[#090c13]"], [class~="bg-[#0e141f]"]) { background-color: var(--background) !important; }
+:is([class~="bg-[#111722]"], [class~="bg-[#141b27]"]) { background-color: var(--card) !important; }
+:is([class~="bg-[#111722]"], [class~="bg-[#141b27]"], [class~="bg-white/[0.02]"], [class~="bg-white/[0.025]"], [class~="bg-white/[0.035]"], [class~="bg-white/[0.04]"], [class~="bg-white/[0.06]"]) { color: var(--card-foreground); }
+:is([class~="border-white/10"], [class~="border-white/[0.06]"], [class~="border-white/[0.07]"], [class~="border-white/[0.08]"]) { border-color: var(--border) !important; }
+:is([class~="bg-white/[0.02]"], [class~="bg-white/[0.025]"], [class~="bg-white/[0.035]"], [class~="bg-white/[0.04]"], [class~="bg-white/[0.06]"], [class~="bg-white/[0.07]"]) { background-color: var(--muted) !important; }
+:is([class~="text-slate-100"], [class~="text-slate-200"]) { color: var(--foreground) !important; }
+:is([class~="text-slate-300"], [class~="text-slate-400"]) { color: var(--muted-foreground) !important; }
+:is([class~="text-slate-500"], [class~="text-slate-600"]) { color: var(--faint) !important; }
+:is([class~="text-cyan-100"], [class~="text-cyan-200"], [class~="text-cyan-300"], [class~="text-cyan-400"]) { color: var(--app-primary) !important; }
+:is([class~="text-emerald-200"], [class~="text-emerald-300"], [class~="text-emerald-400"], [class~="text-green-300"], [class~="text-green-400"]) { color: var(--success) !important; }
+:is([class~="text-amber-200"], [class~="text-amber-300"], [class~="text-amber-400"], [class~="text-orange-300"], [class~="text-orange-400"]) { color: var(--warning) !important; }
+:is([class~="text-rose-200"], [class~="text-rose-300"], [class~="text-rose-400"], [class~="text-red-300"], [class~="text-red-400"]) { color: var(--destructive) !important; }
+:is([class*="text-emerald-"], [class*="text-green-"]) { color: var(--success) !important; }
+:is([class*="text-amber-"], [class*="text-orange-"]) { color: var(--warning) !important; }
+:is([class*="text-rose-"], [class*="text-red-"]) { color: var(--destructive) !important; }
+:is([class*="text-violet-"], [class*="text-purple-"], [class*="text-indigo-"]) { color: var(--info) !important; }
+:is([class*="text-blue-"]) { color: var(--app-primary) !important; }
+:is([class*="text-slate-"], [class*="text-gray-"]) { color: var(--foreground); }
+:is([class~="text-slate-400"], [class~="text-slate-500"], [class~="text-slate-600"], [class~="text-slate-700"], [class~="text-gray-400"], [class~="text-gray-500"], [class~="text-gray-600"], [class~="text-gray-700"]) { color: var(--muted-foreground) !important; }
+:is([class~="bg-emerald-400/10"], [class~="bg-emerald-400/15"], [class~="bg-emerald-400/[0.05]"]) { background-color: var(--success-soft) !important; }
+:is([class~="bg-amber-400/10"], [class~="bg-amber-400/15"], [class~="bg-amber-400/[0.05]"]) { background-color: var(--warning-soft) !important; }
+:is([class~="bg-rose-400/10"], [class~="bg-rose-400/15"], [class~="bg-rose-400/[0.05]"]) { background-color: var(--destructive-soft) !important; }
+:is([class~="bg-cyan-400/10"], [class~="bg-cyan-400/15"], [class~="bg-cyan-400/20"]) { background-color: var(--primary-soft) !important; }
+:is([class*="bg-emerald-400/"], [class*="bg-emerald-500/"], [class*="bg-green-400/"], [class*="bg-green-500/"]) { background-color: var(--success-soft) !important; }
+:is([class*="bg-amber-400/"], [class*="bg-amber-500/"], [class*="bg-orange-400/"], [class*="bg-orange-500/"]) { background-color: var(--warning-soft) !important; }
+:is([class*="bg-rose-400/"], [class*="bg-rose-500/"], [class*="bg-red-400/"], [class*="bg-red-500/"]) { background-color: var(--destructive-soft) !important; }
+:is([class*="bg-violet-400/"], [class*="bg-violet-500/"], [class*="bg-purple-400/"], [class*="bg-purple-500/"], [class*="bg-indigo-400/"], [class*="bg-indigo-500/"]) { background-color: var(--info-soft) !important; }
+:is([class~="bg-white"], [class~="bg-slate-50"], [class~="bg-slate-100"], [class~="bg-slate-200"], [class~="bg-gray-50"], [class~="bg-gray-100"]) { background-color: var(--card); }
+:is([class~="bg-slate-700"], [class~="bg-slate-800"], [class~="bg-slate-900"], [class~="bg-gray-700"], [class~="bg-gray-800"], [class~="bg-gray-900"]) { background-color: var(--muted); }
+:is([class*="border-emerald-"], [class*="border-green-"]) { border-color: color-mix(in srgb, var(--success), transparent 68%); }
+:is([class*="border-amber-"], [class*="border-orange-"]) { border-color: color-mix(in srgb, var(--warning), transparent 68%); }
+:is([class*="border-rose-"], [class*="border-red-"]) { border-color: color-mix(in srgb, var(--destructive), transparent 68%); }
+:is([class*="border-cyan-"], [class*="border-blue-"]) { border-color: color-mix(in srgb, var(--app-primary), transparent 68%); }
+
+/* Le texte blanc générique des anciennes pages devient sémantique; les fonds pleins rétablissent leur contraste. */
+[class~="text-white"] { color: var(--foreground); }
+:is([class~="bg-emerald-400"], [class~="bg-emerald-500"], [class~="bg-green-400"], [class~="bg-green-500"]) :is([class~="text-white"], [class~="text-slate-950"], [class~="text-slate-900"]),
+:is([class~="bg-amber-400"], [class~="bg-amber-500"], [class~="bg-orange-400"], [class~="bg-orange-500"]) :is([class~="text-white"], [class~="text-slate-950"], [class~="text-slate-900"]),
+:is([class~="bg-rose-400"], [class~="bg-rose-500"], [class~="bg-red-400"], [class~="bg-red-500"]) :is([class~="text-white"], [class~="text-slate-950"], [class~="text-slate-900"]),
+:is([class~="bg-violet-400"], [class~="bg-violet-500"], [class~="bg-purple-400"], [class~="bg-purple-500"], [class~="bg-indigo-400"], [class~="bg-indigo-500"]) :is([class~="text-white"], [class~="text-slate-950"], [class~="text-slate-900"]),
+:is([class~="bg-blue-400"], [class~="bg-blue-500"], [class~="bg-cyan-400"], [class~="bg-cyan-500"]) :is([class~="text-white"], [class~="text-slate-950"], [class~="text-slate-900"]),
+:is([class~="bg-primary"] [class~="text-white"], [class~="bg-primary"].text-white,
+    [class~="quick-action-sale"] [class~="text-white"], [class~="quick-action-sale"].text-white) {
+  color: var(--app-primary-foreground) !important;
+}
+:is([class~="bg-emerald-400"], [class~="bg-emerald-500"], [class~="bg-green-400"], [class~="bg-green-500"]) :is([class~="text-white"], [class~="text-slate-950"], [class~="text-slate-900"]) { color: var(--success-foreground) !important; }
+:is([class~="bg-amber-400"], [class~="bg-amber-500"], [class~="bg-orange-400"], [class~="bg-orange-500"]) :is([class~="text-white"], [class~="text-slate-950"], [class~="text-slate-900"]) { color: var(--warning-foreground) !important; }
+:is([class~="bg-rose-400"], [class~="bg-rose-500"], [class~="bg-red-400"], [class~="bg-red-500"]) :is([class~="text-white"], [class~="text-slate-950"], [class~="text-slate-900"]) { color: var(--destructive-foreground) !important; }
+:is([class~="bg-violet-400"], [class~="bg-violet-500"], [class~="bg-purple-400"], [class~="bg-purple-500"], [class~="bg-indigo-400"], [class~="bg-indigo-500"]) :is([class~="text-white"], [class~="text-slate-950"], [class~="text-slate-900"]) { color: var(--info-foreground) !important; }
+
+/* Le primaire plein et les états colorés gardent leur propre contraste, même avec un ancien text-white. */
+:is([class~="bg-primary"], [class~="quick-action-sale"]) { color: var(--app-primary-foreground); }
+:is([class~="bg-primary"] [class~="text-white"], [class~="quick-action-sale"] [class~="text-white"], [class~="bg-primary"].text-white, [class~="quick-action-sale"].text-white) { color: var(--app-primary-foreground) !important; }
+:is([class~="bg-emerald-500"], [class~="bg-green-500"], [class~="bg-success"]) { color: var(--success-foreground); }
+:is([class~="bg-amber-500"], [class~="bg-warning"]) { color: var(--warning-foreground); }
+:is([class~="bg-rose-500"], [class~="bg-red-500"], [class~="bg-destructive"]) { color: var(--destructive-foreground); }
+[data-slot="sidebar-menu-button"][data-active="true"] { background-color: var(--app-primary) !important; color: var(--app-primary-foreground) !important; }
+[data-slot="sidebar-menu-button"][data-active="true"] svg { color: var(--app-primary-foreground) !important; }
+
+/* Harmonisation légère des motifs et des états interactifs. */
+main { background-color: var(--background); }
+.commercial-hero { border-color: color-mix(in srgb, var(--app-primary), transparent 78%); }
+.quick-action-sale { background-color: var(--app-primary); color: var(--app-primary-foreground); border-color: var(--app-primary); }
+[data-slot="dialog-content"], [data-slot="alert-dialog-content"], [data-slot="sheet-content"],
+[data-slot="popover-content"], [data-slot="dropdown-menu-content"], [data-slot="select-content"] {
+  background-color: var(--popover); color: var(--popover-foreground); border-color: var(--border);
 }
 
-@keyframes sp-enter {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-@keyframes sp-pop {
-  0% {
-    transform: scale(1);
-  }
-  45% {
-    transform: scale(1.22);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-@keyframes sp-slide-in {
-  from {
-    opacity: 0;
-    transform: translateX(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-@keyframes sp-shimmer {
-  from {
-    background-position: 100% 0;
-  }
-  to {
-    background-position: -100% 0;
-  }
+/* Impression de facture: seules les zones d'impression sont visibles, palette papier explicite. */
+@media print {
+  body * { visibility: hidden !important; }
+  #invoice-print, #invoice-print * { visibility: visible !important; }
+  #invoice-print { position: absolute; inset: 0; width: 100%; padding: 28px; color: #111827 !important; background: #fff !important; }
+  #invoice-print * { --foreground: #111827; --muted-foreground: #475569; --faint: #475569; --border: #dbe3ea; --card: #fff; --muted: #f8fafc; }
+  .no-print { display: none !important; }
 }
 
-/* Passage clair/sombre en fondu (navigateurs compatibles). */
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation-duration: 220ms;
+/* Le catalogue garde recherche et filtres accessibles sur petits écrans. */
+div:has(> .relative > input[placeholder="Rechercher une référence…"]) { flex-direction: row !important; flex-wrap: wrap !important; overflow: visible; }
+div:has(> .relative > input[placeholder="Rechercher une référence…"]) > .relative { min-width: 100%; flex: 0 0 100%; }
+div:has(> .relative > input[placeholder="Rechercher une référence…"]) > button[role="combobox"] { min-width: 0; flex: 1 1 100%; width: 100% !important; }
+@media (min-width: 640px) {
+  div:has(> .relative > input[placeholder="Rechercher une référence…"]) > button[role="combobox"] { flex: 1 1 0; width: auto !important; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-  .lift:hover,
-  .lift:active {
-    transform: none;
-  }
-}
-
+/* Le panier POS reste un tiroir bas ergonomique et conserve le viewport clavier mobile. */
 @media (max-width: 639px) {
   .fixed.inset-y-0.right-0.z-40.w-full.max-w-md {
-    inset: auto 0 0;
-    height: auto;
-    max-height: min(88dvh, 700px);
-    border-radius: 1.5rem 1.5rem 0 0;
-    overflow: hidden;
+    inset: auto 0 0; height: auto; max-height: min(88dvh, 700px);
+    border-radius: 1.5rem 1.5rem 0 0; overflow: hidden;
     animation: cart-sheet-rise 220ms cubic-bezier(0.23, 1, 0.32, 1);
   }
 }
-
 @keyframes cart-sheet-rise {
-  from {
-    opacity: 0;
-    transform: translateY(1.25rem);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(1.25rem); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-@media print {
-  body * {
-    visibility: hidden !important;
-  }
-  #invoice-print,
-  #invoice-print * {
-    visibility: visible !important;
-  }
-  #invoice-print {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    padding: 28px;
-    color: #111827 !important;
-    background: #fff !important;
-  }
-  #invoice-print * {
-    --foreground: #111827;
-    --muted-foreground: #475569;
-    --faint: #475569;
-    --border: #dbe3ea;
-    --card: #ffffff;
-    --muted: #f8fafc;
-  }
-  .no-print {
-    display: none !important;
-  }
-}
+/* Header des actions hérité par certains écrans de la branche cible. */
+.dark .app-header button[class*="bg-white"] { background-color: var(--card) !important; border-color: var(--border) !important; color: var(--foreground) !important; }
+.dark .app-header button[class*="bg-white"]:hover { background-color: var(--accent) !important; }
 
-/* Catalogue : la recherche garde sa propre ligne ; les filtres ont des largeurs égales et stables. */
-div:has(> .relative > input[placeholder="Rechercher une référence…"]) {
-  flex-direction: row !important;
-  flex-wrap: wrap !important;
-  overflow: visible;
-}
-div:has(> .relative > input[placeholder="Rechercher une référence…"])
-  > .relative {
-  min-width: 100%;
-  flex: 0 0 100%;
-}
-div:has(> .relative > input[placeholder="Rechercher une référence…"])
-  > button[role="combobox"] {
-  min-width: 0;
-  flex: 1 1 100%;
-  width: 100% !important;
-}
-@media (min-width: 640px) {
-  div:has(> .relative > input[placeholder="Rechercher une référence…"])
-    > button[role="combobox"] {
-    flex: 1 1 0;
-    width: auto !important;
+/* Contraste des pages tokenisées : un fond plein conserve son texte associé. */
+:is(.bg-primary, .quick-action-sale):is(.text-foreground, .text-white),
+:is(.bg-primary, .quick-action-sale) :is(.text-foreground, .text-white) { color: var(--app-primary-foreground) !important; }
+:is(.bg-cyan-400, .bg-cyan-500) { background-color: var(--app-primary) !important; color: var(--app-primary-foreground) !important; }
+:is(.bg-amber-400, .bg-amber-500, .bg-orange-500):is(.text-foreground, .text-white, .text-slate-950) { background-color: var(--warning); color: var(--warning-foreground) !important; }
+:is(.bg-emerald-400, .bg-emerald-500):is(.text-foreground, .text-white, .text-slate-950) { background-color: var(--success); color: var(--success-foreground) !important; }
+:is(.bg-rose-400, .bg-rose-500):is(.text-foreground, .text-white, .text-slate-950) { background-color: var(--destructive); color: var(--destructive-foreground) !important; }
+.surface { box-shadow: var(--shadow-sm); }
+.dark .surface { box-shadow: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 1px 3px rgb(0 0 0 / 0.3); }
+/* Portage visuel ciblé : aucune animation sur le shell ou les ancêtres du POS. */
+@layer base {
+  @media (prefers-reduced-motion: no-preference) {
+    a, button, [role="button"], tr {
+      transition-property: color, background-color, border-color;
+      transition-duration: 150ms;
+      transition-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+    }
   }
 }
+@media (prefers-reduced-motion: no-preference) {
+  .lift {
+    transition: color 150ms cubic-bezier(0.23, 1, 0.32, 1), background-color 150ms cubic-bezier(0.23, 1, 0.32, 1), border-color 150ms cubic-bezier(0.23, 1, 0.32, 1), transform 160ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 160ms cubic-bezier(0.23, 1, 0.32, 1);
+  }
+  @media (hover: hover) {
+    .lift:hover:not(:disabled):not([aria-disabled="true"]) { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+    .dark .lift:hover:not(:disabled):not([aria-disabled="true"]) { box-shadow: 0 6px 16px rgb(0 0 0 / 0.3); }
+  }
+  .lift:active:not(:disabled) { transform: translateY(0) scale(0.99); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lift { transition: none; transform: none; }
+  .lift:hover, .lift:active { transform: none; }
+}
+/*
+ * Animations courtes (150–260 ms, transparence et déplacement uniquement),
+ * actives seulement si l'appareil n'a pas demandé de réduire les mouvements.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .animate-enter { animation: sp-enter 240ms cubic-bezier(0.23, 1, 0.32, 1) backwards; }
+  .stagger > * { animation: sp-enter 260ms cubic-bezier(0.23, 1, 0.32, 1) backwards; }
+  .stagger > :nth-child(2) { animation-delay: 40ms; }
+  .stagger > :nth-child(3) { animation-delay: 80ms; }
+  .stagger > :nth-child(4) { animation-delay: 120ms; }
+  .stagger > :nth-child(5) { animation-delay: 160ms; }
+  .stagger > :nth-child(n + 6) { animation-delay: 200ms; }
+  .animate-pop { animation: sp-pop 260ms cubic-bezier(0.3, 1.5, 0.5, 1) backwards; }
+  .animate-slide-in { animation: sp-slide-in 220ms cubic-bezier(0.23, 1, 0.32, 1) backwards; }
+  .shimmer { background-image: linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--card) 70%, transparent) 50%, transparent 100%); background-size: 200% 100%; animation: sp-shimmer 1.3s ease-in-out infinite; }
+  ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 220ms; }
+}
+/* Sans animation, le bloc de chargement reste un simple fond neutre. */
+.shimmer { background-color: var(--accent); }
+/* Remplissage « backwards » : aucune transformation ne subsiste après l’animation, sinon le conteneur capturerait les éléments fixes (barre du panier, panneaux plein écran). */
+@keyframes sp-enter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes sp-pop { 0% { transform: scale(1); } 45% { transform: scale(1.22); } 100% { transform: none; } }
+@keyframes sp-slide-in { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: none; } }
+@keyframes sp-shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+.dark .text-primary { color: color-mix(in srgb, var(--app-primary), white 35%); }
+/* Les anciens dégradés sombres ne doivent pas subsister sous un texte clair/sombre dynamique. */
+.commercial-hero, .onboarding-hero { background: var(--card) !important; color: var(--card-foreground); }

@@ -1,6 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import { TRPCClientError } from "@trpc/client";
 import { useCallback, useEffect, useMemo } from "react";
+import { clearProductPhotoCaches } from "@/lib/productPhotoCache";
 
 type UseAuthOptions = {
   redirectOnUnauthenticated?: boolean;
@@ -26,16 +27,10 @@ export function useAuth(options?: UseAuthOptions) {
     try {
       await logoutMutation.mutateAsync();
     } catch (error: unknown) {
-      if (
-        error instanceof TRPCClientError &&
-        error.data?.code === "UNAUTHORIZED"
-      )
-        return;
+      if (error instanceof TRPCClientError && error.data?.code === "UNAUTHORIZED") return;
       throw error;
     } finally {
-      // Appareil partagé : les photos de produits de l'entreprise ne restent pas en cache.
-      if (typeof caches !== "undefined")
-        await caches.delete("product-images").catch(() => false);
+      await clearProductPhotoCaches();
       utils.auth.me.setData(undefined, null);
       await utils.auth.me.invalidate();
     }
@@ -49,36 +44,13 @@ export function useAuth(options?: UseAuthOptions) {
       error: meQuery.error ?? logoutMutation.error ?? null,
       isAuthenticated: Boolean(user),
     };
-  }, [
-    meQuery.data,
-    meQuery.error,
-    meQuery.isLoading,
-    logoutMutation.error,
-    logoutMutation.isPending,
-  ]);
+  }, [meQuery.data, meQuery.error, meQuery.isLoading, logoutMutation.error, logoutMutation.isPending]);
 
   useEffect(() => {
-    if (
-      !redirectOnUnauthenticated ||
-      meQuery.isLoading ||
-      logoutMutation.isPending ||
-      state.user
-    )
-      return;
-    if (
-      typeof window === "undefined" ||
-      !redirectPath ||
-      window.location.pathname === redirectPath
-    )
-      return;
+    if (!redirectOnUnauthenticated || meQuery.isLoading || logoutMutation.isPending || state.user) return;
+    if (typeof window === "undefined" || !redirectPath || window.location.pathname === redirectPath) return;
     window.location.assign(redirectPath);
-  }, [
-    redirectOnUnauthenticated,
-    redirectPath,
-    logoutMutation.isPending,
-    meQuery.isLoading,
-    state.user,
-  ]);
+  }, [redirectOnUnauthenticated, redirectPath, logoutMutation.isPending, meQuery.isLoading, state.user]);
 
   return {
     ...state,

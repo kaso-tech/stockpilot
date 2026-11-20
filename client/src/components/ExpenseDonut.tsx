@@ -1,56 +1,35 @@
 import { formatCurrency } from "@/lib/format";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 
-export const expenseLabels: Record<string, string> = {
-  rent: "Loyer",
-  energy: "Énergie",
-  connection: "Connexion",
-  salary: "Salaire",
-  agent_payments: "Paiements agents",
-  marketing: "Marketing",
-  supplies: "Fournitures",
-  taxes: "Impôts",
-  other: "Autre",
-};
-
-/** Palette catégorielle sobre, lisible en clair comme en sombre. */
 export const expenseColors: Record<string, string> = {
-  rent: "#0B6E76",
-  energy: "#1D4ED8",
+  rent: "#2563EB",
+  energy: "#0D9488",
   connection: "#7C3AED",
   salary: "#B54708",
   agent_payments: "#E8853D",
   marketing: "#C11574",
   supplies: "#157F4F",
   taxes: "#B42318",
-  other: "#98A2B3",
+  other: "#667085",
 };
 
-export const chartTooltipStyle = {
-  background: "var(--popover)",
-  border: "1px solid var(--border)",
-  borderRadius: "8px",
-  color: "var(--popover-foreground)",
-  fontSize: "12px",
-  boxShadow: "0 4px 12px rgb(var(--shadow-color) / 0.08)",
-};
-
-/** Répartition des dépenses en anneau, total au centre. */
+/** Anneau de répartition des dépenses, sans dépendance aux styles d’un thème spécifique. */
 export function ExpenseDonut({
   breakdown,
   total,
-  label = (category: string) => expenseLabels[category] ?? category,
+  labels,
 }: {
   breakdown: Array<{ category: string; amountCents: number }>;
   total: number;
-  label?: (category: string) => string;
+  labels: Record<string, string>;
 }) {
+  const rows = breakdown.filter(item => Number.isFinite(item.amountCents) && item.amountCents > 0);
   return (
-    <div className="relative h-[220px] w-full">
+    <div className="relative mx-auto h-[220px] w-full max-w-[280px]" role="img" aria-label={`Répartition des dépenses, total ${formatCurrency(total)}`}>
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie
-            data={breakdown}
+            data={rows}
             dataKey="amountCents"
             nameKey="category"
             cx="50%"
@@ -61,26 +40,19 @@ export function ExpenseDonut({
             stroke="var(--card)"
             strokeWidth={2}
           >
-            {breakdown.map(item => (
-              <Cell
-                key={item.category}
-                fill={expenseColors[item.category] ?? "#98A2B3"}
-              />
-            ))}
+            {rows.map(item => <Cell key={item.category} fill={expenseColors[item.category] ?? expenseColors.other} />)}
           </Pie>
           <Tooltip
-            contentStyle={chartTooltipStyle}
+            contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: "10px", color: "var(--popover-foreground)" }}
             formatter={value => formatCurrency(Number(value))}
-            labelFormatter={category => label(String(category))}
+            labelFormatter={category => labels[String(category)] ?? String(category)}
           />
         </PieChart>
       </ResponsiveContainer>
       <div className="pointer-events-none absolute inset-0 grid place-items-center text-center">
         <div>
-          <p className="text-xs text-faint">Total</p>
-          <p className="mt-0.5 text-base font-semibold text-foreground">
-            {formatCurrency(total)}
-          </p>
+          <p className="text-xs text-muted-foreground">Total</p>
+          <p className="mt-0.5 text-base font-semibold text-foreground">{formatCurrency(total)}</p>
         </div>
       </div>
     </div>

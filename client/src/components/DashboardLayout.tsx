@@ -1,17 +1,23 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { can } from "@shared/permissions";
+import { canOpenRoute } from "@shared/routePermissions";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DocumentVatRateSelector } from "@/components/DocumentVatRateSelector";
+import {
+  CommandDialog,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+} from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
-import {
-  readNotificationIds,
-  unreadNotificationCount,
-  writeNotificationIds,
-} from "@/lib/notificationReadState";
-import {
-  visibleNotificationsForRole,
-  type RoleNotification,
-} from "@/lib/roleNotifications";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { readNotificationIds, unreadNotificationCount, writeNotificationIds } from "@/lib/notificationReadState";
+import { visibleNotificationsForRole, type RoleNotification } from "@/lib/roleNotifications";
 import { getPasswordStrength } from "@/lib/passwordStrength";
 import { trpc } from "@/lib/trpc";
 import {
@@ -26,12 +32,9 @@ import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
-  SidebarGroup,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
-  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
@@ -40,21 +43,24 @@ import {
 } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/useMobile";
 import { usePreferences } from "@/contexts/PreferencesContext";
-import { useOffline } from "@/contexts/OfflineContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useActiveWarehouse } from "@/contexts/ActiveWarehouseContext";
+import { useOffline } from "@/contexts/OfflineContext";
 import {
   ArrowLeftRight,
   Archive,
   Bell,
   Boxes,
-  Calculator,
   CheckCheck,
   ChevronDown,
   CircleAlert,
+  CalendarClock,
+  CircleHelp,
   CloudOff,
   CloudUpload,
   ClipboardList,
   ClipboardCheck,
+  CreditCard,
   FileText,
   DatabaseBackup,
   Eye,
@@ -63,13 +69,15 @@ import {
   WalletCards,
   LayoutDashboard,
   LogOut,
+  Mail,
+  MonitorCog,
   Moon,
-  Search,
-  Sun,
   PackageSearch,
   ReceiptText,
   Ruler,
+  Search,
   ShoppingCart,
+  Sun,
   UsersRound,
   Settings2,
   ShieldCheck,
@@ -80,200 +88,25 @@ import {
   Warehouse,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
-import { usePermissions } from "@/hooks/usePermissions";
-import type { Permission } from "@shared/permissions";
+import { DashboardHeaderTitle } from "./DashboardHeaderTitle";
 
-type MenuItem = {
-  icon: typeof LayoutDashboard;
-  label: string;
-  path: string;
-  /** Droits dont l'un suffit pour voir l'entrée ; absent = tout utilisateur connecté. */
-  anyOf?: Permission[];
-};
+type MenuItem = { icon: typeof LayoutDashboard; label: string; path: string };
+type MenuSection = { label: string; items: MenuItem[] };
 
-type MenuGroup = { title: string; items: MenuItem[] };
-
-/** Navigation groupée par métier, dans l'ordre du travail quotidien. */
-const menuGroups: MenuGroup[] = [
-  {
-    title: "Pilotage",
-    items: [{ icon: LayoutDashboard, label: "Vue d’ensemble", path: "/" }],
-  },
-  {
-    title: "Ventes",
-    items: [
-      {
-        icon: ShoppingCart,
-        label: "Vente rapide",
-        path: "/pos",
-        anyOf: ["sales.create"],
-      },
-      { icon: ReceiptText, label: "Factures", path: "/factures" },
-      { icon: FileText, label: "Devis", path: "/devis" },
-      { icon: UserRound, label: "Clients", path: "/clients" },
-    ],
-  },
-  {
-    title: "Stock",
-    items: [
-      { icon: PackageSearch, label: "Produits", path: "/produits" },
-      {
-        icon: Boxes,
-        label: "Catégories",
-        path: "/categories",
-        anyOf: ["catalog.manage"],
-      },
-      {
-        icon: Ruler,
-        label: "Unités",
-        path: "/unites",
-        anyOf: ["catalog.manage"],
-      },
-      { icon: ArrowLeftRight, label: "Mouvements", path: "/mouvements" },
-      {
-        icon: ClipboardCheck,
-        label: "Inventaires",
-        path: "/inventaires",
-        anyOf: ["inventory.manage"],
-      },
-      {
-        icon: Warehouse,
-        label: "Dépôts",
-        path: "/depots",
-        anyOf: ["inventory.manage", "catalog.manage"],
-      },
-      {
-        icon: TriangleAlert,
-        label: "Alertes",
-        path: "/alertes",
-        anyOf: ["catalog.manage", "purchasing.manage"],
-      },
-    ],
-  },
-  {
-    title: "Achats",
-    items: [
-      {
-        icon: Truck,
-        label: "Fournisseurs",
-        path: "/fournisseurs",
-        anyOf: ["catalog.manage", "purchasing.manage"],
-      },
-      {
-        icon: FileText,
-        label: "Bons de commande",
-        path: "/bons-commande",
-        anyOf: ["purchasing.manage", "accounting.export"],
-      },
-    ],
-  },
-  {
-    title: "Finance",
-    items: [
-      {
-        icon: Calculator,
-        label: "Caisse & comptabilité",
-        path: "/comptabilite",
-        anyOf: ["cash.close", "accounting.export"],
-      },
-      {
-        icon: WalletCards,
-        label: "Dépenses",
-        path: "/depenses",
-        anyOf: ["expenses.manage"],
-      },
-      {
-        icon: UsersRound,
-        label: "Agents & paie",
-        path: "/agents",
-        anyOf: ["team.view", "payroll.manage"],
-      },
-    ],
-  },
-  {
-    title: "Administration",
-    items: [
-      {
-        icon: SlidersHorizontal,
-        label: "Paramètres",
-        path: "/parametres",
-        anyOf: ["settings.manage"],
-      },
-      {
-        icon: Archive,
-        label: "Import & export",
-        path: "/donnees",
-        anyOf: ["catalog.manage"],
-      },
-      {
-        icon: DatabaseBackup,
-        label: "Sauvegardes",
-        path: "/sauvegardes",
-        anyOf: ["backups.manage"],
-      },
-      {
-        icon: ClipboardList,
-        label: "Journal",
-        path: "/journal",
-        anyOf: ["audit.view"],
-      },
-      {
-        icon: CloudUpload,
-        label: "Synchronisation",
-        path: "/synchronisation",
-        anyOf: ["sales.create"],
-      },
-    ],
-  },
+const menuSections: MenuSection[] = [
+  { label: "Pilotage", items: [{ icon: LayoutDashboard, label: "Vue d’ensemble", path: "/" }, { icon: LayoutDashboard, label: "Pilotage consolidé", path: "/pilotage-entrepots" }, { icon: TriangleAlert, label: "Alertes", path: "/alertes" }] },
+  { label: "Ventes", items: [{ icon: ShoppingCart, label: "Vente Rapide", path: "/pos" }, { icon: ReceiptText, label: "Tickets", path: "/tickets" }, { icon: ReceiptText, label: "Factures", path: "/factures" }, { icon: FileText, label: "Devis", path: "/devis" }, { icon: UserRound, label: "Clients", path: "/clients" }] },
+  { label: "Stocks & logistique", items: [{ icon: PackageSearch, label: "Produits", path: "/produits" }, { icon: Warehouse, label: "Entrepôts", path: "/entrepots" }, { icon: ArrowLeftRight, label: "Transferts", path: "/transferts-stock" }, { icon: ArrowLeftRight, label: "Mouvements", path: "/mouvements" }, { icon: ClipboardCheck, label: "Inventaires", path: "/inventaires" }, { icon: Truck, label: "Fournisseurs", path: "/fournisseurs" }, { icon: FileText, label: "Bons de commande", path: "/bons-commande" }, { icon: Boxes, label: "Catégories", path: "/categories" }, { icon: Ruler, label: "Unités", path: "/unites" }] },
+  { label: "Équipe & finance", items: [{ icon: UsersRound, label: "Agents & paie", path: "/agents" }, { icon: WalletCards, label: "Dépenses", path: "/depenses" }, { icon: CalendarClock, label: "Échéances", path: "/echeances" }, { icon: WalletCards, label: "Caisse & comptabilité", path: "/comptabilite" }] },
+  { label: "Administration", items: [{ icon: Archive, label: "Import & export", path: "/donnees" }, { icon: CloudUpload, label: "Synchronisation", path: "/synchronisation" }, { icon: DatabaseBackup, label: "Sauvegardes", path: "/sauvegardes" }, { icon: ClipboardList, label: "Journal", path: "/journal" }, { icon: SlidersHorizontal, label: "Paramètres", path: "/parametres" }] },
 ];
 
-/** Pages de détail rattachées à une entrée du menu. */
-function isMenuItemActive(path: string, location: string) {
-  if (path === location) return true;
-  return (
-    path !== "/" &&
-    [
-      "/produits",
-      "/clients",
-      "/fournisseurs",
-      "/bons-commande",
-      "/devis",
-      "/factures",
-      "/agents",
-      "/parametres",
-    ].includes(path) &&
-    location.startsWith(`${path}/`)
-  );
-}
-
-function normalizeSearch(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
-}
-
-/** Réglages personnels proposés aux rôles qui n'accèdent pas aux paramètres de l'entreprise. */
-const personalMenuItems: MenuItem[] = [
-  { icon: Settings2, label: "Apparence", path: "/parametres/apparence" },
-  {
-    icon: LayoutDashboard,
-    label: "Mon tableau de bord",
-    path: "/parametres/tableau-de-bord",
-  },
-  { icon: ShieldCheck, label: "Sécurité", path: "/parametres/securite" },
-];
-
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { loading, user } = useAuth();
+  const utils = trpc.useUtils();
   const [publicLocation, setPublicLocation] = useLocation();
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [companyName, setCompanyName] = useState("");
@@ -283,121 +116,36 @@ export default function DashboardLayout({
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [emailToCheck, setEmailToCheck] = useState("");
-  const returnToDashboard = () => window.location.replace("/");
-  const passwordLogin = trpc.auth.passwordLogin.useMutation({
-    onSuccess: returnToDashboard,
-  });
-  const registerCompany = trpc.auth.registerCompany.useMutation({
-    onSuccess: () => window.location.replace("/parametres/identite"),
-  });
+  const returnToDashboard = async () => { await utils.auth.me.invalidate(); setPublicLocation("/"); };
+  const passwordLogin = trpc.auth.passwordLogin.useMutation({ onSuccess: returnToDashboard });
+  const registerCompany = trpc.auth.registerCompany.useMutation({ onSuccess: async () => { await utils.auth.me.invalidate(); setPublicLocation("/parametres/identite"); } });
   const emailLooksValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-  useEffect(() => {
-    const timer = window.setTimeout(
-      () => setEmailToCheck(email.trim().toLowerCase()),
-      500
-    );
-    return () => window.clearTimeout(timer);
-  }, [email]);
-  const emailAvailability = trpc.auth.emailAvailability.useQuery(
-    { email: emailToCheck || "invalide@example.test" },
-    {
-      enabled:
-        authMode === "register" &&
-        emailLooksValid &&
-        emailToCheck === email.trim().toLowerCase(),
-    }
-  );
-  useEffect(() => {
-    if (!user)
-      setAuthMode(publicLocation === "/inscription" ? "register" : "login");
-  }, [publicLocation, user]);
+  useEffect(() => { const timer = window.setTimeout(() => setEmailToCheck(email.trim().toLowerCase()), 500); return () => window.clearTimeout(timer); }, [email]);
+  const emailAvailability = trpc.auth.emailAvailability.useQuery({ email: emailToCheck || "invalide@example.test" }, { enabled: authMode === "register" && emailLooksValid && emailToCheck === email.trim().toLowerCase() });
+  useEffect(() => { if (!user) setAuthMode(publicLocation === "/inscription" ? "register" : "login"); }, [publicLocation, user]);
 
   if (loading) return <DashboardLayoutSkeleton />;
 
   if (!user) {
     return (
       <div className="grid min-h-screen place-items-center bg-background px-6 text-foreground">
-        <div className="w-full max-w-md rounded-3xl border border-border bg-card p-8 shadow-2xl">
+        <div className="w-full max-w-md rounded-3xl border border-border bg-card p-8 shadow-2xl ">
           <div className="mb-8 flex items-center gap-3">
             <div className="grid h-11 w-11 place-items-center rounded-2xl bg-primary text-primary-foreground">
               <Boxes className="h-6 w-6" />
             </div>
             <div>
               <p className="text-lg font-semibold tracking-tight">StockPilot</p>
-              <p className="text-xs text-muted-foreground">
-                Operations workspace
-              </p>
+              <p className="text-xs text-muted-foreground">Operations workspace</p>
             </div>
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {authMode === "login"
-              ? "Accédez à votre espace commercial"
-              : "Créez votre entreprise"}
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {authMode === "login"
-              ? "Connectez-vous avec l’adresse e-mail et le mot de passe de votre compte."
-              : "Créez le premier compte administrateur de votre espace StockPilot."}
-          </p>
-          {authMode === "login" && (
-            <Link
-              href="/inscription"
-              className="mt-4 flex items-center justify-between rounded-xl border border-primary/25 bg-primary/10 px-4 py-3 text-sm font-semibold text-primary transition hover:border-primary hover:bg-primary/20"
-            >
-              Nouveau sur StockPilot ?{" "}
-              <span className="text-primary">Créer mon entreprise →</span>
-            </Link>
-          )}
-          {authMode === "login" && (
-            <LoginForm
-              email={email}
-              password={password}
-              rememberMe={rememberMe}
-              pending={passwordLogin.isPending}
-              error={passwordLogin.error?.message}
-              onEmailChange={setEmail}
-              onPasswordChange={setPassword}
-              onRememberMeChange={setRememberMe}
-              onSubmit={() =>
-                passwordLogin.mutate({ email, password, rememberMe })
-              }
-              onRegister={() => setPublicLocation("/inscription")}
-            />
-          )}
-          {authMode === "register" && (
-            <RegistrationForm
-              companyName={companyName}
-              administratorName={administratorName}
-              email={email}
-              password={password}
-              passwordConfirmation={passwordConfirmation}
-              rememberMe={rememberMe}
-              emailLooksValid={emailLooksValid}
-              emailAvailability={emailAvailability.data?.available}
-              emailChecking={
-                emailAvailability.isFetching ||
-                (emailLooksValid && emailToCheck !== email.trim().toLowerCase())
-              }
-              pending={registerCompany.isPending}
-              error={registerCompany.error?.message}
-              onCompanyNameChange={setCompanyName}
-              onAdministratorNameChange={setAdministratorName}
-              onEmailChange={setEmail}
-              onPasswordChange={setPassword}
-              onPasswordConfirmationChange={setPasswordConfirmation}
-              onRememberMeChange={setRememberMe}
-              onSubmit={() =>
-                registerCompany.mutate({
-                  companyName,
-                  administratorName,
-                  email,
-                  password,
-                  rememberMe,
-                })
-              }
-              onBack={() => setPublicLocation("/")}
-            />
-          )}
+          <h1 className="text-2xl font-semibold tracking-tight">{authMode === "login" ? "Accédez à votre espace commercial" : "Créez votre entreprise"}</h1>
+          <p className="mt-2 text-sm text-muted-foreground">{authMode === "login" ? "Connectez-vous avec l’adresse e-mail et le mot de passe de votre compte." : "Créez le premier compte administrateur de votre espace StockPilot."}</p>
+          {authMode === "login" && <LoginForm email={email} password={password} rememberMe={rememberMe} pending={passwordLogin.isPending} error={passwordLogin.error?.message} onEmailChange={setEmail} onPasswordChange={setPassword} onRememberMeChange={setRememberMe} onSubmit={() => passwordLogin.mutate({ email, password, rememberMe })} onRegister={() => setPublicLocation("/inscription")} />}
+          {authMode === "register" && <RegistrationForm companyName={companyName} administratorName={administratorName} email={email} password={password} passwordConfirmation={passwordConfirmation} rememberMe={rememberMe} emailLooksValid={emailLooksValid} emailAvailability={emailAvailability.data?.available} emailChecking={emailAvailability.isFetching || (emailLooksValid && emailToCheck !== email.trim().toLowerCase())} pending={registerCompany.isPending} error={registerCompany.error?.message} onCompanyNameChange={setCompanyName} onAdministratorNameChange={setAdministratorName} onEmailChange={setEmail} onPasswordChange={setPassword} onPasswordConfirmationChange={setPasswordConfirmation} onRememberMeChange={setRememberMe} onSubmit={() => registerCompany.mutate({ companyName, administratorName, email, password, rememberMe })} onBack={() => setPublicLocation("/")} />}
+          <div className="hidden">
+          {authMode === "login" ? <form onSubmit={event => { event.preventDefault(); passwordLogin.mutate({ email, password, rememberMe }); }} className="mt-6 space-y-3"><Input value={email} onChange={event => setEmail(event.target.value)} placeholder="Adresse e-mail" type="email" autoComplete="email" className="border-border bg-muted/50" /><Input value={password} onChange={event => setPassword(event.target.value)} placeholder="Mot de passe" type="password" autoComplete="current-password" className="border-border bg-muted/50" /><label htmlFor="remember-me" className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted/50 px-3 py-2.5 text-left transition hover:border-primary/25"><Checkbox id="remember-me" checked={rememberMe} onCheckedChange={value => setRememberMe(value === true)} disabled={passwordLogin.isPending} className="mt-0.5 border-input" /><span><span className="block text-sm font-medium text-foreground">Se souvenir de moi</span><span className="mt-0.5 block text-xs text-muted-foreground">Prolonge la session sur cet appareil.</span></span></label><Button type="submit" disabled={passwordLogin.isPending || !email || !password} className="h-11 w-full bg-primary text-primary-foreground hover:bg-primary/90">{passwordLogin.isPending ? "Connexion…" : "Se connecter"}</Button>{passwordLogin.error && <p className="text-center text-xs text-destructive">{passwordLogin.error.message}</p>}<div className="relative py-1 text-center text-xs text-faint"><span className="relative z-10 bg-card px-3">Première utilisation ?</span><span className="absolute inset-x-0 top-1/2 border-t border-border" /></div><Button type="button" variant="outline" onClick={() => setPublicLocation("/inscription")} className="h-11 w-full border-primary/40 bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary">Créer mon entreprise</Button></form> : <form onSubmit={event => { event.preventDefault(); if (password !== passwordConfirmation) return; registerCompany.mutate({ companyName, administratorName, email, password, rememberMe }); }} className="mt-6 space-y-3"><Input value={companyName} onChange={event => setCompanyName(event.target.value)} placeholder="Nom de l’entreprise" autoComplete="organization" className="border-border bg-muted/50" /><Input value={administratorName} onChange={event => setAdministratorName(event.target.value)} placeholder="Votre nom complet" autoComplete="name" className="border-border bg-muted/50" /><Input value={email} onChange={event => setEmail(event.target.value)} placeholder="Adresse e-mail professionnelle" type="email" autoComplete="email" className="border-border bg-muted/50" /><Input value={password} onChange={event => setPassword(event.target.value)} placeholder="Mot de passe (10 caractères minimum)" type="password" autoComplete="new-password" className="border-border bg-muted/50" /><Input value={passwordConfirmation} onChange={event => setPasswordConfirmation(event.target.value)} placeholder="Confirmer le mot de passe" type="password" autoComplete="new-password" className="border-border bg-muted/50" /><label htmlFor="remember-new-company" className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted/50 px-3 py-2.5 text-left transition hover:border-primary/25"><Checkbox id="remember-new-company" checked={rememberMe} onCheckedChange={value => setRememberMe(value === true)} disabled={registerCompany.isPending} className="mt-0.5 border-input" /><span><span className="block text-sm font-medium text-foreground">Se souvenir de moi</span><span className="mt-0.5 block text-xs text-muted-foreground">Prolonge la session sur cet appareil.</span></span></label>{passwordConfirmation && password !== passwordConfirmation && <p className="text-xs text-destructive">Les mots de passe ne correspondent pas.</p>}<Button type="submit" disabled={registerCompany.isPending || !companyName || !administratorName || !email || password.length < 10 || password !== passwordConfirmation} className="h-11 w-full bg-primary text-primary-foreground hover:bg-primary/90">{registerCompany.isPending ? "Création…" : "Créer mon espace"}</Button>{registerCompany.error && <p className="text-center text-xs text-destructive">{registerCompany.error.message}</p>}<p className="px-1 text-center text-xs leading-5 text-muted-foreground">En créant votre espace, vous acceptez les <Link href="/conditions-utilisation" className="text-primary hover:underline">Conditions d’utilisation</Link> et reconnaissez avoir lu la <Link href="/politique-confidentialite" className="text-primary hover:underline">Politique de confidentialité</Link>.</p><button type="button" onClick={() => setPublicLocation("/")} className="w-full pt-1 text-sm font-medium text-primary hover:text-primary hover:underline">J’ai déjà un compte</button></form>}
+          </div>
         </div>
       </div>
     );
@@ -410,719 +158,158 @@ export default function DashboardLayout({
   );
 }
 
-function PasswordField({
-  value,
-  onChange,
-  placeholder,
-  autoComplete,
-  disabled = false,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-  autoComplete: string;
-  disabled?: boolean;
-}) {
+function PasswordField({ value, onChange, placeholder, autoComplete, disabled = false }: { value: string; onChange: (value: string) => void; placeholder: string; autoComplete: string; disabled?: boolean }) {
   const [visible, setVisible] = useState(false);
-  return (
-    <div className="relative">
-      <Input
-        value={value}
-        onChange={event => onChange(event.target.value)}
-        placeholder={placeholder}
-        type={visible ? "text" : "password"}
-        autoComplete={autoComplete}
-        disabled={disabled}
-        className="border-border bg-muted/50 pr-11"
-      />
-      <button
-        type="button"
-        onClick={() => setVisible(current => !current)}
-        className="absolute inset-y-0 right-0 grid w-11 place-items-center text-muted-foreground transition hover:text-primary"
-        aria-label={
-          visible ? "Masquer le mot de passe" : "Afficher le mot de passe"
-        }
-      >
-        {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-      </button>
-    </div>
-  );
+  return <div className="relative"><Input value={value} onChange={event => onChange(event.target.value)} placeholder={placeholder} type={visible ? "text" : "password"} autoComplete={autoComplete} disabled={disabled} className="border-border bg-muted/50 pr-11" /><button type="button" onClick={() => setVisible(current => !current)} className="absolute inset-y-0 right-0 grid w-11 place-items-center text-muted-foreground transition hover:text-primary" aria-label={visible ? "Masquer le mot de passe" : "Afficher le mot de passe"}>{visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div>;
 }
 
 function PasswordStrength({ password }: { password: string }) {
   if (!password) return null;
   const { score, label } = getPasswordStrength(password);
-  const state =
-    label === "Faible"
-      ? { tone: "bg-destructive", text: "text-destructive" }
-      : label === "Moyen"
-        ? { tone: "bg-warning", text: "text-warning" }
-        : { tone: "bg-success", text: "text-success" };
-  return (
-    <div className="px-1">
-      <div className="flex items-center justify-between text-xs">
-        <span className="text-muted-foreground">Force du mot de passe</span>
-        <span className={state.text}>{label}</span>
-      </div>
-      <div className="mt-1.5 grid grid-cols-5 gap-1">
-        {Array.from({ length: 5 }, (_, index) => (
-          <span
-            key={index}
-            className={`h-1 rounded-full ${index < score ? state.tone : "bg-muted"}`}
-          />
-        ))}
-      </div>
-      <p className="mt-1.5 text-[11px] text-faint">
-        Utilisez au moins 10 caractères, avec majuscule, minuscule, chiffre et
-        symbole.
-      </p>
-    </div>
-  );
+  const state = label === "Faible" ? { tone: "bg-destructive", text: "text-destructive" } : label === "Moyen" ? { tone: "bg-warning", text: "text-warning" } : { tone: "bg-success", text: "text-success" };
+  return <div className="px-1"><div className="flex items-center justify-between text-xs"><span className="text-muted-foreground">Force du mot de passe</span><span className={state.text}>{label}</span></div><div className="mt-1.5 grid grid-cols-5 gap-1">{Array.from({ length: 5 }, (_, index) => <span key={index} className={`h-1 rounded-full ${index < score ? state.tone : "bg-muted"}`} />)}</div><p className="mt-1.5 text-[11px] text-faint">Utilisez au moins 10 caractères, avec majuscule, minuscule, chiffre et symbole.</p></div>;
 }
 
-function LoginForm({
-  email,
-  password,
-  rememberMe,
-  pending,
-  error,
-  onEmailChange,
-  onPasswordChange,
-  onRememberMeChange,
-  onSubmit,
-  onRegister,
-}: {
-  email: string;
-  password: string;
-  rememberMe: boolean;
-  pending: boolean;
-  error?: string;
-  onEmailChange: (value: string) => void;
-  onPasswordChange: (value: string) => void;
-  onRememberMeChange: (value: boolean) => void;
-  onSubmit: () => void;
-  onRegister: () => void;
-}) {
-  return (
-    <form
-      onSubmit={event => {
-        event.preventDefault();
-        onSubmit();
-      }}
-      className="mt-6 space-y-3"
-    >
-      <Input
-        value={email}
-        onChange={event => onEmailChange(event.target.value)}
-        placeholder="Adresse e-mail"
-        type="email"
-        autoComplete="email"
-        className="border-border bg-muted/50"
-      />
-      <PasswordField
-        value={password}
-        onChange={onPasswordChange}
-        placeholder="Mot de passe"
-        autoComplete="current-password"
-        disabled={pending}
-      />
-      <label
-        htmlFor="remember-me-main"
-        className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted/50 px-3 py-2.5 text-left transition hover:border-primary/25"
-      >
-        <Checkbox
-          id="remember-me-main"
-          checked={rememberMe}
-          onCheckedChange={value => onRememberMeChange(value === true)}
-          disabled={pending}
-          className="mt-0.5 border-input"
-        />
-        <span>
-          <span className="block text-sm font-medium text-foreground">
-            Se souvenir de moi
-          </span>
-          <span className="mt-0.5 block text-xs text-muted-foreground">
-            Prolonge la session sur cet appareil.
-          </span>
-        </span>
-      </label>
-      <Button
-        type="submit"
-        disabled={pending || !email || !password}
-        className="h-11 w-full bg-primary text-primary-foreground hover:bg-primary/90"
-      >
-        {pending ? "Connexion…" : "Se connecter"}
-      </Button>
-      {error && <p className="text-center text-xs text-destructive">{error}</p>}
-      <Link
-        href="/mot-de-passe-oublie"
-        className="block text-center text-sm text-primary hover:text-primary hover:underline"
-      >
-        Mot de passe oublié ?
-      </Link>
-      <div className="relative py-1 text-center text-xs text-faint">
-        <span className="relative z-10 bg-card px-3">
-          Première utilisation ?
-        </span>
-        <span className="absolute inset-x-0 top-1/2 border-t border-border" />
-      </div>
-      <Button
-        type="button"
-        variant="outline"
-        onClick={onRegister}
-        className="h-11 w-full border-primary/40 bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
-      >
-        Créer mon entreprise
-      </Button>
-    </form>
-  );
+function LoginForm({ email, password, rememberMe, pending, error, onEmailChange, onPasswordChange, onRememberMeChange, onSubmit, onRegister }: { email: string; password: string; rememberMe: boolean; pending: boolean; error?: string; onEmailChange: (value: string) => void; onPasswordChange: (value: string) => void; onRememberMeChange: (value: boolean) => void; onSubmit: () => void; onRegister: () => void }) {
+  return <form onSubmit={event => { event.preventDefault(); onSubmit(); }} className="mt-6 space-y-3"><Input value={email} onChange={event => onEmailChange(event.target.value)} placeholder="Adresse e-mail" type="email" autoComplete="email" className="border-border bg-muted/50" /><PasswordField value={password} onChange={onPasswordChange} placeholder="Mot de passe" autoComplete="current-password" disabled={pending} /><label htmlFor="remember-me-main" className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted/50 px-3 py-2.5 text-left transition hover:border-primary/25"><Checkbox id="remember-me-main" checked={rememberMe} onCheckedChange={value => onRememberMeChange(value === true)} disabled={pending} className="mt-0.5 border-input" /><span><span className="block text-sm font-medium text-foreground">Se souvenir de moi</span><span className="mt-0.5 block text-xs text-muted-foreground">Prolonge la session sur cet appareil.</span></span></label><Button type="submit" disabled={pending || !email || !password} className="h-11 w-full bg-primary text-primary-foreground hover:bg-primary/90">{pending ? "Connexion…" : "Se connecter"}</Button><Link href="/mot-de-passe-oublie" className="block min-h-11 py-3 text-right text-sm text-primary hover:underline">Mot de passe oublié ?</Link>{error && <p className="text-center text-xs text-destructive">{error}</p>}<div className="relative py-1 text-center text-xs text-faint"><span className="relative z-10 bg-card px-3">Première utilisation ?</span><span className="absolute inset-x-0 top-1/2 border-t border-border" /></div><Button type="button" variant="outline" onClick={onRegister} className="h-11 w-full border-primary/40 bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary">Créer mon entreprise</Button></form>;
 }
 
-function RegistrationForm({
-  companyName,
-  administratorName,
-  email,
-  password,
-  passwordConfirmation,
-  rememberMe,
-  emailLooksValid,
-  emailAvailability,
-  emailChecking,
-  pending,
-  error,
-  onCompanyNameChange,
-  onAdministratorNameChange,
-  onEmailChange,
-  onPasswordChange,
-  onPasswordConfirmationChange,
-  onRememberMeChange,
-  onSubmit,
-  onBack,
-}: {
-  companyName: string;
-  administratorName: string;
-  email: string;
-  password: string;
-  passwordConfirmation: string;
-  rememberMe: boolean;
-  emailLooksValid: boolean;
-  emailAvailability: boolean | undefined;
-  emailChecking: boolean;
-  pending: boolean;
-  error?: string;
-  onCompanyNameChange: (value: string) => void;
-  onAdministratorNameChange: (value: string) => void;
-  onEmailChange: (value: string) => void;
-  onPasswordChange: (value: string) => void;
-  onPasswordConfirmationChange: (value: string) => void;
-  onRememberMeChange: (value: boolean) => void;
-  onSubmit: () => void;
-  onBack: () => void;
-}) {
-  const emailState = !email
-    ? null
-    : !emailLooksValid
-      ? "Adresse e-mail invalide"
-      : emailChecking
-        ? "Vérification de l’adresse…"
-        : emailAvailability
-          ? "Adresse e-mail disponible"
-          : "Cette adresse e-mail est déjà utilisée";
-  const emailTone = !email
-    ? ""
-    : !emailLooksValid || emailAvailability === false
-      ? "text-destructive"
-      : emailChecking
-        ? "text-muted-foreground"
-        : "text-success";
-  const canSubmit = Boolean(
-    companyName &&
-      administratorName &&
-      emailLooksValid &&
-      emailAvailability &&
-      !emailChecking &&
-      password.length >= 10 &&
-      password === passwordConfirmation
-  );
-  return (
-    <form
-      onSubmit={event => {
-        event.preventDefault();
-        if (canSubmit) onSubmit();
-      }}
-      className="mt-6 space-y-3"
-    >
-      <Input
-        value={companyName}
-        onChange={event => onCompanyNameChange(event.target.value)}
-        placeholder="Nom de l’entreprise"
-        autoComplete="organization"
-        className="border-border bg-muted/50"
-      />
-      <Input
-        value={administratorName}
-        onChange={event => onAdministratorNameChange(event.target.value)}
-        placeholder="Votre nom complet"
-        autoComplete="name"
-        className="border-border bg-muted/50"
-      />
-      <div>
-        <Input
-          value={email}
-          onChange={event => onEmailChange(event.target.value)}
-          placeholder="Adresse e-mail professionnelle"
-          type="email"
-          autoComplete="email"
-          aria-invalid={Boolean(
-            email && (!emailLooksValid || emailAvailability === false)
-          )}
-          className="border-border bg-muted/50"
-        />
-        {emailState && (
-          <p className={`mt-1.5 px-1 text-xs ${emailTone}`}>{emailState}</p>
-        )}
-      </div>
-      <PasswordField
-        value={password}
-        onChange={onPasswordChange}
-        placeholder="Mot de passe (10 caractères minimum)"
-        autoComplete="new-password"
-        disabled={pending}
-      />
-      <PasswordStrength password={password} />
-      <PasswordField
-        value={passwordConfirmation}
-        onChange={onPasswordConfirmationChange}
-        placeholder="Confirmer le mot de passe"
-        autoComplete="new-password"
-        disabled={pending}
-      />
-      {passwordConfirmation && password !== passwordConfirmation && (
-        <p className="text-xs text-destructive">
-          Les mots de passe ne correspondent pas.
-        </p>
-      )}
-      <label
-        htmlFor="remember-new-company"
-        className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted/50 px-3 py-2.5 text-left transition hover:border-primary/25"
-      >
-        <Checkbox
-          id="remember-new-company"
-          checked={rememberMe}
-          onCheckedChange={value => onRememberMeChange(value === true)}
-          disabled={pending}
-          className="mt-0.5 border-input"
-        />
-        <span>
-          <span className="block text-sm font-medium text-foreground">
-            Se souvenir de moi
-          </span>
-          <span className="mt-0.5 block text-xs text-muted-foreground">
-            Prolonge la session sur cet appareil.
-          </span>
-        </span>
-      </label>
-      <Button
-        type="submit"
-        disabled={pending || !canSubmit}
-        className="h-11 w-full bg-primary text-primary-foreground hover:bg-primary/90"
-      >
-        {pending ? "Création…" : "Créer mon espace"}
-      </Button>
-      {error && <p className="text-center text-xs text-destructive">{error}</p>}
-      <p className="px-1 text-center text-xs leading-5 text-muted-foreground">
-        En créant votre espace, vous acceptez les{" "}
-        <Link
-          href="/conditions-utilisation"
-          className="text-primary hover:underline"
-        >
-          Conditions d’utilisation
-        </Link>{" "}
-        et reconnaissez avoir lu la{" "}
-        <Link
-          href="/politique-confidentialite"
-          className="text-primary hover:underline"
-        >
-          Politique de confidentialité
-        </Link>
-        .
-      </p>
-      <button
-        type="button"
-        onClick={onBack}
-        className="w-full pt-1 text-sm font-medium text-primary hover:text-primary hover:underline"
-      >
-        J’ai déjà un compte
-      </button>
-    </form>
-  );
-}
-
-function EmailVerificationBanner() {
-  const resend = trpc.auth.resendVerification.useMutation();
-  return (
-    <div
-      className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warning/25 bg-warning-soft px-4 py-3 text-sm text-warning"
-      role="status"
-    >
-      <span>
-        Confirmez votre adresse e-mail pour sécuriser la récupération de votre
-        compte.
-      </span>
-      <Button
-        type="button"
-        size="sm"
-        variant="outline"
-        disabled={resend.isPending || resend.isSuccess}
-        onClick={() => resend.mutate()}
-        className="border-warning/40 text-warning"
-      >
-        {resend.isSuccess
-          ? "E-mail envoyé"
-          : resend.isPending
-            ? "Envoi…"
-            : "Renvoyer le lien"}
-      </Button>
-    </div>
-  );
+function RegistrationForm({ companyName, administratorName, email, password, passwordConfirmation, rememberMe, emailLooksValid, emailAvailability, emailChecking, pending, error, onCompanyNameChange, onAdministratorNameChange, onEmailChange, onPasswordChange, onPasswordConfirmationChange, onRememberMeChange, onSubmit, onBack }: { companyName: string; administratorName: string; email: string; password: string; passwordConfirmation: string; rememberMe: boolean; emailLooksValid: boolean; emailAvailability: boolean | undefined; emailChecking: boolean; pending: boolean; error?: string; onCompanyNameChange: (value: string) => void; onAdministratorNameChange: (value: string) => void; onEmailChange: (value: string) => void; onPasswordChange: (value: string) => void; onPasswordConfirmationChange: (value: string) => void; onRememberMeChange: (value: boolean) => void; onSubmit: () => void; onBack: () => void }) {
+  const emailState = !email ? null : !emailLooksValid ? "Adresse e-mail invalide" : emailChecking ? "Vérification de l’adresse…" : emailAvailability ? "Adresse e-mail disponible" : "Cette adresse e-mail est déjà utilisée";
+  const emailTone = !email ? "" : !emailLooksValid || emailAvailability === false ? "text-destructive" : emailChecking ? "text-muted-foreground" : "text-success";
+  const canSubmit = Boolean(companyName && administratorName && emailLooksValid && emailAvailability && !emailChecking && password.length >= 10 && password === passwordConfirmation);
+  return <form onSubmit={event => { event.preventDefault(); if (canSubmit) onSubmit(); }} className="mt-6 space-y-3"><Input value={companyName} onChange={event => onCompanyNameChange(event.target.value)} placeholder="Nom de l’entreprise" autoComplete="organization" className="border-border bg-muted/50" /><Input value={administratorName} onChange={event => onAdministratorNameChange(event.target.value)} placeholder="Votre nom complet" autoComplete="name" className="border-border bg-muted/50" /><div><Input value={email} onChange={event => onEmailChange(event.target.value)} placeholder="Adresse e-mail professionnelle" type="email" autoComplete="email" aria-invalid={Boolean(email && (!emailLooksValid || emailAvailability === false))} className="border-border bg-muted/50" />{emailState && <p className={`mt-1.5 px-1 text-xs ${emailTone}`}>{emailState}</p>}</div><PasswordField value={password} onChange={onPasswordChange} placeholder="Mot de passe (10 caractères minimum)" autoComplete="new-password" disabled={pending} /><PasswordStrength password={password} /><PasswordField value={passwordConfirmation} onChange={onPasswordConfirmationChange} placeholder="Confirmer le mot de passe" autoComplete="new-password" disabled={pending} />{passwordConfirmation && password !== passwordConfirmation && <p className="text-xs text-destructive">Les mots de passe ne correspondent pas.</p>}<label htmlFor="remember-new-company" className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted/50 px-3 py-2.5 text-left transition hover:border-primary/25"><Checkbox id="remember-new-company" checked={rememberMe} onCheckedChange={value => onRememberMeChange(value === true)} disabled={pending} className="mt-0.5 border-input" /><span><span className="block text-sm font-medium text-foreground">Se souvenir de moi</span><span className="mt-0.5 block text-xs text-muted-foreground">Prolonge la session sur cet appareil.</span></span></label><Button type="submit" disabled={pending || !canSubmit} className="h-11 w-full bg-primary text-primary-foreground hover:bg-primary/90">{pending ? "Création…" : "Créer mon espace"}</Button>{error && <p className="text-center text-xs text-destructive">{error}</p>}<p className="px-1 text-center text-xs leading-5 text-muted-foreground">En créant votre espace, vous acceptez les <Link href="/conditions-utilisation" className="text-primary hover:underline">Conditions d’utilisation</Link> et reconnaissez avoir lu la <Link href="/politique-confidentialite" className="text-primary hover:underline">Politique de confidentialité</Link>.</p><button type="button" onClick={onBack} className="w-full pt-1 text-sm font-medium text-primary hover:text-primary hover:underline">J’ai déjà un compte</button></form>;
 }
 
 function DashboardShell({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const { currency } = usePreferences();
+  const { activeWarehouseId, activeWarehouse, warehouses, isReady: warehouseReady, setActiveWarehouseId } = useActiveWarehouse();
   const { isOnline, pendingCount, sales: offlineSales, syncNow } = useOffline();
   const [location, setLocation] = useLocation();
   const { state, setOpenMobile } = useSidebar();
   const isCollapsed = state === "collapsed";
   const isMobile = useIsMobile();
-  const { data: companySettings } = trpc.commerce.settings.get.useQuery(
-    undefined,
-    { staleTime: 5 * 60_000 }
-  );
-  const [menuSearch, setMenuSearch] = useState("");
+  const [navigationOpen, setNavigationOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
-  const searchInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    const focusSearch = (event: KeyboardEvent) => {
+    const openNavigation = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
-        searchInputRef.current?.focus();
-        searchInputRef.current?.select();
+        setNavigationOpen(true);
       }
     };
-    window.addEventListener("keydown", focusSearch);
-    return () => window.removeEventListener("keydown", focusSearch);
+    window.addEventListener("keydown", openNavigation);
+    return () => window.removeEventListener("keydown", openNavigation);
   }, []);
-  const { can: hasPermission, roleLabel } = usePermissions();
-  const { theme, setTheme } = useTheme();
-  const { data: subscription } = trpc.company.subscription.useQuery(undefined, {
-    staleTime: 5 * 60_000,
-  });
-  const canSeeItem = (item: MenuItem) =>
-    (!item.anyOf || item.anyOf.some(permission => hasPermission(permission))) &&
-    // Un vendeur ne voit les produits que s'il peut modifier le coût d'achat (réglage du point de vente).
-    !(
-      item.path === "/produits" &&
-      user?.role === "seller" &&
-      !companySettings?.sellerCanEditPurchasePrice
-    );
-  const visibleGroups: MenuGroup[] = menuGroups
-    .map(group => {
-      const items = group.items.filter(canSeeItem);
-      if (group.title === "Administration") {
-        if (!hasPermission("settings.manage")) items.push(...personalMenuItems);
-        if (subscription?.isPlatformAdmin)
-          items.push({
-            icon: ShieldCheck,
-            label: "Plateforme",
-            path: "/plateforme",
-          });
-      }
-      return { ...group, items };
-    })
-    .filter(group => group.items.length > 0);
-  const visibleMenuItems = visibleGroups.flatMap(group => group.items);
-  const searchTerm = normalizeSearch(menuSearch);
-  const displayedGroups = searchTerm
-    ? visibleGroups
-        .map(group => ({
-          ...group,
-          items: group.items.filter(item =>
-            normalizeSearch(`${item.label} ${group.title}`).includes(searchTerm)
-          ),
-        }))
-        .filter(group => group.items.length > 0)
-    : visibleGroups;
-  const activeGroup =
-    visibleGroups.find(group =>
-      group.items.some(item => isMenuItemActive(item.path, location))
-    ) ?? visibleGroups[0];
-  const activeMenuItem =
-    activeGroup?.items.find(item => isMenuItemActive(item.path, location)) ??
-    visibleMenuItems[0];
+  const { data: sellerPermissions } = trpc.commerce.settings.get.useQuery(undefined, { enabled: user?.role === "seller" });
+  const platformAccess = trpc.platform.access.useQuery(undefined, { enabled: Boolean(user), retry: false });
+  const isDocumentCreation = location === "/factures/nouvelle" || location === "/devis/nouveau";
+  const { data: documentVatSettings } = trpc.commerce.settings.get.useQuery(undefined, { enabled: Boolean(user) && isDocumentCreation });
+  const { data: vatRatePresets = [] } = trpc.vatRates.list.useQuery(undefined, { enabled: Boolean(user) && isDocumentCreation });
+  const sellerAllowedPaths = new Set(["/", "/pos", "/tickets", "/factures", "/devis", "/clients", "/mouvements", "/synchronisation"]);
+  if (sellerPermissions?.sellerCanEditPurchasePrice) sellerAllowedPaths.add("/produits");
+  const sellerMenuSections: MenuSection[] = [
+    ...menuSections.map(section => ({ ...section, items: section.items.filter(item => sellerAllowedPaths.has(item.path)) })).filter(section => section.items.length > 0),
+    { label: "Mon compte", items: [{ icon: Settings2, label: "Apparence", path: "/parametres/apparence" }, { icon: LayoutDashboard, label: "Mon tableau de bord", path: "/parametres/tableau-de-bord" }, { icon: ShieldCheck, label: "Sécurité", path: "/parametres/securite" }] },
+  ];
+  const roleMenuSections = menuSections.map(section => ({ ...section, items: section.items.filter(item => canOpenRoute(user?.role, item.path)) })).filter(section => section.items.length);
+  const visibleMenuSections = user?.role === "seller" ? sellerMenuSections : roleMenuSections;
+  const visibleMenuItems = visibleMenuSections.flatMap(section => section.items);
+  const navigateFromPalette = (path: string) => {
+    setNavigationOpen(false);
+    setLocation(path);
+    if (isMobile) setOpenMobile(false);
+  };
+  const activeMenuItem = visibleMenuItems.find(item => item.path === location || (item.path === "/produits" && location.startsWith("/produits/")) || (item.path === "/clients" && location.startsWith("/clients/")) || (item.path === "/fournisseurs" && location.startsWith("/fournisseurs/")) || (item.path === "/bons-commande" && location.startsWith("/bons-commande/")) || (item.path === "/devis" && location.startsWith("/devis/")) || (item.path === "/tickets" && location.startsWith("/tickets/"))) ?? visibleMenuItems[0];
   const initials = (user?.name || user?.email || "U").slice(0, 2).toUpperCase();
-  const isAdmin = hasPermission("backups.manage");
-  const canRunBackup = Boolean(user);
-  const { data: dashboard } = trpc.dashboard.get.useQuery(undefined, {
-    enabled: isAdmin,
-    refetchInterval: 60_000,
-  });
-  const { data: backups } = trpc.backups.get.useQuery(undefined, {
-    enabled: isAdmin,
-    refetchInterval: 60_000,
-  });
-  const runBackup = trpc.backups.runNow.useMutation({
-    onSuccess: archive =>
-      toast.success(`Sauvegarde ${archive.filename} créée.`),
-    onError: error => toast.error(error.message),
-  });
+  const isAdmin = can(user?.role, "finance.notifications");
+  const canRunBackup = user?.role === "admin" || user?.role === "seller";
+  const { data: dashboard } = trpc.dashboard.get.useQuery(activeWarehouseId ? { warehouseId: activeWarehouseId } : undefined, { enabled: isAdmin, refetchInterval: 60_000 });
+  const { data: backups } = trpc.backups.get.useQuery(undefined, { enabled: user?.role === "admin", refetchInterval: 60_000 });
+  const { data: warehouseAlerts = [] } = trpc.warehouses.managerAlerts.useQuery(undefined, { enabled: Boolean(user), refetchInterval: 60_000 });
+  const { data: paymentDueNotifications = [] } = trpc.paymentDues.notifications.useQuery(undefined, { enabled: Boolean(user), refetchInterval: 60_000 });
+  const runBackup = trpc.backups.runNow.useMutation({ onSuccess: archive => toast.success(`Sauvegarde ${archive.filename} créée.`), onError: error => toast.error(error.message) });
   const candidateNotifications: RoleNotification[] = [];
   if (isAdmin) {
-    if (dashboard?.lowStock?.length)
-      candidateNotifications.push({
-        id: "stock",
-        title: "Stock critique",
-        detail: `${dashboard.lowStock.length} produit(s) au seuil minimum`,
-        tone: "amber",
-        path: "/alertes",
-        audience: "admin",
-      });
-    if ((dashboard?.summary?.duePayrollCents ?? 0) > 0)
-      candidateNotifications.push({
-        id: "payroll",
-        title: "Paie à régler",
-        detail: `${dashboard?.summary?.duePayrollCents ?? 0} centimes restent à payer`,
-        tone: "violet",
-        path: "/agents",
-        audience: "admin",
-      });
-    if (dashboard?.summary?.expenseBudget?.exceeded)
-      candidateNotifications.push({
-        id: "budget-over",
-        title: "Budget dépassé",
-        detail: "Les dépenses ont dépassé le plafond mensuel.",
-        tone: "rose",
-        path: "/depenses",
-        audience: "admin",
-      });
-    else if (dashboard?.summary?.expenseBudget?.warningReached)
-      candidateNotifications.push({
-        id: "budget-warning",
-        title: "Seuil budget atteint",
-        detail: "Le seuil d’alerte des dépenses est atteint.",
-        tone: "amber",
-        path: "/depenses",
-        audience: "admin",
-      });
-    if (backups?.settings.lastBackupStatus === "failed")
-      candidateNotifications.push({
-        id: "backup",
-        title: "Sauvegarde à vérifier",
-        detail:
-          backups.settings.lastBackupError ||
-          "La dernière sauvegarde a échoué.",
-        tone: "rose",
-        path: "/sauvegardes",
-        audience: "admin",
-      });
+    if ((dashboard?.summary?.duePayrollCents ?? 0) > 0) candidateNotifications.push({ id: "payroll", title: "Paie à régler", detail: `${dashboard?.summary?.duePayrollCents ?? 0} centimes restent à payer`, tone: "violet", path: "/agents", audience: "admin" });
+    if (dashboard?.summary?.expenseBudget?.exceeded) candidateNotifications.push({ id: "budget-over", title: "Budget dépassé", detail: "Les dépenses ont dépassé le plafond mensuel.", tone: "rose", path: "/depenses", audience: "admin" });
+    else if (dashboard?.summary?.expenseBudget?.warningReached) candidateNotifications.push({ id: "budget-warning", title: "Seuil budget atteint", detail: "Le seuil d’alerte des dépenses est atteint.", tone: "amber", path: "/depenses", audience: "admin" });
+    if (backups?.settings.lastBackupStatus === "failed") candidateNotifications.push({ id: "backup", title: "Sauvegarde à vérifier", detail: backups.settings.lastBackupError || "La dernière sauvegarde a échoué.", tone: "rose", path: "/sauvegardes", audience: "admin" });
   }
-  const notifications = visibleNotificationsForRole(
-    user?.role === "admin" ? "admin" : "seller",
-    candidateNotifications
-  );
-  const [readNotificationIdsState, setReadNotificationIdsState] = useState<
-    string[]
-  >([]);
-  useEffect(() => {
-    setReadNotificationIdsState(
-      readNotificationIds(user?.companyId ?? undefined, user?.id)
-    );
-  }, [user?.companyId, user?.id]);
-  const saveReadNotifications = (ids: string[]) => {
-    setReadNotificationIdsState(ids);
-    writeNotificationIds(user?.companyId ?? undefined, user?.id, ids);
-  };
-  const markNotificationRead = (id: string) => {
-    if (!readNotificationIdsState.includes(id))
-      saveReadNotifications([...readNotificationIdsState, id]);
-  };
-  const markAllNotificationsRead = () =>
-    saveReadNotifications(notifications.map(notification => notification.id));
-
-  const lowStockCount = dashboard?.lowStock?.length ?? 0;
-  const companyName = companySettings?.companyName || "StockPilot";
-  const goTo = (path: string) => {
-    setMenuSearch("");
-    setOpenMobile(false);
-    setLocation(path);
-  };
+  warehouseAlerts.forEach(alert => candidateNotifications.push({ id: alert.id, title: alert.title, detail: alert.detail, tone: alert.status === "active" ? "rose" : "violet", path: "/alertes", audience: can(user?.role, "finance.notifications") ? "admin" : "seller" }));
+  paymentDueNotifications.forEach(notification => candidateNotifications.push({ ...notification, audience: can(user?.role, "finance.notifications") ? "admin" : "seller" }));
+  const notifications = visibleNotificationsForRole(can(user?.role, "finance.notifications") ? "admin" : "seller", candidateNotifications);
+  const [readNotificationIdsState, setReadNotificationIdsState] = useState<string[]>([]);
+  useEffect(() => { setReadNotificationIdsState(readNotificationIds(user?.companyId ?? undefined, user?.id)); }, [user?.companyId, user?.id]);
+  const saveReadNotifications = (ids: string[]) => { setReadNotificationIdsState(ids); writeNotificationIds(user?.companyId ?? undefined, user?.id, ids); };
+  const markNotificationRead = (id: string) => { if (!readNotificationIdsState.includes(id)) saveReadNotifications([...readNotificationIdsState, id]); };
+  const markAllNotificationsRead = () => saveReadNotifications(notifications.map(notification => notification.id));
 
   return (
     <>
-      <Sidebar collapsible="icon" className="border-r border-sidebar-border">
-        <SidebarHeader className="gap-4 px-3 pt-5 pb-2">
+      <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
+        <SidebarHeader className="h-18 justify-center border-b border-sidebar-border px-3">
           <button
-            onClick={() => goTo("/")}
-            className="flex w-full items-center gap-3 rounded-lg px-2 py-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            onClick={() => setLocation("/")}
+            className="flex w-full items-center gap-3 rounded-xl p-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-primary"
             aria-label="Aller au tableau de bord"
           >
-            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary text-[15px] font-bold text-primary-foreground">
-              {companySettings?.companyLogoUrl ? (
-                <img
-                  src={companySettings.companyLogoUrl}
-                  alt=""
-                  className="h-8 w-8 rounded-lg bg-card object-contain"
-                />
-              ) : (
-                companyName.slice(0, 1).toUpperCase()
-              )}
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
+              <Boxes className="h-5 w-5" />
             </span>
             {!isCollapsed && (
               <span className="min-w-0">
-                <span className="block truncate text-[15px] font-bold tracking-tight text-foreground">
-                  StockPilot
-                </span>
-                <span className="block truncate text-xs text-faint">
-                  {companyName}
-                </span>
+                <span className="block truncate text-sm font-semibold tracking-tight text-foreground">StockPilot</span>
+                <span className="block truncate text-[10px] font-medium uppercase tracking-[0.16em] text-primary/80">B2B Operations</span>
               </span>
             )}
           </button>
-          {!isCollapsed && (
-            <label className="flex h-9 items-center gap-2 rounded-lg border border-border bg-muted px-2.5 text-faint focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20">
-              <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
-              <input
-                ref={searchInputRef}
-                value={menuSearch}
-                onChange={event => setMenuSearch(event.target.value)}
-                onKeyDown={event => {
-                  if (event.key === "Enter" && displayedGroups[0]?.items[0])
-                    goTo(displayedGroups[0].items[0].path);
-                  if (event.key === "Escape") setMenuSearch("");
-                }}
-                placeholder="Rechercher…"
-                aria-label="Rechercher une page"
-                className="min-w-0 flex-1 bg-transparent text-[13px] text-foreground outline-none placeholder:text-faint"
-              />
-              <kbd className="hidden rounded border border-border bg-card px-1.5 text-[10px] font-medium text-faint sm:inline">
-                Ctrl K
-              </kbd>
-            </label>
-          )}
         </SidebarHeader>
 
-        <SidebarContent className="gap-0 overflow-y-auto px-3 pb-4">
-          {displayedGroups.map(group => (
-            <SidebarGroup key={group.title} className="shrink-0 px-0 py-2">
-              <SidebarGroupLabel className="h-6 px-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-faint">
-                {group.title}
-              </SidebarGroupLabel>
-              <SidebarMenu className="gap-0.5">
-                {group.items.map(item => {
-                  const isActive = isMenuItemActive(item.path, location);
-                  const badge =
-                    item.path === "/alertes" && lowStockCount > 0
-                      ? lowStockCount
-                      : null;
-                  return (
-                    <SidebarMenuItem key={item.path}>
-                      <SidebarMenuButton
-                        isActive={isActive}
-                        tooltip={item.label}
-                        onClick={() => goTo(item.path)}
-                        className="h-[34px] rounded-lg px-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground relative data-[active=true]:bg-primary-soft data-[active=true]:font-semibold data-[active=true]:text-primary data-[active=true]:before:absolute data-[active=true]:before:inset-y-2 data-[active=true]:before:left-0 data-[active=true]:before:w-[3px] data-[active=true]:before:rounded-r-full data-[active=true]:before:bg-primary"
-                      >
-                        <item.icon className="h-[17px] w-[17px]" />
-                        <span>{item.label}</span>
-                      </SidebarMenuButton>
-                      {badge !== null && (
-                        <SidebarMenuBadge className="rounded-full bg-destructive-soft px-1.5 text-xs font-semibold text-destructive peer-data-[active=true]/menu-button:text-destructive">
-                          {badge > 99 ? "99+" : badge}
-                        </SidebarMenuBadge>
-                      )}
-                    </SidebarMenuItem>
-                  );
-                })}
-              </SidebarMenu>
-            </SidebarGroup>
-          ))}
-          {searchTerm && displayedGroups.length === 0 && (
-            <p className="px-2.5 py-3 text-sm text-faint">
-              Aucune page ne correspond.
-            </p>
-          )}
+        <SidebarContent className="px-3 py-5">
+          <div className="space-y-4">{visibleMenuSections.map(section => <section key={section.label}>{!isCollapsed && <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-faint">{section.label}</p>}<SidebarMenu className="gap-0.5">{section.items.map(item => { const isActive = location === item.path || (item.path === "/produits" && location.startsWith("/produits/")) || (item.path === "/clients" && location.startsWith("/clients/")) || (item.path === "/fournisseurs" && location.startsWith("/fournisseurs/")) || (item.path === "/bons-commande" && location.startsWith("/bons-commande/")) || (item.path === "/devis" && location.startsWith("/devis/")) || (item.path === "/tickets" && location.startsWith("/tickets/")) || (item.path === "/factures" && location.startsWith("/factures/")); return <SidebarMenuItem key={item.path}><SidebarMenuButton isActive={isActive} tooltip={item.label} onClick={() => setLocation(item.path)} className="relative h-9 rounded-lg px-3 text-muted-foreground hover:bg-accent hover:text-primary-foreground data-[active=true]:bg-primary-soft data-[active=true]:font-semibold data-[active=true]:text-primary data-[active=true]:before:absolute data-[active=true]:before:inset-y-2 data-[active=true]:before:left-0 data-[active=true]:before:w-[3px] data-[active=true]:before:rounded-r-full data-[active=true]:before:bg-primary"><item.icon className="h-[18px] w-[18px]" /><span className="font-medium">{item.label}</span></SidebarMenuButton></SidebarMenuItem>; })}</SidebarMenu></section>)}</div>
         </SidebarContent>
 
         <SidebarFooter className="border-t border-sidebar-border p-3">
-          <DropdownMenu
-            open={accountMenuOpen}
-            onOpenChange={setAccountMenuOpen}
-          >
+          <DropdownMenu open={accountMenuOpen} onOpenChange={setAccountMenuOpen}>
             <DropdownMenuTrigger asChild>
               <button
-                // Ouverture au clic complet : un appui prolongé ne doit jamais
-                // « glisser » jusqu'à « Se déconnecter » au relâchement.
                 onPointerDown={event => event.preventDefault()}
                 onClick={() => setAccountMenuOpen(current => !current)}
-                className="flex w-full items-center gap-3 rounded-lg p-2 text-left transition-colors hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex w-full items-center gap-3 rounded-xl p-2 text-left transition-colors hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <Avatar className="h-8 w-8 shrink-0 border border-border">
-                  <AvatarFallback className="bg-primary-soft text-[11px] font-semibold text-primary">
-                    {initials}
-                  </AvatarFallback>
+                  <AvatarFallback className="bg-muted text-[11px] font-semibold text-primary">{initials}</AvatarFallback>
                 </Avatar>
                 {!isCollapsed && (
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[13px] font-medium text-foreground">
-                      {user?.name || "Utilisateur"}
-                    </span>
-                    <span className="block truncate pt-0.5 text-xs text-faint">
-                      {roleLabel}
-                    </span>
+                    <span className="block truncate text-xs font-medium text-foreground">{user?.name || "Utilisateur"}</span>
+                    <span className="block truncate pt-0.5 text-[11px] text-faint">{user?.email || "Compte membre"}</span>
                   </span>
                 )}
-                {!isCollapsed && (
-                  <ChevronDown className="h-3.5 w-3.5 text-faint" />
-                )}
+                {!isCollapsed && <ChevronDown className="h-3.5 w-3.5 text-faint" />}
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              side={isMobile ? "top" : "right"}
-              sideOffset={8}
-              className="w-60"
-            >
+            <DropdownMenuContent align="end" side={isMobile ? "top" : "right"} sideOffset={8} className="w-56 border-border bg-popover text-popover-foreground">
               <DropdownMenuLabel className="font-normal">
-                <p className="truncate text-sm font-medium">
-                  {user?.name || "Utilisateur"}
-                </p>
-                <p className="mt-0.5 truncate text-xs text-faint">
-                  {user?.email}
-                </p>
+                <p className="truncate text-sm font-medium">{user?.name || "Utilisateur"}</p>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">{user?.email}</p>
               </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                className="cursor-pointer"
-              >
-                {theme === "dark" ? (
-                  <Sun className="mr-2 h-4 w-4" />
-                ) : (
-                  <Moon className="mr-2 h-4 w-4" />
-                )}
-                {theme === "dark" ? "Thème clair" : "Thème sombre"}
+              <DropdownMenuSeparator className="bg-border" />
+              <DropdownMenuItem className="cursor-default focus:bg-transparent">
+                <Badge className="border-0 bg-primary-soft text-primary hover:bg-primary-soft">{user?.role === "admin" ? "Administrateur" : "Opérateur"}</Badge>
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => goTo("/parametres/securite")}
-                className="cursor-pointer"
-              >
-                <ShieldCheck className="mr-2 h-4 w-4" /> Sécurité du compte
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={logout}
-                className="cursor-pointer text-destructive focus:bg-destructive-soft focus:text-destructive"
-              >
+              <DropdownMenuSeparator className="bg-border" />
+              <DropdownMenuItem onClick={() => setLocation("/aide")} className="cursor-pointer focus:bg-accent"><CircleHelp className="mr-2 h-4 w-4" />Aide</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setLocation("/tarifs")} className="cursor-pointer focus:bg-accent"><WalletCards className="mr-2 h-4 w-4" />Tarification</DropdownMenuItem>
+              {isAdmin && <DropdownMenuItem onClick={() => setLocation("/abonnement")} className="cursor-pointer focus:bg-accent"><CreditCard className="mr-2 h-4 w-4" />Mon abonnement</DropdownMenuItem>}
+              <DropdownMenuItem onClick={() => setLocation("/politique-securite")} className="cursor-pointer focus:bg-accent"><ShieldCheck className="mr-2 h-4 w-4" />Politique de sécurité</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setLocation("/contactez-nous")} className="cursor-pointer focus:bg-accent"><Mail className="mr-2 h-4 w-4" />Contactez-nous</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setLocation("/conditions-utilisation")} className="cursor-pointer focus:bg-accent"><FileText className="mr-2 h-4 w-4" />Conditions d’utilisation</DropdownMenuItem>
+              {platformAccess.data?.platformRole && <DropdownMenuItem onClick={() => setLocation("/plateforme")} className="cursor-pointer focus:bg-accent"><MonitorCog className="mr-2 h-4 w-4" />Console plateforme</DropdownMenuItem>}
+              <DropdownMenuSeparator className="bg-border" />
+              <DropdownMenuItem onClick={logout} className="cursor-pointer text-destructive focus:bg-destructive-soft focus:text-destructive">
                 <LogOut className="mr-2 h-4 w-4" /> Se déconnecter
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -1131,247 +318,40 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       </Sidebar>
 
       <SidebarInset className="min-w-0 bg-background text-foreground">
-        <header className="app-header sticky top-0 z-40 flex min-h-16 items-center gap-3 border-b border-border bg-card/95 px-4 backdrop-blur sm:px-8">
-          <SidebarTrigger className="h-9 w-9 shrink-0 rounded-lg border border-input bg-card text-muted-foreground hover:bg-accent lg:hidden" />
-          <div className="min-w-0">
-            <p className="truncate text-xs font-medium text-faint">
-              {activeGroup?.title ?? "Pilotage"}
-            </p>
-            <p className="truncate text-[17px] font-semibold tracking-tight text-foreground">
-              {activeMenuItem?.label ?? "Vue d’ensemble"}
-            </p>
-          </div>
-          <div className="ml-auto">
-            <HeaderActions
-              canRunBackup={canRunBackup}
-              compact={isMobile}
-              pending={runBackup.isPending}
-              onBackup={() => runBackup.mutate()}
-              notifications={notifications}
-              readNotificationIds={readNotificationIdsState}
-              onNotification={goTo}
-              onMarkNotificationRead={markNotificationRead}
-              onMarkAllNotificationsRead={markAllNotificationsRead}
-              isOnline={isOnline}
-              pendingOfflineSales={pendingCount}
-              hasFailedOfflineSale={offlineSales.some(
-                sale => sale.status === "failed"
-              )}
-              onSync={() => void syncNow()}
-            />
-          </div>
-        </header>
-        <div
-          key={currency}
-          className="min-h-[calc(100vh-4rem)] px-4 py-6 sm:px-8 sm:py-7"
-        >
-          {subscription && !subscription.writable && (
-            <div
-              className="mb-4 rounded-xl border border-destructive/25 bg-destructive-soft px-4 py-3 text-sm text-destructive"
-              role="alert"
-            >
-              {subscription.reason === "suspended"
-                ? "Cet espace est suspendu : les données restent consultables, les nouvelles opérations sont bloquées. Contactez le support."
-                : "La période d’essai est terminée : les données restent consultables et exportables. Choisissez une offre pour continuer à enregistrer des opérations."}{" "}
-              {hasPermission("settings.manage") && (
-                <Link
-                  href="/parametres/abonnement"
-                  className="font-semibold underline"
-                >
-                  Voir l’abonnement
-                </Link>
-              )}
-            </div>
-          )}
-          {user && !user.emailVerifiedAt && <EmailVerificationBanner />}
-          {/* Le contenu de chaque page arrive en fondu, avec une légère montée. */}
-          <div key={location} className="animate-enter">
-            {children}
-          </div>
-        </div>
+        <header className="app-header sticky top-0 z-40 flex h-16 items-center gap-3 border-b border-border bg-background/95 px-4 text-foreground shadow-sm backdrop-blur sm:px-6"><div className="lg:hidden"><SidebarTrigger className="h-9 w-9 rounded-lg border border-border bg-card text-muted-foreground hover:bg-accent" /></div><DashboardHeaderTitle activeMenuItem={activeMenuItem} /><Button type="button" variant="outline" onClick={() => setNavigationOpen(true)} className="ml-2 hidden h-9 min-w-36 justify-start gap-2 border-border bg-card px-3 text-muted-foreground shadow-none sm:flex" aria-label="Rechercher une page (Ctrl+K)"><Search className="h-4 w-4" /><span className="flex-1 text-left">Rechercher…</span><kbd className="rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-faint">⌘K</kbd></Button><Button type="button" variant="outline" size="icon" onClick={() => setNavigationOpen(true)} className="ml-1 h-9 w-9 border-border bg-card text-muted-foreground sm:hidden" aria-label="Rechercher une page"><Search className="h-4 w-4" /></Button>{isAdmin && <div className="hidden min-w-0 sm:block"><Select value={activeWarehouseId ? String(activeWarehouseId) : ""} onValueChange={value => setActiveWarehouseId(Number(value))} disabled={!warehouseReady || !warehouses.length}><SelectTrigger aria-label="Entrepôt actif" className="h-9 min-w-[190px] border-border bg-card text-foreground"><span className="flex min-w-0 items-center gap-2"><Warehouse className="h-4 w-4 shrink-0 text-primary" /><SelectValue placeholder="Entrepôt actif" /></span></SelectTrigger><SelectContent>{warehouses.map(warehouse => <SelectItem key={warehouse.id} value={String(warehouse.id)}>{warehouse.name}{warehouse.isDefault ? " · Principal" : ""}</SelectItem>)}</SelectContent></Select></div>}<div className="ml-auto flex items-center gap-2"><ThemeHeaderToggle /><HeaderActions canRunBackup={canRunBackup} compact={isMobile} pending={runBackup.isPending} onBackup={() => runBackup.mutate()} notifications={notifications} readNotificationIds={readNotificationIdsState} onNotification={setLocation} onMarkNotificationRead={markNotificationRead} onMarkAllNotificationsRead={markAllNotificationsRead} isOnline={isOnline} pendingOfflineSales={pendingCount} hasFailedOfflineSale={offlineSales.some(sale => sale.status === "failed")} onSync={() => void syncNow()} /></div></header>
+        <main key={currency} className="min-h-screen bg-background p-3 sm:p-5 lg:p-6">{/* Contenu de chaque page en fondu, avec une légère montée. */}<div key={location} className="animate-enter">{children}</div></main>
       </SidebarInset>
+      <CommandDialog open={navigationOpen} onOpenChange={setNavigationOpen} title="Rechercher dans StockPilot" description="Accéder à une page autorisée dans votre espace." className="sm:max-w-xl">
+        <CommandInput placeholder="Rechercher une page…" />
+        <CommandList className="max-h-[min(60vh,420px)] p-2">
+          <CommandEmpty>Aucune page trouvée.</CommandEmpty>
+          {visibleMenuSections.map(section => (
+            <CommandGroup key={section.label} heading={section.label}>
+              {section.items.map(item => (
+                <CommandItem key={item.path} value={`${item.label} ${item.path}`} onSelect={() => navigateFromPalette(item.path)} className="rounded-md py-2.5">
+                  <item.icon className="h-4 w-4" />
+                  <span>{item.label}</span>
+                  <span className="ml-auto text-xs text-faint">{item.path}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          ))}
+        </CommandList>
+      </CommandDialog>
     </>
   );
 }
 
-function HeaderActions({
-  canRunBackup,
-  compact = false,
-  pending,
-  onBackup,
-  notifications,
-  readNotificationIds,
-  onNotification,
-  onMarkNotificationRead,
-  onMarkAllNotificationsRead,
-  isOnline,
-  pendingOfflineSales,
-  hasFailedOfflineSale,
-  onSync,
-}: {
-  canRunBackup: boolean;
-  compact?: boolean;
-  pending: boolean;
-  onBackup: () => void;
-  notifications: Array<{
-    id: string;
-    title: string;
-    detail: string;
-    tone: "amber" | "violet" | "rose";
-    path: string;
-  }>;
-  readNotificationIds: string[];
-  onNotification: (path: string) => void;
-  onMarkNotificationRead: (id: string) => void;
-  onMarkAllNotificationsRead: () => void;
-  isOnline: boolean;
-  pendingOfflineSales: number;
-  hasFailedOfflineSale: boolean;
-  onSync: () => void;
-}) {
-  const unreadCount = unreadNotificationCount(
-    notifications.map(notification => notification.id),
-    readNotificationIds
-  );
+function HeaderActions({ canRunBackup, compact = false, pending, onBackup, notifications, readNotificationIds, onNotification, onMarkNotificationRead, onMarkAllNotificationsRead, isOnline, pendingOfflineSales, hasFailedOfflineSale, onSync }: { canRunBackup: boolean; compact?: boolean; pending: boolean; onBackup: () => void; notifications: Array<{ id: string; title: string; detail: string; tone: "amber" | "violet" | "rose"; path: string }>; readNotificationIds: string[]; onNotification: (path: string) => void; onMarkNotificationRead: (id: string) => void; onMarkAllNotificationsRead: () => void; isOnline: boolean; pendingOfflineSales: number; hasFailedOfflineSale: boolean; onSync: () => void }) {
+  const unreadCount = unreadNotificationCount(notifications.map(notification => notification.id), readNotificationIds);
   const counter = unreadCount > 9 ? "9+" : String(unreadCount);
-  const tones = {
-    amber: "bg-warning-soft text-warning",
-    violet: "bg-info-soft text-info",
-    rose: "bg-destructive-soft text-destructive",
-  };
-  return (
-    <div className="flex items-center gap-2">
-      {(!isOnline || pendingOfflineSales > 0) && (
-        <Button
-          onClick={onSync}
-          disabled={!isOnline}
-          variant="outline"
-          size={compact ? "icon" : "sm"}
-          className={`h-9 border-border bg-card ${hasFailedOfflineSale ? "text-destructive" : !isOnline ? "text-warning" : "text-primary"}`}
-          aria-label={
-            !isOnline
-              ? "Mode hors connexion"
-              : `${pendingOfflineSales} vente(s) à synchroniser`
-          }
-        >
-          {!isOnline ? (
-            <CloudOff className={`h-4 w-4 ${compact ? "" : "mr-2"}`} />
-          ) : (
-            <CloudUpload className={`h-4 w-4 ${compact ? "" : "mr-2"}`} />
-          )}
-          {!compact &&
-            (!isOnline
-              ? "Hors connexion"
-              : `${pendingOfflineSales} à synchroniser`)}
-        </Button>
-      )}
-      {canRunBackup && (
-        <Button
-          onClick={onBackup}
-          disabled={pending}
-          size={compact ? "icon" : "sm"}
-          className="h-9 bg-primary text-primary-foreground hover:bg-primary/90"
-          aria-label="Créer une sauvegarde maintenant"
-        >
-          {pending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Archive className={`h-4 w-4 ${compact ? "" : "mr-2"}`} />
-          )}
-          {!compact && (pending ? "Sauvegarde…" : "Sauvegarder")}
-        </Button>
-      )}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            size="icon"
-            variant="outline"
-            className="relative h-9 w-9 border-border bg-card text-foreground hover:bg-accent"
-            aria-label={`${unreadCount} notification(s) non lue(s)`}
-          >
-            <Bell className="h-4 w-4" />
-            {unreadCount > 0 && (
-              <span className="absolute -right-1.5 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-warning px-1 text-[9px] font-bold leading-none text-warning-foreground shadow-sm">
-                {counter}
-              </span>
-            )}
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align="end"
-          className="w-[340px] border-border bg-card p-0 text-foreground shadow-xl"
-        >
-          <DropdownMenuLabel className="flex items-center justify-between gap-3 px-4 py-3">
-            <span>Notifications</span>
-            {unreadCount > 0 ? (
-              <button
-                type="button"
-                onClick={onMarkAllNotificationsRead}
-                className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-primary hover:underline"
-              >
-                <CheckCheck className="h-3.5 w-3.5" />
-                Tout marquer comme lu
-              </button>
-            ) : (
-              <span className="text-xs font-normal text-faint">
-                Tout est à jour
-              </span>
-            )}
-          </DropdownMenuLabel>
-          <DropdownMenuSeparator className="bg-muted" />
-          {notifications.length ? (
-            <div className="max-h-[360px] overflow-y-auto py-1">
-              {notifications.map(notification => {
-                const unread = !readNotificationIds.includes(notification.id);
-                return (
-                  <DropdownMenuItem
-                    key={notification.id}
-                    onClick={() => {
-                      onMarkNotificationRead(notification.id);
-                      onNotification(notification.path);
-                    }}
-                    className={`cursor-pointer items-start gap-3 px-4 py-3 focus:bg-accent ${unread ? "bg-primary/5" : ""}`}
-                  >
-                    <span
-                      className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg ${tones[notification.tone]}`}
-                    >
-                      <CircleAlert className="h-4 w-4" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-2">
-                        <span
-                          className={`block text-sm text-foreground ${unread ? "font-semibold" : "font-medium"}`}
-                        >
-                          {notification.title}
-                        </span>
-                        {unread && (
-                          <span
-                            className="h-2 w-2 shrink-0 rounded-full bg-primary"
-                            aria-label="Non lue"
-                          />
-                        )}
-                      </span>
-                      <span className="mt-0.5 block text-xs leading-relaxed text-faint">
-                        {notification.detail}
-                      </span>
-                    </span>
-                  </DropdownMenuItem>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="px-5 py-9 text-center">
-              <Bell className="mx-auto h-5 w-5 text-muted-foreground" />
-              <p className="mt-2 text-sm text-foreground">
-                Aucune notification
-              </p>
-              <p className="mt-1 text-xs text-faint">
-                Les alertes importantes apparaîtront ici.
-              </p>
-            </div>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
-  );
+  const tones = { amber: "bg-warning-soft text-warning", violet: "bg-info-soft text-info", rose: "bg-destructive-soft text-destructive" };
+  return <div className="flex items-center gap-2">{(!isOnline || pendingOfflineSales > 0) && <Button onClick={onSync} disabled={!isOnline} variant="outline" size={compact ? "icon" : "sm"} className={`h-9 border-border bg-card ${hasFailedOfflineSale ? "text-destructive" : !isOnline ? "text-warning" : "text-primary"}`} aria-label={!isOnline ? "Mode hors connexion" : `${pendingOfflineSales} vente(s) à synchroniser`}>{!isOnline ? <CloudOff className={`h-4 w-4 ${compact ? "" : "mr-2"}`} /> : <CloudUpload className={`h-4 w-4 ${compact ? "" : "mr-2"}`} />}{!compact && (!isOnline ? "Hors connexion" : `${pendingOfflineSales} à synchroniser`)}</Button>}{canRunBackup && <Button onClick={onBackup} disabled={pending} size={compact ? "icon" : "sm"} className="h-9 bg-primary text-primary-foreground hover:bg-primary/90" aria-label="Créer une sauvegarde maintenant">{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className={`h-4 w-4 ${compact ? "" : "mr-2"}`} />}{!compact && (pending ? "Sauvegarde…" : "Sauvegarder")}</Button>}<DropdownMenu><DropdownMenuTrigger asChild><Button size="icon" variant="outline" className="relative h-9 w-9 border-border bg-card text-foreground hover:bg-accent" aria-label={`${unreadCount} notification(s) non lue(s)`}><Bell className="h-4 w-4" />{unreadCount > 0 && <span className="absolute -right-1.5 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-warning px-1 text-[9px] font-bold leading-none text-warning-foreground shadow-sm">{counter}</span>}</Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-[340px] border-border bg-card p-0 text-foreground shadow-xl"><DropdownMenuLabel className="flex items-center justify-between gap-3 px-4 py-3"><span>Notifications</span>{unreadCount > 0 ? <button type="button" onClick={onMarkAllNotificationsRead} className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-primary hover:underline"><CheckCheck className="h-3.5 w-3.5" />Tout marquer comme lu</button> : <span className="text-xs font-normal text-faint">Tout est à jour</span>}</DropdownMenuLabel><DropdownMenuSeparator className="bg-muted" />{notifications.length ? <div className="max-h-[360px] overflow-y-auto py-1">{notifications.map(notification => { const unread = !readNotificationIds.includes(notification.id); return <DropdownMenuItem key={notification.id} onClick={() => { onMarkNotificationRead(notification.id); onNotification(notification.path); }} className={`cursor-pointer items-start gap-3 px-4 py-3 focus:bg-accent ${unread ? "bg-primary/5" : ""}`}><span className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg ${tones[notification.tone]}`}><CircleAlert className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="flex items-center gap-2"><span className={`block text-sm text-foreground ${unread ? "font-semibold" : "font-medium"}`}>{notification.title}</span>{unread && <span className="h-2 w-2 shrink-0 rounded-full bg-primary" aria-label="Non lue" />}</span><span className="mt-0.5 block text-xs leading-relaxed text-faint">{notification.detail}</span></span></DropdownMenuItem>; })}</div> : <div className="px-5 py-9 text-center"><Bell className="mx-auto h-5 w-5 text-muted-foreground" /><p className="mt-2 text-sm text-foreground">Aucune notification</p><p className="mt-1 text-xs text-faint">Les alertes importantes apparaîtront ici.</p></div>}</DropdownMenuContent></DropdownMenu></div>;
+}
+
+function ThemeHeaderToggle() {
+  const { theme, toggleTheme } = useTheme();
+  if (!toggleTheme) return null;
+  const isDark = theme === "dark";
+  return <Button type="button" size="icon" variant="outline" onClick={toggleTheme} className="h-9 w-9 border-border bg-card text-foreground hover:bg-accent " aria-label={isDark ? "Passer au thème clair" : "Passer au thème sombre"} title={isDark ? "Passer au thème clair" : "Passer au thème sombre"}>{isDark ? <Sun className="h-4 w-4 text-primary" /> : <Moon className="h-4 w-4 text-primary" />}</Button>;
 }

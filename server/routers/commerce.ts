@@ -1,1531 +1,251 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, inArray, ne, or } from "drizzle-orm";
+import { and, desc, eq, inArray, or } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import {
-  agentPayments,
-  agents,
-  auditLogs,
-  customers,
-  products,
-  remunerationProfiles,
-  saleCommissions,
-  sellerCredentials,
-  saleItems,
-  saleReturns,
-  salePayments,
-  sales,
-  saleSettings,
-  users,
+  agentPayments, agents, auditLogs, customers, paymentDueSchedules, paymentDueTemplates, productPriceTiers, products, remunerationProfiles, saleCommissions, saleReturns, sellerCredentials,
+  sellerWarehouseAssignments, salesAgentWarehouseAssignments, saleItems, salePayments, sales, saleSettings, stockAlerts, stockMovements, users, warehouses,
 } from "../../drizzle/schema";
+import { commissionCents, priceForCustomer, priceForQuantityTier } from "../commerceRules";
 import { getDb } from "../db";
-import { protectedProcedure, router, permissionProcedure } from "../_core/trpc";
+import { adminProcedure, permissionProcedure, protectedProcedure, router } from "../_core/trpc";
+import { resultingStock, signedMovementQuantity } from "../stockRules";
 import { hashPassword } from "../passwords";
 import { storagePut } from "../storage";
 import { customerCanBeRemoved } from "../customerRules";
+import { calculateCommercialTotals } from "../commercialTotals";
 import { MAX_CENTS } from "../numericLimits";
 import { companyScope } from "../companyScope";
-import { conflictOr } from "../dbErrors";
-import { emailIsTaken, revokeUserSessions } from "../authSessions";
-import { safeFileUrl } from "../inputRules";
-import { assertPlanLimit } from "../subscription";
-import { companyTimezone, isValidTimezone, monthKey } from "../companyTime";
+import { debitWarehouseStock, getDefaultWarehouse, getScopedWarehouse } from "../warehouseStock";
+import { assertSellerWarehouseAccess } from "../sellerWarehouseAccess";
+import { canCoordinateSaleFromWarehouse, hasValidCommercialScopeSelection, type SalesAgentWarehouseScope } from "../salesAgentWarehouseScope";
+import { materializePaymentDueOccurrences } from "./paymentDues";
+import { initialMonthlyDueAt, normalizeReminderDays } from "../paymentDueRules";
+import { assertSubscriptionQuota } from "../subscriptionQuotas";
 
-const optionalAlphaReference = z
-  .string()
-  .trim()
-  .max(80)
-  .regex(/^[A-Za-z0-9]*$/, "La référence doit être alphanumérique.")
-  .nullable();
-const customerInput = z.object({
-  name: z.string().trim().min(2).max(180),
-  otherReference: optionalAlphaReference,
-  type: z.enum(["ordinary", "wholesale"]),
-  email: z.string().trim().email().max(320).nullable(),
-  phone: z.string().trim().max(50).nullable(),
-  address: z.string().trim().max(1000).nullable(),
-  taxNumber: z.string().trim().max(100).nullable(),
-  notes: z.string().trim().max(2000).nullable(),
-});
-const agentInput = z.object({
-  name: z.string().trim().min(2).max(160),
-  type: z.enum(["sales_agent", "cashier"]),
-  email: z.string().trim().email().max(320).nullable(),
-  phone: z.string().trim().max(50).nullable(),
-  active: z.boolean(),
-});
-const remunerationInput = z.object({
-  remunerationMode: z.enum(["fixed", "commission", "fixed_plus_commission"]),
-  fixedMonthlyCents: z.number().int().min(0).max(MAX_CENTS),
-  commissionBasis: z.enum(["revenue", "net_profit"]),
-  rateBasisPoints: z.number().int().min(0).max(10000),
-  active: z.boolean(),
-});
-const sellerInput = z.object({
-  name: z.string().trim().min(2).max(160),
-  email: z.string().trim().email().max(320),
-  phone: z.string().trim().max(50).nullable().optional(),
-  username: z
-    .string()
-    .trim()
-    .min(3)
-    .max(80)
-    .regex(/^[a-zA-Z0-9._-]+$/),
-  password: z.string().min(8).max(128),
-  remuneration: remunerationInput,
-});
-const vatSettingsInput = z.object({
-  vatEnabled: z.boolean().optional(),
-  vatRateBasisPoints: z.number().int().min(0).max(10000).optional(),
-});
-const companyIdentityInput = z.object({
-  companyName: z.string().trim().min(2).max(200).optional(),
-  companyLogoUrl: safeFileUrl.nullable().optional(),
-  companySignatureUrl: safeFileUrl.nullable().optional(),
-  companySignatureLabel: z.string().trim().min(2).max(120).optional(),
-  companyAgreementLabel: z.string().trim().min(2).max(120).optional(),
-  companySignatureAlignment: z.enum(["left", "center", "right"]).optional(),
-  companyAddress: z.string().trim().max(1500).nullable().optional(),
-  companyPhone: z.string().trim().max(50).nullable().optional(),
-  companyEmail: z.string().trim().email().max(320).nullable().optional(),
-  companyFooter: z.string().trim().max(1000).nullable().optional(),
-});
-const printingInput = z.object({
-  ticketHeader: z.string().trim().min(2).max(160).optional(),
-  ticketFooter: z.string().trim().min(2).max(240).optional(),
-  ticketWidthMm: z.enum(["58", "80"]).optional(),
-  printerName: z.string().trim().min(2).max(120).optional(),
-  printerType: z.enum(["browser", "thermal"]).optional(),
-});
+const optionalAlphaReference = z.string().trim().max(80).regex(/^[A-Za-z0-9]*$/, "La référence doit être alphanumérique.").nullable();
+const customerInput = z.object({ name: z.string().trim().min(2).max(180), otherReference: optionalAlphaReference, type: z.enum(["ordinary", "wholesale"]), email: z.string().trim().email().max(320).nullable(), phone: z.string().trim().max(50).nullable(), address: z.string().trim().max(1000).nullable(), taxNumber: z.string().trim().max(100).nullable(), notes: z.string().trim().max(2000).nullable() });
+const salaryScheduleInput = z.object({ templateId: z.number().int().positive().nullable().optional(), dueDay: z.number().int().min(1).max(31).nullable().optional() }).nullable().optional();
+const agentInput = z.object({ name: z.string().trim().min(2).max(160), type: z.enum(["sales_agent", "cashier"]), email: z.string().trim().email().max(320).nullable(), phone: z.string().trim().max(50).nullable(), active: z.boolean(), salarySchedule: salaryScheduleInput });
+const remunerationInput = z.object({ remunerationMode: z.enum(["fixed", "commission", "fixed_plus_commission"]), fixedMonthlyCents: z.number().int().min(0), commissionBasis: z.enum(["revenue", "net_profit"]), rateBasisPoints: z.number().int().min(0).max(10000), active: z.boolean() });
+const sellerInput = z.object({ name: z.string().trim().min(2).max(160), email: z.string().trim().email().max(320), phone: z.string().trim().max(50).nullable().optional(), username: z.string().trim().min(3).max(80).regex(/^[a-zA-Z0-9._-]+$/), password: z.string().min(8).max(128), remuneration: remunerationInput, salarySchedule: salaryScheduleInput });
+const vatSettingsInput = z.object({ vatEnabled: z.boolean().optional(), vatRateBasisPoints: z.number().int().min(0).max(10000).optional() });
+const companyIdentityInput = z.object({ companyName: z.string().trim().min(2).max(200).optional(), companyLogoUrl: z.string().max(1024).nullable().optional(), companySignatureUrl: z.string().max(1024).nullable().optional(), companySignatureLabel: z.string().trim().min(2).max(120).optional(), companyAgreementLabel: z.string().trim().min(2).max(120).optional(), companySignatureAlignment: z.enum(["left", "center", "right"]).optional(), companyAddress: z.string().trim().max(1500).nullable().optional(), companyPhone: z.string().trim().max(50).nullable().optional(), companyEmail: z.string().trim().email().max(320).nullable().optional(), companyFooter: z.string().trim().max(1000).nullable().optional(), ticketHeader: z.string().trim().min(2).max(160).optional(), ticketFooter: z.string().trim().min(2).max(240).optional(), ticketWidthMm: z.enum(["58", "80"]).optional() });
 
 async function dbOrThrow() {
   const db = await getDb();
-  if (!db)
-    throw new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: "Base de données indisponible.",
-    });
+  if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Base de données indisponible." });
   return db;
 }
 
-async function companySettings(db: any, companyId: number | null | undefined) {
-  return (
-    (
-      await db
-        .select()
-        .from(saleSettings)
-        .where(companyScope(saleSettings.companyId, companyId ?? null))
-        .limit(1)
-    )[0] ?? null
-  );
+async function companySettings(db: any, companyId: number) {
+  const query = db.select().from(saleSettings);
+  if (typeof query.where !== "function") return query[0] ?? null;
+  return (await query.where(companyScope(saleSettings.companyId, companyId)).limit(1))[0] ?? null;
 }
 
-async function audit(
-  actor: { id: number; companyId: number | null },
-  action: string,
-  entityType: string,
-  entityId: string | number | null,
-  detail: string
-) {
+async function audit(actorUserId: number, action: string, entityType: string, entityId: string | number | null, detail: string) {
   const db = await dbOrThrow();
-  await db.insert(auditLogs).values({
-    companyId: actor.companyId,
-    actorUserId: actor.id,
-    action,
-    entityType,
-    entityId: entityId === null ? null : String(entityId),
-    detail,
-  });
+  const actor = (await db.select({ companyId: users.companyId }).from(users).where(eq(users.id, actorUserId)).limit(1))[0];
+  if (!actor || actor.companyId == null) throw new TRPCError({ code: "FORBIDDEN", message: "Aucune entreprise active n’est associée à cet acteur." });
+  await db.insert(auditLogs).values({ companyId: actor.companyId, actorUserId, action, entityType, entityId: entityId === null ? null : String(entityId), detail });
 }
 
-async function ensureLoginEmailAvailable(
-  db: Awaited<ReturnType<typeof dbOrThrow>>,
-  email: string,
-  exceptUserId?: number
-) {
-  if (await emailIsTaken(db, email, exceptUserId))
-    throw new TRPCError({
-      code: "CONFLICT",
-      message:
-        "Cette adresse e-mail est déjà utilisée par un compte de connexion.",
-    });
+async function ensureLoginEmailAvailable(db: Awaited<ReturnType<typeof dbOrThrow>>, email: string, exceptUserId?: number) {
+  const normalizedEmail = email.trim().toLowerCase();
+  const accounts = await db.select().from(users);
+  const conflict = accounts.find(account => account.id !== exceptUserId && (account.role === "admin" || account.role === "seller") && account.email?.trim().toLowerCase() === normalizedEmail);
+  if (conflict) throw new TRPCError({ code: "CONFLICT", message: "Cette adresse e-mail est déjà utilisée par un compte de connexion." });
+}
+
+async function attachSalaryScheduleFromTemplate(db: any, input: { templateId?: number | null; dueDay?: number | null } | null | undefined, companyId: number, actorUserId: number, beneficiary: { type: "agent" | "user"; id: number; name: string }) {
+  if (!input?.templateId) return null;
+  const template = (await db.select().from(paymentDueTemplates).where(and(eq(paymentDueTemplates.id, input.templateId), companyScope(paymentDueTemplates.companyId, companyId), eq(paymentDueTemplates.active, true), eq(paymentDueTemplates.scheduleType, "salary"))).limit(1))[0];
+  if (!template) throw new TRPCError({ code: "BAD_REQUEST", message: "Le modèle salarial sélectionné est introuvable ou indisponible." });
+  if (template.recurrence !== "monthly") throw new TRPCError({ code: "BAD_REQUEST", message: "Le modèle associé à un agent doit être mensuel." });
+  const dueDay = input.dueDay ?? template.dueDay;
+  if (!dueDay || dueDay < 1 || dueDay > 31) throw new TRPCError({ code: "BAD_REQUEST", message: "Le jour mensuel du salaire est invalide." });
+  const warehouse = template.warehouseId ? await getScopedWarehouse(db, companyId, template.warehouseId, { requireActive: true }) : await getDefaultWarehouse(db, companyId);
+  const result = await db.insert(paymentDueSchedules).values({ companyId, warehouseId: warehouse.id, scheduleType: "salary", title: `${template.name} — ${beneficiary.name}`, beneficiaryType: beneficiary.type, beneficiaryId: beneficiary.id, templateId: template.id, amountCents: template.amountCents, recurrence: "monthly", dueDay, startsAt: initialMonthlyDueAt(dueDay), reminderDaysJson: template.reminderDaysJson, responsibleUserId: template.responsibleUserId, createdByUserId: actorUserId });
+  const scheduleId = Number(result[0].insertId);
+  const schedule = (await db.select().from(paymentDueSchedules).where(eq(paymentDueSchedules.id, scheduleId)).limit(1))[0]!;
+  await materializePaymentDueOccurrences(db, schedule);
+  return scheduleId;
+}
+
+async function runAtomically<T>(db: any, operation: (transaction: any) => Promise<T>) {
+  return typeof db.transaction === "function" ? db.transaction(operation) : operation(db);
+}
+
+async function listSales(companyId: number, limit = 100) {
+  const db = await dbOrThrow();
+  return db.select({ id: sales.id, invoiceNumber: sales.invoiceNumber, status: sales.status, paymentMethod: sales.paymentMethod, totalCents: sales.totalCents, netProfitCents: sales.netProfitCents, createdAt: sales.createdAt, customerName: customers.name, customerType: customers.type, sellerName: users.name, salesAgentName: agents.name })
+    .from(sales).innerJoin(customers, eq(sales.customerId, customers.id)).leftJoin(users, eq(sales.sellerUserId, users.id)).leftJoin(agents, eq(sales.salesAgentId, agents.id)).where(companyScope(sales.companyId, companyId)).orderBy(desc(sales.createdAt)).limit(limit);
 }
 
 export const commerceRouter = router({
   customers: router({
-    list: protectedProcedure.query(async ({ ctx }) =>
-      (await dbOrThrow())
-        .select()
-        .from(customers)
-        .where(companyScope(customers.companyId, ctx.user.companyId))
-        .orderBy(customers.name)
-    ),
-    invoiceContext: protectedProcedure
-      .input(z.object({ id: z.number().int().positive() }))
-      .query(async ({ ctx, input }) => {
-        const db = await dbOrThrow();
-        const customer = (
-          await db
-            .select()
-            .from(customers)
-            .where(
-              and(
-                eq(customers.id, input.id),
-                companyScope(customers.companyId, ctx.user.companyId)
-              )
-            )
-            .limit(1)
-        )[0];
-        if (!customer)
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Client introuvable.",
-          });
-        const saleRows = await db
-          .select({
-            id: sales.id,
-            status: sales.status,
-            createdAt: sales.createdAt,
-            deliveryAddress: sales.deliveryAddress,
-          })
-          .from(sales)
-          .where(
-            and(
-              eq(sales.customerId, input.id),
-              companyScope(sales.companyId, ctx.user.companyId)
-            )
-          )
-          .orderBy(desc(sales.createdAt))
-          .limit(100);
-        const completedSales = saleRows.filter(sale => sale.status !== "void");
-        const saleIds = completedSales.map(sale => sale.id);
-        const items = saleIds.length
-          ? await db
-              .select()
-              .from(saleItems)
-              .where(inArray(saleItems.saleId, saleIds))
-          : [];
-        const productIds = Array.from(
-          new Set(items.map(item => item.productId))
-        );
-        const productRows = productIds.length
-          ? await db
-              .select()
-              .from(products)
-              .where(
-                and(
-                  inArray(products.id, productIds),
-                  companyScope(products.companyId, ctx.user.companyId)
-                )
-              )
-          : [];
-        const saleDates = new Map(
-          completedSales.map(sale => [sale.id, sale.createdAt])
-        );
-        const grouped = new Map<
-          number,
-          {
-            productId: number;
-            purchaseCount: number;
-            quantity: number;
-            lastBoughtAt: Date;
-            product: (typeof productRows)[number];
-          }
-        >();
-        for (const item of items) {
-          const product = productRows.find(row => row.id === item.productId);
-          const lastBoughtAt = saleDates.get(item.saleId);
-          if (!product || !lastBoughtAt || product.quantity <= 0) continue;
-          const current = grouped.get(item.productId);
-          if (current) {
-            current.purchaseCount += 1;
-            current.quantity += item.quantity;
-            if (lastBoughtAt > current.lastBoughtAt)
-              current.lastBoughtAt = lastBoughtAt;
-          } else
-            grouped.set(item.productId, {
-              productId: product.id,
-              purchaseCount: 1,
-              quantity: item.quantity,
-              lastBoughtAt,
-              product,
-            });
-        }
-        const suggestions = Array.from(grouped.values())
-          .sort(
-            (a, b) =>
-              b.purchaseCount - a.purchaseCount ||
-              b.lastBoughtAt.getTime() - a.lastBoughtAt.getTime()
-          )
-          .slice(0, 6)
-          .map(item => ({
-            productId: item.productId,
-            name: item.product.name,
-            reference: item.product.reference,
-            availableQuantity: item.product.quantity,
-            purchaseCount: item.purchaseCount,
-            quantity: item.quantity,
-            lastBoughtAt: item.lastBoughtAt,
-          }));
-        return {
-          deliveryAddress:
-            completedSales.find(sale => sale.deliveryAddress?.trim())
-              ?.deliveryAddress ??
-            customer.address ??
-            null,
-          suggestions,
-        };
-      }),
-    get: protectedProcedure
-      .input(z.object({ id: z.number().int().positive() }))
-      .query(async ({ ctx, input }) => {
-        const db = await dbOrThrow();
-        const customer = (
-          await db
-            .select()
-            .from(customers)
-            .where(
-              and(
-                eq(customers.id, input.id),
-                companyScope(customers.companyId, ctx.user.companyId)
-              )
-            )
-            .limit(1)
-        )[0];
-        if (!customer)
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Client introuvable.",
-          });
-        const invoices = await db
-          .select({
-            id: sales.id,
-            invoiceNumber: sales.invoiceNumber,
-            status: sales.status,
-            totalCents: sales.totalCents,
-            amountPaidCents: sales.amountPaidCents,
-            createdAt: sales.createdAt,
-          })
-          .from(sales)
-          .where(
-            and(
-              eq(sales.customerId, input.id),
-              companyScope(sales.companyId, ctx.user.companyId)
-            )
-          )
-          .orderBy(desc(sales.createdAt))
-          .limit(30);
-        const totalSalesCents = invoices.reduce(
-          (sum, invoice) => sum + invoice.totalCents,
-          0
-        );
-        const outstandingCents = invoices.reduce(
-          (sum, invoice) =>
-            sum + Math.max(0, invoice.totalCents - invoice.amountPaidCents),
-          0
-        );
-        return {
-          customer,
-          invoices,
-          summary: {
-            invoiceCount: invoices.length,
-            totalSalesCents,
-            outstandingCents,
-            lastInvoiceAt: invoices[0]?.createdAt ?? null,
-          },
-        };
-      }),
-    create: permissionProcedure("customers.manage")
-      .input(customerInput)
-      .mutation(async ({ ctx, input }) => {
-        const db = await dbOrThrow();
-        const result = await db
-          .insert(customers)
-          .values({ ...input, companyId: ctx.user.companyId });
-        const id = Number(result[0].insertId);
-        await audit(
-          ctx.user,
-          "Création",
-          "Client",
-          id,
-          `Client ${input.name} créé`
-        );
-        return { id };
-      }),
-    update: permissionProcedure("customers.manage")
-      .input(customerInput.extend({ id: z.number().int().positive() }))
-      .mutation(async ({ ctx, input }) => {
-        const db = await dbOrThrow();
-        const { id, ...data } = input;
-        await db
-          .update(customers)
-          .set(data)
-          .where(
-            and(
-              eq(customers.id, id),
-              companyScope(customers.companyId, ctx.user.companyId)
-            )
-          );
-        await audit(
-          ctx.user,
-          "Modification",
-          "Client",
-          id,
-          `Client ${data.name} modifié`
-        );
-        return { success: true };
-      }),
-    remove: permissionProcedure("customers.manage")
-      .input(z.object({ id: z.number().int().positive() }))
-      .mutation(async ({ ctx, input }) => {
-        const db = await dbOrThrow();
-        const current = (
-          await db
-            .select()
-            .from(customers)
-            .where(
-              and(
-                eq(customers.id, input.id),
-                companyScope(customers.companyId, ctx.user.companyId)
-              )
-            )
-            .limit(1)
-        )[0];
-        if (!current)
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Client introuvable.",
-          });
-        const invoices = await db
-          .select({ id: sales.id })
-          .from(sales)
-          .where(
-            and(
-              eq(sales.customerId, input.id),
-              companyScope(sales.companyId, ctx.user.companyId)
-            )
-          )
-          .limit(1);
-        if (!customerCanBeRemoved(invoices.length))
-          throw new TRPCError({
-            code: "PRECONDITION_FAILED",
-            message:
-              "Ce client est lié à des factures et ne peut pas être supprimé.",
-          });
-        await db
-          .delete(customers)
-          .where(
-            and(
-              eq(customers.id, input.id),
-              companyScope(customers.companyId, ctx.user.companyId)
-            )
-          );
-        await audit(
-          ctx.user,
-          "Suppression",
-          "Client",
-          input.id,
-          `Client ${current.name} supprimé`
-        );
-        return { success: true };
-      }),
+    list: permissionProcedure("customers.view").query(async ({ ctx }) => (await dbOrThrow()).select().from(customers).where(companyScope(customers.companyId, ctx.user.companyId)).orderBy(customers.name)),
+    invoiceContext: permissionProcedure("customers.view").input(z.object({ id: z.number().int().positive() })).query(async ({ ctx, input }) => {
+      const db = await dbOrThrow();
+      const customer = (await db.select().from(customers).where(and(eq(customers.id, input.id), companyScope(customers.companyId, ctx.user.companyId))).limit(1))[0];
+      if (!customer) throw new TRPCError({ code: "NOT_FOUND", message: "Client introuvable." });
+      const saleRows = await db.select({ id: sales.id, status: sales.status, createdAt: sales.createdAt, deliveryAddress: sales.deliveryAddress }).from(sales).where(and(eq(sales.customerId, input.id), companyScope(sales.companyId, ctx.user.companyId))).orderBy(desc(sales.createdAt)).limit(100);
+      const completedSales = saleRows.filter(sale => sale.status !== "void");
+      const saleIds = completedSales.map(sale => sale.id);
+      const items = saleIds.length ? await db.select().from(saleItems).where(inArray(saleItems.saleId, saleIds)) : [];
+      const productIds = Array.from(new Set(items.map(item => item.productId)));
+      const productRows = productIds.length ? await db.select().from(products).where(and(inArray(products.id, productIds), companyScope(products.companyId, ctx.user.companyId))) : [];
+      const saleDates = new Map(completedSales.map(sale => [sale.id, sale.createdAt]));
+      const grouped = new Map<number, { productId: number; purchaseCount: number; quantity: number; lastBoughtAt: Date; product: typeof productRows[number] }>();
+      for (const item of items) {
+        const product = productRows.find(row => row.id === item.productId);
+        const lastBoughtAt = saleDates.get(item.saleId);
+        if (!product || !lastBoughtAt || product.quantity <= 0) continue;
+        const current = grouped.get(item.productId);
+        if (current) { current.purchaseCount += 1; current.quantity += item.quantity; if (lastBoughtAt > current.lastBoughtAt) current.lastBoughtAt = lastBoughtAt; }
+        else grouped.set(item.productId, { productId: product.id, purchaseCount: 1, quantity: item.quantity, lastBoughtAt, product });
+      }
+      const suggestions = Array.from(grouped.values()).sort((a, b) => b.purchaseCount - a.purchaseCount || b.lastBoughtAt.getTime() - a.lastBoughtAt.getTime()).slice(0, 6).map(item => ({ productId: item.productId, name: item.product.name, reference: item.product.reference, availableQuantity: item.product.quantity, purchaseCount: item.purchaseCount, quantity: item.quantity, lastBoughtAt: item.lastBoughtAt }));
+      return { deliveryAddress: completedSales.find(sale => sale.deliveryAddress?.trim())?.deliveryAddress ?? customer.address ?? null, suggestions };
+    }),
+    get: permissionProcedure("customers.view").input(z.object({ id: z.number().int().positive() })).query(async ({ ctx, input }) => {
+      const db = await dbOrThrow();
+      const customer = (await db.select().from(customers).where(and(eq(customers.id, input.id), companyScope(customers.companyId, ctx.user.companyId))).limit(1))[0];
+      if (!customer) throw new TRPCError({ code: "NOT_FOUND", message: "Client introuvable." });
+      const invoices = await db.select({ id: sales.id, invoiceNumber: sales.invoiceNumber, status: sales.status, totalCents: sales.totalCents, amountPaidCents: sales.amountPaidCents, createdAt: sales.createdAt }).from(sales).where(and(eq(sales.customerId, input.id), companyScope(sales.companyId, ctx.user.companyId))).orderBy(desc(sales.createdAt)).limit(30);
+      const totalSalesCents = invoices.reduce((sum, invoice) => sum + invoice.totalCents, 0);
+      const outstandingCents = invoices.reduce((sum, invoice) => sum + Math.max(0, invoice.totalCents - invoice.amountPaidCents), 0);
+      return { customer, invoices, summary: { invoiceCount: invoices.length, totalSalesCents, outstandingCents, lastInvoiceAt: invoices[0]?.createdAt ?? null } };
+    }),
+    create: permissionProcedure("customers.manage").input(customerInput).mutation(async ({ ctx, input }) => { const db = await dbOrThrow(); const result = await db.insert(customers).values({ ...input, companyId: ctx.user.companyId }); const id = Number(result[0].insertId); await audit(ctx.user.id, "Création", "Client", id, `Client ${input.name} créé`); return { id }; }),
+    update: permissionProcedure("customers.manage").input(customerInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await dbOrThrow(); const { id, ...data } = input; await db.update(customers).set(data).where(and(eq(customers.id, id), companyScope(customers.companyId, ctx.user.companyId))); await audit(ctx.user.id, "Modification", "Client", id, `Client ${data.name} modifié`); return { success: true }; }),
+    remove: permissionProcedure("customers.manage").input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await dbOrThrow(); const current = (await db.select().from(customers).where(and(eq(customers.id, input.id), companyScope(customers.companyId, ctx.user.companyId))).limit(1))[0]; if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Client introuvable." }); const invoices = await db.select({ id: sales.id }).from(sales).where(and(eq(sales.customerId, input.id), companyScope(sales.companyId, ctx.user.companyId))).limit(1); if (!customerCanBeRemoved(invoices.length)) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Ce client est lié à des factures et ne peut pas être supprimé." }); await db.delete(customers).where(and(eq(customers.id, input.id), companyScope(customers.companyId, ctx.user.companyId))); await audit(ctx.user.id, "Suppression", "Client", input.id, `Client ${current.name} supprimé`); return { success: true }; }),
+  }),
+  documentParticipants: permissionProcedure("team.view").input(z.object({ warehouseId: z.number().int().positive().optional() }).optional()).query(async ({ ctx, input }) => {
+    const db = await dbOrThrow();
+    if (input?.warehouseId) await getScopedWarehouse(db, ctx.user.companyId, input.warehouseId, { requireActive: true });
+    const [sellerRows, agentRows, commercialAssignments] = await Promise.all([
+      db.select({ id: users.id, name: users.name }).from(users).where(and(eq(users.role, "seller"), companyScope(users.companyId, ctx.user.companyId))).orderBy(users.name),
+      db.select({ id: agents.id, name: agents.name, type: agents.type, warehouseScope: agents.warehouseScope }).from(agents).where(companyScope(agents.companyId, ctx.user.companyId)).orderBy(agents.name),
+      db.select({ agentId: salesAgentWarehouseAssignments.agentId, warehouseId: salesAgentWarehouseAssignments.warehouseId }).from(salesAgentWarehouseAssignments).where(companyScope(salesAgentWarehouseAssignments.companyId, ctx.user.companyId)),
+    ]);
+    return [
+      ...sellerRows.map(seller => ({ key: `seller:${seller.id}` as const, name: seller.name || "Vendeur", role: "Vendeur" as const })),
+      ...agentRows.filter(agent => agent.type !== "sales_agent" || !input?.warehouseId || canCoordinateSaleFromWarehouse(agent.warehouseScope as SalesAgentWarehouseScope, commercialAssignments.filter(assignment => assignment.agentId === agent.id).map(assignment => assignment.warehouseId), input.warehouseId)).map(agent => ({ key: `agent:${agent.id}` as const, name: agent.name, role: agent.type === "cashier" ? ("Caissier" as const) : ("Agent commercial" as const) })),
+    ];
   }),
   agents: router({
-    list: protectedProcedure.query(async ({ ctx }) =>
-      (await dbOrThrow())
-        .select()
-        .from(agents)
-        .where(companyScope(agents.companyId, ctx.user.companyId))
-        .orderBy(agents.name)
-    ),
-    detail: permissionProcedure("team.view")
-      .input(
-        z.object({
-          beneficiaryType: z.enum(["user", "agent"]),
-          id: z.number().int().positive(),
-        })
-      )
-      .query(async ({ ctx, input }) => {
-        const db = await dbOrThrow();
-        const isSeller = input.beneficiaryType === "user";
-        const [source] = isSeller
-          ? await db
-              .select()
-              .from(users)
-              .where(
-                and(
-                  eq(users.id, input.id),
-                  ne(users.role, "admin"),
-                  companyScope(users.companyId, ctx.user.companyId)
-                )
-              )
-              .limit(1)
-          : await db
-              .select()
-              .from(agents)
-              .where(
-                and(
-                  eq(agents.id, input.id),
-                  companyScope(agents.companyId, ctx.user.companyId)
-                )
-              )
-              .limit(1);
-        if (!source)
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Agent introuvable.",
-          });
-        const credential = isSeller
-          ? ((
-              await db
-                .select()
-                .from(sellerCredentials)
-                .where(eq(sellerCredentials.userId, input.id))
-                .limit(1)
-            )[0] ?? null)
-          : null;
-        const [profile] = await db
-          .select()
-          .from(remunerationProfiles)
-          .where(
-            and(
-              eq(remunerationProfiles.beneficiaryType, input.beneficiaryType),
-              eq(remunerationProfiles.beneficiaryId, input.id),
-              companyScope(remunerationProfiles.companyId, ctx.user.companyId)
-            )
-          )
-          .limit(1);
-        const [commissionRows, paymentRows, saleRows] = await Promise.all([
-          db
-            .select()
-            .from(saleCommissions)
-            .where(
-              and(
-                eq(saleCommissions.beneficiaryType, input.beneficiaryType),
-                eq(saleCommissions.beneficiaryId, input.id)
-              )
-            )
-            .orderBy(desc(saleCommissions.createdAt)),
-          db
-            .select()
-            .from(agentPayments)
-            .where(
-              and(
-                eq(agentPayments.beneficiaryType, input.beneficiaryType),
-                eq(agentPayments.beneficiaryId, input.id),
-                companyScope(agentPayments.companyId, ctx.user.companyId)
-              )
-            )
-            .orderBy(desc(agentPayments.paidAt)),
-          isSeller
-            ? db
-                .select()
-                .from(sales)
-                .where(
-                  and(
-                    eq(sales.sellerUserId, input.id),
-                    companyScope(sales.companyId, ctx.user.companyId)
-                  )
-                )
-                .orderBy(desc(sales.createdAt))
-                .limit(40)
-            : db
-                .select()
-                .from(sales)
-                .where(
-                  and(
-                    or(
-                      eq(sales.salesAgentId, input.id),
-                      eq(sales.cashierId, input.id)
-                    ),
-                    companyScope(sales.companyId, ctx.user.companyId)
-                  )
-                )
-                .orderBy(desc(sales.createdAt))
-                .limit(40),
-        ]);
-        const customerIds = Array.from(
-          new Set(
-            saleRows
-              .map(sale => sale.customerId)
-              .filter((id): id is number => id !== null)
-          )
-        );
-        const customerRows = customerIds.length
-          ? await db
-              .select()
-              .from(customers)
-              .where(inArray(customers.id, customerIds))
-          : [];
-        const saleById = new Map(saleRows.map(sale => [sale.id, sale]));
-        const timezone = await companyTimezone(db, ctx.user.companyId);
-        const currentPeriod = monthKey(new Date(), timezone);
-        const activeSales = saleRows.filter(sale => sale.status !== "void");
-        const commissionCents = commissionRows.reduce(
-          (sum, item) => sum + item.commissionCents,
-          0
-        );
-        const paidCents = paymentRows.reduce(
-          (sum, item) => sum + item.amountCents,
-          0
-        );
-        const monthlyCommissionCents = commissionRows
-          .filter(item => monthKey(item.createdAt, timezone) === currentPeriod)
-          .reduce((sum, item) => sum + item.commissionCents, 0);
-        const monthlyPaidCents = paymentRows
-          .filter(item => item.periodLabel === currentPeriod)
-          .reduce((sum, item) => sum + item.amountCents, 0);
-        const role = isSeller
-          ? "Vendeur"
-          : (source as typeof agents.$inferSelect).type === "cashier"
-            ? "Caissier"
-            : "Agent commercial";
-        return {
-          agent: {
-            id: source.id,
-            beneficiaryType: input.beneficiaryType,
-            name: source.name || "Agent",
-            role,
-            email: source.email,
-            phone: isSeller ? source.phone : source.phone,
-            username: credential?.username ?? null,
-            active: source.active,
-            createdAt: source.createdAt,
-          },
-          profile: profile ?? null,
-          summary: {
-            salesCount: activeSales.length,
-            revenueCents: activeSales.reduce(
-              (sum, sale) => sum + sale.totalCents,
-              0
-            ),
-            netProfitCents: activeSales.reduce(
-              (sum, sale) => sum + sale.netProfitCents,
-              0
-            ),
-            commissionCents,
-            paidCents,
-            dueCents: Math.max(
-              0,
-              (profile?.fixedMonthlyCents ?? 0) +
-                monthlyCommissionCents -
-                monthlyPaidCents
-            ),
-            monthlyCommissionCents,
-            monthlyPaidCents,
-          },
-          sales: activeSales.map(sale => ({
-            id: sale.id,
-            invoiceNumber: sale.invoiceNumber,
-            status: sale.status,
-            totalCents: sale.totalCents,
-            netProfitCents: sale.netProfitCents,
-            createdAt: sale.createdAt,
-            customerName:
-              customerRows.find(customer => customer.id === sale.customerId)
-                ?.name ?? "Vente comptoir",
-          })),
-          commissions: commissionRows.slice(0, 30).map(item => ({
-            ...item,
-            invoiceNumber:
-              saleById.get(item.saleId)?.invoiceNumber ?? "Facture supprimée",
-          })),
-          payments: paymentRows.slice(0, 30),
-        };
-      }),
-    create: permissionProcedure("team.manage")
-      .input(agentInput.extend({ remuneration: remunerationInput }))
-      .mutation(async ({ ctx, input }) => {
-        const db = await dbOrThrow();
-        const { remuneration, ...agentData } = input;
-        const result = await db
-          .insert(agents)
-          .values({ ...agentData, companyId: ctx.user.companyId });
-        const id = Number(result[0].insertId);
-        await db.insert(remunerationProfiles).values({
-          beneficiaryType: "agent",
-          beneficiaryId: id,
-          companyId: ctx.user.companyId,
-          ...remuneration,
-        });
-        await audit(
-          ctx.user,
-          "Création",
-          "Agent",
-          id,
-          `Agent ${input.name} créé avec rémunération`
-        );
-        return { id };
-      }),
-    update: permissionProcedure("team.manage")
-      .input(
-        agentInput.extend({
-          id: z.number().int().positive(),
-          remuneration: remunerationInput,
-        })
-      )
-      .mutation(async ({ ctx, input }) => {
-        const db = await dbOrThrow();
-        const { id, remuneration, ...data } = input;
-        await db
-          .update(agents)
-          .set(data)
-          .where(
-            and(
-              eq(agents.id, id),
-              companyScope(agents.companyId, ctx.user.companyId)
-            )
-          );
-        const profile = (
-          await db
-            .select()
-            .from(remunerationProfiles)
-            .where(
-              and(
-                eq(remunerationProfiles.beneficiaryType, "agent"),
-                eq(remunerationProfiles.beneficiaryId, id),
-                companyScope(remunerationProfiles.companyId, ctx.user.companyId)
-              )
-            )
-            .limit(1)
-        )[0];
-        if (profile)
-          await db
-            .update(remunerationProfiles)
-            .set(remuneration)
-            .where(
-              and(
-                eq(remunerationProfiles.id, profile.id),
-                companyScope(remunerationProfiles.companyId, ctx.user.companyId)
-              )
-            );
-        else
-          await db.insert(remunerationProfiles).values({
-            beneficiaryType: "agent",
-            beneficiaryId: id,
-            companyId: ctx.user.companyId,
-            ...remuneration,
-          });
-        await audit(
-          ctx.user,
-          "Modification",
-          "Agent",
-          id,
-          `Agent ${data.name} modifié`
-        );
-        return { success: true };
-      }),
-    remove: permissionProcedure("team.manage")
-      .input(z.object({ id: z.number().int().positive() }))
-      .mutation(async ({ ctx, input }) => {
-        const db = await dbOrThrow();
-        await db
-          .update(agents)
-          .set({ active: false })
-          .where(
-            and(
-              eq(agents.id, input.id),
-              companyScope(agents.companyId, ctx.user.companyId)
-            )
-          );
-        await audit(
-          ctx.user,
-          "Suppression",
-          "Agent",
-          input.id,
-          "Agent désactivé et conservé dans l’historique"
-        );
-        return { success: true };
-      }),
-    convertToSeller: permissionProcedure("team.manage")
-      .input(
-        z.object({
-          id: z.number().int().positive(),
-          email: z.string().trim().email().max(320),
-          username: z
-            .string()
-            .trim()
-            .min(3)
-            .max(80)
-            .regex(/^[a-zA-Z0-9._-]+$/),
-          password: z.string().min(8).max(128),
-          remuneration: remunerationInput,
-        })
-      )
-      .mutation(async ({ ctx, input }) => {
-        const db = await dbOrThrow();
-        const source = (
-          await db
-            .select()
-            .from(agents)
-            .where(
-              and(
-                eq(agents.id, input.id),
-                companyScope(agents.companyId, ctx.user.companyId)
-              )
-            )
-            .limit(1)
-        )[0];
-        if (!source || !source.active)
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Agent actif introuvable.",
-          });
-        await ensureLoginEmailAvailable(db, input.email);
-        await assertPlanLimit(db, ctx.user.companyId, "users");
-        try {
-          const result = await db.insert(users).values({
-            openId: `local_seller_${randomUUID()}`,
-            name: source.name,
-            email: input.email,
-            loginMethod: "password",
-            role: "seller",
-            active: true,
-            companyId: ctx.user.companyId,
-            // Compte créé par l'administrateur, qui en garantit l'adresse.
-            emailVerifiedAt: new Date(),
-          });
-          const userId = Number(result[0].insertId);
-          await db.insert(sellerCredentials).values({
-            userId,
-            username: input.username,
-            passwordHash: await hashPassword(input.password),
-          });
-          await db.insert(remunerationProfiles).values({
-            beneficiaryType: "user",
-            beneficiaryId: userId,
-            companyId: ctx.user.companyId,
-            ...input.remuneration,
-          });
-          await db
-            .update(agents)
-            .set({ active: false })
-            .where(
-              and(
-                eq(agents.id, source.id),
-                companyScope(agents.companyId, ctx.user.companyId)
-              )
-            );
-          await audit(
-            ctx.user,
-            "Conversion",
-            "Agent",
-            source.id,
-            `${source.name} converti en vendeur`
-          );
-          return { id: userId };
-        } catch (error) {
-          conflictOr(
-            error,
-            "Cette adresse e-mail ou cet identifiant interne est déjà utilisé."
-          );
-        }
-      }),
-    convertSellerToAgent: permissionProcedure("team.manage")
-      .input(
-        z.object({
-          id: z.number().int().positive(),
-          type: z.enum(["sales_agent", "cashier"]),
-          phone: z.string().trim().max(50).nullable(),
-          remuneration: remunerationInput,
-        })
-      )
-      .mutation(async ({ ctx, input }) => {
-        if (ctx.user.id === input.id)
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message:
-              "Vous ne pouvez pas convertir votre propre compte vendeur.",
-          });
-        const db = await dbOrThrow();
-        const source = (
-          await db
-            .select()
-            .from(users)
-            .where(
-              and(
-                eq(users.id, input.id),
-                companyScope(users.companyId, ctx.user.companyId)
-              )
-            )
-            .limit(1)
-        )[0];
-        if (!source || source.role !== "seller" || !source.active)
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Vendeur actif introuvable.",
-          });
-        const result = await db.insert(agents).values({
-          companyId: ctx.user.companyId,
-          name: source.name || "Agent",
-          type: input.type,
-          email: source.email,
-          phone: input.phone,
-          active: true,
-        });
-        const agentId = Number(result[0].insertId);
-        await db.insert(remunerationProfiles).values({
-          companyId: ctx.user.companyId,
-          beneficiaryType: "agent",
-          beneficiaryId: agentId,
-          ...input.remuneration,
-        });
-        await db
-          .update(users)
-          .set({ active: false })
-          .where(
-            and(
-              eq(users.id, source.id),
-              companyScope(users.companyId, ctx.user.companyId)
-            )
-          );
-        await revokeUserSessions(db, source.id);
-        await audit(
-          ctx.user,
-          "Conversion",
-          "Vendeur",
-          source.id,
-          `${source.name || "Vendeur"} converti en ${input.type === "cashier" ? "caissier" : "agent commercial"}`
-        );
-        return { id: agentId };
-      }),
+    list: permissionProcedure("team.view").input(z.object({ warehouseId: z.number().int().positive().optional() }).optional()).query(async ({ ctx, input }) => {
+      const db = await dbOrThrow();
+      if (input?.warehouseId) await getScopedWarehouse(db, ctx.user.companyId, input.warehouseId, { requireActive: true });
+      const agentRows = await db.select().from(agents).where(companyScope(agents.companyId, ctx.user.companyId)).orderBy(agents.name);
+      if (!input?.warehouseId) return agentRows;
+      const assignments = await db.select({ agentId: salesAgentWarehouseAssignments.agentId, warehouseId: salesAgentWarehouseAssignments.warehouseId }).from(salesAgentWarehouseAssignments).where(companyScope(salesAgentWarehouseAssignments.companyId, ctx.user.companyId));
+      return agentRows.filter(agent => agent.type !== "sales_agent" || canCoordinateSaleFromWarehouse(agent.warehouseScope as SalesAgentWarehouseScope, assignments.filter(assignment => assignment.agentId === agent.id).map(assignment => assignment.warehouseId), input.warehouseId!));
+    }),
+    detail: permissionProcedure("payroll.manage").input(z.object({ beneficiaryType: z.enum(["user", "agent"]), id: z.number().int().positive(), warehouseId: z.number().int().positive().optional() })).query(async ({ ctx, input }) => {
+      const db = await dbOrThrow();
+      if (input.warehouseId) await getScopedWarehouse(db, ctx.user.companyId, input.warehouseId, { requireActive: true });
+      const isSeller = input.beneficiaryType === "user";
+      const [source] = isSeller ? await db.select().from(users).where(and(eq(users.id, input.id), eq(users.role, "seller"), companyScope(users.companyId, ctx.user.companyId))).limit(1) : await db.select().from(agents).where(and(eq(agents.id, input.id), companyScope(agents.companyId, ctx.user.companyId))).limit(1);
+      if (!source) throw new TRPCError({ code: "NOT_FOUND", message: "Agent introuvable." });
+      const credential = isSeller ? (await db.select().from(sellerCredentials).where(eq(sellerCredentials.userId, input.id)).limit(1))[0] ?? null : null;
+      const [profile] = await db.select().from(remunerationProfiles).where(and(eq(remunerationProfiles.beneficiaryType, input.beneficiaryType), eq(remunerationProfiles.beneficiaryId, input.id), companyScope(remunerationProfiles.companyId, ctx.user.companyId))).limit(1);
+      const [commissionRows, paymentRows, saleRows] = await Promise.all([
+        db.select().from(saleCommissions).where(and(eq(saleCommissions.beneficiaryType, input.beneficiaryType), eq(saleCommissions.beneficiaryId, input.id))).orderBy(desc(saleCommissions.createdAt)),
+        db.select().from(agentPayments).where(and(eq(agentPayments.beneficiaryType, input.beneficiaryType), eq(agentPayments.beneficiaryId, input.id), companyScope(agentPayments.companyId, ctx.user.companyId))).orderBy(desc(agentPayments.paidAt)),
+        isSeller ? db.select().from(sales).where(and(eq(sales.sellerUserId, input.id), companyScope(sales.companyId, ctx.user.companyId), ...(input.warehouseId ? [eq(sales.warehouseId, input.warehouseId)] : []))).orderBy(desc(sales.createdAt)).limit(40) : db.select().from(sales).where(and(or(eq(sales.salesAgentId, input.id), eq(sales.cashierId, input.id)), companyScope(sales.companyId, ctx.user.companyId), ...(input.warehouseId ? [eq(sales.warehouseId, input.warehouseId)] : []))).orderBy(desc(sales.createdAt)).limit(40),
+      ]);
+      const customerIds = Array.from(new Set(saleRows.map(sale => sale.customerId).filter((id): id is number => id !== null)));
+      const customerRows = customerIds.length ? await db.select().from(customers).where(inArray(customers.id, customerIds)) : [];
+      const saleById = new Map(saleRows.map(sale => [sale.id, sale]));
+      const currentPeriod = new Date().toISOString().slice(0, 7);
+      const activeSales = saleRows.filter(sale => sale.status !== "void");
+      const commissionCents = commissionRows.reduce((sum, item) => sum + item.commissionCents, 0);
+      const paidCents = paymentRows.reduce((sum, item) => sum + item.amountCents, 0);
+      const monthlyCommissionCents = commissionRows.filter(item => item.createdAt.toISOString().slice(0, 7) === currentPeriod).reduce((sum, item) => sum + item.commissionCents, 0);
+      const monthlyPaidCents = paymentRows.filter(item => item.periodLabel === currentPeriod).reduce((sum, item) => sum + item.amountCents, 0);
+      const role = isSeller ? "Vendeur" : (source as typeof agents.$inferSelect).type === "cashier" ? "Caissier" : "Agent commercial";
+      return {
+        agent: { id: source.id, beneficiaryType: input.beneficiaryType, name: source.name || "Agent", role, email: source.email, phone: isSeller ? source.phone : source.phone, username: credential?.username ?? null, active: source.active, createdAt: source.createdAt },
+        profile: profile ?? null,
+        summary: { salesCount: activeSales.length, revenueCents: activeSales.reduce((sum, sale) => sum + sale.totalCents, 0), netProfitCents: activeSales.reduce((sum, sale) => sum + sale.netProfitCents, 0), commissionCents, paidCents, dueCents: Math.max(0, (profile?.fixedMonthlyCents ?? 0) + monthlyCommissionCents - monthlyPaidCents), monthlyCommissionCents, monthlyPaidCents },
+        sales: activeSales.map(sale => ({ id: sale.id, invoiceNumber: sale.invoiceNumber, status: sale.status, totalCents: sale.totalCents, netProfitCents: sale.netProfitCents, createdAt: sale.createdAt, customerName: customerRows.find(customer => customer.id === sale.customerId)?.name ?? "Vente comptoir" })),
+        commissions: commissionRows.slice(0, 30).map(item => ({ ...item, invoiceNumber: saleById.get(item.saleId)?.invoiceNumber ?? "Facture supprimée" })),
+        payments: paymentRows.slice(0, 30),
+      };
+    }),
+    create: permissionProcedure("team.manage").input(agentInput.extend({ remuneration: remunerationInput })).mutation(async ({ ctx, input }) => { const db = await dbOrThrow(); const { remuneration, salarySchedule, ...agentData } = input; const id = await runAtomically(db, async tx => { const result = await tx.insert(agents).values({ ...agentData, companyId: ctx.user.companyId }); const createdId = Number(result[0].insertId); await tx.insert(remunerationProfiles).values({ beneficiaryType: "agent", beneficiaryId: createdId, companyId: ctx.user.companyId, ...remuneration }); await attachSalaryScheduleFromTemplate(tx, salarySchedule, ctx.user.companyId, ctx.user.id, { type: "agent", id: createdId, name: input.name }); return createdId; }); await audit(ctx.user.id, "Création", "Agent", id, `Agent ${input.name} créé avec rémunération${salarySchedule?.templateId ? " et échéance liée" : ""}`); return { id }; }),
+    update: permissionProcedure("team.manage").input(agentInput.extend({ id: z.number().int().positive(), remuneration: remunerationInput })).mutation(async ({ ctx, input }) => { const db = await dbOrThrow(); const { id, remuneration, salarySchedule: _salarySchedule, ...data } = input; await db.update(agents).set(data).where(and(eq(agents.id, id), companyScope(agents.companyId, ctx.user.companyId))); const profile = (await db.select().from(remunerationProfiles).where(companyScope(remunerationProfiles.companyId, ctx.user.companyId))).find(item => item.beneficiaryType === "agent" && item.beneficiaryId === id); if (profile) await db.update(remunerationProfiles).set(remuneration).where(eq(remunerationProfiles.id, profile.id)); else await db.insert(remunerationProfiles).values({ beneficiaryType: "agent", beneficiaryId: id, companyId: ctx.user.companyId, ...remuneration }); await audit(ctx.user.id, "Modification", "Agent", id, `Agent ${data.name} modifié`); return { success: true }; }),
+    scope: router({
+      get: adminProcedure.input(z.object({ agentId: z.number().int().positive() })).query(async ({ ctx, input }) => { const db = await dbOrThrow(); const agent = (await db.select({ id: agents.id, warehouseScope: agents.warehouseScope }).from(agents).where(and(eq(agents.id, input.agentId), eq(agents.type, "sales_agent"), companyScope(agents.companyId, ctx.user.companyId))).limit(1))[0]; if (!agent) throw new TRPCError({ code: "NOT_FOUND", message: "Agent commercial introuvable." }); const assignments = await db.select({ warehouseId: salesAgentWarehouseAssignments.warehouseId }).from(salesAgentWarehouseAssignments).where(and(companyScope(salesAgentWarehouseAssignments.companyId, ctx.user.companyId), eq(salesAgentWarehouseAssignments.agentId, input.agentId))); return { warehouseScope: agent.warehouseScope, warehouseIds: assignments.map(assignment => assignment.warehouseId) }; }),
+      save: permissionProcedure("team.manage").input(z.object({ agentId: z.number().int().positive(), warehouseScope: z.enum(["all", "selected", "attribution_only"]), warehouseIds: z.array(z.number().int().positive()).max(100) })).mutation(async ({ ctx, input }) => { const db = await dbOrThrow(); const warehouseIds = input.warehouseIds.filter((id, index, values) => values.indexOf(id) === index); if (!hasValidCommercialScopeSelection(input.warehouseScope, warehouseIds)) throw new TRPCError({ code: "BAD_REQUEST", message: "Sélectionnez au moins un entrepôt pour une portée limitée." }); await db.transaction(async tx => { const agent = (await tx.select({ id: agents.id }).from(agents).where(and(eq(agents.id, input.agentId), eq(agents.type, "sales_agent"), companyScope(agents.companyId, ctx.user.companyId))).limit(1))[0]; if (!agent) throw new TRPCError({ code: "NOT_FOUND", message: "Agent commercial introuvable." }); const selected = warehouseIds.length ? await tx.select({ id: warehouses.id }).from(warehouses).where(and(companyScope(warehouses.companyId, ctx.user.companyId), eq(warehouses.active, true), inArray(warehouses.id, warehouseIds))) : []; if (selected.length !== warehouseIds.length) throw new TRPCError({ code: "BAD_REQUEST", message: "Sélectionnez uniquement des entrepôts actifs de votre entreprise." }); await tx.update(agents).set({ warehouseScope: input.warehouseScope }).where(eq(agents.id, agent.id)); await tx.delete(salesAgentWarehouseAssignments).where(and(companyScope(salesAgentWarehouseAssignments.companyId, ctx.user.companyId), eq(salesAgentWarehouseAssignments.agentId, agent.id))); if (input.warehouseScope === "selected") await tx.insert(salesAgentWarehouseAssignments).values(warehouseIds.map(warehouseId => ({ companyId: ctx.user.companyId!, agentId: agent.id, warehouseId, createdByUserId: ctx.user.id }))); }); await audit(ctx.user.id, "Portée commerciale", "Agent", input.agentId, `${input.warehouseScope} : ${warehouseIds.length} entrepôt(s) sélectionné(s).`); return { success: true, warehouseScope: input.warehouseScope, warehouseIds: input.warehouseScope === "selected" ? warehouseIds : [] }; }),
+    }),
+    remove: permissionProcedure("team.manage").input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const db = await dbOrThrow(); await db.update(agents).set({ active: false }).where(and(eq(agents.id, input.id), companyScope(agents.companyId, ctx.user.companyId))); await audit(ctx.user.id, "Suppression", "Agent", input.id, "Agent désactivé et conservé dans l’historique"); return { success: true }; }),
+    convertToSeller: permissionProcedure("team.manage").input(z.object({ id: z.number().int().positive(), email: z.string().trim().email().max(320), username: z.string().trim().min(3).max(80).regex(/^[a-zA-Z0-9._-]+$/), password: z.string().min(8).max(128), remuneration: remunerationInput })).mutation(async ({ ctx, input }) => { const db = await dbOrThrow(); const source = (await db.select().from(agents).where(and(eq(agents.id, input.id), companyScope(agents.companyId, ctx.user.companyId))).limit(1))[0]; if (!source || !source.active) throw new TRPCError({ code: "NOT_FOUND", message: "Agent actif introuvable." }); await ensureLoginEmailAvailable(db, input.email); try { const result = await db.insert(users).values({ openId: `local_seller_${randomUUID()}`, name: source.name, email: input.email, loginMethod: "password", role: "seller", active: true, companyId: ctx.user.companyId }); const userId = Number(result[0].insertId); await db.insert(sellerCredentials).values({ userId, username: input.username, passwordHash: await hashPassword(input.password) }); await db.insert(remunerationProfiles).values({ beneficiaryType: "user", beneficiaryId: userId, companyId: ctx.user.companyId, ...input.remuneration }); const defaultWarehouse = (await db.select({ id: warehouses.id }).from(warehouses).where(and(companyScope(warehouses.companyId, ctx.user.companyId), eq(warehouses.active, true), eq(warehouses.isDefault, true))).limit(1))[0]; if (defaultWarehouse) await db.insert(sellerWarehouseAssignments).values({ companyId: ctx.user.companyId!, sellerUserId: userId, warehouseId: defaultWarehouse.id, createdByUserId: ctx.user.id }); await db.update(agents).set({ active: false }).where(and(eq(agents.id, source.id), companyScope(agents.companyId, ctx.user.companyId))); await audit(ctx.user.id, "Conversion", "Agent", source.id, `${source.name} converti en vendeur`); return { id: userId }; } catch (error) { if (error instanceof TRPCError) throw error; throw new TRPCError({ code: "CONFLICT", message: "Cette adresse e-mail ou cet identifiant interne est déjà utilisé.", cause: error }); } }),
+    convertSellerToAgent: permissionProcedure("team.manage").input(z.object({ id: z.number().int().positive(), type: z.enum(["sales_agent", "cashier"]), phone: z.string().trim().max(50).nullable(), remuneration: remunerationInput })).mutation(async ({ ctx, input }) => { if (ctx.user.id === input.id) throw new TRPCError({ code: "BAD_REQUEST", message: "Vous ne pouvez pas convertir votre propre compte vendeur." }); const db = await dbOrThrow(); const source = (await db.select().from(users).where(and(eq(users.id, input.id), companyScope(users.companyId, ctx.user.companyId))).limit(1))[0]; if (!source || source.role !== "seller" || !source.active) throw new TRPCError({ code: "NOT_FOUND", message: "Vendeur actif introuvable." }); const result = await db.insert(agents).values({ companyId: ctx.user.companyId, name: source.name || "Agent", type: input.type, email: source.email, phone: input.phone, active: true }); const agentId = Number(result[0].insertId); await db.insert(remunerationProfiles).values({ companyId: ctx.user.companyId, beneficiaryType: "agent", beneficiaryId: agentId, ...input.remuneration }); await db.update(users).set({ active: false }).where(and(eq(users.id, source.id), companyScope(users.companyId, ctx.user.companyId))); await audit(ctx.user.id, "Conversion", "Vendeur", source.id, `${source.name || "Vendeur"} converti en ${input.type === "cashier" ? "caissier" : "agent commercial"}`); return { id: agentId }; }),
   }),
   sellers: router({
-    list: permissionProcedure("team.view").query(async ({ ctx }) => {
-      const db = await dbOrThrow();
-      return db
-        .select({
-          id: users.id,
-          name: users.name,
-          email: users.email,
-          phone: users.phone,
-          active: users.active,
-          role: users.role,
-          username: sellerCredentials.username,
-        })
-        .from(users)
-        .innerJoin(sellerCredentials, eq(sellerCredentials.userId, users.id))
-        .where(
-          and(
-            ne(users.role, "admin"),
-            companyScope(users.companyId, ctx.user.companyId)
-          )
-        )
-        .orderBy(users.name);
+    list: permissionProcedure("team.view").query(async ({ ctx }) => { const db = await dbOrThrow(); const [sellerRows, assignments] = await Promise.all([db.select({ id: users.id, name: users.name, email: users.email, phone: users.phone, active: users.active, username: sellerCredentials.username }).from(users).innerJoin(sellerCredentials, eq(sellerCredentials.userId, users.id)).where(and(eq(users.role, "seller"), companyScope(users.companyId, ctx.user.companyId))).orderBy(users.name), db.select({ sellerUserId: sellerWarehouseAssignments.sellerUserId, warehouseId: sellerWarehouseAssignments.warehouseId }).from(sellerWarehouseAssignments).where(companyScope(sellerWarehouseAssignments.companyId, ctx.user.companyId))]); return sellerRows.map(seller => ({ ...seller, warehouseIds: assignments.filter(assignment => assignment.sellerUserId === seller.id).map(assignment => assignment.warehouseId) })); }),
+    assignments: router({
+      get: permissionProcedure("team.view").input(z.object({ sellerId: z.number().int().positive() })).query(async ({ ctx, input }) => { const db = await dbOrThrow(); const seller = (await db.select({ id: users.id }).from(users).where(and(eq(users.id, input.sellerId), eq(users.role, "seller"), companyScope(users.companyId, ctx.user.companyId))).limit(1))[0]; if (!seller) throw new TRPCError({ code: "NOT_FOUND", message: "Vendeur introuvable." }); return db.select({ warehouseId: sellerWarehouseAssignments.warehouseId }).from(sellerWarehouseAssignments).where(and(companyScope(sellerWarehouseAssignments.companyId, ctx.user.companyId), eq(sellerWarehouseAssignments.sellerUserId, seller.id))); }),
+      save: permissionProcedure("team.manage").input(z.object({ sellerId: z.number().int().positive(), warehouseIds: z.array(z.number().int().positive()).max(100) })).mutation(async ({ ctx, input }) => { const db = await dbOrThrow(); const ids = input.warehouseIds.filter((warehouseId, index, values) => values.indexOf(warehouseId) === index); await db.transaction(async tx => { const seller = (await tx.select({ id: users.id }).from(users).where(and(eq(users.id, input.sellerId), eq(users.role, "seller"), companyScope(users.companyId, ctx.user.companyId))).limit(1))[0]; if (!seller) throw new TRPCError({ code: "NOT_FOUND", message: "Vendeur introuvable." }); const selected = ids.length ? await tx.select({ id: warehouses.id }).from(warehouses).where(and(companyScope(warehouses.companyId, ctx.user.companyId), eq(warehouses.active, true), inArray(warehouses.id, ids))) : []; if (selected.length !== ids.length) throw new TRPCError({ code: "BAD_REQUEST", message: "Sélectionnez uniquement des entrepôts actifs de votre entreprise." }); await tx.delete(sellerWarehouseAssignments).where(and(companyScope(sellerWarehouseAssignments.companyId, ctx.user.companyId), eq(sellerWarehouseAssignments.sellerUserId, seller.id))); if (ids.length) await tx.insert(sellerWarehouseAssignments).values(ids.map(warehouseId => ({ companyId: ctx.user.companyId!, sellerUserId: seller.id, warehouseId, createdByUserId: ctx.user.id }))); }); await audit(ctx.user.id, "Affectations entrepôts", "Vendeur", input.sellerId, `${ids.length} entrepôt(s) attribué(s).`); return { success: true, warehouseIds: ids }; }),
     }),
-    create: permissionProcedure("team.manage")
-      .input(sellerInput)
-      .mutation(async ({ ctx, input }) => {
-        const db = await dbOrThrow();
-        const openId = `local_seller_${randomUUID()}`;
-        await ensureLoginEmailAvailable(db, input.email);
-        await assertPlanLimit(db, ctx.user.companyId, "users");
-        try {
-          const result = await db.insert(users).values({
-            openId,
-            name: input.name,
-            email: input.email,
-            phone: input.phone ?? null,
-            loginMethod: "password",
-            role: "seller",
-            active: true,
-            companyId: ctx.user.companyId,
-            // Compte créé par l'administrateur, qui en garantit l'adresse.
-            emailVerifiedAt: new Date(),
-          });
-          const userId = Number(result[0].insertId);
-          await db.insert(sellerCredentials).values({
-            userId,
-            username: input.username,
-            passwordHash: await hashPassword(input.password),
-          });
-          await db.insert(remunerationProfiles).values({
-            beneficiaryType: "user",
-            beneficiaryId: userId,
-            companyId: ctx.user.companyId,
-            ...input.remuneration,
-          });
-          await audit(
-            ctx.user,
-            "Création",
-            "Vendeur",
-            userId,
-            `Vendeur ${input.name} créé avec accès e-mail`
-          );
-          return { id: userId };
-        } catch (error) {
-          conflictOr(
-            error,
-            "Cette adresse e-mail ou cet identifiant interne est déjà utilisé."
-          );
-        }
-      }),
-    update: permissionProcedure("team.manage")
-      .input(
-        sellerInput.extend({
-          id: z.number().int().positive(),
-          password: z.string().min(8).max(128).optional(),
-        })
-      )
-      .mutation(async ({ ctx, input }) => {
-        const db = await dbOrThrow();
-        const { id, username, password, remuneration, ...userData } = input;
-        const seller = (
-          await db
-            .select()
-            .from(users)
-            .where(
-              and(
-                eq(users.id, id),
-                companyScope(users.companyId, ctx.user.companyId)
-              )
-            )
-            .limit(1)
-        )[0];
-        if (!seller || seller.role === "admin")
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Vendeur introuvable.",
-          });
-        await ensureLoginEmailAvailable(db, userData.email, id);
-        await db
-          .update(users)
-          .set({
-            name: userData.name,
-            email: userData.email,
-            phone: userData.phone ?? null,
-          })
-          .where(
-            and(
-              eq(users.id, id),
-              companyScope(users.companyId, ctx.user.companyId)
-            )
-          );
-        const credential = (
-          await db
-            .select()
-            .from(sellerCredentials)
-            .where(eq(sellerCredentials.userId, id))
-            .limit(1)
-        )[0];
-        if (!credential)
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Identifiants vendeur introuvables.",
-          });
-        const credentialData: { username: string; passwordHash?: string } = {
-          username,
-        };
-        if (password)
-          credentialData.passwordHash = await hashPassword(password);
-        await db
-          .update(sellerCredentials)
-          .set(credentialData)
-          .where(eq(sellerCredentials.id, credential.id));
-        if (
-          password ||
-          userData.email.trim().toLowerCase() !==
-            (seller.email ?? "").trim().toLowerCase()
-        )
-          await revokeUserSessions(db, id);
-        const profile = (
-          await db
-            .select()
-            .from(remunerationProfiles)
-            .where(
-              and(
-                eq(remunerationProfiles.beneficiaryType, "user"),
-                eq(remunerationProfiles.beneficiaryId, id),
-                companyScope(remunerationProfiles.companyId, ctx.user.companyId)
-              )
-            )
-            .limit(1)
-        )[0];
-        if (profile)
-          await db
-            .update(remunerationProfiles)
-            .set(remuneration)
-            .where(
-              and(
-                eq(remunerationProfiles.id, profile.id),
-                companyScope(remunerationProfiles.companyId, ctx.user.companyId)
-              )
-            );
-        else
-          await db.insert(remunerationProfiles).values({
-            beneficiaryType: "user",
-            beneficiaryId: id,
-            companyId: ctx.user.companyId,
-            ...remuneration,
-          });
-        await audit(
-          ctx.user,
-          "Modification",
-          "Vendeur",
-          id,
-          `Vendeur ${input.name} modifié`
-        );
-        return { success: true };
-      }),
-    remove: permissionProcedure("team.manage")
-      .input(z.object({ id: z.number().int().positive() }))
-      .mutation(async ({ ctx, input }) => {
-        if (ctx.user.id === input.id)
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Vous ne pouvez pas désactiver votre propre compte.",
-          });
-        const db = await dbOrThrow();
-        const target = (
-          await db
-            .select({ id: users.id })
-            .from(users)
-            .where(
-              and(
-                eq(users.id, input.id),
-                companyScope(users.companyId, ctx.user.companyId)
-              )
-            )
-            .limit(1)
-        )[0];
-        if (!target)
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Vendeur introuvable.",
-          });
-        await db
-          .update(users)
-          .set({ active: false })
-          .where(
-            and(
-              eq(users.id, target.id),
-              companyScope(users.companyId, ctx.user.companyId)
-            )
-          );
-        await revokeUserSessions(db, target.id);
-        await audit(
-          ctx.user,
-          "Suppression",
-          "Vendeur",
-          input.id,
-          "Vendeur désactivé et conservé dans l’historique"
-        );
-        return { success: true };
-      }),
+    create: permissionProcedure("team.manage").input(sellerInput).mutation(async ({ ctx, input }) => { const db = await dbOrThrow(); const openId = `local_seller_${randomUUID()}`; await ensureLoginEmailAvailable(db, input.email); try { const userId = await runAtomically(db, async tx => { await assertSubscriptionQuota(tx, ctx.user.companyId, "users"); const result = await tx.insert(users).values({ openId, name: input.name, email: input.email, phone: input.phone ?? null, loginMethod: "password", role: "seller", active: true, companyId: ctx.user.companyId }); const createdId = Number(result[0].insertId); await tx.insert(sellerCredentials).values({ userId: createdId, username: input.username, passwordHash: await hashPassword(input.password) }); await tx.insert(remunerationProfiles).values({ beneficiaryType: "user", beneficiaryId: createdId, companyId: ctx.user.companyId, ...input.remuneration }); const defaultWarehouse = (await tx.select({ id: warehouses.id }).from(warehouses).where(and(companyScope(warehouses.companyId, ctx.user.companyId), eq(warehouses.active, true), eq(warehouses.isDefault, true))).limit(1))[0]; if (defaultWarehouse) await tx.insert(sellerWarehouseAssignments).values({ companyId: ctx.user.companyId!, sellerUserId: createdId, warehouseId: defaultWarehouse.id, createdByUserId: ctx.user.id }); await attachSalaryScheduleFromTemplate(tx, input.salarySchedule, ctx.user.companyId, ctx.user.id, { type: "user", id: createdId, name: input.name }); return createdId; }); await audit(ctx.user.id, "Création", "Vendeur", userId, `Vendeur ${input.name} créé avec accès e-mail et dépôt principal attribué${input.salarySchedule?.templateId ? ", et échéance liée" : ""}.`); return { id: userId }; } catch (error) { if (error instanceof TRPCError) throw error; throw new TRPCError({ code: "CONFLICT", message: "Cette adresse e-mail ou cet identifiant interne est déjà utilisé.", cause: error }); } }),
+    update: permissionProcedure("team.manage").input(sellerInput.extend({ id: z.number().int().positive(), password: z.string().min(8).max(128).optional() })).mutation(async ({ ctx, input }) => { const db = await dbOrThrow(); const { id, username, password, remuneration, salarySchedule: _salarySchedule, ...userData } = input; const seller = (await db.select().from(users).where(and(eq(users.id, id), companyScope(users.companyId, ctx.user.companyId))).limit(1))[0]; if (!seller || seller.role !== "seller") throw new TRPCError({ code: "NOT_FOUND", message: "Vendeur introuvable." }); await ensureLoginEmailAvailable(db, userData.email, id); await db.update(users).set({ name: userData.name, email: userData.email, phone: userData.phone ?? null }).where(and(eq(users.id, id), companyScope(users.companyId, ctx.user.companyId))); const credential = (await db.select().from(sellerCredentials).where(eq(sellerCredentials.userId, id)).limit(1))[0]; if (!credential) throw new TRPCError({ code: "NOT_FOUND", message: "Identifiants vendeur introuvables." }); const credentialData: { username: string; passwordHash?: string } = { username }; if (password) credentialData.passwordHash = await hashPassword(password); await db.update(sellerCredentials).set(credentialData).where(eq(sellerCredentials.id, credential.id)); const profile = (await db.select().from(remunerationProfiles).where(companyScope(remunerationProfiles.companyId, ctx.user.companyId))).find(item => item.beneficiaryType === "user" && item.beneficiaryId === id); if (profile) await db.update(remunerationProfiles).set(remuneration).where(eq(remunerationProfiles.id, profile.id)); else await db.insert(remunerationProfiles).values({ beneficiaryType: "user", beneficiaryId: id, companyId: ctx.user.companyId, ...remuneration }); await audit(ctx.user.id, "Modification", "Vendeur", id, `Vendeur ${input.name} modifié`); return { success: true }; }),
+    remove: permissionProcedure("team.manage").input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { if (ctx.user.id === input.id) throw new TRPCError({ code: "BAD_REQUEST", message: "Vous ne pouvez pas désactiver votre propre compte." }); const db = await dbOrThrow(); await db.update(users).set({ active: false }).where(and(eq(users.id, input.id), companyScope(users.companyId, ctx.user.companyId))); await audit(ctx.user.id, "Suppression", "Vendeur", input.id, "Vendeur désactivé et conservé dans l’historique"); return { success: true }; }),
   }),
   settings: router({
-    get: protectedProcedure.query(async ({ ctx }) => {
-      const db = await dbOrThrow();
-      return companySettings(db, ctx.user.companyId);
-    }),
-    save: permissionProcedure("settings.manage")
-      .input(
-        z
-          .object({
-            defaultSalesAgentId: z.number().int().positive().nullable(),
-            defaultCashierId: z.number().int().positive().nullable(),
-            requireSalesAgent: z.boolean(),
-            requireCashier: z.boolean(),
-            currency: z.enum(["USD", "EUR", "XOF"]).default("XOF"),
-            primaryColor: z
-              .string()
-              .regex(
-                /^#[0-9a-fA-F]{6}$/,
-                "La couleur principale doit être au format hexadécimal."
-              )
-              .optional(),
-            paymentCashEnabled: z.boolean().optional(),
-            paymentCardEnabled: z.boolean().optional(),
-            paymentMobileMoneyEnabled: z.boolean().optional(),
-            paymentBankTransferEnabled: z.boolean().optional(),
-            paymentCreditEnabled: z.boolean().optional(),
-            sellerCanOverridePrice: z.boolean().optional(),
-            sellerCanSellBelowPrice: z.boolean().optional(),
-            sellerMaxDiscountPercent: z
-              .number()
-              .int()
-              .min(0)
-              .max(100)
-              .optional(),
-            sellerCanCancelInvoice: z.boolean().optional(),
-            sellerCanRefund: z.boolean().optional(),
-            sellerCanCorrectStock: z.boolean().optional(),
-            sellerCanEditPurchasePrice: z.boolean().optional(),
-            vatEnabled: z.boolean().optional(),
-            vatRateBasisPoints: z.number().int().min(0).max(10000).optional(),
-            timezone: z
-              .string()
-              .trim()
-              .min(1)
-              .max(64)
-              .refine(isValidTimezone, "Fuseau horaire invalide.")
-              .optional(),
-          })
-          .merge(vatSettingsInput)
-          .merge(companyIdentityInput)
-          .merge(printingInput)
-      )
-      .mutation(async ({ ctx, input }) => {
-        const db = await dbOrThrow();
-        const current = (
-          await db
-            .select()
-            .from(saleSettings)
-            .where(companyScope(saleSettings.companyId, ctx.user.companyId))
-            .limit(1)
-        )[0];
-        const data = {
-          ...input,
-          companyId: ctx.user.companyId,
-          primaryColor:
-            input.primaryColor?.toUpperCase() ??
-            current?.primaryColor ??
-            "#0B6E76",
-          companyName:
-            input.companyName ?? current?.companyName ?? "StockPilot",
-          companyLogoUrl:
-            input.companyLogoUrl ?? current?.companyLogoUrl ?? null,
-          companySignatureUrl:
-            input.companySignatureUrl ?? current?.companySignatureUrl ?? null,
-          companySignatureLabel:
-            input.companySignatureLabel ??
-            current?.companySignatureLabel ??
-            "Signature & cachet",
-          companyAgreementLabel:
-            input.companyAgreementLabel ??
-            current?.companyAgreementLabel ??
-            "Bon pour accord",
-          companySignatureAlignment:
-            input.companySignatureAlignment ??
-            current?.companySignatureAlignment ??
-            "right",
-          companyAddress:
-            input.companyAddress ?? current?.companyAddress ?? null,
-          companyPhone: input.companyPhone ?? current?.companyPhone ?? null,
-          companyEmail: input.companyEmail ?? current?.companyEmail ?? null,
-          companyFooter: input.companyFooter ?? current?.companyFooter ?? null,
-          ticketHeader:
-            input.ticketHeader ??
-            current?.ticketHeader ??
-            "Merci de votre achat",
-          ticketFooter:
-            input.ticketFooter ?? current?.ticketFooter ?? "À bientôt",
-          ticketWidthMm: input.ticketWidthMm ?? current?.ticketWidthMm ?? "80",
-          printerName:
-            input.printerName ?? current?.printerName ?? "Imprimante système",
-          printerType: input.printerType ?? current?.printerType ?? "browser",
-          paymentCashEnabled:
-            input.paymentCashEnabled ?? current?.paymentCashEnabled ?? true,
-          paymentCardEnabled:
-            input.paymentCardEnabled ?? current?.paymentCardEnabled ?? true,
-          paymentMobileMoneyEnabled:
-            input.paymentMobileMoneyEnabled ??
-            current?.paymentMobileMoneyEnabled ??
-            true,
-          paymentBankTransferEnabled:
-            input.paymentBankTransferEnabled ??
-            current?.paymentBankTransferEnabled ??
-            true,
-          paymentCreditEnabled:
-            input.paymentCreditEnabled ?? current?.paymentCreditEnabled ?? true,
-          sellerCanOverridePrice:
-            input.sellerCanOverridePrice ??
-            current?.sellerCanOverridePrice ??
-            false,
-          sellerCanSellBelowPrice:
-            input.sellerCanSellBelowPrice ??
-            current?.sellerCanSellBelowPrice ??
-            false,
-          sellerMaxDiscountPercent:
-            input.sellerMaxDiscountPercent ??
-            current?.sellerMaxDiscountPercent ??
-            0,
-          sellerCanCancelInvoice:
-            input.sellerCanCancelInvoice ??
-            current?.sellerCanCancelInvoice ??
-            false,
-          sellerCanRefund:
-            input.sellerCanRefund ?? current?.sellerCanRefund ?? false,
-          sellerCanCorrectStock:
-            input.sellerCanCorrectStock ??
-            current?.sellerCanCorrectStock ??
-            false,
-          sellerCanEditPurchasePrice:
-            input.sellerCanEditPurchasePrice ??
-            current?.sellerCanEditPurchasePrice ??
-            false,
-          vatEnabled: input.vatEnabled ?? current?.vatEnabled ?? false,
-          vatRateBasisPoints:
-            input.vatRateBasisPoints ?? current?.vatRateBasisPoints ?? 0,
-          updatedByUserId: ctx.user.id,
-        };
-        if (current)
-          await db
-            .update(saleSettings)
-            .set(data)
-            .where(
-              and(
-                eq(saleSettings.id, current.id),
-                companyScope(saleSettings.companyId, ctx.user.companyId)
-              )
-            );
-        else await db.insert(saleSettings).values(data);
-        await audit(
-          ctx.user,
-          "Paramètres mis à jour",
-          "Entreprise",
-          null,
-          `Paramètres et identité ${data.companyName} mis à jour`
-        );
-        return { success: true };
-      }),
-    uploadLogo: permissionProcedure("settings.manage")
-      .input(
-        z.object({
-          dataUrl: z.string().min(30).max(4_000_000),
-          filename: z.string().trim().min(1).max(120),
-        })
-      )
-      .mutation(async ({ ctx, input }) => {
-        const match = input.dataUrl.match(
-          /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/
-        );
-        if (!match)
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Le logo doit être une image PNG, JPEG ou WEBP.",
-          });
-        const mimeType = match[1];
-        const buffer = Buffer.from(match[2], "base64");
-        if (buffer.byteLength > 2 * 1024 * 1024)
-          throw new TRPCError({
-            code: "PAYLOAD_TOO_LARGE",
-            message: "Le logo ne doit pas dépasser 2 Mo.",
-          });
-        const extension =
-          mimeType === "image/jpeg" ? "jpg" : mimeType.split("/")[1];
-        const { url } = await storagePut(
-          `company/${ctx.user.companyId ?? "legacy"}/logo.${extension}`,
-          buffer,
-          mimeType
-        );
-        const db = await dbOrThrow();
-        const current = await companySettings(db, ctx.user.companyId);
-        if (current)
-          await db
-            .update(saleSettings)
-            .set({ companyLogoUrl: url, updatedByUserId: ctx.user.id })
-            .where(
-              and(
-                eq(saleSettings.id, current.id),
-                companyScope(saleSettings.companyId, ctx.user.companyId)
-              )
-            );
-        else
-          await db.insert(saleSettings).values({
-            companyId: ctx.user.companyId,
-            companyLogoUrl: url,
-            updatedByUserId: ctx.user.id,
-          });
-        await audit(
-          ctx.user,
-          "Logo mis à jour",
-          "Entreprise",
-          null,
-          `Logo ${input.filename} enregistré`
-        );
-        return { url };
-      }),
-    uploadSignature: permissionProcedure("settings.manage")
-      .input(
-        z.object({
-          dataUrl: z.string().min(30).max(4_000_000),
-          filename: z.string().trim().min(1).max(120),
-        })
-      )
-      .mutation(async ({ ctx, input }) => {
-        const match = input.dataUrl.match(
-          /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/
-        );
-        if (!match)
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "La signature doit être une image PNG, JPEG ou WEBP.",
-          });
-        const mimeType = match[1];
-        const buffer = Buffer.from(match[2], "base64");
-        if (buffer.byteLength > 2 * 1024 * 1024)
-          throw new TRPCError({
-            code: "PAYLOAD_TOO_LARGE",
-            message: "La signature ne doit pas dépasser 2 Mo.",
-          });
-        const extension =
-          mimeType === "image/jpeg" ? "jpg" : mimeType.split("/")[1];
-        const { url } = await storagePut(
-          `company/${ctx.user.companyId ?? "legacy"}/signature.${extension}`,
-          buffer,
-          mimeType
-        );
-        const db = await dbOrThrow();
-        const current = await companySettings(db, ctx.user.companyId);
-        if (current)
-          await db
-            .update(saleSettings)
-            .set({ companySignatureUrl: url, updatedByUserId: ctx.user.id })
-            .where(
-              and(
-                eq(saleSettings.id, current.id),
-                companyScope(saleSettings.companyId, ctx.user.companyId)
-              )
-            );
-        else
-          await db.insert(saleSettings).values({
-            companyId: ctx.user.companyId,
-            companySignatureUrl: url,
-            updatedByUserId: ctx.user.id,
-          });
-        await audit(
-          ctx.user,
-          "Signature mise à jour",
-          "Entreprise",
-          null,
-          `Signature ou cachet ${input.filename} enregistré`
-        );
-        return { url };
-      }),
+    get: permissionProcedure("settings.manage").query(async ({ ctx }) => { const db = await dbOrThrow(); return companySettings(db, ctx.user.companyId); }),
+    save: permissionProcedure("team.manage").input(z.object({ defaultSalesAgentId: z.number().int().positive().nullable(), defaultCashierId: z.number().int().positive().nullable(), requireSalesAgent: z.boolean(), requireCashier: z.boolean(), currency: z.enum(["USD", "EUR", "XOF"]).default("XOF"), primaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, "La couleur principale doit être au format hexadécimal.").optional(), paymentCashEnabled: z.boolean().optional(), paymentCardEnabled: z.boolean().optional(), paymentMobileMoneyEnabled: z.boolean().optional(), paymentBankTransferEnabled: z.boolean().optional(), paymentCreditEnabled: z.boolean().optional(), sellerCanOverridePrice: z.boolean().optional(), sellerCanSellBelowPrice: z.boolean().optional(), sellerMaxDiscountPercent: z.number().int().min(0).max(100).optional(), sellerCanCancelInvoice: z.boolean().optional(), sellerCanRefund: z.boolean().optional(), sellerCanCorrectStock: z.boolean().optional(), sellerCanEditPurchasePrice: z.boolean().optional(), vatEnabled: z.boolean().optional(), vatRateBasisPoints: z.number().int().min(0).max(10000).optional(), defaultDeliveryFeeCents: z.number().int().min(0).max(MAX_CENTS).optional(), customerSuggestionsEnabled: z.boolean().optional(), customerSuggestionsLimit: z.number().int().min(1).max(12).optional() }).merge(vatSettingsInput).merge(companyIdentityInput)).mutation(async ({ ctx, input }) => { const db = await dbOrThrow(); const current = (await db.select().from(saleSettings).where(companyScope(saleSettings.companyId, ctx.user.companyId)).limit(1))[0]; const data = { ...input, companyId: ctx.user.companyId, primaryColor: input.primaryColor?.toUpperCase() ?? current?.primaryColor ?? "#0B6E76", companyName: input.companyName ?? current?.companyName ?? "StockPilot", companyLogoUrl: input.companyLogoUrl ?? current?.companyLogoUrl ?? null, companySignatureUrl: input.companySignatureUrl ?? current?.companySignatureUrl ?? null, companySignatureLabel: input.companySignatureLabel ?? current?.companySignatureLabel ?? "Signature & cachet", companyAgreementLabel: input.companyAgreementLabel ?? current?.companyAgreementLabel ?? "Bon pour accord", companySignatureAlignment: input.companySignatureAlignment ?? current?.companySignatureAlignment ?? "right", companyAddress: input.companyAddress ?? current?.companyAddress ?? null, companyPhone: input.companyPhone ?? current?.companyPhone ?? null, companyEmail: input.companyEmail ?? current?.companyEmail ?? null, companyFooter: input.companyFooter ?? current?.companyFooter ?? null, ticketHeader: input.ticketHeader ?? current?.ticketHeader ?? "Merci de votre achat", ticketFooter: input.ticketFooter ?? current?.ticketFooter ?? "À bientôt", ticketWidthMm: input.ticketWidthMm ?? current?.ticketWidthMm ?? "80", paymentCashEnabled: input.paymentCashEnabled ?? current?.paymentCashEnabled ?? true, paymentCardEnabled: input.paymentCardEnabled ?? current?.paymentCardEnabled ?? true, paymentMobileMoneyEnabled: input.paymentMobileMoneyEnabled ?? current?.paymentMobileMoneyEnabled ?? true, paymentBankTransferEnabled: input.paymentBankTransferEnabled ?? current?.paymentBankTransferEnabled ?? true, paymentCreditEnabled: input.paymentCreditEnabled ?? current?.paymentCreditEnabled ?? true, sellerCanOverridePrice: input.sellerCanOverridePrice ?? current?.sellerCanOverridePrice ?? false, sellerCanSellBelowPrice: input.sellerCanSellBelowPrice ?? current?.sellerCanSellBelowPrice ?? false, sellerMaxDiscountPercent: input.sellerMaxDiscountPercent ?? current?.sellerMaxDiscountPercent ?? 0, sellerCanCancelInvoice: input.sellerCanCancelInvoice ?? current?.sellerCanCancelInvoice ?? false, sellerCanRefund: input.sellerCanRefund ?? current?.sellerCanRefund ?? false, sellerCanCorrectStock: input.sellerCanCorrectStock ?? current?.sellerCanCorrectStock ?? false, sellerCanEditPurchasePrice: input.sellerCanEditPurchasePrice ?? current?.sellerCanEditPurchasePrice ?? false, vatEnabled: input.vatEnabled ?? current?.vatEnabled ?? false, vatRateBasisPoints: input.vatRateBasisPoints ?? current?.vatRateBasisPoints ?? 0, defaultDeliveryFeeCents: input.defaultDeliveryFeeCents ?? current?.defaultDeliveryFeeCents ?? 0, customerSuggestionsEnabled: input.customerSuggestionsEnabled ?? current?.customerSuggestionsEnabled ?? true, customerSuggestionsLimit: input.customerSuggestionsLimit ?? current?.customerSuggestionsLimit ?? 4, updatedByUserId: ctx.user.id }; if (current) await db.update(saleSettings).set(data).where(eq(saleSettings.id, current.id)); else await db.insert(saleSettings).values(data); await audit(ctx.user.id, "Paramètres mis à jour", "Entreprise", null, `Paramètres et identité ${data.companyName} mis à jour`); return { success: true }; }),
+    uploadLogo: adminProcedure.input(z.object({ dataUrl: z.string().min(30).max(4_000_000), filename: z.string().trim().min(1).max(120) })).mutation(async ({ ctx, input }) => { const match = input.dataUrl.match(/^data:(image\/(?:png|jpeg|webp|svg\+xml));base64,([A-Za-z0-9+/=]+)$/); if (!match) throw new TRPCError({ code: "BAD_REQUEST", message: "Le logo doit être une image PNG, JPEG, WEBP ou SVG." }); const mimeType = match[1]; const buffer = Buffer.from(match[2], "base64"); if (buffer.byteLength > 2 * 1024 * 1024) throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "Le logo ne doit pas dépasser 2 Mo." }); const extension = mimeType === "image/jpeg" ? "jpg" : mimeType === "image/svg+xml" ? "svg" : mimeType.split("/")[1]; const { url } = await storagePut(`company/${ctx.user.companyId ?? "legacy"}/logo.${extension}`, buffer, mimeType); const db = await dbOrThrow(); const current = await companySettings(db, ctx.user.companyId); if (current) await db.update(saleSettings).set({ companyLogoUrl: url, updatedByUserId: ctx.user.id }).where(eq(saleSettings.id, current.id)); else await db.insert(saleSettings).values({ companyId: ctx.user.companyId, companyLogoUrl: url, updatedByUserId: ctx.user.id }); await audit(ctx.user.id, "Logo mis à jour", "Entreprise", null, `Logo ${input.filename} enregistré`); return { url}; }),
+    uploadSignature: adminProcedure.input(z.object({ dataUrl: z.string().min(30).max(4_000_000), filename: z.string().trim().min(1).max(120) })).mutation(async ({ ctx, input }) => { const match = input.dataUrl.match(/^data:(image\/(?:png|jpeg|webp|svg\+xml));base64,([A-Za-z0-9+/=]+)$/); if (!match) throw new TRPCError({ code: "BAD_REQUEST", message: "La signature doit être une image PNG, JPEG, WEBP ou SVG." }); const mimeType = match[1]; const buffer = Buffer.from(match[2], "base64"); if (buffer.byteLength > 2 * 1024 * 1024) throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "La signature ne doit pas dépasser 2 Mo." }); const extension = mimeType === "image/jpeg" ? "jpg" : mimeType === "image/svg+xml" ? "svg" : mimeType.split("/")[1]; const { url } = await storagePut(`company/${ctx.user.companyId ?? "legacy"}/signature.${extension}`, buffer, mimeType); const db = await dbOrThrow(); const current = await companySettings(db, ctx.user.companyId); if (current) await db.update(saleSettings).set({ companySignatureUrl: url, updatedByUserId: ctx.user.id }).where(eq(saleSettings.id, current.id)); else await db.insert(saleSettings).values({ companyId: ctx.user.companyId, companySignatureUrl: url, updatedByUserId: ctx.user.id }); await audit(ctx.user.id, "Signature mise à jour", "Entreprise", null, `Signature ou cachet ${input.filename} enregistré`); return { url }; }),
+  }),
+  remuneration: router({
+    list: permissionProcedure("payroll.manage").query(async ({ ctx }) => (await dbOrThrow()).select().from(remunerationProfiles).where(companyScope(remunerationProfiles.companyId, ctx.user.companyId)).orderBy(desc(remunerationProfiles.updatedAt))),
+    save: permissionProcedure("team.manage").input(z.object({ beneficiaryType: z.enum(["user", "agent"]), beneficiaryId: z.number().int().positive(), remunerationMode: z.enum(["fixed", "commission", "fixed_plus_commission"]), fixedMonthlyCents: z.number().int().min(0), commissionBasis: z.enum(["revenue", "net_profit"]), rateBasisPoints: z.number().int().min(0).max(10000), active: z.boolean() })).mutation(async ({ ctx, input }) => { const db = await dbOrThrow(); const beneficiary = input.beneficiaryType === "user" ? (await db.select().from(users).where(and(eq(users.id, input.beneficiaryId), companyScope(users.companyId, ctx.user.companyId))).limit(1))[0] : (await db.select().from(agents).where(and(eq(agents.id, input.beneficiaryId), companyScope(agents.companyId, ctx.user.companyId))).limit(1))[0]; if (!beneficiary) throw new TRPCError({ code: "NOT_FOUND", message: "Bénéficiaire introuvable." }); const current = (await db.select().from(remunerationProfiles).where(companyScope(remunerationProfiles.companyId, ctx.user.companyId))).find(item => item.beneficiaryType === input.beneficiaryType && item.beneficiaryId === input.beneficiaryId); if (current) await db.update(remunerationProfiles).set(input).where(eq(remunerationProfiles.id, current.id)); else await db.insert(remunerationProfiles).values({ ...input, companyId: ctx.user.companyId }); await audit(ctx.user.id, "Rémunération configurée", "Agent", input.beneficiaryId, "Profil de rémunération mis à jour"); return { success: true }; }),
   }),
   sales: router({
-    detail: protectedProcedure
-      .input(z.object({ id: z.number().int().positive() }))
-      .query(async ({ ctx, input }) => {
-        const db = await dbOrThrow();
-        const sale = (
-          await db
-            .select()
-            .from(sales)
-            .where(
-              and(
-                eq(sales.id, input.id),
-                companyScope(sales.companyId, ctx.user.companyId)
-              )
-            )
-            .limit(1)
-        )[0];
-        if (!sale)
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Facture introuvable.",
-          });
-        const [
-          customer,
-          items,
-          payments,
-          commissions,
-          seller,
-          salesAgent,
-          cashier,
-        ] = await Promise.all([
-          sale.customerId
-            ? ((
-                await db
-                  .select()
-                  .from(customers)
-                  .where(
-                    and(
-                      eq(customers.id, sale.customerId),
-                      companyScope(customers.companyId, ctx.user.companyId)
-                    )
-                  )
-                  .limit(1)
-              )[0] ?? null)
-            : null,
-          db.select().from(saleItems).where(eq(saleItems.saleId, sale.id)),
-          db
-            .select()
-            .from(salePayments)
-            .where(eq(salePayments.saleId, sale.id)),
-          db
-            .select()
-            .from(saleCommissions)
-            .where(eq(saleCommissions.saleId, sale.id)),
-          (
-            await db
-              .select()
-              .from(users)
-              .where(
-                and(
-                  eq(users.id, sale.sellerUserId),
-                  companyScope(users.companyId, ctx.user.companyId)
-                )
-              )
-              .limit(1)
-          )[0] ?? null,
-          sale.salesAgentId
-            ? ((
-                await db
-                  .select()
-                  .from(agents)
-                  .where(
-                    and(
-                      eq(agents.id, sale.salesAgentId),
-                      companyScope(agents.companyId, ctx.user.companyId)
-                    )
-                  )
-                  .limit(1)
-              )[0] ?? null)
-            : null,
-          sale.cashierId
-            ? ((
-                await db
-                  .select()
-                  .from(agents)
-                  .where(
-                    and(
-                      eq(agents.id, sale.cashierId),
-                      companyScope(agents.companyId, ctx.user.companyId)
-                    )
-                  )
-                  .limit(1)
-              )[0] ?? null)
-            : null,
-        ]);
-        const returns = await db
-          .select()
-          .from(saleReturns)
-          .where(
-            and(
-              eq(saleReturns.saleId, sale.id),
-              companyScope(saleReturns.companyId, ctx.user.companyId)
-            )
-          )
-          .orderBy(desc(saleReturns.createdAt));
-        return {
-          sale,
-          customer,
-          items,
-          payments,
-          commissions,
-          returns,
-          participants: {
-            seller: seller
-              ? {
-                  id: seller.id,
-                  name: seller.name || seller.email || "Vendeur",
-                  role: "Vendeur",
-                }
-              : null,
-            salesAgent: salesAgent
-              ? {
-                  id: salesAgent.id,
-                  name: salesAgent.name,
-                  role: "Agent commercial",
-                }
-              : null,
-            cashier: cashier
-              ? { id: cashier.id, name: cashier.name, role: "Caissier" }
-              : null,
-          },
-        };
-      }),
+    list: permissionProcedure("sales.view").query(({ ctx }) => listSales(ctx.user.companyId)),
+    detail: permissionProcedure("sales.view").input(z.object({ id: z.number().int().positive() })).query(async ({ ctx, input }) => { const db = await dbOrThrow(); const sale = (await db.select().from(sales).where(and(eq(sales.id, input.id), companyScope(sales.companyId, ctx.user.companyId))).limit(1))[0]; if (!sale) throw new TRPCError({ code: "NOT_FOUND", message: "Facture introuvable." }); if (sale.warehouseId != null) await assertSellerWarehouseAccess(db, ctx.user, sale.warehouseId); const [customer, items, payments, commissions, seller, salesAgent, cashier, returns] = await Promise.all([sale.customerId ? (await db.select().from(customers).where(and(eq(customers.id, sale.customerId), companyScope(customers.companyId, ctx.user.companyId))).limit(1))[0] ?? null : null, db.select().from(saleItems).where(eq(saleItems.saleId, sale.id)), db.select().from(salePayments).where(eq(salePayments.saleId, sale.id)), db.select().from(saleCommissions).where(eq(saleCommissions.saleId, sale.id)), (await db.select().from(users).where(and(eq(users.id, sale.sellerUserId), companyScope(users.companyId, ctx.user.companyId))).limit(1))[0] ?? null, sale.salesAgentId ? (await db.select().from(agents).where(and(eq(agents.id, sale.salesAgentId), companyScope(agents.companyId, ctx.user.companyId))).limit(1))[0] ?? null : null, sale.cashierId ? (await db.select().from(agents).where(and(eq(agents.id, sale.cashierId), companyScope(agents.companyId, ctx.user.companyId))).limit(1))[0] ?? null : null, db.select().from(saleReturns).where(and(eq(saleReturns.saleId, sale.id), companyScope(saleReturns.companyId, ctx.user.companyId)))]); return { sale, customer, items, payments, commissions, returns: returns.sort((a: any, b: any) => b.createdAt.getTime() - a.createdAt.getTime()), participants: { seller: seller ? { id: seller.id, name: seller.name || seller.email || "Vendeur", role: "Vendeur" } : null, salesAgent: salesAgent ? { id: salesAgent.id, name: salesAgent.name, role: "Agent commercial" } : null, cashier: cashier ? { id: cashier.id, name: cashier.name, role: "Caissier" } : null } }; }),
+    create: permissionProcedure("sales.create").input(z.object({ customerId: z.number().int().positive(), warehouseId: z.number().int().positive().optional(), salesAgentId: z.number().int().positive().nullable(), cashierId: z.number().int().positive().nullable(), paymentMethod: z.enum(["cash", "card", "mobile_money", "bank_transfer", "credit"]), note: z.string().trim().max(1000).nullable(), deliveryFeeCents: z.number().int().min(0).max(MAX_CENTS).default(0), items: z.array(z.object({ productId: z.number().int().positive(), quantity: z.number().int().positive() })).min(1) })).mutation(async ({ ctx, input }) => {
+      const db = await dbOrThrow();
+      const invoiceNumber = `FAC-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-${Date.now().toString().slice(-7)}`;
+      await db.transaction(async tx => {
+        const [customer] = await tx.select().from(customers).where(and(eq(customers.id, input.customerId), companyScope(customers.companyId, ctx.user.companyId))).limit(1);
+        if (!customer) throw new TRPCError({ code: "NOT_FOUND", message: "Client introuvable." });
+        const settings = (await tx.select().from(saleSettings).where(companyScope(saleSettings.companyId, ctx.user.companyId)).limit(1))[0];
+        const salesAgentId = input.salesAgentId ?? settings?.defaultSalesAgentId ?? null;
+        const cashierId = input.cashierId ?? settings?.defaultCashierId ?? null;
+        if (settings?.requireSalesAgent && !salesAgentId) throw new TRPCError({ code: "BAD_REQUEST", message: "Un agent commercial est requis pour cette vente." });
+        if (settings?.requireCashier && !cashierId) throw new TRPCError({ code: "BAD_REQUEST", message: "Un caissier est requis pour cette vente." });
+        const associatedIds = [salesAgentId, cashierId].filter((id): id is number => id !== null);
+        const selectedAgents = associatedIds.length ? await tx.select().from(agents).where(and(inArray(agents.id, associatedIds), companyScope(agents.companyId, ctx.user.companyId))) : [];
+        if (salesAgentId && !selectedAgents.some(agent => agent.id === salesAgentId && agent.type === "sales_agent" && agent.active)) throw new TRPCError({ code: "BAD_REQUEST", message: "Agent commercial invalide." });
+        if (cashierId && !selectedAgents.some(agent => agent.id === cashierId && agent.type === "cashier" && agent.active)) throw new TRPCError({ code: "BAD_REQUEST", message: "Caissier invalide." });
+        const productIds = input.items.map(item => item.productId);
+        const productRows = await tx.select().from(products).where(and(inArray(products.id, productIds), companyScope(products.companyId, ctx.user.companyId)));
+        if (productRows.length !== productIds.length) throw new TRPCError({ code: "NOT_FOUND", message: "Un produit de la vente est introuvable." });
+        const defaultWarehouse = input.warehouseId ? null : await getDefaultWarehouse(tx, ctx.user.companyId);
+        const warehouse = input.warehouseId ? await assertSellerWarehouseAccess(tx, ctx.user, input.warehouseId, { requireActive: true }) : ctx.user.role === "seller" ? await assertSellerWarehouseAccess(tx, ctx.user, defaultWarehouse!.id, { requireActive: true }) : defaultWarehouse!;
+        const selectedSalesAgent = selectedAgents.find(agent => agent.id === salesAgentId);
+        if (salesAgentId && selectedSalesAgent?.warehouseScope === "selected") {
+          const assignments = await tx.select({ warehouseId: salesAgentWarehouseAssignments.warehouseId }).from(salesAgentWarehouseAssignments).where(and(companyScope(salesAgentWarehouseAssignments.companyId, ctx.user.companyId), eq(salesAgentWarehouseAssignments.agentId, salesAgentId)));
+          if (!canCoordinateSaleFromWarehouse("selected", assignments.map(assignment => assignment.warehouseId), warehouse.id)) throw new TRPCError({ code: "FORBIDDEN", message: "Cet agent commercial n’est pas autorisé pour l’entrepôt sélectionné." });
+        }
+        const tierRows = productIds.length ? await tx.select().from(productPriceTiers).where(inArray(productPriceTiers.productId, productIds)) : [];
+        const lines = input.items.map(item => { const product = productRows.find(row => row.id === item.productId)!; const isWholesale = customer.type === "wholesale"; const basePriceCents = priceForCustomer(customer.type, product.retailPriceCents, product.wholesalePriceCents); const unitPriceCents = priceForQuantityTier(basePriceCents, item.quantity, tierRows.filter(tier => tier.productId === product.id && tier.customerType === (isWholesale ? "wholesale" : "retail"))); const lineTotalCents = unitPriceCents * item.quantity; const lineCostCents = product.purchasePriceCents * item.quantity; const resultingQuantity = resultingStock(product.quantity, "exit", item.quantity); return { product, quantity: item.quantity, unitPriceCents, lineTotalCents, lineCostCents, resultingQuantity }; });
+        const subtotalCents = lines.reduce((sum, line) => sum + line.lineTotalCents, 0); const commercialTotals = calculateCommercialTotals({ subtotalCents, vatRateBasisPoints: settings?.vatEnabled ? settings.vatRateBasisPoints : 0, deliveryFeeCents: input.deliveryFeeCents }); const totalCents = commercialTotals.totalCents; const totalCostCents = lines.reduce((sum, line) => sum + line.lineCostCents, 0); const netProfitCents = totalCents - totalCostCents;
+        const result = await tx.insert(sales).values({ companyId: ctx.user.companyId, invoiceNumber, channel: "invoice", customerId: customer.id, warehouseId: warehouse.id, sellerUserId: ctx.user.id, salesAgentId, cashierId, paymentMethod: input.paymentMethod, status: "paid", amountPaidCents: totalCents, subtotalCents, vatRateBasisPoints: commercialTotals.vatRateBasisPoints, vatCents: commercialTotals.vatCents, deliveryFeeCents: commercialTotals.deliveryFeeCents, totalCents, totalCostCents, netProfitCents, note: input.note });
+        const saleId = Number(result[0].insertId);
+        for (const line of lines) { const localStock = await debitWarehouseStock(tx, ctx.user.companyId, warehouse.id, line.product.id, line.quantity); await tx.insert(saleItems).values({ saleId, productId: line.product.id, productName: line.product.name, productReference: line.product.reference, quantity: line.quantity, unitPriceCents: line.unitPriceCents, purchasePriceCents: line.product.purchasePriceCents, lineTotalCents: line.lineTotalCents, lineCostCents: line.lineCostCents }); await tx.update(products).set({ quantity: line.resultingQuantity }).where(and(eq(products.id, line.product.id), companyScope(products.companyId, ctx.user.companyId))); await tx.insert(stockMovements).values({ companyId: ctx.user.companyId, productId: line.product.id, warehouseId: warehouse.id, type: "exit", quantity: signedMovementQuantity("exit", line.quantity), previousQuantity: localStock.previousQuantity, resultingQuantity: localStock.resultingQuantity, reason: `Vente ${invoiceNumber}`, createdByUserId: ctx.user.id }); const existingAlert = (await tx.select().from(stockAlerts).where(and(eq(stockAlerts.productId, line.product.id), companyScope(stockAlerts.companyId, ctx.user.companyId))).limit(1))[0]; if (line.resultingQuantity <= line.product.minimumQuantity) { if (existingAlert) await tx.update(stockAlerts).set({ threshold: line.product.minimumQuantity, observedQuantity: line.resultingQuantity, status: "active", resolvedAt: null }).where(eq(stockAlerts.id, existingAlert.id)); else await tx.insert(stockAlerts).values({ companyId: ctx.user.companyId, productId: line.product.id, threshold: line.product.minimumQuantity, observedQuantity: line.resultingQuantity }); } }
+        const profiles = await tx.select().from(remunerationProfiles).where(and(eq(remunerationProfiles.active, true), companyScope(remunerationProfiles.companyId, ctx.user.companyId)));
+        const beneficiaries = [{ type: "user" as const, id: ctx.user.id }, ...(salesAgentId ? [{ type: "agent" as const, id: salesAgentId }] : []), ...(cashierId ? [{ type: "agent" as const, id: cashierId }] : [])];
+        for (const beneficiary of beneficiaries) { const profile = profiles.find(item => item.beneficiaryType === beneficiary.type && item.beneficiaryId === beneficiary.id); if (profile) { const amount = commissionCents({ remunerationMode: profile.remunerationMode, commissionBasis: profile.commissionBasis, rateBasisPoints: profile.rateBasisPoints, invoiceRevenueCents: totalCents, invoiceNetProfitCents: netProfitCents }); if (amount > 0) await tx.insert(saleCommissions).values({ saleId, beneficiaryType: beneficiary.type, beneficiaryId: beneficiary.id, commissionBasis: profile.commissionBasis, rateBasisPoints: profile.rateBasisPoints, commissionCents: amount }); } }
+        await tx.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Vente créée", entityType: "Facture", entityId: String(saleId), detail: `Facture ${invoiceNumber} créée pour ${customer.name}` });
+      });
+      return { success: true, invoiceNumber };
+    }),
   }),
 });

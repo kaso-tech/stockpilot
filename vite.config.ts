@@ -1,8 +1,9 @@
+import { jsxLocPlugin } from "@builder.io/vite-plugin-jsx-loc";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import fs from "node:fs";
 import path from "node:path";
-import { defineConfig, loadEnv, type Plugin, type ViteDevServer } from "vite";
+import { defineConfig, type Plugin, type ViteDevServer } from "vite";
 import { vitePluginManusRuntime } from "vite-plugin-manus-runtime";
 import { VitePWA } from "vite-plugin-pwa";
 
@@ -56,7 +57,7 @@ function writeToLogFile(source: LogSource, entries: unknown[]) {
   const logPath = path.join(LOG_DIR, `${source}.log`);
 
   // Format entries with timestamps
-  const lines = entries.map(entry => {
+  const lines = entries.map((entry) => {
     const ts = new Date().toISOString();
     return `[${ts}] ${JSON.stringify(entry)}`;
   });
@@ -79,7 +80,7 @@ function vitePluginManusDebugCollector(): Plugin {
     name: "manus-debug-collector",
 
     transformIndexHtml(html) {
-      if (process.env.NODE_ENV === "production") {
+      if (process.env.NODE_ENV === "production" || process.env.MANUS_DEBUG_COLLECTOR !== "true") {
         return html;
       }
       return {
@@ -98,18 +99,6 @@ function vitePluginManusDebugCollector(): Plugin {
     },
 
     configureServer(server: ViteDevServer) {
-      // Le script vit hors de publicDir pour ne jamais être copié dans le build de production.
-      server.middlewares.use("/__manus__/debug-collector.js", (_req, res) => {
-        res.writeHead(200, {
-          "Content-Type": "application/javascript; charset=utf-8",
-        });
-        res.end(
-          fs.readFileSync(
-            path.join(PROJECT_ROOT, "client", "dev", "debug-collector.js"),
-            "utf-8"
-          )
-        );
-      });
       // POST /__manus__/logs: Browser sends logs (written directly to files)
       server.middlewares.use("/__manus__/logs", (req, res, next) => {
         if (req.method !== "POST") {
@@ -144,7 +133,7 @@ function vitePluginManusDebugCollector(): Plugin {
         }
 
         let body = "";
-        req.on("data", chunk => {
+        req.on("data", (chunk) => {
           body += chunk.toString();
         });
 
@@ -162,40 +151,14 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
-/** Script d'analytics injecté seulement si son URL est configurée (sinon requête 404 en production). */
-function analyticsPlugin(mode: string): Plugin {
-  const env = loadEnv(mode, PROJECT_ROOT, "VITE_ANALYTICS_");
-  return {
-    name: "stockpilot-analytics",
-    transformIndexHtml(html) {
-      if (!env.VITE_ANALYTICS_ENDPOINT || !env.VITE_ANALYTICS_WEBSITE_ID)
-        return html;
-      return {
-        html,
-        tags: [
-          {
-            tag: "script",
-            attrs: {
-              defer: true,
-              src: `${env.VITE_ANALYTICS_ENDPOINT.replace(/\/+$/, "")}/umami`,
-              "data-website-id": env.VITE_ANALYTICS_WEBSITE_ID,
-            },
-            injectTo: "body",
-          },
-        ],
-      };
-    },
-  };
-}
-
-const createPlugins = (isBuild: boolean, mode: string) => [
-  analyticsPlugin(mode),
+const plugins = [
   react(),
   tailwindcss(),
+  jsxLocPlugin(),
   vitePluginManusRuntime(),
   vitePluginManusDebugCollector(),
   VitePWA({
-    registerType: "autoUpdate",
+    registerType: "prompt",
     injectRegister: false,
     manifest: {
       name: "StockPilot Pro",
@@ -209,37 +172,18 @@ const createPlugins = (isBuild: boolean, mode: string) => [
       background_color: "#F7F8FA",
     },
     workbox: {
-      clientsClaim: true,
-      skipWaiting: true,
       navigateFallback: "/index.html",
-      // Les routes serveur (API, OAuth Google Drive, fichiers stockés) ne doivent jamais être servies par la coquille PWA.
       navigateFallbackDenylist: [/^\/api\//, /^\/manus-storage\//],
+      importScripts: ["/product-photo-cache.js"],
       cleanupOutdatedCaches: true,
-      // Photos de produits : gardées sur l'appareil pour que la caisse les affiche hors connexion.
-      // Chaque envoi a une adresse unique : une photo en cache n'est jamais périmée.
-      runtimeCaching: [
-        {
-          urlPattern:
-            /\/manus-storage\/company\/[^/]+\/products\/\d+\/(image|thumb)_[a-f0-9]{8}\.(webp|jpg|png)$/,
-          handler: "CacheFirst",
-          options: {
-            cacheName: "product-images",
-            expiration: {
-              maxEntries: 3000,
-              maxAgeSeconds: 60 * 60 * 24 * 180,
-            },
-            cacheableResponse: { statuses: [200] },
-          },
-        },
-      ],
-      maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+      maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
     },
-    devOptions: { enabled: true },
+    devOptions: { enabled: process.env.VITE_ENABLE_PWA_DEV === "true" },
   }),
 ];
 
-export default defineConfig(({ command, mode }) => ({
-  plugins: createPlugins(command === "build", mode),
+export default defineConfig({
+  plugins,
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "client", "src"),
@@ -270,4 +214,4 @@ export default defineConfig(({ command, mode }) => ({
       deny: ["**/.*"],
     },
   },
-}));
+});

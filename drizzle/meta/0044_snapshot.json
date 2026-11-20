@@ -1,8 +1,8 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "395d84a7-d28f-4681-b1e3-b2d37d142eb4",
-  "prevId": "c19dec85-ea95-458e-b2cc-0a6c1980e412",
+  "id": "80e602d6-d5f5-4904-a7b1-2bcecf70a179",
+  "prevId": "115ffbb7-2779-4a26-ae96-54fde6b4a78d",
   "tables": {
     "adminFallbackPasswords": {
       "name": "adminFallbackPasswords",
@@ -170,17 +170,7 @@
           "default": "(now())"
         }
       },
-      "indexes": {
-        "agent_payments_company_beneficiary_idx": {
-          "name": "agent_payments_company_beneficiary_idx",
-          "columns": [
-            "companyId",
-            "beneficiaryType",
-            "beneficiaryId"
-          ],
-          "isUnique": false
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "agentPayments_id": {
@@ -633,12 +623,6 @@
           "columns": [
             "scheduleCronTaskUid"
           ]
-        },
-        "backup_settings_company_unique": {
-          "name": "backup_settings_company_unique",
-          "columns": [
-            "companyId"
-          ]
         }
       },
       "checkConstraint": {}
@@ -811,15 +795,7 @@
           "default": "(now())"
         }
       },
-      "indexes": {
-        "customers_company_idx": {
-          "name": "customers_company_idx",
-          "columns": [
-            "companyId"
-          ],
-          "isUnique": false
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "customers_id": {
@@ -907,10 +883,9 @@
         }
       },
       "uniqueConstraints": {
-        "expense_budgets_company_month_unique": {
-          "name": "expense_budgets_company_month_unique",
+        "expenseBudgets_yearMonth_unique": {
+          "name": "expenseBudgets_yearMonth_unique",
           "columns": [
-            "companyId",
             "yearMonth"
           ]
         }
@@ -1009,16 +984,7 @@
           "default": "(now())"
         }
       },
-      "indexes": {
-        "expenses_company_spent_idx": {
-          "name": "expenses_company_spent_idx",
-          "columns": [
-            "companyId",
-            "spentAt"
-          ],
-          "isUnique": false
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "expenses_id": {
@@ -1087,15 +1053,7 @@
           "default": "(now())"
         }
       },
-      "indexes": {
-        "inventory_items_session_idx": {
-          "name": "inventory_items_session_idx",
-          "columns": [
-            "inventorySessionId"
-          ],
-          "isUnique": false
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "inventoryItems_id": {
@@ -1236,10 +1194,9 @@
         }
       },
       "uniqueConstraints": {
-        "product_categories_company_name_unique": {
-          "name": "product_categories_company_name_unique",
+        "productCategories_name_unique": {
+          "name": "productCategories_name_unique",
           "columns": [
-            "companyId",
             "name"
           ]
         }
@@ -1303,15 +1260,7 @@
           "default": "(now())"
         }
       },
-      "indexes": {
-        "product_price_tiers_product_idx": {
-          "name": "product_price_tiers_product_idx",
-          "columns": [
-            "productId"
-          ],
-          "isUnique": false
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "productPriceTiers_id": {
@@ -1377,10 +1326,9 @@
         }
       },
       "uniqueConstraints": {
-        "product_units_company_name_unique": {
-          "name": "product_units_company_name_unique",
+        "productUnits_name_unique": {
+          "name": "productUnits_name_unique",
           "columns": [
-            "companyId",
             "name"
           ]
         }
@@ -1516,10 +1464,9 @@
         }
       },
       "uniqueConstraints": {
-        "products_company_reference_unique": {
-          "name": "products_company_reference_unique",
+        "products_reference_unique": {
+          "name": "products_reference_unique",
           "columns": [
-            "companyId",
             "reference"
           ]
         }
@@ -1609,15 +1556,7 @@
           "default": "(now())"
         }
       },
-      "indexes": {
-        "purchase_order_items_order_idx": {
-          "name": "purchase_order_items_order_idx",
-          "columns": [
-            "purchaseOrderId"
-          ],
-          "isUnique": false
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "purchaseOrderItems_id": {
@@ -1769,16 +1708,7 @@
           "default": "(now())"
         }
       },
-      "indexes": {
-        "purchase_orders_company_created_idx": {
-          "name": "purchase_orders_company_created_idx",
-          "columns": [
-            "companyId",
-            "createdAt"
-          ],
-          "isUnique": false
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "purchaseOrders_id": {
@@ -1961,23 +1891,7 @@
           "default": "(now())"
         }
       },
-      "indexes": {
-        "sale_commissions_sale_idx": {
-          "name": "sale_commissions_sale_idx",
-          "columns": [
-            "saleId"
-          ],
-          "isUnique": false
-        },
-        "sale_commissions_beneficiary_idx": {
-          "name": "sale_commissions_beneficiary_idx",
-          "columns": [
-            "beneficiaryType",
-            "beneficiaryId"
-          ],
-          "isUnique": false
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "saleCommissions_id": {
@@ -2529,14 +2443,7 @@
           ]
         }
       },
-      "uniqueConstraints": {
-        "sale_settings_company_unique": {
-          "name": "sale_settings_company_unique",
-          "columns": [
-            "companyId"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "checkConstraint": {}
     },
     "sales": {
@@ -3175,10 +3082,9 @@
         }
       },
       "uniqueConstraints": {
-        "suppliers_company_name_unique": {
-          "name": "suppliers_company_name_unique",
+        "suppliers_name_unique": {
+          "name": "suppliers_name_unique",
           "columns": [
-            "companyId",
             "name"
           ]
         }
@@ -3441,14 +3347,87 @@
           "columns": [
             "openId"
           ]
+        }
+      },
+      "checkConstraint": {}
+    },
+    "vatRatePresets": {
+      "name": "vatRatePresets",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
         },
-        "users_email_unique": {
-          "name": "users_email_unique",
+        "companyId": {
+          "name": "companyId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "label": {
+          "name": "label",
+          "type": "varchar(80)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "rateBasisPoints": {
+          "name": "rateBasisPoints",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "onUpdate": true,
+          "default": "(now())"
+        }
+      },
+      "indexes": {
+        "vat_rate_presets_company_rate_idx": {
+          "name": "vat_rate_presets_company_rate_idx",
           "columns": [
-            "email"
+            "companyId",
+            "rateBasisPoints"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "vatRatePresets_id": {
+          "name": "vatRatePresets_id",
+          "columns": [
+            "id"
           ]
         }
       },
+      "uniqueConstraints": {},
       "checkConstraint": {}
     }
   },

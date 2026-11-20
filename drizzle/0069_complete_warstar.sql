@@ -1,0 +1,1 @@
+ALTER TABLE `backupSettings` ADD CONSTRAINT `backup_settings_company_unique` UNIQUE(`companyId`);

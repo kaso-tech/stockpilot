@@ -1,77 +1,84 @@
 import type { Express } from "express";
+import { and, eq } from "drizzle-orm";
+import { products } from "../../drizzle/schema";
+import { companyScope } from "../companyScope";
+import { getDb } from "../db";
 import { storageGetSignedUrl, storageRead } from "../storage";
+import { parseProductImageKey } from "../productImages";
 import { sdk } from "./sdk";
 
-/**
- * Fichiers privés : sauvegardes (administrateurs), justificatifs de dépenses ou de
- * paie et photos de produits de l'entreprise. Logos et signatures restent publics
- * (factures partagées).
- */
-const PRIVATE_KEY = /^company\/([^/]+)\/(backups|expenses|payroll|products)\//;
-/** Photos de produits : contenu servi directement, mis en cache par le navigateur (clé unique par envoi). */
-const PRODUCT_IMAGE_KEY =
-  /^company\/[^/]+\/products\/\d+\/(image|thumb)_[a-f0-9]{8}\.(webp|jpg|png)$/;
-const IMAGE_TYPES: Record<string, string> = {
-  webp: "image/webp",
-  jpg: "image/jpeg",
-  png: "image/png",
-};
-
-export async function canReadStorageKey(
-  key: string,
-  authenticate: () => Promise<{ companyId: number | null; role: string }>
-) {
-  const match = key.match(PRIVATE_KEY);
-  if (!match) return true;
-  try {
-    const user = await authenticate();
-    if (String(user.companyId) !== match[1]) return false;
-    return match[2] !== "backups" || user.role === "admin";
-  } catch {
-    return false;
-  }
+export function canReadCompanyStorageKey(key: string, companyId: number): boolean {
+  const expectedPrefix = `company/${companyId}/`;
+  if (!key.startsWith(expectedPrefix)) return false;
+  return key.split("/").every(segment => segment.length > 0 && segment !== "." && segment !== "..");
 }
 
+/** Une photo n'est lisible que si son URL exacte figure sur le produit du même tenant. */
+export async function isAttachedProductImage(key: string, companyId: number): Promise<boolean> {
+  const parsed = parseProductImageKey(key);
+  if (!parsed || parsed.companyId !== companyId) return false;
+  const db = await getDb();
+  if (!db) return false;
+  const column = parsed.variant === "image" ? products.imageUrl : products.imageThumbUrl;
+  const expectedUrl = `/manus-storage/${key}`;
+  const rows = await db.select({ id: products.id }).from(products).where(and(
+    eq(products.id, parsed.productId),
+    companyScope(products.companyId, companyId),
+    eq(column, expectedUrl),
+  )).limit(1);
+  return rows.length > 0;
+}
+
+const IMAGE_TYPES: Record<string, string> = { webp: "image/webp", jpg: "image/jpeg", png: "image/png" };
 export function registerStorageProxy(app: Express) {
-  app.get("/manus-storage/*", async (req, res) => {
-    const key = (req.params as Record<string, string>)[0];
+  app.get("/manus-storage/{*key}", async (req, res) => {
+    const rawKey = (req.params as Record<string, string | string[]>).key;
+    const key = Array.isArray(rawKey) ? rawKey.join("/") : rawKey;
     if (!key) {
       res.status(400).send("Missing storage key");
       return;
     }
-
-    if (
-      key.includes("..") ||
-      !(await canReadStorageKey(key, () => sdk.authenticateRequest(req)))
-    ) {
-      res.status(404).send("Not found");
+    let user;
+    try {
+      user = await sdk.authenticateRequest(req);
+    } catch {
+      res.status(401).send("Authentication required");
       return;
     }
-
-    if (PRODUCT_IMAGE_KEY.test(key)) {
+    if (user.isCron || !canReadCompanyStorageKey(key, user.companyId)) {
+      res.status(403).send("File access denied");
+      return;
+    }
+    const image = parseProductImageKey(key);
+    if (/^company\/\d+\/products\//.test(key) && !image) {
+      res.status(404).set("Cache-Control", "no-store").send("Not found");
+      return;
+    }
+    if (image) {
       try {
+        if (!(await isAttachedProductImage(key, user.companyId))) {
+          res.status(404).set("Cache-Control", "no-store").send("Not found");
+          return;
+        }
         const body = await storageRead(key);
         res.set({
-          "Content-Type":
-            IMAGE_TYPES[key.split(".").pop() ?? ""] ?? "image/webp",
-          "Cache-Control": "private, max-age=31536000, immutable",
+          "Content-Type": IMAGE_TYPES[image.extension],
+          "Cache-Control": "private, no-store",
           "X-Content-Type-Options": "nosniff",
           "Content-Security-Policy": "default-src 'none'; sandbox",
         });
         res.send(body);
-      } catch (err) {
-        console.error("[StorageProxy] product image failed:", err);
-        res.status(404).send("Not found");
+      } catch {
+        res.set("Cache-Control", "no-store").status(404).send("Not found");
       }
       return;
     }
-
     try {
       const url = await storageGetSignedUrl(key);
       res.set("Cache-Control", "no-store");
       res.redirect(307, url);
-    } catch (err) {
-      console.error("[StorageProxy] failed:", err);
+    } catch {
+      console.error("[StorageProxy] storage signing failed");
       res.status(502).send("Storage proxy error");
     }
   });

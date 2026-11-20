@@ -1,81 +1,246 @@
-import {
-  boolean,
-  index,
-  int,
-  mysqlEnum,
-  mysqlTable,
-  text,
-  timestamp,
-  unique,
-  varchar,
-} from "drizzle-orm/mysql-core";
+import { boolean, decimal, index, int, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 
 export const companies = mysqlTable("companies", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 200 }).notNull(),
   ownerUserId: int("ownerUserId"),
+  platformStatus: mysqlEnum("platformStatus", ["active", "suspended"]).notNull().default("active"),
+  suspendedAt: timestamp("suspendedAt"),
+  suspensionReason: varchar("suspensionReason", { length: 400 }),
   onboardingCompletedAt: timestamp("onboardingCompletedAt"),
   onboardingSkippedAt: timestamp("onboardingSkippedAt"),
-  /** Abonnement (9.8) : plan, fin de l'essai et suspension éventuelle. */
-  plan: mysqlEnum("plan", ["trial", "starter", "pro"])
-    .notNull()
-    .default("trial"),
-  trialEndsAt: timestamp("trialEndsAt"),
-  planRenewsAt: timestamp("planRenewsAt"),
-  status: mysqlEnum("status", ["active", "suspended"])
-    .notNull()
-    .default("active"),
-  suspendedReason: varchar("suspendedReason", { length: 300 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
-export const users = mysqlTable(
-  "users",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    openId: varchar("openId", { length: 64 }).notNull().unique(),
-    name: text("name"),
-    email: varchar("email", { length: 320 }),
-    phone: varchar("phone", { length: 50 }),
-    loginMethod: varchar("loginMethod", { length: 64 }),
-    role: mysqlEnum("role", [
-      "admin",
-      "manager",
-      "seller",
-      "accountant",
-      "viewer",
-    ])
-      .default("seller")
-      .notNull(),
-    active: boolean("active").notNull().default(true),
-    companyId: int("companyId"),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-    lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
-    /** Date de confirmation de l'adresse e-mail (lien envoyé à l'inscription). */
-    emailVerifiedAt: timestamp("emailVerifiedAt"),
-  },
-  table => [
-    index("users_company_active_idx").on(table.companyId, table.active),
-    unique("users_email_unique").on(table.email),
-  ]
-);
+export const users = mysqlTable("users", {
+  id: int("id").autoincrement().primaryKey(),
+  openId: varchar("openId", { length: 64 }).notNull().unique(),
+  name: text("name"),
+  email: varchar("email", { length: 320 }),
+  emailNormalized: varchar("emailNormalized", { length: 320 }).unique(),
+  emailVerifiedAt: timestamp("emailVerifiedAt"),
+  phone: varchar("phone", { length: 50 }),
+  loginMethod: varchar("loginMethod", { length: 64 }),
+  role: mysqlEnum("role", ["admin", "manager", "seller", "accountant", "viewer"]).default("seller").notNull(),
+  active: boolean("active").notNull().default(true),
+  companyId: int("companyId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
+}, table => [index("users_company_active_idx").on(table.companyId, table.active)]);
 
-export const userSessions = mysqlTable(
-  "userSessions",
-  {
-    id: varchar("id", { length: 64 }).primaryKey(),
-    userId: int("userId").notNull(),
-    deviceLabel: varchar("deviceLabel", { length: 160 }).notNull(),
-    userAgent: varchar("userAgent", { length: 512 }),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    lastSeenAt: timestamp("lastSeenAt").defaultNow().notNull(),
-    expiresAt: timestamp("expiresAt").notNull(),
-    revokedAt: timestamp("revokedAt"),
-  },
-  table => [index("user_sessions_user_idx").on(table.userId)]
-);
+/** Opérateurs explicitement autorisés à administrer la plateforme SaaS. */
+export const platformAdminUsers = mysqlTable("platformAdminUsers", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique(),
+  platformRole: mysqlEnum("platformRole", ["super_admin", "operator", "operations", "support", "billing"]).notNull().default("operator"),
+  active: boolean("active").notNull().default(true),
+  createdByUserId: int("createdByUserId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+/** Journal append-only des actions de l’administration SaaS. */
+export const platformAuditLogs = mysqlTable("platformAuditLogs", {
+  id: int("id").autoincrement().primaryKey(),
+  actorUserId: int("actorUserId").notNull(),
+  action: varchar("action", { length: 120 }).notNull(),
+  entityType: varchar("entityType", { length: 80 }).notNull(),
+  entityId: int("entityId"),
+  companyId: int("companyId"),
+  reason: varchar("reason", { length: 400 }),
+  metadataJson: text("metadataJson"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [
+  index("platform_audit_company_created_idx").on(table.companyId, table.createdAt),
+  index("platform_audit_actor_created_idx").on(table.actorUserId, table.createdAt),
+]);
+
+/** Événements réversibles du cycle de vie d’une entreprise sur la plateforme. */
+export const companyLifecycleEvents = mysqlTable("companyLifecycleEvents", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  action: mysqlEnum("action", ["activated", "suspended"]).notNull(),
+  reason: varchar("reason", { length: 400 }),
+  actorUserId: int("actorUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [index("company_lifecycle_company_created_idx").on(table.companyId, table.createdAt)]);
+
+/** État agrégé de synchronisation remonté par l’application d’une entreprise, sans contenu d’opération. */
+export const companySyncHealth = mysqlTable("companySyncHealth", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull().unique(),
+  status: mysqlEnum("status", ["healthy", "pending", "failed", "offline"]).notNull().default("healthy"),
+  pendingOperations: int("pendingOperations").notNull().default(0),
+  failedOperations: int("failedOperations").notNull().default(0),
+  lastSyncedAt: timestamp("lastSyncedAt"),
+  reportedByUserId: int("reportedByUserId"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [index("company_sync_health_status_updated_idx").on(table.status, table.updatedAt)]);
+
+/** Métadonnées de supervision des traitements planifiés, sans contenu de données métier. */
+export const automationJobRuns = mysqlTable("automationJobRuns", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  jobType: mysqlEnum("jobType", ["backup", "payment_due_reminders"]).notNull(),
+  periodKey: varchar("periodKey", { length: 48 }).notNull(),
+  correlationId: varchar("correlationId", { length: 64 }).notNull(),
+  status: mysqlEnum("status", ["running", "success", "failed", "skipped"]).notNull().default("running"),
+  startedAt: timestamp("startedAt").defaultNow().notNull(),
+  completedAt: timestamp("completedAt"),
+  durationMs: int("durationMs"),
+  errorCode: varchar("errorCode", { length: 80 }),
+}, table => [
+  uniqueIndex("automation_job_runs_idempotency_unique").on(table.jobType, table.companyId, table.periodKey),
+  index("automation_job_runs_status_started_idx").on(table.status, table.startedAt),
+  index("automation_job_runs_company_started_idx").on(table.companyId, table.startedAt),
+]);
+
+/** Offre SaaS configurée par la plateforme ; aucun tarif ou paiement n’est activé sans prestataire validé. */
+export const subscriptionPlans = mysqlTable("subscriptionPlans", {
+  id: int("id").autoincrement().primaryKey(),
+  code: varchar("code", { length: 48 }).notNull().unique(),
+  name: varchar("name", { length: 120 }).notNull(),
+  description: varchar("description", { length: 500 }),
+  active: boolean("active").notNull().default(true),
+  sortOrder: int("sortOrder").notNull().default(0),
+  trialDays: int("trialDays").notNull().default(0),
+  monthlyPriceCents: int("monthlyPriceCents").notNull().default(0),
+  priceCents: int("priceCents").notNull().default(0),
+  currency: varchar("currency", { length: 3 }).notNull().default("XOF"),
+  billingInterval: mysqlEnum("billingInterval", ["monthly", "annual", "lifetime"]).notNull().default("monthly"),
+  limitsJson: varchar("limitsJson", { length: 4000 }).notNull().default("{}"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [index("subscription_plans_active_sort_idx").on(table.active, table.sortOrder)]);
+
+/** Souscription de l’entreprise, administrée côté serveur et indépendante des paiements métier du client. */
+export const companySubscriptions = mysqlTable("companySubscriptions", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull().unique(),
+  planId: int("planId"),
+  status: mysqlEnum("status", ["trial", "active", "past_due", "suspended", "cancelled", "manual"]).notNull().default("manual"),
+  trialEndsAt: timestamp("trialEndsAt"),
+  currentPeriodEndsAt: timestamp("currentPeriodEndsAt"),
+  graceEndsAt: timestamp("graceEndsAt"),
+  cancelledAt: timestamp("cancelledAt"),
+  updatedByPlatformUserId: int("updatedByPlatformUserId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [index("company_subscriptions_status_ends_idx").on(table.status, table.currentPeriodEndsAt)]);
+
+/** Événements de paiement SaaS reçus, minimisés et dédupliqués avant réconciliation explicite. */
+export const saasPaymentEvents = mysqlTable("saasPaymentEvents", {
+  id: int("id").autoincrement().primaryKey(),
+  provider: mysqlEnum("provider", ["yengapay"]).notNull().default("yengapay"),
+  companyId: int("companyId"),
+  eventType: varchar("eventType", { length: 96 }).notNull(),
+  providerReference: varchar("providerReference", { length: 180 }),
+  payloadSha256: varchar("payloadSha256", { length: 64 }).notNull(),
+  signatureVerified: boolean("signatureVerified").notNull().default(false),
+  status: mysqlEnum("status", ["received", "ignored", "processed", "rejected"]).notNull().default("received"),
+  receivedAt: timestamp("receivedAt").defaultNow().notNull(),
+  processedAt: timestamp("processedAt"),
+}, table => [
+  uniqueIndex("saas_payment_events_provider_payload_unique").on(table.provider, table.payloadSha256),
+  index("saas_payment_events_status_received_idx").on(table.status, table.receivedAt),
+  index("saas_payment_events_company_received_idx").on(table.companyId, table.receivedAt),
+]);
+
+/** Intention PayIn SaaS, créée côté serveur et réconciliée avant toute activation d’abonnement. */
+export const saasPaymentIntents = mysqlTable("saasPaymentIntents", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  planId: int("planId").notNull(),
+  createdByUserId: int("createdByUserId").notNull(),
+  requestKey: varchar("requestKey", { length: 64 }).notNull(),
+  reference: varchar("reference", { length: 180 }).notNull().unique(),
+  amountCents: int("amountCents").notNull(),
+  currency: varchar("currency", { length: 3 }).notNull(),
+  billingInterval: mysqlEnum("billingInterval", ["monthly", "annual", "lifetime"]).notNull().default("monthly"),
+  provider: mysqlEnum("provider", ["yengapay"]).notNull().default("yengapay"),
+  providerIntentId: varchar("providerIntentId", { length: 180 }),
+  providerPaymentId: varchar("providerPaymentId", { length: 180 }),
+  providerStatus: varchar("providerStatus", { length: 80 }),
+  checkoutUrl: varchar("checkoutUrl", { length: 1600 }),
+  status: mysqlEnum("status", ["created", "pending", "confirmed", "failed", "expired", "cancelled", "reconciliation_required"]).notNull().default("created"),
+  paymentEventId: int("paymentEventId"),
+  confirmedAt: timestamp("confirmedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  uniqueIndex("saas_payment_intents_company_request_unique").on(table.companyId, table.requestKey),
+  index("saas_payment_intents_company_status_created_idx").on(table.companyId, table.status, table.createdAt),
+  index("saas_payment_intents_provider_intent_idx").on(table.provider, table.providerIntentId),
+]);
+
+/** Demande d’assistance interne créée par un utilisateur de l’entreprise. */
+export const supportRequests = mysqlTable("supportRequests", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  requesterUserId: int("requesterUserId").notNull(),
+  warehouseId: int("warehouseId"),
+  subject: varchar("subject", { length: 180 }).notNull(),
+  message: text("message").notNull(),
+  status: mysqlEnum("status", ["open", "in_progress", "closed"]).notNull().default("open"),
+  attachmentKey: varchar("attachmentKey", { length: 720 }),
+  attachmentUrl: varchar("attachmentUrl", { length: 1024 }),
+  attachmentName: varchar("attachmentName", { length: 180 }),
+  attachmentMimeType: varchar("attachmentMimeType", { length: 80 }),
+  handledByUserId: int("handledByUserId"),
+  resolvedAt: timestamp("resolvedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  index("support_requests_company_status_created_idx").on(table.companyId, table.status, table.createdAt),
+  index("support_requests_requester_created_idx").on(table.requesterUserId, table.createdAt),
+  index("support_requests_company_warehouse_idx").on(table.companyId, table.warehouseId),
+]);
+
+/** Triage plateforme d’une demande, séparé du contenu et des pièces jointes clients. */
+export const supportAssignments = mysqlTable("supportAssignments", {
+  id: int("id").autoincrement().primaryKey(),
+  supportRequestId: int("supportRequestId").notNull().unique(),
+  priority: mysqlEnum("priority", ["low", "normal", "high", "critical"]).notNull().default("normal"),
+  assignedPlatformUserId: int("assignedPlatformUserId"),
+  dueAt: timestamp("dueAt"),
+  firstRespondedAt: timestamp("firstRespondedAt"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [index("support_assignments_priority_due_idx").on(table.priority, table.dueAt)]);
+
+/** Journal append-only de triage plateforme, sans copie de message ou de capture client. */
+export const supportPlatformEvents = mysqlTable("supportPlatformEvents", {
+  id: int("id").autoincrement().primaryKey(),
+  supportRequestId: int("supportRequestId").notNull(),
+  actorPlatformUserId: int("actorPlatformUserId").notNull(),
+  action: mysqlEnum("action", ["assigned", "priority_changed", "status_changed", "due_date_changed"]).notNull(),
+  metadataJson: varchar("metadataJson", { length: 600 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [index("support_platform_events_request_created_idx").on(table.supportRequestId, table.createdAt)]);
+
+export const userSessions = mysqlTable("userSessions", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  userId: int("userId").notNull(),
+  deviceLabel: varchar("deviceLabel", { length: 160 }).notNull(),
+  userAgent: varchar("userAgent", { length: 512 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  lastSeenAt: timestamp("lastSeenAt").defaultNow().notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  revokedAt: timestamp("revokedAt"),
+}, table => [index("user_sessions_user_idx").on(table.userId)]);
+
+/** Jetons de récupération à usage unique ; seule l’empreinte SHA-256 est persistée. */
+export const authTokens = mysqlTable("authTokens", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  type: mysqlEnum("type", ["password_reset", "email_verification"]).notNull(),
+  tokenHash: varchar("tokenHash", { length: 64 }).notNull().unique(),
+  emailHash: varchar("emailHash", { length: 64 }),
+  expiresAt: timestamp("expiresAt").notNull(),
+  usedAt: timestamp("usedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [index("auth_tokens_user_type_idx").on(table.userId, table.type)]);
 
 export const userDashboardPreferences = mysqlTable("userDashboardPreferences", {
   id: int("id").autoincrement().primaryKey(),
@@ -83,6 +248,32 @@ export const userDashboardPreferences = mysqlTable("userDashboardPreferences", {
   preferencesJson: text("preferencesJson").notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
+
+/** Entrepôt de travail retenu par un administrateur dans une entreprise. */
+export const userWarehousePreferences = mysqlTable("userWarehousePreferences", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  companyId: int("companyId").notNull(),
+  warehouseId: int("warehouseId").notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  uniqueIndex("user_warehouse_preferences_user_company_unique").on(table.userId, table.companyId),
+  index("user_warehouse_preferences_company_warehouse_idx").on(table.companyId, table.warehouseId),
+]);
+
+/** Dépôts auxquels un utilisateur opérationnel est autorisé à accéder, avec son rôle local. */
+export const sellerWarehouseAssignments = mysqlTable("sellerWarehouseAssignments", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  sellerUserId: int("sellerUserId").notNull(),
+  warehouseId: int("warehouseId").notNull(),
+  warehouseRole: mysqlEnum("warehouseRole", ["manager", "cashier", "seller"]).notNull().default("seller"),
+  createdByUserId: int("createdByUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [
+  uniqueIndex("seller_warehouse_assignments_unique").on(table.companyId, table.sellerUserId, table.warehouseId),
+  index("seller_warehouse_assignments_company_warehouse_idx").on(table.companyId, table.warehouseId),
+]);
 
 export const sellerCredentials = mysqlTable("sellerCredentials", {
   id: int("id").autoincrement().primaryKey(),
@@ -102,190 +293,260 @@ export const adminFallbackPasswords = mysqlTable("adminFallbackPasswords", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
-export const suppliers = mysqlTable(
-  "suppliers",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    companyId: int("companyId"),
-    name: varchar("name", { length: 160 }).notNull(),
-    otherReference: varchar("otherReference", { length: 80 }),
-    contactName: varchar("contactName", { length: 160 }),
-    address: text("address"),
-    email: varchar("email", { length: 320 }),
-    phone: varchar("phone", { length: 50 }),
-    taxNumber: varchar("taxNumber", { length: 100 }),
-    notes: text("notes"),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  },
-  table => [
-    unique("suppliers_company_name_unique").on(table.companyId, table.name),
-  ]
-);
+export const suppliers = mysqlTable("suppliers", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  name: varchar("name", { length: 160 }).notNull().unique(),
+  otherReference: varchar("otherReference", { length: 80 }),
+  contactName: varchar("contactName", { length: 160 }),
+  address: text("address"),
+  email: varchar("email", { length: 320 }),
+  phone: varchar("phone", { length: 50 }),
+  taxNumber: varchar("taxNumber", { length: 100 }),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
 
-export const purchaseOrders = mysqlTable(
-  "purchaseOrders",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    companyId: int("companyId"),
-    orderNumber: varchar("orderNumber", { length: 60 }).notNull(),
-    supplierId: int("supplierId").notNull(),
-    status: mysqlEnum("status", ["draft", "sent", "received", "cancelled"])
-      .notNull()
-      .default("draft"),
-    subtotalCents: int("subtotalCents").notNull().default(0),
-    vatRateBasisPoints: int("vatRateBasisPoints").notNull().default(0),
-    vatCents: int("vatCents").notNull().default(0),
-    deliveryFeeCents: int("deliveryFeeCents").notNull().default(0),
-    totalCents: int("totalCents").notNull().default(0),
-    notes: text("notes"),
-    expectedDeliveryDate: timestamp("expectedDeliveryDate"),
-    cancellationReason: text("cancellationReason"),
-    cancelledAt: timestamp("cancelledAt"),
-    receivedAt: timestamp("receivedAt"),
-    createdByUserId: int("createdByUserId").notNull(),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  },
-  table => [
-    index("purchase_orders_company_created_idx").on(
-      table.companyId,
-      table.createdAt
-    ),
-    unique("purchase_orders_company_number_unique").on(
-      table.companyId,
-      table.orderNumber
-    ),
-  ]
-);
+export const purchaseOrders = mysqlTable("purchaseOrders", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  orderNumber: varchar("orderNumber", { length: 60 }).notNull().unique(),
+  supplierId: int("supplierId").notNull(),
+  warehouseId: int("warehouseId"),
+  status: mysqlEnum("status", ["draft", "sent", "received", "cancelled"]).notNull().default("draft"),
+  subtotalCents: int("subtotalCents").notNull().default(0),
+  vatRateBasisPoints: int("vatRateBasisPoints").notNull().default(0),
+  vatCents: int("vatCents").notNull().default(0),
+  deliveryFeeCents: int("deliveryFeeCents").notNull().default(0),
+  totalCents: int("totalCents").notNull().default(0),
+  notes: text("notes"),
+  expectedDeliveryDate: timestamp("expectedDeliveryDate"),
+  cancellationReason: text("cancellationReason"),
+  cancelledAt: timestamp("cancelledAt"),
+  receivedAt: timestamp("receivedAt"),
+  createdByUserId: int("createdByUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
 
-export const purchaseOrderItems = mysqlTable(
-  "purchaseOrderItems",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    purchaseOrderId: int("purchaseOrderId").notNull(),
-    productId: int("productId").notNull(),
-    productName: varchar("productName", { length: 200 }).notNull(),
-    productReference: varchar("productReference", { length: 80 }).notNull(),
-    unit: varchar("unit", { length: 30 }).notNull(),
-    quantity: int("quantity").notNull(),
-    receivedQuantity: int("receivedQuantity").notNull().default(0),
-    purchasePriceCents: int("purchasePriceCents").notNull(),
-    lineTotalCents: int("lineTotalCents").notNull(),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-  },
-  table => [index("purchase_order_items_order_idx").on(table.purchaseOrderId)]
-);
+export const purchaseOrderItems = mysqlTable("purchaseOrderItems", {
+  id: int("id").autoincrement().primaryKey(),
+  purchaseOrderId: int("purchaseOrderId").notNull(),
+  productId: int("productId").notNull(),
+  productName: varchar("productName", { length: 200 }).notNull(),
+  productReference: varchar("productReference", { length: 80 }).notNull(),
+  unit: varchar("unit", { length: 30 }).notNull(),
+  quantity: int("quantity").notNull(),
+  receivedQuantity: int("receivedQuantity").notNull().default(0),
+  purchasePriceCents: int("purchasePriceCents").notNull(),
+  lineTotalCents: int("lineTotalCents").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
 
-export const products = mysqlTable(
-  "products",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    companyId: int("companyId"),
-    reference: varchar("reference", { length: 80 }).notNull(),
-    name: varchar("name", { length: 200 }).notNull(),
-    description: text("description"),
-    category: varchar("category", { length: 100 }).notNull(),
-    unit: varchar("unit", { length: 30 }).notNull().default("unité"),
-    /** Références vers le catalogue (9.4) ; les libellés ci-dessus restent copiés pour l'affichage. */
-    categoryId: int("categoryId"),
-    unitId: int("unitId"),
-    purchasePriceCents: int("purchasePriceCents").notNull().default(0),
-    retailPriceCents: int("retailPriceCents").notNull().default(0),
-    wholesalePriceCents: int("wholesalePriceCents").notNull().default(0),
-    quantity: int("quantity").notNull().default(0),
-    minimumQuantity: int("minimumQuantity").notNull().default(0),
-    /** Taux de TVA propre au produit (points de base) ; NULL = taux de l'entreprise. */
-    vatRateBasisPoints: int("vatRateBasisPoints"),
-    supplierId: int("supplierId"),
-    /** Photo du produit (WebP/JPEG compressé côté client) et sa miniature, sous /manus-storage. */
-    imageUrl: varchar("imageUrl", { length: 512 }),
-    imageThumbUrl: varchar("imageThumbUrl", { length: 512 }),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  },
-  table => [
-    unique("products_company_reference_unique").on(
-      table.companyId,
-      table.reference
-    ),
-  ]
-);
+export const products = mysqlTable("products", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  reference: varchar("reference", { length: 80 }).notNull().unique(),
+  name: varchar("name", { length: 200 }).notNull(),
+  description: text("description"),
+  category: varchar("category", { length: 100 }).notNull(),
+  unit: varchar("unit", { length: 30 }).notNull().default("unité"),
+  /** Références tenant-scopées ; les libellés restent la source d'affichage historique. */
+  categoryId: int("categoryId"),
+  unitId: int("unitId"),
+  purchasePriceCents: int("purchasePriceCents").notNull().default(0),
+  retailPriceCents: int("retailPriceCents").notNull().default(0),
+  wholesalePriceCents: int("wholesalePriceCents").notNull().default(0),
+  quantity: int("quantity").notNull().default(0),
+  minimumQuantity: int("minimumQuantity").notNull().default(0),
+  /** Taux de TVA propre au produit (points de base) ; NULL reprend le taux entreprise. */
+  vatRateBasisPoints: int("vatRateBasisPoints"),
+  supplierId: int("supplierId"),
+  imageUrl: varchar("imageUrl", { length: 512 }),
+  imageThumbUrl: varchar("imageThumbUrl", { length: 512 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  index("products_company_category_ref_idx").on(table.companyId, table.categoryId),
+  index("products_company_unit_ref_idx").on(table.companyId, table.unitId),
+]);
 
-export const productPriceTiers = mysqlTable(
-  "productPriceTiers",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    productId: int("productId").notNull(),
-    customerType: mysqlEnum("customerType", ["retail", "wholesale"])
-      .notNull()
-      .default("retail"),
-    minQuantity: int("minQuantity").notNull(),
-    unitPriceCents: int("unitPriceCents").notNull(),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  },
-  table => [index("product_price_tiers_product_idx").on(table.productId)]
-);
+/** Entrepôt physique ou point de stockage d'une entreprise. */
+export const warehouses = mysqlTable("warehouses", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  name: varchar("name", { length: 160 }).notNull(),
+  code: varchar("code", { length: 40 }).notNull(),
+  address: text("address"),
+  active: boolean("active").notNull().default(true),
+  isDefault: boolean("isDefault").notNull().default(false),
+  createdByUserId: int("createdByUserId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  uniqueIndex("warehouses_company_code_unique").on(table.companyId, table.code),
+  index("warehouses_company_active_idx").on(table.companyId, table.active),
+]);
 
-export const productCategories = mysqlTable(
-  "productCategories",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    companyId: int("companyId"),
-    name: varchar("name", { length: 100 }).notNull(),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  },
-  table => [
-    unique("product_categories_company_name_unique").on(
-      table.companyId,
-      table.name
-    ),
-  ]
-);
+/** Stock porté par un produit dans un entrepôt précis. */
+export const warehouseStocks = mysqlTable("warehouseStocks", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  warehouseId: int("warehouseId").notNull(),
+  productId: int("productId").notNull(),
+  quantity: int("quantity").notNull().default(0),
+  averageCostCents: int("averageCostCents").notNull().default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  uniqueIndex("warehouse_stocks_warehouse_product_unique").on(table.warehouseId, table.productId),
+  index("warehouse_stocks_company_warehouse_idx").on(table.companyId, table.warehouseId),
+  index("warehouse_stocks_company_product_idx").on(table.companyId, table.productId),
+]);
 
-export const productUnits = mysqlTable(
-  "productUnits",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    companyId: int("companyId"),
-    name: varchar("name", { length: 30 }).notNull(),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  },
-  table => [
-    unique("product_units_company_name_unique").on(table.companyId, table.name),
-  ]
-);
+/** Lots de traçabilité adossés au stock canonique warehouseStocks (quantité disponible et coût d'entrée). */
+export const stockLots = mysqlTable("stockLots", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  warehouseId: int("warehouseId").notNull(),
+  productId: int("productId").notNull(),
+  lotNumber: varchar("lotNumber", { length: 80 }).notNull(),
+  expiryDate: varchar("expiryDate", { length: 10 }),
+  quantity: int("quantity").notNull(),
+  unitCostCents: int("unitCostCents").notNull().default(0),
+  receivedAt: timestamp("receivedAt").defaultNow().notNull(),
+}, table => [
+  index("stock_lots_company_warehouse_product_idx").on(table.companyId, table.warehouseId, table.productId),
+  index("stock_lots_company_expiry_idx").on(table.companyId, table.expiryDate),
+]);
 
-export const customers = mysqlTable(
-  "customers",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    companyId: int("companyId"),
-    name: varchar("name", { length: 180 }).notNull(),
-    otherReference: varchar("otherReference", { length: 80 }),
-    type: mysqlEnum("type", ["ordinary", "wholesale"])
-      .notNull()
-      .default("ordinary"),
-    contactName: varchar("contactName", { length: 160 }),
-    email: varchar("email", { length: 320 }),
-    phone: varchar("phone", { length: 50 }),
-    address: text("address"),
-    taxNumber: varchar("taxNumber", { length: 100 }),
-    notes: text("notes"),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  },
-  table => [index("customers_company_idx").on(table.companyId)]
-);
+/** Seuil de réapprovisionnement spécifique à un produit dans un entrepôt. */
+export const warehouseReorderThresholds = mysqlTable("warehouseReorderThresholds", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  warehouseId: int("warehouseId").notNull(),
+  productId: int("productId").notNull(),
+  threshold: int("threshold").notNull().default(0),
+  updatedByUserId: int("updatedByUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  uniqueIndex("warehouse_reorder_thresholds_unique").on(table.companyId, table.warehouseId, table.productId),
+  index("warehouse_reorder_thresholds_company_warehouse_idx").on(table.companyId, table.warehouseId),
+]);
+
+/** Alerte de seuil indépendante pour chaque couple produit-entrepôt. */
+export const warehouseStockAlerts = mysqlTable("warehouseStockAlerts", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  warehouseId: int("warehouseId").notNull(),
+  productId: int("productId").notNull(),
+  threshold: int("threshold").notNull(),
+  observedQuantity: int("observedQuantity").notNull(),
+  coverageDays: decimal("coverageDays", { precision: 10, scale: 1 }),
+  urgency: mysqlEnum("urgency", ["critical", "high", "medium"]).notNull().default("medium"),
+  status: mysqlEnum("status", ["active", "resolved"]).notNull().default("active"),
+  acknowledgedAt: timestamp("acknowledgedAt"),
+  acknowledgedByUserId: int("acknowledgedByUserId"),
+  triggeredAt: timestamp("triggeredAt").defaultNow().notNull(),
+  resolvedAt: timestamp("resolvedAt"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  uniqueIndex("warehouse_stock_alerts_unique").on(table.companyId, table.warehouseId, table.productId),
+  index("warehouse_stock_alerts_company_warehouse_status_idx").on(table.companyId, table.warehouseId, table.status),
+]);
+
+/** Les transferts internes sont expédiés puis reçus dans une transaction distincte. */
+export const stockTransfers = mysqlTable("stockTransfers", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  transferNumber: varchar("transferNumber", { length: 60 }).notNull().unique(),
+  sourceWarehouseId: int("sourceWarehouseId").notNull(),
+  destinationWarehouseId: int("destinationWarehouseId").notNull(),
+  status: mysqlEnum("status", ["draft", "in_transit", "received", "cancelled"]).notNull().default("draft"),
+  notes: text("notes"),
+  cancellationReason: text("cancellationReason"),
+  createdByUserId: int("createdByUserId").notNull(),
+  dispatchedByUserId: int("dispatchedByUserId"),
+  receivedByUserId: int("receivedByUserId"),
+  cancelledByUserId: int("cancelledByUserId"),
+  dispatchedAt: timestamp("dispatchedAt"),
+  receivedAt: timestamp("receivedAt"),
+  cancelledAt: timestamp("cancelledAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  index("stock_transfers_company_status_idx").on(table.companyId, table.status),
+  index("stock_transfers_company_created_idx").on(table.companyId, table.createdAt),
+  index("stock_transfers_source_idx").on(table.sourceWarehouseId),
+  index("stock_transfers_destination_idx").on(table.destinationWarehouseId),
+]);
+
+export const stockTransferItems = mysqlTable("stockTransferItems", {
+  id: int("id").autoincrement().primaryKey(),
+  stockTransferId: int("stockTransferId").notNull(),
+  productId: int("productId").notNull(),
+  productName: varchar("productName", { length: 200 }).notNull(),
+  productReference: varchar("productReference", { length: 80 }).notNull(),
+  unit: varchar("unit", { length: 30 }).notNull(),
+  quantity: int("quantity").notNull(),
+  lotsJson: text("lotsJson"),
+  unitCostCents: int("unitCostCents").notNull().default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [
+  uniqueIndex("stock_transfer_items_transfer_product_unique").on(table.stockTransferId, table.productId),
+  index("stock_transfer_items_transfer_idx").on(table.stockTransferId),
+]);
+
+export const productPriceTiers = mysqlTable("productPriceTiers", {
+  id: int("id").autoincrement().primaryKey(),
+  productId: int("productId").notNull(),
+  customerType: mysqlEnum("customerType", ["retail", "wholesale"]).notNull().default("retail"),
+  minQuantity: int("minQuantity").notNull(),
+  unitPriceCents: int("unitPriceCents").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const productCategories = mysqlTable("productCategories", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [uniqueIndex("product_categories_company_name_unique").on(table.companyId, table.name)]);
+
+export const productUnits = mysqlTable("productUnits", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  name: varchar("name", { length: 30 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [uniqueIndex("product_units_company_name_unique").on(table.companyId, table.name)]);
+
+export const customers = mysqlTable("customers", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  name: varchar("name", { length: 180 }).notNull(),
+  otherReference: varchar("otherReference", { length: 80 }),
+  type: mysqlEnum("type", ["ordinary", "wholesale"]).notNull().default("ordinary"),
+  contactName: varchar("contactName", { length: 160 }),
+  email: varchar("email", { length: 320 }),
+  phone: varchar("phone", { length: 50 }),
+  address: text("address"),
+  taxNumber: varchar("taxNumber", { length: 100 }),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
 
 export const agents = mysqlTable("agents", {
   id: int("id").autoincrement().primaryKey(),
-  companyId: int("companyId"),
+  companyId: int("companyId").notNull(),
   name: varchar("name", { length: 160 }).notNull(),
   type: mysqlEnum("type", ["sales_agent", "cashier"]).notNull(),
+  warehouseScope: mysqlEnum("warehouseScope", ["all", "selected", "attribution_only"]).notNull().default("all"),
   email: varchar("email", { length: 320 }),
   phone: varchar("phone", { length: 50 }),
   active: boolean("active").notNull().default(true),
@@ -293,493 +554,526 @@ export const agents = mysqlTable("agents", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+/** Dépôts retenus lorsqu’un agent commercial est limité à une sélection. */
+export const salesAgentWarehouseAssignments = mysqlTable("salesAgentWarehouseAssignments", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  agentId: int("agentId").notNull(),
+  warehouseId: int("warehouseId").notNull(),
+  createdByUserId: int("createdByUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [
+  uniqueIndex("sales_agent_warehouse_assignments_unique").on(table.companyId, table.agentId, table.warehouseId),
+  index("sales_agent_warehouse_assignments_company_warehouse_idx").on(table.companyId, table.warehouseId),
+]);
+
 export const remunerationProfiles = mysqlTable("remunerationProfiles", {
   id: int("id").autoincrement().primaryKey(),
-  companyId: int("companyId"),
+  companyId: int("companyId").notNull(),
   beneficiaryType: mysqlEnum("beneficiaryType", ["user", "agent"]).notNull(),
   beneficiaryId: int("beneficiaryId").notNull(),
-  remunerationMode: mysqlEnum("remunerationMode", [
-    "fixed",
-    "commission",
-    "fixed_plus_commission",
-  ])
-    .notNull()
-    .default("commission"),
+  remunerationMode: mysqlEnum("remunerationMode", ["fixed", "commission", "fixed_plus_commission"]).notNull().default("commission"),
   fixedMonthlyCents: int("fixedMonthlyCents").notNull().default(0),
-  commissionBasis: mysqlEnum("commissionBasis", ["revenue", "net_profit"])
-    .notNull()
-    .default("revenue"),
+  commissionBasis: mysqlEnum("commissionBasis", ["revenue", "net_profit"]).notNull().default("revenue"),
   rateBasisPoints: int("rateBasisPoints").notNull().default(0),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
-export const saleSettings = mysqlTable(
-  "saleSettings",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    companyId: int("companyId"),
-    defaultSalesAgentId: int("defaultSalesAgentId"),
-    defaultCashierId: int("defaultCashierId"),
-    requireSalesAgent: boolean("requireSalesAgent").notNull().default(false),
-    requireCashier: boolean("requireCashier").notNull().default(false),
-    currency: mysqlEnum("currency", ["USD", "EUR", "XOF"])
-      .notNull()
-      .default("XOF"),
-    /** Fuseau IANA utilisé pour les journées et mois comptables (tableau de bord, paie, dépenses). */
-    timezone: varchar("timezone", { length: 64 })
-      .notNull()
-      .default("Africa/Abidjan"),
-    primaryColor: varchar("primaryColor", { length: 7 })
-      .notNull()
-      .default("#0B6E76"),
-    companyName: varchar("companyName", { length: 200 })
-      .notNull()
-      .default("StockPilot"),
-    companyLogoUrl: text("companyLogoUrl"),
-    companySignatureUrl: text("companySignatureUrl"),
-    companySignatureLabel: varchar("companySignatureLabel", { length: 120 })
-      .notNull()
-      .default("Signature & cachet"),
-    companyAgreementLabel: varchar("companyAgreementLabel", { length: 120 })
-      .notNull()
-      .default("Bon pour accord"),
-    companySignatureAlignment: mysqlEnum("companySignatureAlignment", [
-      "left",
-      "center",
-      "right",
-    ])
-      .notNull()
-      .default("right"),
-    companyAddress: text("companyAddress"),
-    companyPhone: varchar("companyPhone", { length: 50 }),
-    companyEmail: varchar("companyEmail", { length: 320 }),
-    companyFooter: text("companyFooter"),
-    ticketHeader: varchar("ticketHeader", { length: 160 })
-      .notNull()
-      .default("Merci de votre achat"),
-    ticketFooter: varchar("ticketFooter", { length: 240 })
-      .notNull()
-      .default("À bientôt"),
-    ticketWidthMm: mysqlEnum("ticketWidthMm", ["58", "80"])
-      .notNull()
-      .default("80"),
-    printerName: varchar("printerName", { length: 120 })
-      .notNull()
-      .default("Imprimante système"),
-    printerType: mysqlEnum("printerType", ["browser", "thermal"])
-      .notNull()
-      .default("browser"),
-    paymentCashEnabled: boolean("paymentCashEnabled").notNull().default(true),
-    paymentCardEnabled: boolean("paymentCardEnabled").notNull().default(true),
-    paymentMobileMoneyEnabled: boolean("paymentMobileMoneyEnabled")
-      .notNull()
-      .default(true),
-    paymentBankTransferEnabled: boolean("paymentBankTransferEnabled")
-      .notNull()
-      .default(true),
-    paymentCreditEnabled: boolean("paymentCreditEnabled")
-      .notNull()
-      .default(true),
-    sellerCanOverridePrice: boolean("sellerCanOverridePrice")
-      .notNull()
-      .default(false),
-    sellerCanSellBelowPrice: boolean("sellerCanSellBelowPrice")
-      .notNull()
-      .default(false),
-    sellerMaxDiscountPercent: int("sellerMaxDiscountPercent")
-      .notNull()
-      .default(0),
-    sellerCanCancelInvoice: boolean("sellerCanCancelInvoice")
-      .notNull()
-      .default(false),
-    sellerCanRefund: boolean("sellerCanRefund").notNull().default(false),
-    sellerCanCorrectStock: boolean("sellerCanCorrectStock")
-      .notNull()
-      .default(false),
-    sellerCanEditPurchasePrice: boolean("sellerCanEditPurchasePrice")
-      .notNull()
-      .default(false),
-    vatEnabled: boolean("vatEnabled").notNull().default(false),
-    vatRateBasisPoints: int("vatRateBasisPoints").notNull().default(0),
-    updatedByUserId: int("updatedByUserId"),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  },
-  table => [unique("sale_settings_company_unique").on(table.companyId)]
-);
+export const saleSettings = mysqlTable("saleSettings", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  defaultSalesAgentId: int("defaultSalesAgentId"),
+  defaultCashierId: int("defaultCashierId"),
+  requireSalesAgent: boolean("requireSalesAgent").notNull().default(false),
+  requireCashier: boolean("requireCashier").notNull().default(false),
+  currency: mysqlEnum("currency", ["USD", "EUR", "XOF"]).notNull().default("XOF"),
+  timezone: varchar("timezone", { length: 64 }).notNull().default("Africa/Abidjan"),
+  primaryColor: varchar("primaryColor", { length: 7 }).notNull().default("#0B6E76"),
+  companyName: varchar("companyName", { length: 200 }).notNull().default("StockPilot"),
+  companyLogoUrl: text("companyLogoUrl"),
+  companySignatureUrl: text("companySignatureUrl"),
+  companySignatureLabel: varchar("companySignatureLabel", { length: 120 }).notNull().default("Signature & cachet"),
+  companyAgreementLabel: varchar("companyAgreementLabel", { length: 120 }).notNull().default("Bon pour accord"),
+  companySignatureAlignment: mysqlEnum("companySignatureAlignment", ["left", "center", "right"]).notNull().default("right"),
+  companyAddress: text("companyAddress"),
+  companyPhone: varchar("companyPhone", { length: 50 }),
+  companyEmail: varchar("companyEmail", { length: 320 }),
+  companyFooter: text("companyFooter"),
+  ticketHeader: varchar("ticketHeader", { length: 160 }).notNull().default("Merci de votre achat"),
+  ticketFooter: varchar("ticketFooter", { length: 240 }).notNull().default("À bientôt"),
+  ticketWidthMm: mysqlEnum("ticketWidthMm", ["58", "80"]).notNull().default("80"),
+  printerName: varchar("printerName", { length: 120 }).notNull().default("Imprimante système"),
+  printerType: mysqlEnum("printerType", ["browser", "thermal"]).notNull().default("browser"),
+  invoiceTemplate: mysqlEnum("invoiceTemplate", ["classic", "modern", "minimal"]).notNull().default("classic"),
+  invoiceShowLogo: boolean("invoiceShowLogo").notNull().default(true),
+  invoiceShowSignature: boolean("invoiceShowSignature").notNull().default(true),
+  invoiceShowPaymentDetails: boolean("invoiceShowPaymentDetails").notNull().default(true),
+  invoiceShowDelivery: boolean("invoiceShowDelivery").notNull().default(true),
+  paymentCashEnabled: boolean("paymentCashEnabled").notNull().default(true),
+  paymentCardEnabled: boolean("paymentCardEnabled").notNull().default(true),
+  paymentMobileMoneyEnabled: boolean("paymentMobileMoneyEnabled").notNull().default(true),
+  paymentBankTransferEnabled: boolean("paymentBankTransferEnabled").notNull().default(true),
+  paymentCreditEnabled: boolean("paymentCreditEnabled").notNull().default(true),
+  sellerCanOverridePrice: boolean("sellerCanOverridePrice").notNull().default(false),
+  sellerCanSellBelowPrice: boolean("sellerCanSellBelowPrice").notNull().default(false),
+  sellerMaxDiscountPercent: int("sellerMaxDiscountPercent").notNull().default(0),
+  sellerCanToggleVat: boolean("sellerCanToggleVat").notNull().default(false),
+  sellerCanLineDiscount: boolean("sellerCanLineDiscount").notNull().default(false),
+  sellerMaxLineDiscountPercent: int("sellerMaxLineDiscountPercent").notNull().default(0),
+  sellerCanInvoiceDiscount: boolean("sellerCanInvoiceDiscount").notNull().default(false),
+  sellerMaxInvoiceDiscountPercent: int("sellerMaxInvoiceDiscountPercent").notNull().default(0),
+  sellerCanCartDiscount: boolean("sellerCanCartDiscount").notNull().default(false),
+  sellerMaxCartDiscountPercent: int("sellerMaxCartDiscountPercent").notNull().default(0),
+  sellerCanEditInvoiceItemPrice: boolean("sellerCanEditInvoiceItemPrice").notNull().default(false),
+  sellerMaxInvoiceItemPriceChangePercent: int("sellerMaxInvoiceItemPriceChangePercent").notNull().default(0),
+  sellerCanEditCartItemPrice: boolean("sellerCanEditCartItemPrice").notNull().default(false),
+  sellerMaxCartItemPriceChangePercent: int("sellerMaxCartItemPriceChangePercent").notNull().default(0),
+  sellerCanCancelInvoice: boolean("sellerCanCancelInvoice").notNull().default(false),
+  sellerCanRefund: boolean("sellerCanRefund").notNull().default(false),
+  sellerCanCorrectStock: boolean("sellerCanCorrectStock").notNull().default(false),
+  sellerCanEditPurchasePrice: boolean("sellerCanEditPurchasePrice").notNull().default(false),
+  vatEnabled: boolean("vatEnabled").notNull().default(false),
+  vatRateBasisPoints: int("vatRateBasisPoints").notNull().default(0),
+  defaultDeliveryFeeCents: int("defaultDeliveryFeeCents").notNull().default(0),
+  customerSuggestionsEnabled: boolean("customerSuggestionsEnabled").notNull().default(true),
+  customerSuggestionsLimit: int("customerSuggestionsLimit").notNull().default(4),
+  updatedByUserId: int("updatedByUserId"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
 
-export const sales = mysqlTable(
-  "sales",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    companyId: int("companyId"),
-    invoiceNumber: varchar("invoiceNumber", { length: 60 }).notNull(),
-    /** Numéro de l'avoir émis lors d'un remboursement (séquence AV par entreprise). */
-    creditNoteNumber: varchar("creditNoteNumber", { length: 60 }),
-    refundedAt: timestamp("refundedAt"),
-    /** Montant remboursé par des retours partiels (TTC) et coût d'achat correspondant. */
-    returnedCents: int("returnedCents").notNull().default(0),
-    returnedCostCents: int("returnedCostCents").notNull().default(0),
-    offlineOperationId: varchar("offlineOperationId", { length: 80 }).unique(),
-    channel: mysqlEnum("channel", ["pos", "invoice", "quote"])
-      .notNull()
-      .default("invoice"),
-    customerId: int("customerId"),
-    sellerUserId: int("sellerUserId").notNull(),
-    salesAgentId: int("salesAgentId"),
-    cashierId: int("cashierId"),
-    status: mysqlEnum("status", ["draft", "partial", "paid", "void"])
-      .notNull()
-      .default("draft"),
-    paymentMethod: mysqlEnum("paymentMethod", [
-      "cash",
-      "card",
-      "mobile_money",
-      "bank_transfer",
-      "credit",
-    ])
-      .notNull()
-      .default("cash"),
-    amountPaidCents: int("amountPaidCents").notNull().default(0),
-    subtotalCents: int("subtotalCents").notNull(),
-    vatRateBasisPoints: int("vatRateBasisPoints").notNull().default(0),
-    vatCents: int("vatCents").notNull().default(0),
-    deliveryFeeCents: int("deliveryFeeCents").notNull().default(0),
-    invoiceDiscountType: mysqlEnum("invoiceDiscountType", [
-      "none",
-      "percent",
-      "fixed",
-    ])
-      .notNull()
-      .default("none"),
-    invoiceDiscountValue: int("invoiceDiscountValue").notNull().default(0),
-    invoiceDiscountCents: int("invoiceDiscountCents").notNull().default(0),
-    totalCents: int("totalCents").notNull(),
-    totalCostCents: int("totalCostCents").notNull(),
-    netProfitCents: int("netProfitCents").notNull(),
-    note: text("note"),
-    deliveryAddress: text("deliveryAddress"),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    voidedAt: timestamp("voidedAt"),
-  },
-  table => [
-    unique("sales_company_invoice_number_unique").on(
-      table.companyId,
-      table.invoiceNumber
-    ),
-    index("sales_company_created_idx").on(table.companyId, table.createdAt),
-    index("sales_company_status_idx").on(table.companyId, table.status),
-    index("sales_offline_user_idx").on(
-      table.offlineOperationId,
-      table.sellerUserId
-    ),
-  ]
-);
+export const vatRatePresets = mysqlTable("vatRatePresets", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  label: varchar("label", { length: 80 }).notNull(),
+  rateBasisPoints: int("rateBasisPoints").notNull(),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [index("vat_rate_presets_company_rate_idx").on(table.companyId, table.rateBasisPoints)]);
 
-export const expenses = mysqlTable(
-  "expenses",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    companyId: int("companyId"),
-    category: mysqlEnum("category", [
-      "rent",
-      "energy",
-      "connection",
-      "salary",
-      "marketing",
-      "supplies",
-      "taxes",
-      "other",
-    ]).notNull(),
-    description: varchar("description", { length: 300 }).notNull(),
-    amountCents: int("amountCents").notNull(),
-    spentAt: timestamp("spentAt").notNull().defaultNow(),
-    receiptUrl: text("receiptUrl"),
-    receiptName: varchar("receiptName", { length: 180 }),
-    receiptMimeType: varchar("receiptMimeType", { length: 80 }),
-    createdByUserId: int("createdByUserId").notNull(),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  },
-  table => [
-    index("expenses_company_spent_idx").on(table.companyId, table.spentAt),
-  ]
-);
+export const sales = mysqlTable("sales", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  invoiceNumber: varchar("invoiceNumber", { length: 60 }).notNull().unique(),
+  creditNoteNumber: varchar("creditNoteNumber", { length: 60 }),
+  refundedAt: timestamp("refundedAt"),
+  returnedCents: int("returnedCents").notNull().default(0),
+  returnedCostCents: int("returnedCostCents").notNull().default(0),
+  offlineOperationId: varchar("offlineOperationId", { length: 80 }).unique(),
+  channel: mysqlEnum("channel", ["pos", "invoice", "quote"]).notNull().default("invoice"),
+  customerId: int("customerId"),
+  warehouseId: int("warehouseId"),
+  sellerUserId: int("sellerUserId").notNull(),
+  salesAgentId: int("salesAgentId"),
+  cashierId: int("cashierId"),
+  status: mysqlEnum("status", ["draft", "partial", "paid", "void"]).notNull().default("draft"),
+  paymentMethod: mysqlEnum("paymentMethod", ["cash", "card", "mobile_money", "bank_transfer", "credit"]).notNull().default("cash"),
+  amountPaidCents: int("amountPaidCents").notNull().default(0),
+  subtotalCents: int("subtotalCents").notNull(),
+  vatRateBasisPoints: int("vatRateBasisPoints").notNull().default(0),
+  vatCents: int("vatCents").notNull().default(0),
+  deliveryFeeCents: int("deliveryFeeCents").notNull().default(0),
+  invoiceDiscountType: mysqlEnum("invoiceDiscountType", ["none", "percent", "fixed"]).notNull().default("none"),
+  invoiceDiscountValue: int("invoiceDiscountValue").notNull().default(0),
+  invoiceDiscountCents: int("invoiceDiscountCents").notNull().default(0),
+  totalCents: int("totalCents").notNull(),
+  totalCostCents: int("totalCostCents").notNull(),
+  netProfitCents: int("netProfitCents").notNull(),
+  note: text("note"),
+  deliveryAddress: text("deliveryAddress"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  voidedAt: timestamp("voidedAt"),
+}, table => [index("sales_company_created_idx").on(table.companyId, table.createdAt), index("sales_company_status_idx").on(table.companyId, table.status), index("sales_offline_user_idx").on(table.offlineOperationId, table.sellerUserId)]);
 
-export const expenseBudgets = mysqlTable(
-  "expenseBudgets",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    companyId: int("companyId"),
-    yearMonth: varchar("yearMonth", { length: 7 }).notNull(),
-    amountCents: int("amountCents").notNull(),
-    warningPercent: int("warningPercent").notNull().default(80),
-    updatedByUserId: int("updatedByUserId").notNull(),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  },
-  table => [
-    unique("expense_budgets_company_month_unique").on(
-      table.companyId,
-      table.yearMonth
-    ),
-  ]
-);
+export const expenses = mysqlTable("expenses", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  warehouseId: int("warehouseId"),
+  category: mysqlEnum("category", ["rent", "energy", "connection", "salary", "marketing", "supplies", "taxes", "other"]).notNull(),
+  description: varchar("description", { length: 300 }).notNull(),
+  amountCents: int("amountCents").notNull(),
+  spentAt: timestamp("spentAt").notNull().defaultNow(),
+  receiptUrl: text("receiptUrl"),
+  receiptName: varchar("receiptName", { length: 180 }),
+  receiptMimeType: varchar("receiptMimeType", { length: 80 }),
+  createdByUserId: int("createdByUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [index("expenses_company_warehouse_spent_idx").on(table.companyId, table.warehouseId, table.spentAt)]);
 
-export const salePayments = mysqlTable(
-  "salePayments",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    saleId: int("saleId").notNull(),
-    offlineOperationId: varchar("offlineOperationId", { length: 80 }).unique(),
-    method: mysqlEnum("method", [
-      "cash",
-      "card",
-      "mobile_money",
-      "bank_transfer",
-      "credit",
-    ]).notNull(),
-    amountCents: int("amountCents").notNull(),
-    createdByUserId: int("createdByUserId").notNull(),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-  },
-  table => [
-    index("sale_payments_sale_idx").on(table.saleId),
-    index("sale_payments_offline_idx").on(table.offlineOperationId),
-  ]
-);
+export const expenseBudgets = mysqlTable("expenseBudgets", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  warehouseId: int("warehouseId"),
+  yearMonth: varchar("yearMonth", { length: 7 }).notNull(),
+  amountCents: int("amountCents").notNull(),
+  warningPercent: int("warningPercent").notNull().default(80),
+  updatedByUserId: int("updatedByUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [uniqueIndex("expense_budgets_company_warehouse_month_unique").on(table.companyId, table.warehouseId, table.yearMonth)]);
 
-export const saleItems = mysqlTable(
-  "saleItems",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    saleId: int("saleId").notNull(),
-    productId: int("productId").notNull(),
-    productName: varchar("productName", { length: 200 }).notNull(),
-    productReference: varchar("productReference", { length: 80 }).notNull(),
-    quantity: int("quantity").notNull(),
-    unitPriceCents: int("unitPriceCents").notNull(),
-    purchasePriceCents: int("purchasePriceCents").notNull(),
-    discountType: mysqlEnum("discountType", ["none", "percent", "fixed"])
-      .notNull()
-      .default("none"),
-    discountValue: int("discountValue").notNull().default(0),
-    discountCents: int("discountCents").notNull().default(0),
-    lineSubtotalCents: int("lineSubtotalCents").notNull().default(0),
-    lineTotalCents: int("lineTotalCents").notNull(),
-    lineCostCents: int("lineCostCents").notNull(),
-    /** Quantité déjà rendue par des retours partiels. */
-    returnedQuantity: int("returnedQuantity").notNull().default(0),
-    /** TVA de la ligne (taux appliqué et montant après répartition de la remise globale). */
-    vatRateBasisPoints: int("vatRateBasisPoints").notNull().default(0),
-    vatCents: int("vatCents").notNull().default(0),
-  },
-  table => [
-    index("sale_items_sale_idx").on(table.saleId),
-    index("sale_items_product_idx").on(table.productId),
-  ]
-);
+/** Modèle récurrent ou ponctuel d’une échéance de dépense ou de salaire, isolé par entreprise. */
+export const paymentDueSchedules = mysqlTable("paymentDueSchedules", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  warehouseId: int("warehouseId"),
+  scheduleType: mysqlEnum("scheduleType", ["expense", "salary"]).notNull(),
+  title: varchar("title", { length: 180 }).notNull(),
+  expenseCategory: mysqlEnum("expenseCategory", ["rent", "energy", "connection", "salary", "marketing", "supplies", "taxes", "other"]),
+  beneficiaryType: mysqlEnum("beneficiaryType", ["user", "agent"]),
+  beneficiaryId: int("beneficiaryId"),
+  beneficiaryGroupId: int("beneficiaryGroupId"),
+  templateId: int("templateId"),
+  amountCents: int("amountCents").notNull(),
+  recurrence: mysqlEnum("recurrence", ["once", "monthly"]).notNull().default("once"),
+  dueDay: int("dueDay"),
+  startsAt: timestamp("startsAt").notNull(),
+  endsAt: timestamp("endsAt"),
+  reminderDaysJson: varchar("reminderDaysJson", { length: 80 }).notNull().default("[7,3,1]"),
+  responsibleUserId: int("responsibleUserId"),
+  status: mysqlEnum("status", ["active", "paused", "archived"]).notNull().default("active"),
+  createdByUserId: int("createdByUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [index("payment_due_schedules_company_status_idx").on(table.companyId, table.status), index("payment_due_schedules_company_warehouse_idx").on(table.companyId, table.warehouseId)]);
 
-export const saleCommissions = mysqlTable(
-  "saleCommissions",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    saleId: int("saleId").notNull(),
-    beneficiaryType: mysqlEnum("beneficiaryType", ["user", "agent"]).notNull(),
-    beneficiaryId: int("beneficiaryId").notNull(),
-    commissionBasis: mysqlEnum("commissionBasis", [
-      "revenue",
-      "net_profit",
-    ]).notNull(),
-    rateBasisPoints: int("rateBasisPoints").notNull(),
-    commissionCents: int("commissionCents").notNull(),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-  },
-  table => [
-    index("sale_commissions_sale_idx").on(table.saleId),
-    index("sale_commissions_beneficiary_idx").on(
-      table.beneficiaryType,
-      table.beneficiaryId
-    ),
-  ]
-);
+/** Modèle réutilisable pour créer une échéance de dépense ou de salaire sans dupliquer ses règles. */
+export const paymentDueTemplates = mysqlTable("paymentDueTemplates", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  warehouseId: int("warehouseId"),
+  name: varchar("name", { length: 120 }).notNull(),
+  scheduleType: mysqlEnum("scheduleType", ["expense", "salary"]).notNull(),
+  expenseCategory: mysqlEnum("expenseCategory", ["rent", "energy", "connection", "salary", "marketing", "supplies", "taxes", "other"]),
+  amountCents: int("amountCents").notNull(),
+  recurrence: mysqlEnum("recurrence", ["once", "monthly"]).notNull().default("monthly"),
+  dueDay: int("dueDay"),
+  reminderDaysJson: varchar("reminderDaysJson", { length: 80 }).notNull().default("[7,3,1]"),
+  responsibleUserId: int("responsibleUserId"),
+  active: boolean("active").notNull().default(true),
+  createdByUserId: int("createdByUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [uniqueIndex("payment_due_templates_company_name_unique").on(table.companyId, table.name), index("payment_due_templates_company_type_idx").on(table.companyId, table.scheduleType)]);
 
-export const agentPayments = mysqlTable(
-  "agentPayments",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    companyId: int("companyId"),
-    beneficiaryType: mysqlEnum("beneficiaryType", ["user", "agent"]).notNull(),
-    beneficiaryId: int("beneficiaryId").notNull(),
-    amountCents: int("amountCents").notNull(),
-    paidAt: timestamp("paidAt").defaultNow().notNull(),
-    periodLabel: varchar("periodLabel", { length: 40 }),
-    note: text("note"),
-    receiptUrl: varchar("receiptUrl", { length: 1024 }),
-    receiptName: varchar("receiptName", { length: 180 }),
-    receiptMimeType: varchar("receiptMimeType", { length: 80 }),
-    createdByUserId: int("createdByUserId").notNull(),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-  },
-  table => [
-    index("agent_payments_company_beneficiary_idx").on(
-      table.companyId,
-      table.beneficiaryType,
-      table.beneficiaryId
-    ),
-  ]
-);
+/** Groupe d’agents ou de vendeurs pouvant recevoir une même programmation de salaire. */
+export const paymentDueBeneficiaryGroups = mysqlTable("paymentDueBeneficiaryGroups", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  warehouseId: int("warehouseId"),
+  name: varchar("name", { length: 120 }).notNull(),
+  active: boolean("active").notNull().default(true),
+  createdByUserId: int("createdByUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [uniqueIndex("payment_due_groups_company_name_unique").on(table.companyId, table.name), index("payment_due_groups_company_warehouse_idx").on(table.companyId, table.warehouseId)]);
+
+/** Membres d’un groupe de bénéficiaires, isolés par entreprise et sans donnée de paie en double. */
+export const paymentDueBeneficiaryGroupMembers = mysqlTable("paymentDueBeneficiaryGroupMembers", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  groupId: int("groupId").notNull(),
+  beneficiaryType: mysqlEnum("beneficiaryType", ["user", "agent"]).notNull(),
+  beneficiaryId: int("beneficiaryId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [uniqueIndex("payment_due_group_members_unique").on(table.groupId, table.beneficiaryType, table.beneficiaryId), index("payment_due_group_members_company_idx").on(table.companyId, table.groupId)]);
+
+/** Échéance payable concrète ; les paiements réels restent dans dépenses ou paiements agents. */
+export const paymentDueOccurrences = mysqlTable("paymentDueOccurrences", {
+  id: int("id").autoincrement().primaryKey(),
+  scheduleId: int("scheduleId").notNull(),
+  companyId: int("companyId").notNull(),
+  warehouseId: int("warehouseId"),
+  dueAt: timestamp("dueAt").notNull(),
+  periodLabel: varchar("periodLabel", { length: 7 }).notNull(),
+  amountCents: int("amountCents").notNull(),
+  paidCents: int("paidCents").notNull().default(0),
+  status: mysqlEnum("status", ["upcoming", "due", "overdue", "partially_paid", "paid", "cancelled"]).notNull().default("upcoming"),
+  resolvedAt: timestamp("resolvedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [uniqueIndex("payment_due_occurrences_schedule_due_unique").on(table.scheduleId, table.dueAt), index("payment_due_occurrences_company_status_due_idx").on(table.companyId, table.status, table.dueAt)]);
+
+/** Lien traçable entre une échéance et une dépense ou un paiement agent réel, sans double comptage. */
+export const paymentDueSettlements = mysqlTable("paymentDueSettlements", {
+  id: int("id").autoincrement().primaryKey(),
+  occurrenceId: int("occurrenceId").notNull(),
+  companyId: int("companyId").notNull(),
+  operationId: varchar("operationId", { length: 80 }),
+  amountCents: int("amountCents").notNull(),
+  expenseId: int("expenseId"),
+  agentPaymentId: int("agentPaymentId"),
+  receiptUrl: varchar("receiptUrl", { length: 1024 }),
+  receiptName: varchar("receiptName", { length: 180 }),
+  receiptMimeType: varchar("receiptMimeType", { length: 80 }),
+  settledByUserId: int("settledByUserId").notNull(),
+  settledAt: timestamp("settledAt").defaultNow().notNull(),
+}, table => [
+  uniqueIndex("payment_due_settlements_company_operation_unique").on(table.companyId, table.operationId),
+  uniqueIndex("payment_due_settlements_expense_unique").on(table.expenseId),
+  uniqueIndex("payment_due_settlements_agent_payment_unique").on(table.agentPaymentId),
+  index("payment_due_settlements_occurrence_idx").on(table.occurrenceId),
+  index("payment_due_settlements_company_idx").on(table.companyId),
+]);
+
+/** Journal idempotent des rappels internes affichés dans le centre de notifications. */
+export const paymentDueReminderEvents = mysqlTable("paymentDueReminderEvents", {
+  id: int("id").autoincrement().primaryKey(),
+  occurrenceId: int("occurrenceId").notNull(),
+  companyId: int("companyId").notNull(),
+  reminderKind: mysqlEnum("reminderKind", ["upcoming", "due", "overdue"]).notNull(),
+  triggeredForDate: varchar("triggeredForDate", { length: 10 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [uniqueIndex("payment_due_reminder_occurrence_kind_date_unique").on(table.occurrenceId, table.reminderKind, table.triggeredForDate), index("payment_due_reminder_company_created_idx").on(table.companyId, table.createdAt)]);
+
+/** Unique configuration projet du job quotidien de rappels, identifiée exclusivement par son task UID. */
+export const paymentDueReminderJobSettings = mysqlTable("paymentDueReminderJobSettings", {
+  id: int("id").autoincrement().primaryKey(),
+  scheduleCronTaskUid: varchar("scheduleCronTaskUid", { length: 65 }).unique(),
+  enabled: boolean("enabled").notNull().default(true),
+  lastRunAt: timestamp("lastRunAt"),
+  lastRunStatus: mysqlEnum("lastRunStatus", ["success", "failed"]).default("success"),
+  lastRunError: varchar("lastRunError", { length: 500 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+/** État de lecture individuel des alertes de facturation SaaS affichées dans la console plateforme. */
+export const platformNotificationReads = mysqlTable("platformNotificationReads", {
+  id: int("id").autoincrement().primaryKey(),
+  platformUserId: int("platformUserId").notNull(),
+  notificationKey: varchar("notificationKey", { length: 180 }).notNull(),
+  readAt: timestamp("readAt").defaultNow().notNull(),
+}, table => [uniqueIndex("platform_notification_reads_user_key_unique").on(table.platformUserId, table.notificationKey), index("platform_notification_reads_user_read_idx").on(table.platformUserId, table.readAt)]);
+
+export const salePayments = mysqlTable("salePayments", {
+  id: int("id").autoincrement().primaryKey(),
+  saleId: int("saleId").notNull(),
+  offlineOperationId: varchar("offlineOperationId", { length: 80 }).unique(),
+  method: mysqlEnum("method", ["cash", "card", "mobile_money", "bank_transfer", "credit"]).notNull(),
+  amountCents: int("amountCents").notNull(),
+  createdByUserId: int("createdByUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [index("sale_payments_sale_idx").on(table.saleId), index("sale_payments_offline_idx").on(table.offlineOperationId)]);
+
+export const saleItems = mysqlTable("saleItems", {
+  id: int("id").autoincrement().primaryKey(),
+  saleId: int("saleId").notNull(),
+  productId: int("productId").notNull(),
+  productName: varchar("productName", { length: 200 }).notNull(),
+  productReference: varchar("productReference", { length: 80 }).notNull(),
+  quantity: int("quantity").notNull(),
+  unitPriceCents: int("unitPriceCents").notNull(),
+  purchasePriceCents: int("purchasePriceCents").notNull(),
+  discountType: mysqlEnum("discountType", ["none", "percent", "fixed"]).notNull().default("none"),
+  discountValue: int("discountValue").notNull().default(0),
+  discountCents: int("discountCents").notNull().default(0),
+  lineSubtotalCents: int("lineSubtotalCents").notNull().default(0),
+  lineTotalCents: int("lineTotalCents").notNull(),
+  lineCostCents: int("lineCostCents").notNull(),
+  returnedQuantity: int("returnedQuantity").notNull().default(0),
+  /** Taux et montant TVA figés lors de la création de la vente, après remise globale. */
+  vatRateBasisPoints: int("vatRateBasisPoints").notNull().default(0),
+  vatCents: int("vatCents").notNull().default(0),
+}, table => [index("sale_items_sale_idx").on(table.saleId), index("sale_items_product_idx").on(table.productId)]);
+
+/** Compteur d’avoirs transactionnel, isolé par entreprise, série et année. */
+export const documentSequences = mysqlTable("documentSequences", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  series: mysqlEnum("series", ["FAC", "POS", "DEV", "AV", "BC"]).notNull(),
+  year: int("year").notNull(),
+  lastValue: int("lastValue").notNull().default(0),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [uniqueIndex("document_sequences_company_series_year_unique").on(table.companyId, table.series, table.year)]);
+
+/** Retour partiel d’une vente, avec clé de requête idempotente tenant-scopée. */
+export const saleReturns = mysqlTable("saleReturns", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  warehouseId: int("warehouseId").notNull(),
+  saleId: int("saleId").notNull(),
+  requestKey: varchar("requestKey", { length: 80 }).notNull(),
+  requestFingerprint: varchar("requestFingerprint", { length: 64 }).notNull(),
+  creditNoteNumber: varchar("creditNoteNumber", { length: 60 }).notNull(),
+  refundCents: int("refundCents").notNull(),
+  costCents: int("costCents").notNull().default(0),
+  method: mysqlEnum("method", ["cash", "card", "mobile_money", "bank_transfer", "credit"]).notNull(),
+  reason: varchar("reason", { length: 500 }),
+  createdByUserId: int("createdByUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [
+  uniqueIndex("sale_returns_company_request_unique").on(table.companyId, table.requestKey),
+  uniqueIndex("sale_returns_company_credit_note_unique").on(table.companyId, table.creditNoteNumber),
+  index("sale_returns_company_sale_idx").on(table.companyId, table.saleId),
+]);
+
+export const saleReturnItems = mysqlTable("saleReturnItems", {
+  id: int("id").autoincrement().primaryKey(),
+  returnId: int("returnId").notNull(),
+  saleItemId: int("saleItemId").notNull(),
+  productId: int("productId").notNull(),
+  quantity: int("quantity").notNull(),
+  restocked: boolean("restocked").notNull().default(true),
+  refundCents: int("refundCents").notNull(),
+}, table => [index("sale_return_items_return_idx").on(table.returnId)]);
+
+export const saleCommissions = mysqlTable("saleCommissions", {
+  id: int("id").autoincrement().primaryKey(),
+  saleId: int("saleId").notNull(),
+  beneficiaryType: mysqlEnum("beneficiaryType", ["user", "agent"]).notNull(),
+  beneficiaryId: int("beneficiaryId").notNull(),
+  commissionBasis: mysqlEnum("commissionBasis", ["revenue", "net_profit"]).notNull(),
+  rateBasisPoints: int("rateBasisPoints").notNull(),
+  commissionCents: int("commissionCents").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const agentPayments = mysqlTable("agentPayments", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  operationId: varchar("operationId", { length: 80 }),
+  warehouseId: int("warehouseId"),
+  beneficiaryType: mysqlEnum("beneficiaryType", ["user", "agent"]).notNull(),
+  beneficiaryId: int("beneficiaryId").notNull(),
+  paymentKind: mysqlEnum("paymentKind", ["commission", "salary", "mixed"]).notNull().default("mixed"),
+  amountCents: int("amountCents").notNull(),
+  paidAt: timestamp("paidAt").defaultNow().notNull(),
+  periodLabel: varchar("periodLabel", { length: 40 }),
+  note: text("note"),
+  receiptUrl: varchar("receiptUrl", { length: 1024 }),
+  receiptName: varchar("receiptName", { length: 180 }),
+  receiptMimeType: varchar("receiptMimeType", { length: 80 }),
+  createdByUserId: int("createdByUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [
+  uniqueIndex("agent_payments_company_operation_unique").on(table.companyId, table.operationId),
+  index("agent_payments_company_warehouse_paid_idx").on(table.companyId, table.warehouseId, table.paidAt),
+]);
 
 export const inventorySessions = mysqlTable("inventorySessions", {
   id: int("id").autoincrement().primaryKey(),
-  companyId: int("companyId"),
+  companyId: int("companyId").notNull(),
   name: varchar("name", { length: 160 }).notNull(),
-  /** Dépôt inventorié (9.7) ; NULL pour les inventaires antérieurs (dépôt par défaut). */
   warehouseId: int("warehouseId"),
-  status: mysqlEnum("status", ["draft", "validated"])
-    .notNull()
-    .default("draft"),
+  status: mysqlEnum("status", ["draft", "validated"]).notNull().default("draft"),
   createdByUserId: int("createdByUserId").notNull(),
   validatedByUserId: int("validatedByUserId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   validatedAt: timestamp("validatedAt"),
 });
 
-export const inventoryItems = mysqlTable(
-  "inventoryItems",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    inventorySessionId: int("inventorySessionId").notNull(),
-    productId: int("productId").notNull(),
-    expectedQuantity: int("expectedQuantity").notNull(),
-    countedQuantity: int("countedQuantity"),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  },
-  table => [index("inventory_items_session_idx").on(table.inventorySessionId)]
-);
+export const inventoryItems = mysqlTable("inventoryItems", {
+  id: int("id").autoincrement().primaryKey(),
+  inventorySessionId: int("inventorySessionId").notNull(),
+  productId: int("productId").notNull(),
+  expectedQuantity: int("expectedQuantity").notNull(),
+  countedQuantity: int("countedQuantity"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
 
-export const stockMovements = mysqlTable(
-  "stockMovements",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    companyId: int("companyId"),
-    productId: int("productId").notNull(),
-    supplierId: int("supplierId"),
-    type: mysqlEnum("type", ["entry", "exit", "adjustment"]).notNull(),
-    quantity: int("quantity").notNull(),
-    previousQuantity: int("previousQuantity").notNull(),
-    resultingQuantity: int("resultingQuantity").notNull(),
-    reason: varchar("reason", { length: 255 }).notNull(),
-    /** Dépôt concerné (9.7) et coût unitaire d'entrée retenu pour le coût moyen pondéré. */
-    warehouseId: int("warehouseId"),
-    unitCostCents: int("unitCostCents"),
-    createdByUserId: int("createdByUserId").notNull(),
-    occurredAt: timestamp("occurredAt").defaultNow().notNull(),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-  },
-  table => [
-    index("stock_movements_company_product_idx").on(
-      table.companyId,
-      table.productId
-    ),
-    index("stock_movements_company_occurred_idx").on(
-      table.companyId,
-      table.occurredAt
-    ),
-  ]
-);
+export const stockMovements = mysqlTable("stockMovements", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  productId: int("productId").notNull(),
+  warehouseId: int("warehouseId"),
+  supplierId: int("supplierId"),
+  type: mysqlEnum("type", ["entry", "exit", "adjustment"]).notNull(),
+  quantity: int("quantity").notNull(),
+  previousQuantity: int("previousQuantity").notNull(),
+  resultingQuantity: int("resultingQuantity").notNull(),
+  reason: varchar("reason", { length: 255 }).notNull(),
+  createdByUserId: int("createdByUserId").notNull(),
+  occurredAt: timestamp("occurredAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [index("stock_movements_company_product_idx").on(table.companyId, table.productId), index("stock_movements_company_occurred_idx").on(table.companyId, table.occurredAt)]);
 
 export const stockAlerts = mysqlTable("stockAlerts", {
   id: int("id").autoincrement().primaryKey(),
-  companyId: int("companyId"),
+  companyId: int("companyId").notNull(),
   productId: int("productId").notNull().unique(),
   threshold: int("threshold").notNull(),
   observedQuantity: int("observedQuantity").notNull(),
-  status: mysqlEnum("status", ["active", "resolved"])
-    .notNull()
-    .default("active"),
+  status: mysqlEnum("status", ["active", "resolved"]).notNull().default("active"),
   triggeredAt: timestamp("triggeredAt").defaultNow().notNull(),
   resolvedAt: timestamp("resolvedAt"),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
-export const auditLogs = mysqlTable(
-  "auditLogs",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    companyId: int("companyId"),
-    actorUserId: int("actorUserId").notNull(),
-    action: varchar("action", { length: 120 }).notNull(),
-    entityType: varchar("entityType", { length: 80 }).notNull(),
-    entityId: varchar("entityId", { length: 80 }),
-    detail: text("detail"),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-  },
-  table => [
-    index("audit_logs_company_created_idx").on(
-      table.companyId,
-      table.createdAt
-    ),
-    index("audit_logs_company_entity_idx").on(
-      table.companyId,
-      table.entityType,
-      table.entityId
-    ),
-  ]
-);
+export const auditLogs = mysqlTable("auditLogs", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  actorUserId: int("actorUserId").notNull(),
+  action: varchar("action", { length: 120 }).notNull(),
+  entityType: varchar("entityType", { length: 80 }).notNull(),
+  entityId: varchar("entityId", { length: 80 }),
+  detail: text("detail"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [index("audit_logs_company_created_idx").on(table.companyId, table.createdAt), index("audit_logs_company_entity_idx").on(table.companyId, table.entityType, table.entityId)]);
 
-export const backupSettings = mysqlTable(
-  "backupSettings",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    companyId: int("companyId"),
-    automaticEnabled: boolean("automaticEnabled").notNull().default(true),
-    frequencyHours: int("frequencyHours").notNull().default(24),
-    retentionCount: int("retentionCount").notNull().default(14),
-    scheduleCronTaskUid: varchar("scheduleCronTaskUid", {
-      length: 65,
-    }).unique(),
-    scheduleNextAt: timestamp("scheduleNextAt"),
-    googleDriveFolderId: varchar("googleDriveFolderId", { length: 180 }),
-    googleDriveAccessTokenEncrypted: text("googleDriveAccessTokenEncrypted"),
-    googleDriveRefreshTokenEncrypted: text("googleDriveRefreshTokenEncrypted"),
-    googleDriveTokenExpiresAt: timestamp("googleDriveTokenExpiresAt"),
-    googleDriveOauthState: varchar("googleDriveOauthState", { length: 120 }),
-    lastBackupAt: timestamp("lastBackupAt"),
-    lastBackupStatus: mysqlEnum("lastBackupStatus", [
-      "idle",
-      "success",
-      "failed",
-    ])
-      .notNull()
-      .default("idle"),
-    lastBackupError: text("lastBackupError"),
-    updatedByUserId: int("updatedByUserId"),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  },
-  table => [unique("backup_settings_company_unique").on(table.companyId)]
-);
+export const backupSettings = mysqlTable("backupSettings", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  automaticEnabled: boolean("automaticEnabled").notNull().default(true),
+  frequencyHours: int("frequencyHours").notNull().default(6),
+  retentionCount: int("retentionCount").notNull().default(30),
+  scheduleCronTaskUid: varchar("scheduleCronTaskUid", { length: 65 }).unique(),
+  scheduleNextAt: timestamp("scheduleNextAt"),
+  googleDriveFolderId: varchar("googleDriveFolderId", { length: 180 }),
+  googleDriveAccessTokenEncrypted: text("googleDriveAccessTokenEncrypted"),
+  googleDriveRefreshTokenEncrypted: text("googleDriveRefreshTokenEncrypted"),
+  googleDriveTokenExpiresAt: timestamp("googleDriveTokenExpiresAt"),
+  googleDriveOauthState: varchar("googleDriveOauthState", { length: 120 }),
+  lastBackupAt: timestamp("lastBackupAt"),
+  lastBackupStatus: mysqlEnum("lastBackupStatus", ["idle", "success", "failed"]).notNull().default("idle"),
+  lastBackupError: text("lastBackupError"),
+  updatedByUserId: int("updatedByUserId"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [uniqueIndex("backup_settings_company_unique").on(table.companyId)]);
 
 export const backupArchives = mysqlTable("backupArchives", {
   id: int("id").autoincrement().primaryKey(),
-  companyId: int("companyId"),
+  companyId: int("companyId").notNull(),
   filename: varchar("filename", { length: 220 }).notNull(),
   trigger: mysqlEnum("trigger", ["manual", "scheduled"]).notNull(),
-  status: mysqlEnum("status", ["completed", "failed"])
-    .notNull()
-    .default("completed"),
+  status: mysqlEnum("status", ["completed", "failed"]).notNull().default("completed"),
   storageKey: text("storageKey"),
   storageUrl: text("storageUrl"),
   sizeBytes: int("sizeBytes").notNull().default(0),
   recordCount: int("recordCount").notNull().default(0),
+  contentSha256: varchar("contentSha256", { length: 64 }),
+  encryptionVersion: int("encryptionVersion").notNull().default(1),
   googleDriveFileId: varchar("googleDriveFileId", { length: 180 }),
   googleDriveUrl: text("googleDriveUrl"),
   createdByUserId: int("createdByUserId"),
   error: text("error"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
+
+/** Clôture quotidienne immuable de caisse, isolée par entreprise, entrepôt et journée métier. */
+export const cashClosures = mysqlTable("cashClosures", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  warehouseId: int("warehouseId").notNull(),
+  businessDay: varchar("businessDay", { length: 10 }).notNull(),
+  openingFloatCents: int("openingFloatCents").notNull().default(0),
+  cashSalesCents: int("cashSalesCents").notNull().default(0),
+  expectedCashCents: int("expectedCashCents").notNull(),
+  countedCashCents: int("countedCashCents").notNull(),
+  differenceCents: int("differenceCents").notNull(),
+  totalsByMethodJson: text("totalsByMethodJson").notNull(),
+  documentCount: int("documentCount").notNull().default(0),
+  note: varchar("note", { length: 500 }),
+  closedByUserId: int("closedByUserId").notNull(),
+  closedAt: timestamp("closedAt").defaultNow().notNull(),
+}, table => [
+  uniqueIndex("cash_closures_company_warehouse_day_unique").on(table.companyId, table.warehouseId, table.businessDay),
+  index("cash_closures_company_warehouse_day_idx").on(table.companyId, table.warehouseId, table.businessDay),
+]);
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
@@ -790,172 +1084,3 @@ export type Sale = typeof sales.$inferSelect;
 export type SaleItem = typeof saleItems.$inferSelect;
 export type Supplier = typeof suppliers.$inferSelect;
 export type StockMovement = typeof stockMovements.$inferSelect;
-
-/**
- * Compteurs de numérotation par entreprise, série et année (factures FAC, tickets POS,
- * devis DEV, avoirs AV, bons de commande BC) : numérotation continue et sans collision.
- */
-export const documentSequences = mysqlTable(
-  "documentSequences",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    companyId: int("companyId").notNull(),
-    series: varchar("series", { length: 10 }).notNull(),
-    year: int("year").notNull(),
-    lastValue: int("lastValue").notNull().default(0),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  },
-  table => [
-    unique("document_sequences_company_series_year_unique").on(
-      table.companyId,
-      table.series,
-      table.year
-    ),
-  ]
-);
-
-/**
- * Jetons à usage unique envoyés par e-mail (réinitialisation de mot de passe,
- * vérification d'adresse). Seule l'empreinte SHA-256 du jeton est stockée.
- */
-export const authTokens = mysqlTable(
-  "authTokens",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    userId: int("userId").notNull(),
-    type: mysqlEnum("type", ["password_reset", "email_verification"]).notNull(),
-    tokenHash: varchar("tokenHash", { length: 64 }).notNull(),
-    expiresAt: timestamp("expiresAt").notNull(),
-    usedAt: timestamp("usedAt"),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-  },
-  table => [
-    unique("auth_tokens_hash_unique").on(table.tokenHash),
-    index("auth_tokens_user_type_idx").on(table.userId, table.type),
-  ]
-);
-
-/** Retour partiel d'articles d'une vente encaissée, avec son avoir numéroté. */
-export const saleReturns = mysqlTable(
-  "saleReturns",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    companyId: int("companyId"),
-    saleId: int("saleId").notNull(),
-    creditNoteNumber: varchar("creditNoteNumber", { length: 60 }).notNull(),
-    refundCents: int("refundCents").notNull(),
-    costCents: int("costCents").notNull().default(0),
-    method: mysqlEnum("method", [
-      "cash",
-      "card",
-      "mobile_money",
-      "bank_transfer",
-      "credit",
-    ]).notNull(),
-    reason: varchar("reason", { length: 500 }),
-    createdByUserId: int("createdByUserId").notNull(),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-  },
-  table => [
-    index("sale_returns_company_sale_idx").on(table.companyId, table.saleId),
-    unique("sale_returns_company_number_unique").on(
-      table.companyId,
-      table.creditNoteNumber
-    ),
-  ]
-);
-
-export const saleReturnItems = mysqlTable(
-  "saleReturnItems",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    returnId: int("returnId").notNull(),
-    saleItemId: int("saleItemId").notNull(),
-    productId: int("productId").notNull(),
-    quantity: int("quantity").notNull(),
-    restocked: boolean("restocked").notNull().default(true),
-    refundCents: int("refundCents").notNull(),
-  },
-  table => [index("sale_return_items_return_idx").on(table.returnId)]
-);
-
-/** Clôture de caisse quotidienne (Z de caisse) : fond, encaissements attendus, comptage et écart. */
-export const cashClosures = mysqlTable(
-  "cashClosures",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    companyId: int("companyId"),
-    businessDay: varchar("businessDay", { length: 10 }).notNull(),
-    openingFloatCents: int("openingFloatCents").notNull().default(0),
-    cashSalesCents: int("cashSalesCents").notNull().default(0),
-    expectedCashCents: int("expectedCashCents").notNull(),
-    countedCashCents: int("countedCashCents").notNull(),
-    differenceCents: int("differenceCents").notNull(),
-    totalsByMethodJson: text("totalsByMethodJson").notNull(),
-    documentCount: int("documentCount").notNull().default(0),
-    note: varchar("note", { length: 500 }),
-    closedByUserId: int("closedByUserId").notNull(),
-    closedAt: timestamp("closedAt").defaultNow().notNull(),
-  },
-  table => [
-    unique("cash_closures_company_day_unique").on(
-      table.companyId,
-      table.businessDay
-    ),
-  ]
-);
-
-/** Dépôts / magasins d'une entreprise (9.7). Un dépôt par défaut reçoit ventes et réceptions. */
-export const warehouses = mysqlTable(
-  "warehouses",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    companyId: int("companyId"),
-    name: varchar("name", { length: 120 }).notNull(),
-    isDefault: boolean("isDefault").notNull().default(false),
-    active: boolean("active").notNull().default(true),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-  },
-  table => [
-    unique("warehouses_company_name_unique").on(table.companyId, table.name),
-  ]
-);
-
-/** Stock d'un produit dans un dépôt ; `products.quantity` en reste la somme. */
-export const productStocks = mysqlTable(
-  "productStocks",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    productId: int("productId").notNull(),
-    warehouseId: int("warehouseId").notNull(),
-    quantity: int("quantity").notNull().default(0),
-  },
-  table => [
-    unique("product_stocks_product_warehouse_unique").on(
-      table.productId,
-      table.warehouseId
-    ),
-  ]
-);
-
-/** Lots reçus avec date de péremption ; consommés en premier expiré, premier sorti (FEFO). */
-export const stockLots = mysqlTable(
-  "stockLots",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    companyId: int("companyId"),
-    productId: int("productId").notNull(),
-    warehouseId: int("warehouseId").notNull(),
-    lotNumber: varchar("lotNumber", { length: 80 }).notNull(),
-    expiryDate: varchar("expiryDate", { length: 10 }),
-    quantity: int("quantity").notNull(),
-    receivedAt: timestamp("receivedAt").defaultNow().notNull(),
-  },
-  table => [
-    index("stock_lots_product_idx").on(table.productId, table.warehouseId),
-    index("stock_lots_company_expiry_idx").on(
-      table.companyId,
-      table.expiryDate
-    ),
-  ]
-);

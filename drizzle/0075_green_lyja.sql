@@ -1,0 +1,1 @@
+ALTER TABLE `saasPaymentIntents` ADD `checkoutUrl` varchar(1600);

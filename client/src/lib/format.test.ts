@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  formatCurrency,
-  setActiveCurrency,
-  setActivePriceFormat,
-} from "./format";
+import { formatCurrency, setActiveCurrency, setActivePriceFormat } from "./format";
 
 describe("formatCurrency", () => {
   it("applique les trois devises disponibles", () => {

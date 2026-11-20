@@ -1,5 +1,6 @@
 import { BarcodeCameraDialog } from "@/components/BarcodeCameraDialog";
-import { computeVatBreakdown } from "@shared/pricing";
+import { computeVatBreakdown, vatRatesLabel } from "@shared/pricing";
+import { DocumentVatRateSelector } from "@/components/DocumentVatRateSelector";
 import {
   calculateDiscount,
   DiscountEditor,
@@ -27,15 +28,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { formatCurrency } from "@/lib/format";
 import { shouldPromptForAssignment } from "@/lib/assignmentRules";
 import { priceForQuantityTier } from "@/lib/priceTiers";
 import { invoiceCustomerPrefill } from "@/lib/invoicePrefill";
+import { parseTicketInvoicePrefill } from "@/lib/ticketInvoicePrefill";
 import {
   isMaximumInvoiceQuantity,
   nextInvoiceQuantity,
 } from "@/lib/invoiceQuantity";
 import { trpc } from "@/lib/trpc";
+import { useActiveWarehouse } from "@/contexts/ActiveWarehouseContext";
 import {
   useOffline,
   type OfflineInvoiceDraft,
@@ -71,21 +75,31 @@ export default function InvoiceCreate({
   documentType?: CommercialDocumentType;
 }) {
   const { user } = useAuth();
+  const { activeWarehouseId, setActiveWarehouseId } = useActiveWarehouse();
+  const isAdmin = user?.role === "admin";
   const { isOnline, queueInvoiceDraft } = useOffline();
   const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
-  const { data: products = [] } = trpc.products.list.useQuery();
+  const { data: warehouses = [] } = trpc.warehouses.list.useQuery();
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | null>(null);
+  useEffect(() => { if (selectedWarehouseId === null && warehouses.length) setSelectedWarehouseId(warehouses.find(warehouse => warehouse.isDefault)?.id ?? warehouses.find(warehouse => warehouse.active)?.id ?? null); }, [selectedWarehouseId, warehouses]);
+  useEffect(() => { if (isAdmin && activeWarehouseId && activeWarehouseId !== selectedWarehouseId) { setCart([]); setSelectedWarehouseId(activeWarehouseId); } }, [activeWarehouseId, isAdmin, selectedWarehouseId]);
+  const { data: products = [] } = trpc.products.list.useQuery(selectedWarehouseId ? { warehouseId: selectedWarehouseId } : undefined);
   const { data: customers = [] } = trpc.commerce.customers.list.useQuery();
-  const { data: agents = [] } = trpc.commerce.agents.list.useQuery();
+  const { data: agents = [] } = trpc.commerce.agents.list.useQuery(selectedWarehouseId ? { warehouseId: selectedWarehouseId } : undefined);
   const { data: settings } = trpc.commerce.settings.get.useQuery();
+  const { data: sellerDiscountPermissions } = trpc.sellerDiscountPermissions.get.useQuery(undefined, { enabled: user?.role === "seller" });
+  const { data: vatRatePresets = [] } = trpc.vatRates.list.useQuery();
   const documentPath = documentType === "quote" ? "/devis" : "/factures";
   const prefilledCustomerId = invoiceCustomerPrefill(window.location.search);
   const prefillApplied = useRef(false);
+  const ticketConversionApplied = useRef(false);
   const [customerId, setCustomerId] = useState("");
   const [salesAgentId, setSalesAgentId] = useState("");
   const [cashierId, setCashierId] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [deliveryFeeInput, setDeliveryFeeInput] = useState("");
+  const [deliveryEnabled, setDeliveryEnabled] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -93,6 +107,7 @@ export default function InvoiceCreate({
   const [scan, setScan] = useState("");
   const [invoiceDiscount, setInvoiceDiscount] =
     useState<DiscountForm>(noDiscount);
+  const [vatChoiceRevision, setVatChoiceRevision] = useState(0);
   const [checkoutSale, setCheckoutSale] = useState<{
     id: number | null;
     totalCents: number;
@@ -112,15 +127,28 @@ export default function InvoiceCreate({
     setCustomerId(prefilledCustomerId);
     prefillApplied.current = true;
   }, [customers, prefilledCustomerId]);
+  useEffect(() => {
+    if (documentType !== "invoice" || ticketConversionApplied.current || !products.length) return;
+    const raw = sessionStorage.getItem("stockpilot-ticket-to-invoice");
+    if (!raw) return;
+    try {
+      const prefill = parseTicketInvoicePrefill(raw);
+      if (!prefill) throw new Error("Brouillon ticket invalide");
+      const hydratedItems = prefill.items.filter(item => products.some(product => product.id === item.productId)).map(item => ({ productId: item.productId, quantity: item.quantity, manualUnitPriceCents: item.unitPriceCents ?? null, discount: noDiscount }));
+      if (hydratedItems.length) setCart(hydratedItems);
+      if (prefill.customerId && customers.some(customer => customer.id === prefill.customerId)) setCustomerId(String(prefill.customerId));
+      if (prefill.salesAgentId) setSalesAgentId(String(prefill.salesAgentId));
+      if (prefill.cashierId) setCashierId(String(prefill.cashierId));
+      sessionStorage.removeItem("stockpilot-ticket-to-invoice");
+      ticketConversionApplied.current = true;
+      toast.success("Ticket converti en brouillon de facture.");
+    } catch {
+      sessionStorage.removeItem("stockpilot-ticket-to-invoice");
+    }
+  }, [customers, documentType, products]);
   const customer = customers.find(item => item.id === Number(customerId));
   const priceType =
     customer?.type === "wholesale" ? "wholesalePriceCents" : "retailPriceCents";
-  const showSalesAgentSelect = shouldPromptForAssignment(
-    settings?.defaultSalesAgentId
-  );
-  const showCashierSelect = shouldPromptForAssignment(
-    settings?.defaultCashierId
-  );
   const defaultSalesAgent = agents.find(
     agent =>
       agent.id === settings?.defaultSalesAgentId &&
@@ -133,6 +161,8 @@ export default function InvoiceCreate({
       agent.active &&
       agent.type === "cashier"
   );
+  const showSalesAgentSelect = shouldPromptForAssignment(settings?.defaultSalesAgentId) || Boolean(settings?.defaultSalesAgentId && !defaultSalesAgent);
+  const showCashierSelect = shouldPromptForAssignment(settings?.defaultCashierId) || Boolean(settings?.defaultCashierId && !defaultCashier);
   const { data: customerContext } =
     trpc.commerce.customers.invoiceContext.useQuery(
       { id: Number(customerId) },
@@ -145,6 +175,15 @@ export default function InvoiceCreate({
     setDeliveryAddress(address);
     deliveryPrefillKey.current = key;
   }, [customer?.address, customerContext?.deliveryAddress, customerId]);
+  useEffect(() => {
+    const refreshVatChoice = () => setVatChoiceRevision(current => current + 1);
+    window.addEventListener("stockpilot-vat-choice-change", refreshVatChoice);
+    return () =>
+      window.removeEventListener(
+        "stockpilot-vat-choice-change",
+        refreshVatChoice
+      );
+  }, []);
   const lines = cart
     .map(line => {
       const product = products.find(item => item.id === line.productId);
@@ -189,13 +228,19 @@ export default function InvoiceCreate({
   const lineNetCents = lines.reduce((sum, line) => sum + line.totalCents, 0);
   const invoiceDiscountCents = calculateDiscount(lineNetCents, invoiceDiscount);
   const taxableSubtotalCents = lineNetCents - invoiceDiscountCents;
-  const vatRateBasisPoints = settings?.vatEnabled
-    ? (settings.vatRateBasisPoints ?? 0)
+  const sellerCanToggleVat = user?.role !== "seller" || Boolean(settings?.sellerCanToggleVat);
+  const applyVat = settings?.vatEnabled && (sellerCanToggleVat ? sessionStorage.getItem("stockpilot-vat-choice") !== "false" : true);
+  const storedVatRate = Number(sessionStorage.getItem("stockpilot-vat-rate"));
+  const selectedPresetRate = vatRatePresets.find(
+    rate => rate.rateBasisPoints === storedVatRate
+  )?.rateBasisPoints;
+  const vatRateBasisPoints = applyVat
+    ? (selectedPresetRate ?? settings?.vatRateBasisPoints ?? 0)
     : 0;
   const vatBreakdown = computeVatBreakdown(
     lines.map(line => ({
       netCents: line.totalCents,
-      vatRateBasisPoints: settings?.vatEnabled
+      vatRateBasisPoints: applyVat
         ? (line.product.vatRateBasisPoints ?? vatRateBasisPoints)
         : 0,
     })),
@@ -204,10 +249,11 @@ export default function InvoiceCreate({
   const vatCents = vatBreakdown.vatCents;
   const deliveryFeeCents = Math.max(
     0,
-    Math.round((Number(deliveryFeeInput) || 0) * 100)
+    deliveryEnabled ? Math.round((Number(deliveryFeeInput) || 0) * 100) : 0
   );
   const totalCents = taxableSubtotalCents + vatCents + deliveryFeeCents;
   const maximumStockNotified = useRef<Set<number>>(new Set());
+  void vatChoiceRevision;
   useEffect(() => {
     lines.forEach(line => {
       const atMaximum = isMaximumInvoiceQuantity(
@@ -356,6 +402,7 @@ export default function InvoiceCreate({
   });
   const payload = () => ({
     channel: documentType,
+    warehouseId: selectedWarehouseId ?? undefined,
     customerId: customerId ? Number(customerId) : null,
     salesAgentId:
       showSalesAgentSelect && salesAgentId !== "none"
@@ -366,17 +413,26 @@ export default function InvoiceCreate({
     salesAgentSelectionMade: !showSalesAgentSelect || Boolean(salesAgentId),
     cashierSelectionMade: !showCashierSelect || Boolean(cashierId),
     note: null,
-    deliveryAddress: deliveryAddress.trim() || null,
+    deliveryAddress: deliveryEnabled ? deliveryAddress.trim() || null : null,
     deliveryFeeCents,
+    applyVat,
+    vatRateBasisPoints: applyVat ? vatRateBasisPoints : undefined,
     invoiceDiscount: discountPayload(invoiceDiscount),
     items: cart.map(item => ({
       productId: item.productId,
       quantity: item.quantity,
       manualUnitPriceCents: item.manualUnitPriceCents ?? null,
       discount: discountPayload(item.discount),
+      vatRateBasisPoints: applyVat
+        ? (products.find(product => product.id === item.productId)?.vatRateBasisPoints ?? vatRateBasisPoints)
+        : 0,
     })),
   });
   const ensure = () => {
+    if (!selectedWarehouseId) {
+      toast.error("Sélectionnez un entrepôt opérationnel.");
+      return false;
+    }
     if (!customerId) {
       toast.error(
         `Sélectionnez un client pour créer le ${documentType === "quote" ? "devis" : "facture"}.`
@@ -406,6 +462,7 @@ export default function InvoiceCreate({
       if (!next.customerId) return;
       queueInvoiceDraft({
         ...next,
+        warehouseId: next.warehouseId ?? 0,
         customerId: next.customerId,
       } as OfflineInvoiceDraft);
       toast.success(
@@ -443,6 +500,7 @@ export default function InvoiceCreate({
         cashierId: next.cashierId,
         offlineDraft: {
           ...next,
+          warehouseId: next.warehouseId ?? 0,
           customerId: next.customerId,
         } as OfflineInvoiceDraft,
       });
@@ -467,11 +525,11 @@ export default function InvoiceCreate({
     agent => agent.type === "cashier" && agent.active
   );
   return (
-    <div className="max-w-5xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-[22px] font-bold tracking-tight text-foreground">
-            {documentType === "quote" ? "Nouveau devis" : "Nouvelle facture"}
+            Créer un {documentType === "quote" ? "devis" : "facture"}
           </h1>
         </div>
         <Button variant="outline" onClick={() => setLocation(documentPath)}>
@@ -481,6 +539,7 @@ export default function InvoiceCreate({
       <section className="grid gap-5 lg:grid-cols-2">
         <div className="space-y-4 rounded-xl border border-border bg-card p-5">
           <h2 className="font-semibold">Client et intervenants</h2>
+          <div className="space-y-2"><Label>Entrepôt opérationnel</Label><Select value={selectedWarehouseId ? String(selectedWarehouseId) : "unselected"} onValueChange={value => { const nextId = value === "unselected" ? null : Number(value); if (nextId !== selectedWarehouseId && cart.length && !window.confirm("Changer d’entrepôt videra les produits ajoutés. Continuer ?")) return; if (nextId !== selectedWarehouseId) setCart([]); if (isAdmin && nextId) setActiveWarehouseId(nextId); setSelectedWarehouseId(nextId); }}><SelectTrigger><SelectValue placeholder="Sélectionner un entrepôt" /></SelectTrigger><SelectContent><SelectItem value="unselected">Sélectionner un entrepôt</SelectItem>{warehouses.filter(warehouse => warehouse.active).map(warehouse => <SelectItem key={warehouse.id} value={String(warehouse.id)}>{warehouse.name}{warehouse.isDefault ? " · Principal" : ""}</SelectItem>)}</SelectContent></Select><p className="text-xs text-faint">Les disponibilités et le mouvement de sortie seront enregistrés pour ce dépôt.</p></div>
           <div className="space-y-2">
             <Label>
               Client <span className="text-destructive">*</span>
@@ -505,54 +564,15 @@ export default function InvoiceCreate({
                   appliqué
                 </Badge>
                 {prefilledCustomerId && (
-                  <Badge className="border-0 bg-success-soft text-success">
+                  <Badge className="border-0 bg-success-soft text-success ">
                     Client prérempli depuis sa fiche
                   </Badge>
                 )}
               </div>
             )}
           </div>
-          {customer && (
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-primary" />
-                Adresse de livraison
-              </Label>
-              <Textarea
-                value={deliveryAddress}
-                onChange={event => setDeliveryAddress(event.target.value)}
-                placeholder="Adresse de livraison"
-                className="min-h-20"
-              />
-              <p className="text-xs text-muted-foreground">
-                La dernière adresse utilisée est proposée automatiquement et
-                reste modifiable.
-              </p>
-              <div className="mt-3 space-y-2">
-                <Label htmlFor="delivery-fee">Frais de livraison</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    id="delivery-fee"
-                    type="number"
-                    min="0"
-                    step="1"
-                    inputMode="decimal"
-                    value={deliveryFeeInput}
-                    onChange={event => setDeliveryFeeInput(event.target.value)}
-                    placeholder="0"
-                  />
-                  <span className="text-sm text-muted-foreground">
-                    {settings?.currency ?? "XOF"}
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Ces frais sont ajoutés au total et figés sur la facture.
-                </p>
-              </div>
-            </div>
-          )}
-          {customerContext?.suggestions.length ? (
-            <div className="rounded-xl border border-primary/25 bg-primary/5 p-3">
+          {settings?.customerSuggestionsEnabled !== false && customerContext?.suggestions.length ? (
+            <div className="rounded-xl border border-primary/20 bg-primary/[0.045] p-3">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-primary" />
                 <p className="text-sm font-semibold">
@@ -560,12 +580,12 @@ export default function InvoiceCreate({
                 </p>
               </div>
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                {customerContext.suggestions.map(item => (
+                {customerContext.suggestions.slice(0, settings?.customerSuggestionsLimit ?? 4).map(item => (
                   <button
                     type="button"
                     key={item.productId}
                     onClick={() => add(item.productId)}
-                    className="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2 text-left transition hover:border-primary/40 hover:bg-primary/5"
+                    className="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2 text-left transition hover:border-primary/40 hover:bg-primary/[0.05]"
                   >
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-medium">
@@ -591,10 +611,10 @@ export default function InvoiceCreate({
                     Agent commercial <span className="text-destructive">*</span>
                   </Label>
                   <Select
-                    value={salesAgentId || undefined}
+                    value={salesAgentId}
                     onValueChange={setSalesAgentId}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger aria-label="Agent commercial">
                       <SelectValue placeholder="Sélectionner un agent" />
                     </SelectTrigger>
                     <SelectContent>
@@ -614,10 +634,10 @@ export default function InvoiceCreate({
                     Caissier <span className="text-destructive">*</span>
                   </Label>
                   <Select
-                    value={cashierId || undefined}
+                    value={cashierId}
                     onValueChange={setCashierId}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger aria-label="Caissier">
                       <SelectValue placeholder="Sélectionner un caissier" />
                     </SelectTrigger>
                     <SelectContent>
@@ -630,22 +650,6 @@ export default function InvoiceCreate({
                     </SelectContent>
                   </Select>
                 </div>
-              )}
-            </div>
-          )}
-          {(defaultSalesAgent || defaultCashier) && (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {defaultSalesAgent && (
-                <DefaultAssignment
-                  label="Agent commercial appliqué"
-                  name={defaultSalesAgent.name}
-                />
-              )}
-              {defaultCashier && (
-                <DefaultAssignment
-                  label="Caissier appliqué"
-                  name={defaultCashier.name}
-                />
               )}
             </div>
           )}
@@ -666,24 +670,6 @@ export default function InvoiceCreate({
               Ajouter un produit
             </Button>
           </div>
-          {user?.role === "seller" && (
-            <div className="mt-4 rounded-xl border border-primary/20 bg-primary/[0.05] p-3 text-xs text-muted-foreground">
-              <p className="font-semibold text-foreground">
-                Règles de vente applicables
-              </p>
-              <p className="mt-1">
-                Modification de prix :{" "}
-                {settings?.sellerCanOverridePrice
-                  ? "autorisée"
-                  : "non autorisée"}{" "}
-                · Prix inférieur :{" "}
-                {settings?.sellerCanSellBelowPrice
-                  ? "autorisé"
-                  : "non autorisé"}{" "}
-                · Remise maximale : {settings?.sellerMaxDiscountPercent ?? 0} %.
-              </p>
-            </div>
-          )}
           <div className="mt-5 space-y-3">
             {lines.length ? (
               lines.map(line => (
@@ -769,28 +755,15 @@ export default function InvoiceCreate({
                       </Button>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                    <span>
-                      {user?.role === "seller" &&
-                      !settings?.sellerCanOverridePrice &&
-                      !settings?.sellerCanSellBelowPrice
-                        ? "La modification du prix est désactivée par l’administrateur."
-                        : `Tarif appliqué : ${formatCurrency(line.tariffCents)}`}
-                    </span>
-                    {line.tierMinQuantity && (
-                      <span>
-                        Palier dès {line.tierMinQuantity} {line.product.unit}
-                      </span>
-                    )}
-                  </div>
-                  <DiscountEditor
+                  {line.tierMinQuantity && <div className="text-xs text-muted-foreground">Palier dès {line.tierMinQuantity} {line.product.unit}</div>}
+                  {(user?.role !== "seller" || sellerDiscountPermissions?.sellerCanLineDiscount) && <DiscountEditor
                     compact
                     label="Remise ligne"
                     value={line.discount}
                     onChange={discount =>
                       setLineDiscount(line.productId, discount)
                     }
-                  />
+                  />}
                 </div>
               ))
             ) : (
@@ -801,11 +774,30 @@ export default function InvoiceCreate({
             )}
           </div>
           <div className="mt-5 space-y-3 border-t border-border pt-4">
-            <DiscountEditor
-              label="Remise facture"
-              value={invoiceDiscount}
-              onChange={setInvoiceDiscount}
-            />
+            <div className="rounded-xl border border-border bg-muted/20 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-primary" />
+                  <div>
+                    <p className="text-sm font-semibold">Livraison</p>
+                    <p className="text-xs text-muted-foreground">Ajoutez une adresse et des frais uniquement si nécessaire.</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2"><Label htmlFor="delivery-enabled" className="text-sm font-medium">{deliveryEnabled ? "Activée" : "Désactivée"}</Label><Switch id="delivery-enabled" checked={deliveryEnabled} onCheckedChange={setDeliveryEnabled} /></div>
+              </div>
+              {deliveryEnabled && <div className="mt-4 grid gap-3 md:grid-cols-[1fr_220px]">
+                <div className="space-y-2">
+                  <Label htmlFor="delivery-address">Adresse de livraison</Label>
+                  <Textarea id="delivery-address" value={deliveryAddress} onChange={event => setDeliveryAddress(event.target.value)} placeholder={customer ? "Adresse de livraison" : "Sélectionnez d’abord un client"} disabled={!customer} className="min-h-20" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="delivery-fee">Frais de livraison</Label>
+                  <div className="flex items-center gap-2"><Input id="delivery-fee" type="number" min="0" step="1" inputMode="decimal" value={deliveryFeeInput} onChange={event => setDeliveryFeeInput(event.target.value)} placeholder="0" /><span className="text-sm text-muted-foreground">{settings?.currency ?? "XOF"}</span></div>
+                </div>
+              </div>}
+            </div>
+            {(user?.role !== "seller" || sellerDiscountPermissions?.sellerCanInvoiceDiscount) && <DiscountEditor label="Remise facture" value={invoiceDiscount} onChange={setInvoiceDiscount} />}
+            {settings?.vatEnabled ? <DocumentVatRateSelector rates={vatRatePresets} defaultRateBasisPoints={settings.vatRateBasisPoints} canToggle={sellerCanToggleVat} /> : null}
             <div className="space-y-1 text-sm text-muted-foreground">
               <div className="flex justify-between">
                 <span>Sous-total</span>
@@ -823,39 +815,29 @@ export default function InvoiceCreate({
                   <span>-{formatCurrency(invoiceDiscountCents)}</span>
                 </div>
               )}
-              {vatCents > 0 && (
-                <div className="flex justify-between">
-                  <span>
-                    TVA (
-                    {vatBreakdown.byRate
-                      .filter(rate => rate.vatCents > 0)
-                      .map(
-                        rate =>
-                          `${(rate.vatRateBasisPoints / 100).toFixed(2)} %`
-                      )
-                      .join(" · ")}
-                    )
-                  </span>
-                  <span>{formatCurrency(vatCents)}</span>
-                </div>
-              )}
               {deliveryFeeCents > 0 && (
                 <div className="flex justify-between">
                   <span>Frais de livraison</span>
                   <span>{formatCurrency(deliveryFeeCents)}</span>
                 </div>
               )}
+              {vatCents > 0 && (
+                <div className="flex justify-between">
+                  <span>TVA ({vatRatesLabel(vatBreakdown.byRate.filter(rate => rate.vatCents > 0).map(rate => rate.vatRateBasisPoints)) || `${(vatRateBasisPoints / 100).toFixed(2)} %`})</span>
+                  <span>{formatCurrency(vatCents)}</span>
+                </div>
+              )}
             </div>
-            <div className="flex flex-col gap-3">
-              <div className="flex items-baseline justify-between gap-3 border-t border-border pt-3">
-                <p className="text-base font-semibold text-foreground">
-                  Total TTC
+            <div className="flex items-end justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground">
+                  Total de la facture
                 </p>
-                <p className="whitespace-nowrap text-[26px] font-bold tracking-tight text-foreground">
+                <p className="text-2xl font-semibold">
                   {formatCurrency(totalCents)}
                 </p>
               </div>
-              <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
+              <div className="flex flex-wrap justify-end gap-2">
                 <Button
                   variant="outline"
                   onClick={() => {
@@ -865,6 +847,7 @@ export default function InvoiceCreate({
                     setCashierId("");
                     setDeliveryAddress("");
                     setDeliveryFeeInput("");
+                    setDeliveryEnabled(false);
                     setInvoiceDiscount(noDiscount);
                   }}
                 >
@@ -943,7 +926,7 @@ export default function InvoiceCreate({
               <button
                 key={product.id}
                 onClick={() => add(product.id)}
-                className="lift surface rounded-xl border border-border p-4 text-left hover:border-primary/40 hover:bg-primary/5"
+                className="lift surface rounded-xl border border-border p-4 text-left hover:border-primary/50 hover:bg-primary/5"
               >
                 <p className="font-medium">{product.name}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -981,8 +964,10 @@ export default function InvoiceCreate({
 }
 function DefaultAssignment({ label, name }: { label: string; name: string }) {
   return (
-    <div className="rounded-xl border border-primary/25 bg-primary/5 p-3">
-      <p className="text-xs font-semibold text-primary">{label}</p>
+    <div className="rounded-xl border border-primary/20 bg-primary/[0.06] p-3">
+      <p className="text-xs font-semibold text-primary">
+        {label}
+      </p>
       <p className="mt-1 font-medium text-foreground">{name}</p>
       <p className="mt-1 text-xs text-muted-foreground">
         Rattachement automatique

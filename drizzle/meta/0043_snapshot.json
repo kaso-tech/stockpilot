@@ -1,7 +1,7 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "c19dec85-ea95-458e-b2cc-0a6c1980e412",
+  "id": "115ffbb7-2779-4a26-ae96-54fde6b4a78d",
   "prevId": "b31c7cd2-ddce-48cd-b409-ff148bf7800b",
   "tables": {
     "adminFallbackPasswords": {

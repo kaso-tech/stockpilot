@@ -1,4 +1,4 @@
 import Settings from "./Settings";
-export default function SettingsAppearance() {
-  return <Settings section="appearance" />;
-}
+import ThemeModeSettings from "@/components/ThemeModeSettings";
+
+export default function SettingsAppearance() { return <><Settings section="appearance" /><ThemeModeSettings /></>; }

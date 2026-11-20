@@ -1,6 +1,4 @@
-import { useSidebar } from "@/components/ui/sidebar";
 import { ProductImage } from "@/components/ProductImage";
-import { readPreference, writePreference } from "@/lib/preferenceStorage";
 import { BarcodeCameraDialog } from "@/components/BarcodeCameraDialog";
 import { computeVatBreakdown, vatRatesLabel } from "@shared/pricing";
 import {
@@ -10,8 +8,10 @@ import {
   noDiscount,
   type DiscountForm,
 } from "@/components/DiscountEditor";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { CheckoutSheet } from "@/components/CheckoutSheet";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -19,6 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/lib/format";
 import {
   isCheckoutShortcut,
@@ -30,24 +31,26 @@ import {
   restockEstimateCents,
 } from "@/lib/replenishmentRules";
 import { trpc } from "@/lib/trpc";
+import { useActiveWarehouse } from "@/contexts/ActiveWarehouseContext";
 import { useOffline, type OfflinePosDraft } from "@/contexts/OfflineContext";
 import {
   AlertTriangle,
   Camera,
+  ChevronDown,
+  ChevronUp,
   ClipboardList,
-  Image as ImageIcon,
-  ImageOff,
   Keyboard,
   Minus,
   PackagePlus,
   Plus,
   Search,
   ShoppingCart,
+  TicketCheck,
   Trash2,
-  X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useLocation } from "wouter";
 
 type CartItem = { productId: number; quantity: number; discount: DiscountForm };
 type PurchaseItem = {
@@ -72,42 +75,44 @@ type CheckoutSale = {
 
 export default function PointOfSale() {
   const utils = trpc.useUtils();
-  const { isOnline, pendingProductQuantities } = useOffline();
-  const { data: products = [] } = trpc.products.list.useQuery();
+  const [, setLocation] = useLocation();
+  const { user } = useAuth();
+  const { activeWarehouseId, setActiveWarehouseId } = useActiveWarehouse();
+  const isAdmin = user?.role === "admin";
+  const { isOnline, pendingProductQuantitiesByWarehouse, lastLocalSnapshotAt } = useOffline();
+  const { data: warehouses = [] } = trpc.warehouses.list.useQuery();
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | null>(null);
+  useEffect(() => { if (selectedWarehouseId === null && warehouses.length) setSelectedWarehouseId(warehouses.find(warehouse => warehouse.isDefault)?.id ?? warehouses.find(warehouse => warehouse.active)?.id ?? null); }, [selectedWarehouseId, warehouses]);
+  useEffect(() => { if (isAdmin && activeWarehouseId && activeWarehouseId !== selectedWarehouseId) { setCart([]); setSelectedWarehouseId(activeWarehouseId); } }, [activeWarehouseId, isAdmin, selectedWarehouseId]);
+  const { data: products = [] } = trpc.products.list.useQuery(selectedWarehouseId ? { warehouseId: selectedWarehouseId } : undefined);
+  const pendingProductQuantities = pendingProductQuantitiesByWarehouse[selectedWarehouseId ?? 0] ?? {};
   const { data: suppliers = [] } = trpc.suppliers.list.useQuery();
-  const { data: agents = [] } = trpc.commerce.agents.list.useQuery();
+  const { data: agents = [] } = trpc.commerce.agents.list.useQuery(selectedWarehouseId ? { warehouseId: selectedWarehouseId } : undefined);
   const { data: settings } = trpc.commerce.settings.get.useQuery();
-  const [query, setQuery] = useState("");
-  const [lowStockOnly, setLowStockOnly] = useState(false);
-  const [categoryId, setCategoryId] = useState<number | null>(null);
-  // Réglage propre à l'appareil : grille avec ou sans photos.
-  const [showImages, setShowImages] = useState(
-    () =>
-      readPreference(
-        typeof window === "undefined" ? undefined : localStorage,
-        "posImages",
-        ["on", "off"],
-        "on"
-      ) === "on"
-  );
-  const toggleImages = () =>
-    setShowImages(current => {
-      writePreference(
-        typeof window === "undefined" ? undefined : localStorage,
-        "posImages",
-        current ? "off" : "on"
-      );
-      return !current;
+  const { data: transactions = [] } = trpc.transactions.list.useQuery(selectedWarehouseId ? { warehouseId: selectedWarehouseId } : undefined);
+  const { data: sellerDiscountPermissions } =
+    trpc.sellerDiscountPermissions.get.useQuery(undefined, {
+      enabled: user?.role === "seller",
     });
-  const { data: categories = [] } = trpc.categories.list.useQuery();
+  const canLineDiscount =
+    user?.role !== "seller" ||
+    Boolean(sellerDiscountPermissions?.sellerCanLineDiscount);
+  const canCartDiscount =
+    user?.role !== "seller" ||
+    Boolean(sellerDiscountPermissions?.sellerCanCartDiscount);
+  const [query, setQuery] = useState("");
+  const [showPhotos, setShowPhotos] = useState(true);
+  const [lowStockOnly, setLowStockOnly] = useState(false);
   const [purchaseListOpen, setPurchaseListOpen] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
-  // Sur téléphone, le panier reste replié en barre de total pour laisser la place aux produits.
+  // Sur téléphone, le panier reste une barre de total pour laisser la place aux produits.
   const [cartCollapsed, setCartCollapsed] = useState(true);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [invoiceDiscount, setInvoiceDiscount] =
     useState<DiscountForm>(noDiscount);
+  const [posApplyVat, setPosApplyVat] = useState(true);
   const [checkoutSale, setCheckoutSale] = useState<CheckoutSale | null>(null);
+  const pendingTickets = useMemo(() => transactions.filter(ticket => ticket.channel === "pos" && (ticket.status === "draft" || ticket.status === "partial") && (!selectedWarehouseId || ticket.warehouseId === selectedWarehouseId)).slice(0, 4), [selectedWarehouseId, transactions]);
 
   const isLowStock = useCallback(
     (product: (typeof products)[number]) =>
@@ -124,18 +129,10 @@ export default function PointOfSale() {
         return (
           product.quantity - (pendingProductQuantities[product.id] ?? 0) > 0 &&
           matchesSearch &&
-          (categoryId === null || product.categoryId === categoryId) &&
           (!lowStockOnly || isLowStock(product))
         );
       }),
-    [
-      categoryId,
-      isLowStock,
-      lowStockOnly,
-      pendingProductQuantities,
-      products,
-      query,
-    ]
+    [isLowStock, lowStockOnly, pendingProductQuantities, products, query]
   );
   const purchaseItems = useMemo<PurchaseItem[]>(() => {
     if (!lowStockOnly) return [];
@@ -220,22 +217,28 @@ export default function PointOfSale() {
       isLowStock: boolean;
     }
   >;
+  const subtotalCents = lines.reduce(
+    (sum, line) => sum + line.subtotalCents,
+    0
+  );
   const lineNetCents = lines.reduce((sum, line) => sum + line.totalCents, 0);
   const invoiceDiscountCents = calculateDiscount(lineNetCents, invoiceDiscount);
   const taxableSubtotalCents = lineNetCents - invoiceDiscountCents;
-  const vatRateBasisPoints = settings?.vatEnabled
+  const sellerCanToggleVat = user?.role !== "seller" || Boolean(settings?.sellerCanToggleVat);
+  const applyVat = Boolean(settings?.vatEnabled) && (sellerCanToggleVat ? posApplyVat : true);
+  const vatRateBasisPoints = applyVat
     ? (settings.vatRateBasisPoints ?? 0)
     : 0;
-  // Même calcul que le serveur : taux du produit, sinon taux de l'entreprise (9.6).
-  const vatCents = computeVatBreakdown(
+  const vatBreakdown = computeVatBreakdown(
     lines.map(line => ({
       netCents: line.totalCents,
-      vatRateBasisPoints: settings?.vatEnabled
+      vatRateBasisPoints: applyVat
         ? (line.product.vatRateBasisPoints ?? vatRateBasisPoints)
         : 0,
     })),
     invoiceDiscountCents
-  ).vatCents;
+  );
+  const vatCents = vatBreakdown.vatCents;
   const totalCents = taxableSubtotalCents + vatCents;
 
   const add = (productId: number) =>
@@ -247,6 +250,7 @@ export default function PointOfSale() {
         0,
         product.quantity - (pendingProductQuantities[productId] ?? 0)
       );
+      
       return item
         ? current.map(value =>
             value.productId === productId
@@ -290,30 +294,25 @@ export default function PointOfSale() {
   const clearCart = () => {
     setCart([]);
     setInvoiceDiscount(noDiscount);
-    setCartCollapsed(false);
+    setCartCollapsed(true);
   };
-  // Comme sur les caisses professionnelles, l'écran de vente prend toute la largeur
-  // sur tablette : le menu de l'application se replie en icônes, puis revient en sortant.
-  const { open: sidebarOpen, setOpen: setSidebarOpen, isMobile } = useSidebar();
-  const sidebarWasOpen = useRef(sidebarOpen);
-  useEffect(() => {
-    if (isMobile || window.innerWidth >= 1280) return;
-    const wasOpen = sidebarWasOpen.current;
-    if (wasOpen) setSidebarOpen(false);
-    return () => {
-      if (wasOpen) setSidebarOpen(true);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMobile]);
-  const abandonDraft = trpc.transactions.removeDraft.useMutation({
-    onSuccess: () => utils.transactions.list.invalidate(),
-    // Échec silencieux : la vente reste annulable depuis les factures.
-    onError: () => undefined,
-  });
+  // Vente numérotée créée par « Encaisser » : annulée (et tracée) si l'encaissement est abandonné.
+  // Un ticket mis en attente puis repris n'est jamais annulé automatiquement.
+  const freshDraftId = useRef<number | null>(null);
+  const abandonDraft = trpc.transactions.removeDraft.useMutation({ onSuccess: () => utils.transactions.list.invalidate(), onError: () => undefined });
   const draft = trpc.transactions.createDraft.useMutation({
     onSuccess: result => {
       utils.transactions.list.invalidate();
+      freshDraftId.current = result.id;
       setCheckoutSale({ ...result, channel: "pos" });
+    },
+    onError: error => toast.error(error.message),
+  });
+  const savePendingTicket = trpc.transactions.createDraft.useMutation({
+    onSuccess: result => {
+      utils.transactions.list.invalidate();
+      clearCart();
+      toast.success(`${result.invoiceNumber} est enregistré à encaisser plus tard.`);
     },
     onError: error => toast.error(error.message),
   });
@@ -322,6 +321,7 @@ export default function PointOfSale() {
       return toast.error("Ajoutez au moins un produit au panier.");
     const offlineDraft: OfflinePosDraft = {
       channel: "pos",
+      warehouseId: selectedWarehouseId ?? 0,
       customerId: null,
       salesAgentId: null,
       cashierId: null,
@@ -330,10 +330,13 @@ export default function PointOfSale() {
       note: null,
       deliveryAddress: null,
       invoiceDiscount: discountPayload(invoiceDiscount),
+      applyVat,
+      vatRateBasisPoints: applyVat ? vatRateBasisPoints : undefined,
       items: lines.map(line => ({
         productId: line.productId,
         productName: line.product.name,
         productReference: line.product.reference,
+        vatRateBasisPoints: applyVat ? (line.product.vatRateBasisPoints ?? vatRateBasisPoints) : 0,
         unitPriceCents: line.unitPriceCents,
         lineTotalCents: line.totalCents,
         quantity: line.quantity,
@@ -352,18 +355,21 @@ export default function PointOfSale() {
     }
     draft.mutate({
       channel: "pos",
+      warehouseId: selectedWarehouseId ?? undefined,
       customerId: null,
       salesAgentId: null,
       cashierId: null,
       note: null,
       invoiceDiscount: discountPayload(invoiceDiscount),
+      applyVat,
+      vatRateBasisPoints: applyVat ? vatRateBasisPoints : undefined,
       items: cart.map(item => ({
         productId: item.productId,
         quantity: item.quantity,
         discount: discountPayload(item.discount),
       })),
     });
-  }, [cart, draft, invoiceDiscount, isOnline, lines, totalCents]);
+  }, [cart, draft, invoiceDiscount, isOnline, lines, selectedWarehouseId, totalCents]);
   const handleCode = (code: string) => {
     const product = products.find(
       item => item.reference.toLowerCase() === code.trim().toLowerCase()
@@ -372,6 +378,22 @@ export default function PointOfSale() {
     add(product.id);
     setQuery("");
     toast.success(`${product.name} ajouté au panier.`);
+  };
+  const holdTicket = () => {
+    if (!cart.length) return toast.error("Ajoutez au moins un produit au panier.");
+    if (!isOnline) return toast.error("Connectez-vous pour enregistrer un ticket à encaisser plus tard.");
+    savePendingTicket.mutate({
+      channel: "pos",
+      warehouseId: selectedWarehouseId ?? undefined,
+      customerId: null,
+      salesAgentId: null,
+      cashierId: null,
+      note: null,
+      invoiceDiscount: discountPayload(invoiceDiscount),
+      applyVat,
+      vatRateBasisPoints: applyVat ? vatRateBasisPoints : undefined,
+      items: cart.map(item => ({ productId: item.productId, quantity: item.quantity, discount: discountPayload(item.discount) })),
+    });
   };
 
   useEffect(() => {
@@ -397,215 +419,158 @@ export default function PointOfSale() {
     return () => window.removeEventListener("keydown", handleShortcut);
   }, [cart.length, draft.isPending, openCheckout]);
 
-  const usedCategories = categories.filter(category =>
-    products.some(product => product.categoryId === category.id)
+  const cartUnits = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const closeCheckout = (abandoned: boolean) => {
+    const id = freshDraftId.current;
+    freshDraftId.current = null;
+    setCheckoutSale(null);
+    // Encaissement abandonné : la vente numérotée créée à l'instant est annulée, le panier reste intact.
+    if (abandoned && id && isOnline) abandonDraft.mutate({ saleId: id });
+  };
+  const cartLines = (
+    <div className="divide-y divide-border">
+      {lines.map(line => (
+        <div key={line.productId} className="animate-slide-in flex gap-3 px-4 py-3">
+          <ProductImage product={line.product} className="h-12 w-12 text-base" rounded="rounded-lg" />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-2">
+              <p className="min-w-0 truncate text-sm font-medium text-foreground">{line.product.name}</p>
+              <p className="shrink-0 text-sm font-semibold text-foreground">{formatCurrency(line.totalCents)}</p>
+            </div>
+            <p className="text-xs text-muted-foreground">{formatCurrency(line.unitPriceCents)} l’unité{line.tierMinQuantity ? <span className="font-medium text-primary"> · palier {line.tierMinQuantity}+</span> : null}</p>
+            {line.isLowStock && <p className="mt-1 inline-flex items-center gap-1 rounded-md bg-warning-soft px-1.5 py-0.5 text-xs font-medium text-warning"><AlertTriangle className="h-3 w-3" />Stock faible · {line.remainingAfterSale} restant · seuil {line.product.minimumQuantity}</p>}
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center overflow-hidden rounded-lg border border-border bg-background">
+                <Button aria-label={`Retirer une unité de ${line.product.name}`} size="icon" variant="ghost" className="h-8 w-8 rounded-none" onClick={() => quantity(line.productId, line.quantity - 1)}><Minus className="h-3.5 w-3.5" /></Button>
+                <Input aria-label={`Quantité de ${line.product.name}`} type="number" inputMode="numeric" min="1" max={line.product.quantity} value={line.quantity} onChange={event => { const next = Number(event.target.value); if (Number.isSafeInteger(next) && next > 0) quantity(line.productId, next); }} className="h-8 w-12 rounded-none border-y-0 px-1 text-center text-sm font-semibold" />
+                <Button aria-label={`Ajouter une unité de ${line.product.name}`} size="icon" variant="ghost" className="h-8 w-8 rounded-none" onClick={() => quantity(line.productId, line.quantity + 1)}><Plus className="h-3.5 w-3.5" /></Button>
+              </div>
+              <Button aria-label={`Retirer ${line.product.name} du panier`} size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:bg-destructive-soft hover:text-destructive" onClick={() => quantity(line.productId, 0)}><Trash2 className="h-4 w-4" /></Button>
+            </div>
+            {canLineDiscount && <div className="mt-2"><DiscountEditor compact label="Remise" value={line.discount} onChange={discount => setLineDiscount(line.productId, discount)} /></div>}
+          </div>
+        </div>
+      ))}
+    </div>
   );
-  const bottomSpacing = cart.length ? "pb-24 md:pb-0" : "";
-  const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const cartFooter = (
+    <div className="space-y-3 border-t border-border bg-muted/40 px-4 py-4">
+      {canCartDiscount && <DiscountEditor compact label="Remise sur le panier" value={invoiceDiscount} onChange={setInvoiceDiscount} />}
+      {settings?.vatEnabled && <div className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-sm"><div className="flex items-center gap-2 font-medium">{sellerCanToggleVat ? <Checkbox id="pos-vat" checked={posApplyVat} onCheckedChange={value => setPosApplyVat(value === true)} /> : null}<label htmlFor={sellerCanToggleVat ? "pos-vat" : undefined}>TVA appliquée</label></div>{!sellerCanToggleVat && <span className="text-xs text-muted-foreground">Configuration de l’entreprise</span>}</div>}
+      <div className="space-y-1 text-sm text-muted-foreground">
+        <div className="flex items-center justify-between"><span>Sous-total net</span><span>{formatCurrency(taxableSubtotalCents)}</span></div>
+        {vatCents > 0 && <div className="flex items-center justify-between"><span>TVA ({vatRatesLabel(vatBreakdown.byRate.filter(rate => rate.vatCents > 0).map(rate => rate.vatRateBasisPoints)) || `${(vatRateBasisPoints / 100).toFixed(2)} %`})</span><span>{formatCurrency(vatCents)}</span></div>}
+      </div>
+      <div className="flex items-baseline justify-between"><span className="text-sm font-medium text-foreground">Total TTC</span><span className="text-2xl font-bold tracking-tight text-foreground">{formatCurrency(totalCents)}</span></div>
+      <Button onClick={openCheckout} disabled={!cart.length || draft.isPending} className="h-12 w-full text-base">{draft.isPending ? "Préparation…" : <><Keyboard className="h-4 w-4" />{isOnline ? "Encaisser" : "Encaisser hors connexion"}<span className="ml-1 rounded bg-primary-foreground/15 px-1.5 py-0.5 text-xs">F9</span></>}</Button>
+      <Button variant="outline" onClick={holdTicket} disabled={!cart.length || savePendingTicket.isPending || !isOnline} className="h-10 w-full"><TicketCheck className="h-4 w-4" />{savePendingTicket.isPending ? "Enregistrement…" : "Mettre en attente"}</Button>
+    </div>
+  );
+  const cartHeader = (onClose?: () => void) => (
+    <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
+      <div className="flex items-center gap-2.5">
+        <span className="relative grid h-9 w-9 place-items-center rounded-lg bg-primary-soft text-primary"><ShoppingCart className="h-[18px] w-[18px]" />{cartUnits > 0 && <span key={cartUnits} className="animate-pop absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[11px] font-bold text-primary-foreground">{cartUnits}</span>}</span>
+        <div><h2 className="text-base font-semibold text-foreground">Panier</h2><p className="text-xs text-muted-foreground">{cart.length ? `${cart.length} article${cart.length > 1 ? "s" : ""}` : "Vide"}</p></div>
+      </div>
+      <div className="flex items-center gap-1">
+        {cart.length > 0 && <Button variant="ghost" size="sm" onClick={clearCart} className="text-destructive hover:bg-destructive-soft hover:text-destructive"><Trash2 className="h-4 w-4" />Vider</Button>}
+        {onClose && <Button variant="outline" size="sm" onClick={onClose}><ChevronDown className="h-4 w-4" />Continuer</Button>}
+      </div>
+    </div>
+  );
   return (
-    <div
-      className={`mx-auto grid max-w-[1600px] gap-6 md:grid-cols-[minmax(0,1fr)_320px] lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_400px] ${bottomSpacing}`}
-    >
-      <section className="min-w-0 space-y-[18px]">
-        <header className="flex flex-wrap items-center gap-3">
-          <h1 className="flex-1 text-[22px] font-bold tracking-tight text-foreground">
-            Vente rapide
-          </h1>
-          <span
-            className={`inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold ${isOnline ? "bg-success-soft text-success" : "bg-warning-soft text-warning"}`}
-          >
-            <span
-              className={`h-[7px] w-[7px] rounded-full ${isOnline ? "bg-success" : "bg-warning"}`}
-            />
-            {isOnline ? "Caisse en ligne" : "Caisse hors connexion"}
-          </span>
-        </header>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <label className="flex h-12 flex-1 items-center gap-2.5 rounded-[10px] border border-input bg-card px-3.5 text-faint focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/30">
-            <Search className="h-5 w-5 shrink-0" aria-hidden="true" />
-            <input
-              value={query}
-              onChange={event => setQuery(event.target.value)}
-              onKeyDown={event => {
-                if (event.key === "Enter" && query.trim()) {
-                  const exact = products.find(
-                    item =>
-                      item.reference.toLowerCase() ===
-                      query.trim().toLowerCase()
-                  );
-                  if (exact) handleCode(query);
-                  else if (available.length === 1) {
-                    add(available[0].id);
-                    setQuery("");
-                  }
-                }
-              }}
-              placeholder="Nom, référence ou code-barres"
-              aria-label="Rechercher un produit"
-              className="min-w-0 flex-1 bg-transparent text-base text-foreground outline-none placeholder:text-faint"
-            />
-          </label>
-          <div className="flex gap-2">
-            <Button
-              aria-label="Scanner un code-barres"
-              variant="outline"
-              className="h-12 w-12 px-0"
-              onClick={() => setCameraOpen(true)}
-            >
-              <Camera className="h-5 w-5" />
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              aria-pressed={showImages}
-              aria-label={
-                showImages ? "Masquer les photos" : "Afficher les photos"
-              }
-              title={showImages ? "Masquer les photos" : "Afficher les photos"}
-              onClick={toggleImages}
-              className={`h-12 w-12 px-0 ${showImages ? "border-primary/40 text-primary" : ""}`}
-            >
-              {showImages ? (
-                <ImageIcon className="h-5 w-5" />
-              ) : (
-                <ImageOff className="h-5 w-5" />
-              )}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              aria-pressed={lowStockOnly}
-              onClick={() => setLowStockOnly(value => !value)}
-              className={`h-12 ${lowStockOnly ? "border-warning bg-warning-soft text-warning hover:bg-warning-soft" : ""}`}
-            >
-              <AlertTriangle className="h-4 w-4" />
-              Stock faible
-            </Button>
-            {lowStockOnly && (
-              <Button
-                type="button"
-                variant="outline"
-                disabled={!purchaseItems.length}
-                onClick={() => setPurchaseListOpen(true)}
-                className="h-12"
-              >
-                <ClipboardList className="h-4 w-4" />
-                Liste d’achats
-              </Button>
-            )}
+    <div className="mx-auto max-w-[1600px] pb-24 md:pb-0">
+      <div className="grid items-start gap-5 md:grid-cols-[minmax(0,1fr)_320px] lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_400px]">
+        <div className="min-w-0 space-y-4">
+          <header className="flex flex-wrap items-end justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="text-[22px] font-bold tracking-tight text-foreground">Vente rapide</h1>
+              <p className="mt-0.5 text-[13px] text-muted-foreground">Touchez un produit pour l’ajouter au panier.</p>
+            </div>
+            <label className="flex min-w-0 items-center gap-2 text-[13px] text-muted-foreground">Entrepôt<select value={selectedWarehouseId ? String(selectedWarehouseId) : ""} onChange={event => { const nextId = Number(event.target.value); if (nextId && nextId !== selectedWarehouseId && cart.length && !window.confirm("Changer d’entrepôt videra le panier en cours. Continuer ?")) return; if (nextId !== selectedWarehouseId) clearCart(); if (isAdmin && nextId) setActiveWarehouseId(nextId); setSelectedWarehouseId(nextId || null); }} className="min-w-0 rounded-lg border border-border bg-card px-2.5 py-1.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary" disabled={!warehouses.length}>{warehouses.filter(warehouse => warehouse.active).map(warehouse => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}{warehouse.isDefault ? " · Principal" : ""}</option>)}</select></label>
+          </header>
+          {pendingTickets.length > 0 && (
+            <section aria-label="Tickets à encaisser" className="surface rounded-xl border border-border bg-card px-4 py-3">
+              <div className="mb-2 flex items-center justify-between"><span className="flex items-center gap-2 text-sm font-semibold text-foreground"><TicketCheck className="h-4 w-4 text-warning" />En attente d’encaissement</span><button type="button" onClick={() => setLocation("/tickets?statut=unpaid")} className="text-[13px] font-medium text-primary hover:underline">Voir tout</button></div>
+              <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">{pendingTickets.map(ticket => <button key={ticket.id} type="button" onClick={() => { freshDraftId.current = null; setCheckoutSale({ id: ticket.id, totalCents: ticket.totalCents, invoiceNumber: ticket.invoiceNumber, channel: "pos" }); }} className="lift shrink-0 rounded-lg border border-border bg-background px-3 py-2 text-left hover:border-warning/40"><span className="block text-xs font-semibold text-foreground">{ticket.invoiceNumber}</span><span className="mt-0.5 block text-sm font-semibold text-warning">{formatCurrency(ticket.totalCents - ticket.amountPaidCents)}</span></button>)}</div>
+            </section>
+          )}
+          <section className="surface rounded-xl border border-border bg-card p-4">
+            <div className="flex flex-col gap-2 xl:flex-row xl:items-center">
+              <div className="relative flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input value={query} onChange={event => setQuery(event.target.value)} placeholder="Rechercher un produit ou une référence" className="pl-9" />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" aria-pressed={showPhotos} onClick={() => setShowPhotos(value => !value)}>{showPhotos ? "Masquer les photos" : "Afficher les photos"}</Button>
+                <Button aria-label="Scanner un code-barres" variant="outline" size="icon" onClick={() => setCameraOpen(true)}><Camera className="h-4 w-4" /></Button>
+                <Button type="button" variant="outline" aria-pressed={lowStockOnly} onClick={() => setLowStockOnly(value => !value)} className={lowStockOnly ? "border-warning bg-warning-soft text-warning hover:bg-warning-soft" : ""}><AlertTriangle className="h-4 w-4" />Stock faible</Button>
+                <Button type="button" variant="outline" disabled={!lowStockOnly || !purchaseItems.length} onClick={() => setPurchaseListOpen(true)}><ClipboardList className="h-4 w-4" />Liste d’achats</Button>
+              </div>
+            </div>
+            {lowStockOnly && <p className="mt-3 text-xs text-muted-foreground">La liste d’achats regroupe les produits filtrés et propose une quantité suffisante pour dépasser le seuil de sécurité.</p>}
+            <div className="stagger mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+              {available.map(product => {
+                const productIsLowStock = isLowStock(product);
+                const pendingQuantity = pendingProductQuantities[product.id] ?? 0;
+                const estimatedQuantity = product.quantity - pendingQuantity;
+                const inCart = cart.find(item => item.productId === product.id)?.quantity ?? 0;
+                return (
+                  <button key={product.id} type="button" onClick={() => add(product.id)} className={`lift relative flex flex-col overflow-hidden rounded-xl border bg-card text-left ${inCart ? "border-primary ring-1 ring-primary" : productIsLowStock ? "border-warning/40" : "border-border hover:border-primary/40"}`}>
+                    {inCart > 0 && <span key={inCart} className="animate-pop absolute right-2 top-2 z-10 grid h-6 min-w-6 place-items-center rounded-full bg-primary px-1.5 text-xs font-bold text-primary-foreground shadow">{inCart}</span>}
+                    {showPhotos && <ProductImage product={product} full className="aspect-square w-full border-b border-border text-3xl" rounded="rounded-none" />}
+                    <div className="flex flex-1 flex-col p-3">
+                      <p className="line-clamp-2 text-sm font-medium leading-snug text-foreground">{product.name}</p>
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground">{product.reference} · {product.quantity} {product.unit}</p>
+                      {!isOnline && <p className="mt-1 text-xs font-medium text-warning">Stock estimé : {estimatedQuantity} {product.unit}{pendingQuantity ? ` · ${pendingQuantity} en attente` : ""}</p>}
+                      {product.priceTiers?.length ? <p className="mt-1 text-xs font-medium text-primary">Paliers dès {product.priceTiers[0].minQuantity} {product.unit}</p> : null}
+                      {productIsLowStock && <p className="mt-1 inline-flex w-fit items-center gap-1 rounded-md bg-warning-soft px-1.5 py-0.5 text-xs font-medium text-warning"><AlertTriangle className="h-3 w-3" />Seuil {product.minimumQuantity}</p>}
+                      <div className="mt-auto flex items-center justify-between pt-2"><span className="font-semibold text-primary">{formatCurrency(product.retailPriceCents)}</span><span className="grid h-7 w-7 place-items-center rounded-full bg-primary-soft text-primary"><Plus className="h-4 w-4" /></span></div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            {!isOnline && <p className="mt-3 text-xs text-warning">Les quantités affichées sont une estimation locale{lastLocalSnapshotAt ? ` enregistrée le ${new Date(lastLocalSnapshotAt).toLocaleString("fr-FR")}` : ""}. La validation finale du stock est effectuée lors de la synchronisation.</p>}
+            {!available.length && <p className="py-14 text-center text-sm text-muted-foreground">{lowStockOnly ? "Aucun produit en stock faible ne correspond à votre recherche." : "Aucun produit disponible."}</p>}
+          </section>
+        </div>
+        {/* Tablette et ordinateur : panier toujours visible à droite, les produits restent accessibles. */}
+        <aside aria-label="Panier de vente" className="surface sticky top-4 hidden max-h-[calc(100dvh-2rem)] flex-col overflow-hidden rounded-xl border border-border bg-card md:flex">
+          {cartHeader()}
+          <div className="min-h-0 flex-1 overflow-y-auto">{cart.length ? cartLines : <p className="px-6 py-12 text-center text-sm text-muted-foreground">Le panier est vide.<br />Touchez un produit pour l’ajouter.</p>}</div>
+          {cart.length > 0 && cartFooter}
+        </aside>
+      </div>
+      {/* Téléphone : barre de total en bas, panier plein écran à la demande. */}
+      {cart.length > 0 && cartCollapsed && !checkoutSale && (
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 px-4 py-3 backdrop-blur md:hidden" style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
+          <div className="flex items-center gap-3">
+            <button type="button" onClick={() => setCartCollapsed(false)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
+              <span className="relative grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary-soft text-primary"><ShoppingCart className="h-5 w-5" /><span key={cartUnits} className="animate-pop absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[11px] font-bold text-primary-foreground">{cartUnits}</span></span>
+              <span className="min-w-0"><span className="block text-xs text-muted-foreground">Voir le panier <ChevronUp className="inline h-3 w-3" /></span><span className="block truncate text-lg font-bold text-foreground">{formatCurrency(totalCents)}</span></span>
+            </button>
+            <Button onClick={openCheckout} disabled={draft.isPending} className="h-11 px-5">{draft.isPending ? "Préparation…" : "Encaisser"}</Button>
           </div>
         </div>
-        {usedCategories.length > 0 && (
-          <div
-            className="flex flex-wrap gap-2"
-            role="group"
-            aria-label="Catégories"
-          >
-            {[
-              { id: null as number | null, name: "Tout" },
-              ...usedCategories,
-            ].map(category => {
-              const active = categoryId === category.id;
-              return (
-                <button
-                  key={category.id ?? "all"}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => setCategoryId(category.id)}
-                  className={`h-10 rounded-full border px-4 text-sm font-semibold transition-colors ${active ? "border-primary bg-primary text-primary-foreground" : "border-input bg-card text-foreground hover:bg-accent"}`}
-                >
-                  {category.name}
-                </button>
-              );
-            })}
-          </div>
-        )}
-        {lowStockOnly && (
-          <p className="text-[13px] text-muted-foreground">
-            La liste d’achats regroupe les produits filtrés et propose une
-            quantité suffisante pour dépasser le seuil de sécurité.
-          </p>
-        )}
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
-          {available.map(product => {
-            const productIsLowStock = isLowStock(product);
-            const quantityInCart =
-              cart.find(item => item.productId === product.id)?.quantity ?? 0;
-            const inCart = quantityInCart > 0;
-            const remaining =
-              product.quantity - (pendingProductQuantities[product.id] ?? 0);
-            return (
-              <button
-                key={product.id}
-                onClick={() => add(product.id)}
-                aria-label={`${product.name}${quantityInCart ? `, ${quantityInCart} au panier` : ""}`}
-                className={`lift surface relative flex min-h-[112px] flex-col gap-1.5 rounded-xl border bg-card p-2.5 text-left hover:border-primary/60 ${inCart ? "border-primary ring-1 ring-primary" : "border-border"}`}
-              >
-                {quantityInCart > 0 && (
-                  <span
-                    key={quantityInCart}
-                    className="animate-pop absolute right-2 top-2 z-10 grid h-7 min-w-7 place-items-center rounded-full bg-primary px-2 text-sm font-bold text-primary-foreground shadow-sm"
-                  >
-                    {quantityInCart}
-                  </span>
-                )}
-                {showImages && (
-                  <ProductImage
-                    product={product}
-                    className="mb-1 aspect-square w-full text-3xl"
-                    rounded="rounded-lg"
-                  />
-                )}
-                <span className="line-clamp-2 px-1 text-[15px] font-semibold leading-snug text-foreground">
-                  {product.name}
-                </span>
-                <span
-                  className={`px-1 text-xs font-medium ${productIsLowStock ? "text-warning" : "text-faint"}`}
-                >
-                  {productIsLowStock ? "Stock bas" : "En stock"} · {remaining}{" "}
-                  {product.unit}
-                </span>
-                {product.priceTiers?.length ? (
-                  <span className="px-1 text-[11px] font-medium text-primary">
-                    Paliers dès {product.priceTiers[0].minQuantity}{" "}
-                    {product.unit}
-                  </span>
-                ) : null}
-                <span className="mt-auto px-1 text-base font-bold text-foreground">
-                  {formatCurrency(product.retailPriceCents)}
-                </span>
-              </button>
-            );
-          })}
+      )}
+      {cart.length > 0 && !cartCollapsed && !checkoutSale && (
+        <div role="dialog" aria-modal="true" aria-label="Panier de vente" className="animate-enter fixed inset-0 z-40 flex flex-col bg-card md:hidden">
+          {cartHeader(() => setCartCollapsed(true))}
+          <div className="min-h-0 flex-1 overflow-y-auto">{cartLines}</div>
+          {cartFooter}
         </div>
-        {!available.length && (
-          <p className="rounded-xl border border-dashed border-border py-14 text-center text-sm text-muted-foreground">
-            {lowStockOnly
-              ? "Aucun produit en stock faible ne correspond à votre recherche."
-              : query || categoryId !== null
-                ? "Aucun produit ne correspond à votre recherche."
-                : "Aucun produit disponible."}
-          </p>
-        )}
-      </section>
-      <BarcodeCameraDialog
-        open={cameraOpen}
-        onOpenChange={setCameraOpen}
-        onDetected={handleCode}
-      />
+      )}
+      <BarcodeCameraDialog open={cameraOpen} onOpenChange={setCameraOpen} onDetected={handleCode} />
       <CheckoutSheet
         open={Boolean(checkoutSale)}
-        onOpenChange={open => !open && setCheckoutSale(null)}
-        onAbandon={() => {
-          // Encaissement abandonné : la vente numérotée en attente est annulée
-          // (elle reste tracée), le panier est conservé pour reprendre la vente.
-          if (checkoutSale?.id)
-            abandonDraft.mutate({ saleId: checkoutSale.id });
-        }}
+        onOpenChange={open => !open && closeCheckout(false)}
+        onAbandon={() => closeCheckout(true)}
         sale={checkoutSale}
         agents={agents}
         settings={settings}
         onComplete={() => {
+          freshDraftId.current = null;
           clearCart();
           setCheckoutSale(null);
           utils.products.list.invalidate();
@@ -655,7 +620,7 @@ export default function PointOfSale() {
               </section>
             ))}
           </div>
-          <div className="flex items-center justify-between rounded-xl bg-primary/5 px-4 py-3">
+          <div className="flex items-center justify-between rounded-xl bg-primary/[0.06] px-4 py-3">
             <span className="text-sm text-muted-foreground">
               Estimation des achats
             </span>
@@ -673,230 +638,6 @@ export default function PointOfSale() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <aside
-        aria-label="Panier de vente"
-        // Téléphone : barre de total fixe, panier en plein écran à la demande.
-        // Tablette et ordinateur : panneau latéral toujours visible.
-        className={`flex-col overflow-hidden bg-card md:sticky md:inset-auto md:top-[5.5rem] md:z-0 md:flex md:max-h-[calc(100vh-7.5rem)] md:self-start md:rounded-xl md:border md:border-border md:shadow-sm ${
-          cart.length === 0 || checkoutSale
-            ? "hidden"
-            : cartCollapsed
-              ? "fixed inset-x-0 bottom-0 z-30 flex border-t border-border shadow-[0_-8px_24px_rgb(var(--shadow-color)/0.12)]"
-              : "fixed inset-0 z-50 flex"
-        }`}
-      >
-        <div
-          className={`flex-col gap-2.5 border-b border-border px-5 py-4 md:flex md:px-6 md:py-5 ${cartCollapsed ? "hidden" : "flex"}`}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="min-w-0 truncate text-base font-semibold text-foreground md:text-[17px]">
-              Panier · {itemCount} article{itemCount > 1 ? "s" : ""}
-            </h2>
-            <div className="flex items-center gap-1">
-              {cart.length > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearCart}
-                  className="text-destructive hover:bg-destructive-soft hover:text-destructive"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Vider
-                </Button>
-              )}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="md:hidden"
-                aria-label="Continuer la vente"
-                onClick={() => setCartCollapsed(true)}
-              >
-                <X className="h-4 w-4" />
-                Continuer
-              </Button>
-            </div>
-          </div>
-        </div>
-        {cartCollapsed && (
-          <div className="flex items-center gap-3 px-4 py-3 md:hidden">
-            <button
-              type="button"
-              onClick={() => setCartCollapsed(false)}
-              className="flex min-w-0 flex-1 items-center gap-3 text-left"
-              aria-label="Voir le panier"
-            >
-              <span className="relative grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">
-                <ShoppingCart className="h-5 w-5" />
-                <span
-                  key={itemCount}
-                  className="animate-pop absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[11px] font-bold text-primary-foreground"
-                >
-                  {itemCount}
-                </span>
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-lg font-bold leading-tight tracking-tight text-foreground">
-                  {formatCurrency(totalCents)}
-                </span>
-                <span className="block text-xs font-medium text-primary">
-                  Voir le panier
-                </span>
-              </span>
-            </button>
-            <Button
-              onClick={openCheckout}
-              disabled={draft.isPending || !cart.length}
-              className="h-12 rounded-xl px-6 text-base font-bold"
-            >
-              {draft.isPending ? "Préparation…" : "Encaisser"}
-            </Button>
-          </div>
-        )}
-        <div
-          className={`min-h-0 flex-1 flex-col md:flex ${cartCollapsed ? "hidden" : "flex"}`}
-        >
-          {lines.length ? (
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 md:px-6">
-              {lines.map(line => (
-                <div
-                  key={line.productId}
-                  className="animate-slide-in border-b border-border py-3 last:border-b-0"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="line-clamp-2 text-[15px] font-medium leading-snug text-foreground">
-                        {line.product.name}
-                      </p>
-                      <p className="mt-0.5 text-[13px] text-faint">
-                        {formatCurrency(line.unitPriceCents)} l’unité
-                        {line.tierMinQuantity
-                          ? ` · palier ${line.tierMinQuantity}+`
-                          : ""}
-                      </p>
-                    </div>
-                    <p className="shrink-0 text-right text-[15px] font-semibold text-foreground">
-                      {formatCurrency(line.totalCents)}
-                    </p>
-                  </div>
-                  {line.isLowStock && (
-                    <p className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-warning-soft px-1.5 py-0.5 text-[11px] font-medium text-warning">
-                      <AlertTriangle className="h-3 w-3" />
-                      {line.remainingAfterSale} restant après la vente · seuil{" "}
-                      {line.product.minimumQuantity}
-                    </p>
-                  )}
-                  <div className="mt-2 flex items-center justify-between gap-3">
-                    <div className="flex shrink-0 items-center overflow-hidden rounded-[10px] border border-input">
-                      <button
-                        type="button"
-                        aria-label={`Retirer une unité de ${line.product.name}`}
-                        className="grid h-11 w-11 place-items-center text-muted-foreground hover:bg-accent"
-                        onClick={() =>
-                          quantity(line.productId, line.quantity - 1)
-                        }
-                      >
-                        {line.quantity === 1 ? (
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        ) : (
-                          <Minus className="h-4 w-4" />
-                        )}
-                      </button>
-                      <span className="w-10 text-center text-[15px] font-semibold">
-                        {line.quantity}
-                      </span>
-                      <button
-                        type="button"
-                        aria-label={`Ajouter une unité de ${line.product.name}`}
-                        className="grid h-11 w-11 place-items-center text-muted-foreground hover:bg-accent"
-                        onClick={() =>
-                          quantity(line.productId, line.quantity + 1)
-                        }
-                      >
-                        <Plus className="h-4 w-4" />
-                      </button>
-                    </div>
-                    <DiscountEditor
-                      compact
-                      label="Remise"
-                      value={line.discount}
-                      onChange={discount =>
-                        setLineDiscount(line.productId, discount)
-                      }
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="grid flex-1 place-items-center px-6 py-10 text-center">
-              <div>
-                <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-muted text-faint">
-                  <ShoppingCart className="h-5 w-5" />
-                </span>
-                <p className="mt-3 text-sm font-medium text-foreground">
-                  Panier vide
-                </p>
-                <p className="mt-1 text-[13px] text-muted-foreground">
-                  Touchez un produit ou scannez un code-barres.
-                </p>
-              </div>
-            </div>
-          )}
-          <div className="space-y-2.5 border-t border-border bg-muted/40 px-5 py-5 md:px-6">
-            <DiscountEditor
-              compact
-              label="Remise sur le panier"
-              value={invoiceDiscount}
-              onChange={setInvoiceDiscount}
-            />
-            <div className="flex items-center justify-between text-sm text-muted-foreground">
-              <span>{vatCents > 0 ? "Sous-total HT" : "Sous-total"}</span>
-              <span>{formatCurrency(taxableSubtotalCents)}</span>
-            </div>
-            {vatCents > 0 && (
-              <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <span>
-                  TVA{" "}
-                  {vatRatesLabel(
-                    lines.map(line =>
-                      settings?.vatEnabled
-                        ? (line.product.vatRateBasisPoints ??
-                          vatRateBasisPoints)
-                        : 0
-                    )
-                  )}
-                </span>
-                <span>{formatCurrency(vatCents)}</span>
-              </div>
-            )}
-            <div className="flex items-baseline justify-between pt-1.5">
-              <span className="text-base font-semibold text-foreground">
-                Total TTC
-              </span>
-              <span
-                key={totalCents}
-                className="animate-pop inline-block text-[28px] font-bold tracking-tight text-foreground"
-              >
-                {formatCurrency(totalCents)}
-              </span>
-            </div>
-            <Button
-              onClick={openCheckout}
-              disabled={draft.isPending || !cart.length}
-              className="mt-1.5 h-14 w-full rounded-xl text-[17px] font-bold"
-            >
-              {draft.isPending
-                ? "Préparation…"
-                : `${isOnline ? "Encaisser" : "Encaisser hors connexion"} ${formatCurrency(totalCents)}`}
-            </Button>
-            <p className="hidden items-center justify-center gap-1.5 text-center text-xs text-faint sm:flex">
-              <Keyboard className="h-3.5 w-3.5" />
-              F9 pour encaisser
-            </p>
-          </div>
-        </div>
-      </aside>
     </div>
   );
 }

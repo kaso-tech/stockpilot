@@ -1,0 +1,23 @@
+ALTER TABLE `agentPayments` MODIFY COLUMN `companyId` int NOT NULL;--> statement-breakpoint
+ALTER TABLE `agents` MODIFY COLUMN `companyId` int NOT NULL;--> statement-breakpoint
+ALTER TABLE `auditLogs` MODIFY COLUMN `companyId` int NOT NULL;--> statement-breakpoint
+ALTER TABLE `backupArchives` MODIFY COLUMN `companyId` int NOT NULL;--> statement-breakpoint
+ALTER TABLE `backupSettings` MODIFY COLUMN `companyId` int NOT NULL;--> statement-breakpoint
+ALTER TABLE `customers` MODIFY COLUMN `companyId` int NOT NULL;--> statement-breakpoint
+ALTER TABLE `expenseBudgets` MODIFY COLUMN `companyId` int NOT NULL;--> statement-breakpoint
+ALTER TABLE `expenses` MODIFY COLUMN `companyId` int NOT NULL;--> statement-breakpoint
+ALTER TABLE `inventorySessions` MODIFY COLUMN `companyId` int NOT NULL;--> statement-breakpoint
+ALTER TABLE `productCategories` MODIFY COLUMN `companyId` int NOT NULL;--> statement-breakpoint
+ALTER TABLE `productUnits` MODIFY COLUMN `companyId` int NOT NULL;--> statement-breakpoint
+ALTER TABLE `products` MODIFY COLUMN `companyId` int NOT NULL;--> statement-breakpoint
+ALTER TABLE `purchaseOrders` MODIFY COLUMN `companyId` int NOT NULL;--> statement-breakpoint
+ALTER TABLE `remunerationProfiles` MODIFY COLUMN `companyId` int NOT NULL;--> statement-breakpoint
+ALTER TABLE `saleSettings` MODIFY COLUMN `companyId` int NOT NULL;--> statement-breakpoint
+ALTER TABLE `sales` MODIFY COLUMN `companyId` int NOT NULL;--> statement-breakpoint
+ALTER TABLE `stockAlerts` MODIFY COLUMN `companyId` int NOT NULL;--> statement-breakpoint
+ALTER TABLE `stockMovements` MODIFY COLUMN `companyId` int NOT NULL;--> statement-breakpoint
+ALTER TABLE `stockTransfers` MODIFY COLUMN `companyId` int NOT NULL;--> statement-breakpoint
+ALTER TABLE `suppliers` MODIFY COLUMN `companyId` int NOT NULL;--> statement-breakpoint
+ALTER TABLE `supportRequests` MODIFY COLUMN `companyId` int NOT NULL;--> statement-breakpoint
+ALTER TABLE `warehouseStocks` MODIFY COLUMN `companyId` int NOT NULL;--> statement-breakpoint
+ALTER TABLE `warehouses` MODIFY COLUMN `companyId` int NOT NULL;

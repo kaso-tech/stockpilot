@@ -8,18 +8,15 @@ export type TestTenant = {
   seller: AuthenticatedUser;
 };
 
-function userFor(
-  companyId: number,
-  id: number,
-  role: "admin" | "seller",
-  slug: string
-): AuthenticatedUser {
+function userFor(companyId: number, id: number, role: "admin" | "seller", slug: string): AuthenticatedUser {
   const now = new Date("2026-01-01T00:00:00.000Z");
   return {
     id,
     openId: `test-${slug}-${role}`,
     name: `${role === "admin" ? "Administrateur" : "Vendeur"} ${slug}`,
     email: `${role}@${slug}.example.test`,
+    emailNormalized: `${role}@${slug}.example.test`,
+    emailVerifiedAt: null,
     phone: null,
     loginMethod: "password",
     role,
@@ -28,7 +25,6 @@ function userFor(
     createdAt: now,
     updatedAt: now,
     lastSignedIn: now,
-    emailVerifiedAt: null,
   };
 }
 

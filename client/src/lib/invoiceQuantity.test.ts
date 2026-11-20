@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  isMaximumInvoiceQuantity,
-  nextInvoiceQuantity,
-} from "./invoiceQuantity";
+import { isMaximumInvoiceQuantity, nextInvoiceQuantity } from "./invoiceQuantity";
 
 describe("nextInvoiceQuantity", () => {
   it("borne les ajustements entre une unité et le stock disponible", () => {

@@ -1,75 +1,31 @@
-import { expect, type Page } from "@playwright/test";
-
-export const PASSWORD = "MotDePasse!2026";
-
-/** Relève les erreurs JavaScript de la page pour les faire échouer explicitement. */
-export function trackErrors(page: Page) {
-  const errors: string[] = [];
-  page.on("pageerror", error => errors.push(error.message));
-  page.on("console", message => {
-    if (
-      message.type() === "error" &&
-      !/Failed to load resource|401|403/.test(message.text())
-    )
-      errors.push(message.text());
-  });
-  return errors;
-}
-
-export async function register(
-  page: Page,
-  email: string,
-  company = "Boutique E2E"
-) {
-  await page.goto("/inscription");
-  await page.getByPlaceholder("Nom de l’entreprise").fill(company);
-  await page.getByPlaceholder("Votre nom complet").fill("Awa Diallo");
-  await page.getByPlaceholder("Adresse e-mail professionnelle").fill(email);
-  await page
-    .getByPlaceholder("Mot de passe (10 caractères minimum)")
-    .fill(PASSWORD);
-  await page.getByPlaceholder("Confirmer le mot de passe").fill(PASSWORD);
-  const submit = page.getByRole("button", { name: "Créer mon espace" });
-  await expect(submit).toBeEnabled({ timeout: 10_000 });
-  await submit.click();
-  await page.waitForURL("**/parametres/identite");
-}
-
-export async function login(page: Page, email: string, password = PASSWORD) {
-  await page.goto("/");
-  await page.getByPlaceholder("Adresse e-mail").fill(email);
-  await page.getByPlaceholder("Mot de passe").first().fill(password);
-  await page.getByRole("button", { name: "Se connecter" }).click();
-  await expect(page.getByText("Vue d’ensemble").first()).toBeVisible({
-    timeout: 15_000,
+import { type Page } from "@playwright/test";
+import superjson from "superjson";
+export const warehouse = { id: 99, companyId: 101, name: "Entrepôt de recette", code: "TEST", active: true, isDefault: true };
+export const product = { id: 42, companyId: 101, reference: "TEST-42", name: "Produit de recette", category: "Recette", unit: "pièce", quantity: 10, minimumQuantity: 2, purchasePriceCents: 100, retailPriceCents: 200, wholesalePriceCents: 180, supplierId: null };
+export async function mockApi(page: Page, role = "admin", authenticated = true, withPhoto = false, overrides: Record<string, unknown> = {}) {
+  const user = authenticated ? { id: 1001, openId: "e2e-synthetic", companyId: 101, name: "Compte de recette", role, active: true, email: "test@example.test", createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() } : null;
+  await page.route("**/api/trpc/**", async route => {
+    const names = new URL(route.request().url()).pathname.split("/api/trpc/")[1]!.split(",");
+    const known: Record<string, unknown> = {
+      "auth.me": user, "warehouses.active": { warehouseId: 99, warehouse }, "warehouses.list": [warehouse],
+      "products.list": [{ ...product, imageUrl: withPhoto ? "/manus-storage/company/101/products/42/image_1234abcd.png" : null, imageThumbUrl: withPhoto ? "/manus-storage/company/101/products/42/thumb_1234abcd.png" : null }], "commerce.customers.list": [{ id: 55, name: "Client de recette", type: "ordinary", email: null, phone: null, address: null }],
+      "commerce.settings.get": { companyName: "Entreprise de recette", currency: "XOF", primaryColor: "#2563EB", vatEnabled: false },
+      "preferences.get": { currency: "XOF", primaryColor: "#2563EB" },
+      "dashboard.get": { summary: {}, salesTrend: [], unpaidInvoices: [], recentSales: [], lowStock: [] },
+      "onboarding.status": { completed: true, steps: { product: true, customer: true, paymentMethod: true } },
+      "dashboardPreferences.get": null, "platform.access": { allowed: false },
+      "backups.get": { settings: {}, archives: [] },
+      "auth.requestPasswordReset": { success: true }, "auth.resetPassword": { success: true },
+      "emailVerification.status": { verifiedAt: null, available: false },
+      ...overrides,
+    };
+    const results = names.map(name => {
+      const data = Object.hasOwn(known, name) ? known[name] : (name.endsWith(".list") || name.endsWith(".notifications") || name.endsWith(".managerAlerts") ? [] : {});
+      return { result: { data: superjson.serialize(data) } };
+    });
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(results) });
   });
 }
-
-/** Appel tRPC authentifié depuis le navigateur (cookie de session de la page). */
-export async function trpc<T>(
-  page: Page,
-  path: string,
-  input: unknown
-): Promise<T> {
-  const response = await page.request.post(`/api/trpc/${path}`, {
-    data: { json: input },
-    headers: { "content-type": "application/json" },
-  });
-  expect(response.ok(), await response.text()).toBeTruthy();
-  return (await response.json()).result.data.json as T;
-}
-
-/** Lecture tRPC (procédure « query ») en GET. */
-export async function trpcQuery<T>(
-  page: Page,
-  path: string,
-  input?: unknown
-): Promise<T> {
-  const query =
-    input === undefined
-      ? ""
-      : `?input=${encodeURIComponent(JSON.stringify({ json: input }))}`;
-  const response = await page.request.get(`/api/trpc/${path}${query}`);
-  expect(response.ok(), await response.text()).toBeTruthy();
-  return (await response.json()).result.data.json as T;
+export async function pushRoute(page: Page, path: string) {
+  await page.evaluate(pathname => { history.pushState(null, "", pathname); window.dispatchEvent(new PopStateEvent("popstate")); }, path);
 }

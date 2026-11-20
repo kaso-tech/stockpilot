@@ -1,14 +1,7 @@
-import {
-  EmptyState,
-  ListSkeleton,
-  PageHeader,
-  Panel,
-  table,
-} from "@/components/page";
+import { EmptyState, ListSkeleton, Panel, table } from "@/components/page";
+import { can } from "@shared/permissions";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { usePermissions } from "@/hooks/usePermissions";
 import { vatRatesLabel } from "@shared/pricing";
-import { LoadMore, usePagedLimit } from "@/components/LoadMore";
 import { CheckoutSheet } from "@/components/CheckoutSheet";
 import {
   AlertDialog,
@@ -20,6 +13,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -29,9 +23,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { documentParticipantNames, documentParticipantOptionLabel, matchesDocumentParticipant } from "@/lib/documentParticipants";
 import { invoiceEmailMessage, invoiceEmailSubject } from "@/lib/invoiceShare";
+import { downloadCommercialDocumentsCsv } from "@/lib/documentCsv";
 import { trpc } from "@/lib/trpc";
-import { fileToBase64 } from "@/lib/emailDocument";
+import { DocumentSendMenu } from "@/components/DocumentSendMenu";
+import { useActiveWarehouse } from "@/contexts/ActiveWarehouseContext";
 import {
   Download,
   Eye,
@@ -39,12 +36,13 @@ import {
   Plus,
   Printer,
   ReceiptText,
+  Search,
   Trash2,
   Undo2,
   WalletCards,
 } from "lucide-react";
 import { jsPDF } from "jspdf";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 
@@ -58,11 +56,12 @@ type Invoice = {
   customerName?: string | null;
   salesAgentId?: number | null;
   cashierId?: number | null;
+  sellerUserId?: number | null;
 };
 
 export default function Invoices() {
   const { user } = useAuth();
-  const { can } = usePermissions();
+  const { activeWarehouseId } = useActiveWarehouse();
   const [, setLocation] = useLocation();
   const initial =
     Number(new URLSearchParams(window.location.search).get("facture")) || null;
@@ -71,23 +70,20 @@ export default function Invoices() {
   const [checkoutSale, setCheckoutSale] = useState<Invoice | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Invoice | null>(null);
   const [refundTarget, setRefundTarget] = useState<Invoice | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | Invoice["status"] | "unpaid">("all");
+  const [agentFilter, setAgentFilter] = useState("all");
+  const [periodFilter, setPeriodFilter] = useState<"all" | "today" | "week" | "month">("all");
   const utils = trpc.useUtils();
-  const sendSaleByEmail = trpc.documents.sendSale.useMutation();
-  const paging = usePagedLimit();
-  const {
-    data: transactions = [],
-    isLoading,
-    isFetching,
-  } = trpc.transactions.list.useQuery({
-    channel: "invoice",
-    limit: paging.limit,
-  });
+  const { data: transactions = [], isLoading } =
+    trpc.transactions.list.useQuery(activeWarehouseId ? { warehouseId: activeWarehouseId } : undefined);
   const { data: detail } = trpc.commerce.sales.detail.useQuery(
     { id: selectedId ?? 0 },
     { enabled: Boolean(selectedId) }
   );
   const { data: identity } = trpc.commerce.settings.get.useQuery();
   const { data: agents = [] } = trpc.commerce.agents.list.useQuery();
+  const { data: documentParticipants = [] } = trpc.commerce.documentParticipants.useQuery();
   const removeDraft = trpc.transactions.removeDraft.useMutation({
     onSuccess: () => {
       utils.transactions.list.invalidate();
@@ -95,30 +91,37 @@ export default function Invoices() {
       setPreviewOpen(false);
       setSelectedId(null);
       window.history.replaceState({}, "", "/factures");
-      toast.success("Facture non encaissée annulée.");
+      toast.success("Facture annulée.");
     },
     onError: error => toast.error(error.message),
   });
   const refund = trpc.transactions.refund.useMutation({
-    onSuccess: result => {
+    onSuccess: () => {
       utils.transactions.list.invalidate();
       utils.movements.list.invalidate();
       utils.products.list.invalidate();
       utils.dashboard.get.invalidate();
       setRefundTarget(null);
       setPreviewOpen(false);
-      toast.success(
-        `Remboursement enregistré (avoir ${result.creditNoteNumber}). Le stock a été réintégré.`
-      );
+      toast.success("Remboursement enregistré. Le stock a été réintégré.");
     },
     onError: error => toast.error(error.message),
   });
   const invoices = transactions.filter(
     item => item.channel === "invoice"
   ) as Invoice[];
+  const filteredInvoices = useMemo(() => invoices.filter(invoice => {
+    const term = search.trim().toLowerCase();
+    const matchesSearch = !term || invoice.invoiceNumber.toLowerCase().includes(term) || (invoice.customerName || "").toLowerCase().includes(term);
+    const matchesStatus = statusFilter === "all" || (statusFilter === "unpaid" ? invoice.status === "draft" || invoice.status === "partial" : invoice.status === statusFilter);
+    const matchesAgent = matchesDocumentParticipant(invoice, agentFilter);
+    const created = new Date(invoice.createdAt).getTime(); const now = Date.now();
+    const matchesPeriod = periodFilter === "all" || (periodFilter === "today" ? created >= new Date().setHours(0, 0, 0, 0) : periodFilter === "week" ? created >= now - 7 * 86_400_000 : created >= now - 31 * 86_400_000);
+    return matchesSearch && matchesStatus && matchesAgent && matchesPeriod;
+  }), [agentFilter, invoices, periodFilter, search, statusFilter]);
   const canRefund =
-    (can("sales.refund") && user?.role !== "seller") ||
-    (user?.role === "seller" && Boolean(identity?.sellerCanRefund));
+    can(user?.role, "sales.refund") && (user?.role !== "seller" || Boolean(identity?.sellerCanRefund));
+  const exportFilteredInvoices = () => { downloadCommercialDocumentsCsv("factures-filtrees.csv", filteredInvoices.map(invoice => ({ reference: invoice.invoiceNumber, date: invoice.createdAt, client: invoice.customerName || "Client comptoir", statut: invoiceStatusMeta[invoice.status][0], agent: documentParticipantNames(invoice, documentParticipants), totalCents: invoice.totalCents, encaisseCents: invoice.amountPaidCents }))); toast.success(`${filteredInvoices.length} facture(s) exportée(s) au format CSV.`); };
 
   useEffect(() => {
     if (initial) setPreviewOpen(true);
@@ -145,7 +148,7 @@ export default function Invoices() {
     if (format === "ticket")
       copy.querySelectorAll(".a4-only").forEach(element => element.remove());
     popup.document.write(
-      `<!doctype html><html><head><title>Facture</title><style>@page{size:${format === "ticket" ? "80mm auto" : "A4"};margin:12mm}body{font-family:Arial,sans-serif;color:#172033;max-width:${format === "ticket" ? "80mm" : "100%"};margin:0 auto}.row{display:flex;justify-content:space-between;gap:12px}.muted{color:#64748b;font-size:12px}.line{border-top:1px solid #dbe3ea;padding-top:12px;margin-top:12px}.signature{margin-top:32px;text-align:right}.signature.center{text-align:center}.signature.left{text-align:left}.signature img{max-width:180px;max-height:80px;object-fit:contain}</style></head><body>${copy.innerHTML}</body></html>`
+      `<!doctype html><html><head><title>Facture</title><style>@page{size:${format === "ticket" ? "80mm auto" : "A4"};margin:12mm}body{font-family:Arial,sans-serif;color:#172033;max-width:${format === "ticket" ? "80mm" : "100%"};margin:0 auto}.row{display:flex;justify-content:space-between;gap:12px}.muted{color:#64748b;font-size:12px}.line{border-top:1px solid #dbe3ea;padding-top:12px;margin-top:12px}.signature{margin-top:32px;text-align:right}.signature.center{text-align:center}.signature.left{text-align:left}.signature img{max-width:180px;max-height:80px;object-fit:contain}.invoice-logo{max-height:56px;max-width:150px;object-fit:contain}.invoice-template.modern{border-top:5px solid #2563eb;padding-top:16px}.invoice-template.minimal .line{border-top:0;padding-top:8px;margin-top:8px}.invoice-template.minimal header{padding-bottom:8px;border-bottom:1px solid #dbe3ea}</style></head><body>${copy.innerHTML}</body></html>`
     );
     let printTriggered = false;
     const triggerPrint = () => {
@@ -177,24 +180,6 @@ export default function Invoices() {
       invoiceNumber: detail.sale.invoiceNumber,
       total: formatCurrency(detail.sale.totalCents),
     });
-    // Envoi direct par le serveur (pièce jointe PDF) ; partage local si aucun
-    // serveur d'e-mails n'est configuré.
-    try {
-      const result = await sendSaleByEmail.mutateAsync({
-        id: detail.sale.id,
-        pdfBase64: await fileToBase64(file),
-        filename: file.name,
-        subject,
-        message,
-      });
-      if (result.delivered) {
-        toast.success(`Facture envoyée à ${email}.`);
-        return;
-      }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Envoi impossible.");
-      return;
-    }
     if (navigator.canShare?.({ files: [file] })) {
       try {
         await navigator.share({ title: subject, text: message, files: [file] });
@@ -213,59 +198,34 @@ export default function Invoices() {
 
   return (
     <div className="mx-auto max-w-[1440px] space-y-6">
-      <PageHeader
-        title="Factures"
-        description={
-          invoices.length
-            ? `${invoices.length} facture${invoices.length > 1 ? "s" : ""}`
-            : undefined
-        }
-        actions={
-          <Button onClick={() => setLocation("/factures/nouvelle")}>
-            <Plus className="h-4 w-4" />
-            Créer une facture
-          </Button>
-        }
-      />
+      <header className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-[22px] font-bold tracking-tight text-foreground">
+            Factures
+          </h1>
+        </div>
+        <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={exportFilteredInvoices}><Download className="mr-2 h-4 w-4" />Exporter CSV</Button><Button onClick={() => setLocation("/factures/nouvelle")} className="bg-primary text-primary-foreground hover:bg-primary/90"><Plus className="mr-2 h-4 w-4" />Créer une facture</Button></div>
+      </header>
+
+      <section className="rounded-xl border border-border bg-card p-4"><div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_repeat(3,minmax(150px,.45fr))]"><label className="relative"><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-faint" /><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Facture, client…" className="h-10 w-full rounded-xl border border-border bg-muted pl-9 pr-3 text-sm text-foreground outline-none focus:border-primary/70" /></label><select value={statusFilter} onChange={event => setStatusFilter(event.target.value as typeof statusFilter)} className="h-10 rounded-xl border border-border bg-muted px-3 text-sm text-foreground"><option value="all">Tous les statuts</option><option value="unpaid">Non encaissées</option><option value="paid">Réglées</option><option value="partial">Partielles</option><option value="void">Retournées</option></select><select value={agentFilter} onChange={event => setAgentFilter(event.target.value)} className="h-10 rounded-xl border border-border bg-muted px-3 text-sm text-foreground"><option value="all">Tous les intervenants</option>{documentParticipants.map(participant => <option key={participant.key} value={participant.key}>{documentParticipantOptionLabel(participant)}</option>)}</select><select value={periodFilter} onChange={event => setPeriodFilter(event.target.value as typeof periodFilter)} className="h-10 rounded-xl border border-border bg-muted px-3 text-sm text-foreground"><option value="all">Toutes les dates</option><option value="today">Aujourd’hui</option><option value="week">7 derniers jours</option><option value="month">30 derniers jours</option></select></div><p className="mt-3 text-xs text-faint">{filteredInvoices.length} facture{filteredInvoices.length > 1 ? "s" : ""} affichée{filteredInvoices.length > 1 ? "s" : ""}</p></section>
 
       <Panel>
         {isLoading ? (
           <ListSkeleton rows={6} />
-        ) : invoices.length ? (
+        ) : filteredInvoices.length ? (
           <>
             <div className="divide-y divide-border sm:hidden">
-              {invoices.map(invoice => {
-                const remaining = Math.max(
-                  0,
-                  invoice.totalCents - invoice.amountPaidCents
-                );
+              {filteredInvoices.map(invoice => {
+                const remaining = Math.max(0, invoice.totalCents - invoice.amountPaidCents);
                 return (
-                  <button
-                    key={invoice.id}
-                    type="button"
-                    onClick={() => setLocation(`/factures/${invoice.id}`)}
-                    className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-accent/60"
-                  >
+                  <button key={invoice.id} type="button" onClick={() => setLocation(`/factures/${invoice.id}`)} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-accent/60">
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold text-primary">
-                        {invoice.invoiceNumber}
-                      </span>
-                      <span className="mt-0.5 block truncate text-xs text-faint">
-                        {invoice.customerName || "Client comptoir"} ·{" "}
-                        {formatDate(invoice.createdAt)}
-                      </span>
+                      <span className="block truncate text-sm font-semibold text-primary">{invoice.invoiceNumber}</span>
+                      <span className="mt-0.5 block truncate text-xs text-faint">{invoice.customerName || "Client comptoir"} · {formatDate(invoice.createdAt)}</span>
                     </span>
                     <span className="flex shrink-0 flex-col items-end gap-1">
-                      <span className="text-sm font-semibold text-foreground">
-                        {formatCurrency(invoice.totalCents)}
-                      </span>
-                      {remaining > 0 ? (
-                        <span className="text-xs text-warning">
-                          Solde {formatCurrency(remaining)}
-                        </span>
-                      ) : (
-                        <StatusBadge status={invoice.status} />
-                      )}
+                      <span className="text-sm font-semibold text-foreground">{formatCurrency(invoice.totalCents)}</span>
+                      {remaining > 0 ? <span className="text-xs text-warning">Solde {formatCurrency(remaining)}</span> : <StatusBadge status={invoice.status} />}
                     </span>
                   </button>
                 );
@@ -275,62 +235,25 @@ export default function Invoices() {
               <table className={`${table.table} min-w-[760px]`}>
                 <thead className={table.head}>
                   <tr>
-                    <th scope="col" className={table.th}>
-                      Numéro
-                    </th>
-                    <th scope="col" className={table.th}>
-                      Client
-                    </th>
-                    <th scope="col" className={table.th}>
-                      Date
-                    </th>
-                    <th scope="col" className={table.th}>
-                      Statut
-                    </th>
-                    <th scope="col" className={`${table.th} text-right`}>
-                      Montant TTC
-                    </th>
-                    <th scope="col" className={`${table.th} text-right`}>
-                      Reste dû
-                    </th>
+                    <th scope="col" className={table.th}>Numéro</th>
+                    <th scope="col" className={table.th}>Client</th>
+                    <th scope="col" className={table.th}>Date</th>
+                    <th scope="col" className={table.th}>Statut</th>
+                    <th scope="col" className={`${table.th} text-right`}>Montant TTC</th>
+                    <th scope="col" className={`${table.th} text-right`}>Reste dû</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {invoices.map(invoice => {
-                    const remaining = Math.max(
-                      0,
-                      invoice.totalCents - invoice.amountPaidCents
-                    );
+                  {filteredInvoices.map(invoice => {
+                    const remaining = Math.max(0, invoice.totalCents - invoice.amountPaidCents);
                     return (
-                      <tr
-                        key={invoice.id}
-                        onClick={() => setLocation(`/factures/${invoice.id}`)}
-                        className={`${table.row} cursor-pointer`}
-                      >
-                        <td
-                          className={`${table.td} font-semibold text-primary`}
-                        >
-                          {invoice.invoiceNumber}
-                        </td>
-                        <td className={`${table.td} text-foreground`}>
-                          {invoice.customerName || "Client comptoir"}
-                        </td>
-                        <td className={`${table.td} text-muted-foreground`}>
-                          {formatDate(invoice.createdAt, true)}
-                        </td>
-                        <td className={table.td}>
-                          <StatusBadge status={invoice.status} />
-                        </td>
-                        <td
-                          className={`${table.td} text-right font-semibold text-foreground`}
-                        >
-                          {formatCurrency(invoice.totalCents)}
-                        </td>
-                        <td
-                          className={`${table.td} text-right ${remaining > 0 ? "font-semibold text-warning" : "text-faint"}`}
-                        >
-                          {remaining > 0 ? formatCurrency(remaining) : "—"}
-                        </td>
+                      <tr key={invoice.id} onClick={() => setLocation(`/factures/${invoice.id}`)} className={`${table.row} cursor-pointer`}>
+                        <td className={`${table.td} font-semibold text-primary`}>{invoice.invoiceNumber}</td>
+                        <td className={`${table.td} text-foreground`}>{invoice.customerName || "Client comptoir"}</td>
+                        <td className={`${table.td} text-muted-foreground`}>{formatDate(invoice.createdAt, true)}</td>
+                        <td className={table.td}><StatusBadge status={invoice.status} /></td>
+                        <td className={`${table.td} text-right font-semibold text-foreground`}>{formatCurrency(invoice.totalCents)}</td>
+                        <td className={`${table.td} text-right ${remaining > 0 ? "font-semibold text-warning" : "text-faint"}`}>{remaining > 0 ? formatCurrency(remaining) : "—"}</td>
                       </tr>
                     );
                   })}
@@ -339,17 +262,7 @@ export default function Invoices() {
             </div>
           </>
         ) : (
-          <EmptyState
-            icon={ReceiptText}
-            title="Aucune facture pour le moment"
-            detail="Les factures émises et les ventes de caisse apparaîtront ici."
-            action={
-              <Button onClick={() => setLocation("/factures/nouvelle")}>
-                <Plus className="h-4 w-4" />
-                Créer une facture
-              </Button>
-            }
-          />
+          <EmptyState icon={ReceiptText} title="Aucune facture ne correspond aux filtres" detail="Modifiez la recherche ou les filtres." />
         )}
       </Panel>
 
@@ -458,12 +371,6 @@ export default function Invoices() {
           </div>
         </CardContent>
       </Card>
-      <LoadMore
-        shown={transactions.length}
-        limit={paging.limit}
-        onMore={paging.loadMore}
-        loading={isFetching}
-      />
 
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-h-[92vh] max-w-2xl overflow-y-auto">
@@ -484,10 +391,7 @@ export default function Invoices() {
                   <Printer className="mr-2 h-4 w-4" />
                   Imprimer
                 </Button>
-                <Button variant="outline" onClick={emailPdf}>
-                  <Mail className="mr-2 h-4 w-4" />
-                  E-mail + PDF
-                </Button>
+                <DocumentSendMenu documentLabel="Facture" documentNumber={detail.sale.invoiceNumber} total={formatCurrency(detail.sale.totalCents)} customerName={detail.customer?.name} customerPhone={detail.customer?.phone} customerEmail={detail.customer?.email} documentId={detail.sale.id} documentKind="sale" getPdfFile={() => createInvoicePdf(detail, identity)} />
                 <Button
                   variant="outline"
                   className="sm:col-span-3"
@@ -516,9 +420,7 @@ export default function Invoices() {
                     onClick={() => setDeleteTarget(detail.sale)}
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
-                    {detail.sale.channel === "pos"
-                      ? "Annuler la vente"
-                      : "Annuler la facture"}
+                    Annuler la facture
                   </Button>
                 )}
                 {(detail.sale.status === "paid" ||
@@ -562,13 +464,13 @@ export default function Invoices() {
           <AlertDialogHeader>
             <AlertDialogTitle>Annuler cette facture ?</AlertDialogTitle>
             <AlertDialogDescription>
-              La facture restera visible avec le statut « annulée » afin de
-              préserver la continuité de la numérotation. Seules les factures
-              non encaissées peuvent être annulées.
+              La facture est conservée avec le statut « annulée » pour garder la
+              numérotation continue. Aucun stock n’est modifié. Cette action est
+              irréversible.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogCancel>Retour</AlertDialogCancel>
             <AlertDialogAction
               onClick={() =>
                 deleteTarget && removeDraft.mutate({ saleId: deleteTarget.id })
@@ -620,9 +522,7 @@ export const invoiceStatusMeta = {
 
 export function StatusBadge({ status }: { status: Invoice["status"] }) {
   return (
-    <span
-      className={`inline-flex h-6 items-center whitespace-nowrap rounded-full px-2.5 text-xs font-semibold ${invoiceStatusMeta[status][1]}`}
-    >
+    <span className={`inline-flex h-6 items-center whitespace-nowrap rounded-full px-2.5 text-xs font-semibold ${invoiceStatusMeta[status][1]}`}>
       {invoiceStatusMeta[status][0]}
     </span>
   );
@@ -644,8 +544,13 @@ export function InvoiceDocument({
   );
   const vatCents = detail.sale.vatCents || 0;
   const deliveryFeeCents = detail.sale.deliveryFeeCents || 0;
+  const template = identity?.invoiceTemplate || "classic";
+  const showLogo = identity?.invoiceShowLogo !== false;
+  const showSignature = identity?.invoiceShowSignature !== false;
+  const showPaymentDetails = identity?.invoiceShowPaymentDetails !== false;
+  const showDelivery = identity?.invoiceShowDelivery !== false;
   return (
-    <article>
+    <article className={`invoice-template ${template}`}>
       <header className="row">
         <div>
           <p className="muted">{identity?.companyName || "StockPilot"}</p>
@@ -656,7 +561,10 @@ export function InvoiceDocument({
           </h2>
           <p className="muted">{formatDate(detail.sale.createdAt, true)}</p>
         </div>
-        <StatusBadge status={detail.sale.status} />
+        <div className="flex items-start gap-3">
+          {showLogo && identity?.companyLogoUrl && <img className="invoice-logo a4-only" src={identity.companyLogoUrl} alt="Logo de l’entreprise" />}
+          <StatusBadge status={detail.sale.status} />
+        </div>
       </header>
       <section className="line row">
         <div>
@@ -664,19 +572,11 @@ export function InvoiceDocument({
           <p>
             <b>{customer?.name || "Client comptoir"}</b>
           </p>
-          {detail.sale.deliveryAddress && (
+          {showDelivery && detail.sale.deliveryAddress && (
             <p className="muted">Livraison : {detail.sale.deliveryAddress}</p>
           )}
         </div>
-        <div className="text-right">
-          <p className="muted">Total encaissé</p>
-          <p>
-            <b>
-              {formatCurrency(detail.sale.amountPaidCents || 0)} /{" "}
-              {formatCurrency(detail.sale.totalCents)}
-            </b>
-          </p>
-        </div>
+        {showPaymentDetails && <div className="text-right"><p className="muted">Total encaissé</p><p><b>{formatCurrency(detail.sale.amountPaidCents || 0)} / {formatCurrency(detail.sale.totalCents)}</b></p></div>}
       </section>
       <section className="line space-y-3">
         {detail.items.map((item: any) => (
@@ -710,7 +610,9 @@ export function InvoiceDocument({
         )}
         {vatCents > 0 && (
           <div className="row">
-            <span>TVA ({invoiceVatLabel(detail)})</span>
+            <span>
+              TVA ({invoiceVatLabel(detail)})
+            </span>
             <span>{formatCurrency(vatCents)}</span>
           </div>
         )}
@@ -725,7 +627,7 @@ export function InvoiceDocument({
           <b>{formatCurrency(detail.sale.totalCents)}</b>
         </div>
       </section>
-      <section
+      {showSignature && <section
         className={`a4-only signature ${identity?.companySignatureAlignment || "right"}`}
       >
         <p className="muted">
@@ -734,7 +636,7 @@ export function InvoiceDocument({
         {identity?.companySignatureUrl && (
           <img src={identity.companySignatureUrl} alt="Signature ou cachet" />
         )}
-      </section>
+      </section>}
     </article>
   );
 }
@@ -745,9 +647,12 @@ export function createInvoicePdf(
   documentLabel?: string
 ) {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
+  const template = identity?.invoiceTemplate || "classic";
+  const showDelivery = identity?.invoiceShowDelivery !== false;
+  const accentColor: [number, number, number] = template === "modern" ? [37, 99, 235] : template === "minimal" ? [30, 41, 59] : [0, 123, 139];
   let y = 56;
   doc.setFontSize(20);
-  doc.setTextColor(0, 123, 139);
+  doc.setTextColor(...accentColor);
   doc.text(identity?.companyName || "StockPilot", 44, y);
   y += 26;
   doc.setFontSize(13);
@@ -769,7 +674,7 @@ export function createInvoicePdf(
   doc.setFontSize(10);
   doc.text(`Client : ${detail.customer?.name || "Client comptoir"}`, 44, y);
   y += 16;
-  if (detail.sale.deliveryAddress) {
+  if (showDelivery && detail.sale.deliveryAddress) {
     doc.setFontSize(9);
     doc.setTextColor(90, 101, 115);
     doc.text(`Livraison : ${detail.sale.deliveryAddress}`, 44, y, {
@@ -843,14 +748,12 @@ export function createInvoicePdf(
     type: "application/pdf",
   });
 }
-/** Taux réellement appliqués aux lignes (TVA par produit), à défaut celui de la facture. */
+/** Taux de ligne appliqués, avec repli historique pour les ventes antérieures. */
 function invoiceVatLabel(detail: any) {
-  const rates = (detail.items ?? [])
-    .filter((item: any) => item.vatCents > 0)
-    .map((item: any) => item.vatRateBasisPoints as number);
-  return vatRatesLabel(
-    rates.length ? rates : [detail.sale.vatRateBasisPoints || 0]
-  );
+  const lineRates = (detail.items ?? [])
+    .filter((item: any) => (item.vatCents ?? 0) > 0)
+    .map((item: any) => Number(item.vatRateBasisPoints));
+  return vatRatesLabel(lineRates.length ? lineRates : [Number(detail.sale.vatRateBasisPoints || 0)]);
 }
 
 export function downloadFile(file: File) {

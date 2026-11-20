@@ -1,8 +1,8 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "7bfe138d-4514-48b6-94a6-b8367ac8bf0e",
-  "prevId": "1fb106f0-82a6-43ad-9af8-3d7f2fd89935",
+  "id": "b27550ee-e1c9-4bfc-800f-1dddafd095e0",
+  "prevId": "57fe6fc6-b076-48c1-92dd-5e2e38835e15",
   "tables": {
     "adminFallbackPasswords": {
       "name": "adminFallbackPasswords",
@@ -170,17 +170,7 @@
           "default": "(now())"
         }
       },
-      "indexes": {
-        "agent_payments_company_beneficiary_idx": {
-          "name": "agent_payments_company_beneficiary_idx",
-          "columns": [
-            "companyId",
-            "beneficiaryType",
-            "beneficiaryId"
-          ],
-          "isUnique": false
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "agentPayments_id": {
@@ -367,89 +357,6 @@
         }
       },
       "uniqueConstraints": {},
-      "checkConstraint": {}
-    },
-    "authTokens": {
-      "name": "authTokens",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": true
-        },
-        "userId": {
-          "name": "userId",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "type": {
-          "name": "type",
-          "type": "enum('password_reset','email_verification')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "tokenHash": {
-          "name": "tokenHash",
-          "type": "varchar(64)",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "expiresAt": {
-          "name": "expiresAt",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "usedAt": {
-          "name": "usedAt",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "createdAt": {
-          "name": "createdAt",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(now())"
-        }
-      },
-      "indexes": {
-        "auth_tokens_user_type_idx": {
-          "name": "auth_tokens_user_type_idx",
-          "columns": [
-            "userId",
-            "type"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {
-        "authTokens_id": {
-          "name": "authTokens_id",
-          "columns": [
-            "id"
-          ]
-        }
-      },
-      "uniqueConstraints": {
-        "auth_tokens_hash_unique": {
-          "name": "auth_tokens_hash_unique",
-          "columns": [
-            "tokenHash"
-          ]
-        }
-      },
       "checkConstraint": {}
     },
     "backupArchives": {
@@ -716,12 +623,6 @@
           "columns": [
             "scheduleCronTaskUid"
           ]
-        },
-        "backup_settings_company_unique": {
-          "name": "backup_settings_company_unique",
-          "columns": [
-            "companyId"
-          ]
         }
       },
       "checkConstraint": {}
@@ -894,15 +795,7 @@
           "default": "(now())"
         }
       },
-      "indexes": {
-        "customers_company_idx": {
-          "name": "customers_company_idx",
-          "columns": [
-            "companyId"
-          ],
-          "isUnique": false
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "customers_id": {
@@ -913,77 +806,6 @@
         }
       },
       "uniqueConstraints": {},
-      "checkConstraint": {}
-    },
-    "documentSequences": {
-      "name": "documentSequences",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": true
-        },
-        "companyId": {
-          "name": "companyId",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "series": {
-          "name": "series",
-          "type": "varchar(10)",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "year": {
-          "name": "year",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "lastValue": {
-          "name": "lastValue",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "updatedAt": {
-          "name": "updatedAt",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "onUpdate": true,
-          "default": "(now())"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {
-        "documentSequences_id": {
-          "name": "documentSequences_id",
-          "columns": [
-            "id"
-          ]
-        }
-      },
-      "uniqueConstraints": {
-        "document_sequences_company_series_year_unique": {
-          "name": "document_sequences_company_series_year_unique",
-          "columns": [
-            "companyId",
-            "series",
-            "year"
-          ]
-        }
-      },
       "checkConstraint": {}
     },
     "expenseBudgets": {
@@ -1061,10 +883,9 @@
         }
       },
       "uniqueConstraints": {
-        "expense_budgets_company_month_unique": {
-          "name": "expense_budgets_company_month_unique",
+        "expenseBudgets_yearMonth_unique": {
+          "name": "expenseBudgets_yearMonth_unique",
           "columns": [
-            "companyId",
             "yearMonth"
           ]
         }
@@ -1163,16 +984,7 @@
           "default": "(now())"
         }
       },
-      "indexes": {
-        "expenses_company_spent_idx": {
-          "name": "expenses_company_spent_idx",
-          "columns": [
-            "companyId",
-            "spentAt"
-          ],
-          "isUnique": false
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "expenses_id": {
@@ -1241,15 +1053,7 @@
           "default": "(now())"
         }
       },
-      "indexes": {
-        "inventory_items_session_idx": {
-          "name": "inventory_items_session_idx",
-          "columns": [
-            "inventorySessionId"
-          ],
-          "isUnique": false
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "inventoryItems_id": {
@@ -1284,6 +1088,13 @@
           "type": "varchar(160)",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "warehouseId": {
+          "name": "warehouseId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "status": {
@@ -1390,10 +1201,9 @@
         }
       },
       "uniqueConstraints": {
-        "product_categories_company_name_unique": {
-          "name": "product_categories_company_name_unique",
+        "productCategories_name_unique": {
+          "name": "productCategories_name_unique",
           "columns": [
-            "companyId",
             "name"
           ]
         }
@@ -1457,15 +1267,7 @@
           "default": "(now())"
         }
       },
-      "indexes": {
-        "product_price_tiers_product_idx": {
-          "name": "product_price_tiers_product_idx",
-          "columns": [
-            "productId"
-          ],
-          "isUnique": false
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "productPriceTiers_id": {
@@ -1531,10 +1333,9 @@
         }
       },
       "uniqueConstraints": {
-        "product_units_company_name_unique": {
-          "name": "product_units_company_name_unique",
+        "productUnits_name_unique": {
+          "name": "productUnits_name_unique",
           "columns": [
-            "companyId",
             "name"
           ]
         }
@@ -1634,13 +1435,6 @@
           "autoincrement": false,
           "default": 0
         },
-        "vatRateBasisPoints": {
-          "name": "vatRateBasisPoints",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "supplierId": {
           "name": "supplierId",
           "type": "int",
@@ -1677,10 +1471,9 @@
         }
       },
       "uniqueConstraints": {
-        "products_company_reference_unique": {
-          "name": "products_company_reference_unique",
+        "products_reference_unique": {
+          "name": "products_reference_unique",
           "columns": [
-            "companyId",
             "reference"
           ]
         }
@@ -1770,15 +1563,7 @@
           "default": "(now())"
         }
       },
-      "indexes": {
-        "purchase_order_items_order_idx": {
-          "name": "purchase_order_items_order_idx",
-          "columns": [
-            "purchaseOrderId"
-          ],
-          "isUnique": false
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "purchaseOrderItems_id": {
@@ -1820,6 +1605,13 @@
           "type": "int",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "warehouseId": {
+          "name": "warehouseId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "status": {
@@ -1930,16 +1722,7 @@
           "default": "(now())"
         }
       },
-      "indexes": {
-        "purchase_orders_company_created_idx": {
-          "name": "purchase_orders_company_created_idx",
-          "columns": [
-            "companyId",
-            "createdAt"
-          ],
-          "isUnique": false
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "purchaseOrders_id": {
@@ -1950,10 +1733,9 @@
         }
       },
       "uniqueConstraints": {
-        "purchase_orders_company_number_unique": {
-          "name": "purchase_orders_company_number_unique",
+        "purchaseOrders_orderNumber_unique": {
+          "name": "purchaseOrders_orderNumber_unique",
           "columns": [
-            "companyId",
             "orderNumber"
           ]
         }
@@ -2123,23 +1905,7 @@
           "default": "(now())"
         }
       },
-      "indexes": {
-        "sale_commissions_sale_idx": {
-          "name": "sale_commissions_sale_idx",
-          "columns": [
-            "saleId"
-          ],
-          "isUnique": false
-        },
-        "sale_commissions_beneficiary_idx": {
-          "name": "sale_commissions_beneficiary_idx",
-          "columns": [
-            "beneficiaryType",
-            "beneficiaryId"
-          ],
-          "isUnique": false
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "saleCommissions_id": {
@@ -2256,30 +2022,6 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
-        },
-        "returnedQuantity": {
-          "name": "returnedQuantity",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "vatRateBasisPoints": {
-          "name": "vatRateBasisPoints",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "vatCents": {
-          "name": "vatCents",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
         }
       },
       "indexes": {
@@ -2399,187 +2141,6 @@
       },
       "checkConstraint": {}
     },
-    "saleReturnItems": {
-      "name": "saleReturnItems",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": true
-        },
-        "returnId": {
-          "name": "returnId",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "saleItemId": {
-          "name": "saleItemId",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "productId": {
-          "name": "productId",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "quantity": {
-          "name": "quantity",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "restocked": {
-          "name": "restocked",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": true
-        },
-        "refundCents": {
-          "name": "refundCents",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "sale_return_items_return_idx": {
-          "name": "sale_return_items_return_idx",
-          "columns": [
-            "returnId"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {
-        "saleReturnItems_id": {
-          "name": "saleReturnItems_id",
-          "columns": [
-            "id"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraint": {}
-    },
-    "saleReturns": {
-      "name": "saleReturns",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": true
-        },
-        "companyId": {
-          "name": "companyId",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "saleId": {
-          "name": "saleId",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "creditNoteNumber": {
-          "name": "creditNoteNumber",
-          "type": "varchar(60)",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "refundCents": {
-          "name": "refundCents",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "costCents": {
-          "name": "costCents",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "method": {
-          "name": "method",
-          "type": "enum('cash','card','mobile_money','bank_transfer','credit')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "reason": {
-          "name": "reason",
-          "type": "varchar(500)",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "createdByUserId": {
-          "name": "createdByUserId",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "createdAt": {
-          "name": "createdAt",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(now())"
-        }
-      },
-      "indexes": {
-        "sale_returns_company_sale_idx": {
-          "name": "sale_returns_company_sale_idx",
-          "columns": [
-            "companyId",
-            "saleId"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {
-        "saleReturns_id": {
-          "name": "saleReturns_id",
-          "columns": [
-            "id"
-          ]
-        }
-      },
-      "uniqueConstraints": {
-        "sale_returns_company_number_unique": {
-          "name": "sale_returns_company_number_unique",
-          "columns": [
-            "companyId",
-            "creditNoteNumber"
-          ]
-        }
-      },
-      "checkConstraint": {}
-    },
     "saleSettings": {
       "name": "saleSettings",
       "columns": {
@@ -2634,14 +2195,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'XOF'"
-        },
-        "timezone": {
-          "name": "timezone",
-          "type": "varchar(64)",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'Africa/Abidjan'"
         },
         "primaryColor": {
           "name": "primaryColor",
@@ -2765,6 +2318,46 @@
           "autoincrement": false,
           "default": "'browser'"
         },
+        "invoiceTemplate": {
+          "name": "invoiceTemplate",
+          "type": "enum('classic','modern','minimal')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'classic'"
+        },
+        "invoiceShowLogo": {
+          "name": "invoiceShowLogo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "invoiceShowSignature": {
+          "name": "invoiceShowSignature",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "invoiceShowPaymentDetails": {
+          "name": "invoiceShowPaymentDetails",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "invoiceShowDelivery": {
+          "name": "invoiceShowDelivery",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
         "paymentCashEnabled": {
           "name": "paymentCashEnabled",
           "type": "boolean",
@@ -2829,6 +2422,94 @@
           "autoincrement": false,
           "default": 0
         },
+        "sellerCanToggleVat": {
+          "name": "sellerCanToggleVat",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "sellerCanLineDiscount": {
+          "name": "sellerCanLineDiscount",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "sellerMaxLineDiscountPercent": {
+          "name": "sellerMaxLineDiscountPercent",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "sellerCanInvoiceDiscount": {
+          "name": "sellerCanInvoiceDiscount",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "sellerMaxInvoiceDiscountPercent": {
+          "name": "sellerMaxInvoiceDiscountPercent",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "sellerCanCartDiscount": {
+          "name": "sellerCanCartDiscount",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "sellerMaxCartDiscountPercent": {
+          "name": "sellerMaxCartDiscountPercent",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "sellerCanEditInvoiceItemPrice": {
+          "name": "sellerCanEditInvoiceItemPrice",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "sellerMaxInvoiceItemPriceChangePercent": {
+          "name": "sellerMaxInvoiceItemPriceChangePercent",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "sellerCanEditCartItemPrice": {
+          "name": "sellerCanEditCartItemPrice",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "sellerMaxCartItemPriceChangePercent": {
+          "name": "sellerMaxCartItemPriceChangePercent",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
         "sellerCanCancelInvoice": {
           "name": "sellerCanCancelInvoice",
           "type": "boolean",
@@ -2877,6 +2558,30 @@
           "autoincrement": false,
           "default": 0
         },
+        "defaultDeliveryFeeCents": {
+          "name": "defaultDeliveryFeeCents",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "customerSuggestionsEnabled": {
+          "name": "customerSuggestionsEnabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "customerSuggestionsLimit": {
+          "name": "customerSuggestionsLimit",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 4
+        },
         "updatedByUserId": {
           "name": "updatedByUserId",
           "type": "int",
@@ -2904,14 +2609,7 @@
           ]
         }
       },
-      "uniqueConstraints": {
-        "sale_settings_company_unique": {
-          "name": "sale_settings_company_unique",
-          "columns": [
-            "companyId"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "checkConstraint": {}
     },
     "sales": {
@@ -2938,36 +2636,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "creditNoteNumber": {
-          "name": "creditNoteNumber",
-          "type": "varchar(60)",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "refundedAt": {
-          "name": "refundedAt",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "returnedCents": {
-          "name": "returnedCents",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "returnedCostCents": {
-          "name": "returnedCostCents",
-          "type": "int",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
         "offlineOperationId": {
           "name": "offlineOperationId",
           "type": "varchar(80)",
@@ -2985,6 +2653,13 @@
         },
         "customerId": {
           "name": "customerId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "warehouseId": {
+          "name": "warehouseId",
           "type": "int",
           "primaryKey": false,
           "notNull": false,
@@ -3177,17 +2852,16 @@
         }
       },
       "uniqueConstraints": {
+        "sales_invoiceNumber_unique": {
+          "name": "sales_invoiceNumber_unique",
+          "columns": [
+            "invoiceNumber"
+          ]
+        },
         "sales_offlineOperationId_unique": {
           "name": "sales_offlineOperationId_unique",
           "columns": [
             "offlineOperationId"
-          ]
-        },
-        "sales_company_invoice_number_unique": {
-          "name": "sales_company_invoice_number_unique",
-          "columns": [
-            "companyId",
-            "invoiceNumber"
           ]
         }
       },
@@ -3383,6 +3057,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "warehouseId": {
+          "name": "warehouseId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "supplierId": {
           "name": "supplierId",
           "type": "int",
@@ -3477,6 +3158,274 @@
         }
       },
       "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "stockTransferItems": {
+      "name": "stockTransferItems",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "stockTransferId": {
+          "name": "stockTransferId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "productId": {
+          "name": "productId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "productName": {
+          "name": "productName",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "productReference": {
+          "name": "productReference",
+          "type": "varchar(80)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "unit": {
+          "name": "unit",
+          "type": "varchar(30)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "quantity": {
+          "name": "quantity",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        }
+      },
+      "indexes": {
+        "stock_transfer_items_transfer_product_unique": {
+          "name": "stock_transfer_items_transfer_product_unique",
+          "columns": [
+            "stockTransferId",
+            "productId"
+          ],
+          "isUnique": true
+        },
+        "stock_transfer_items_transfer_idx": {
+          "name": "stock_transfer_items_transfer_idx",
+          "columns": [
+            "stockTransferId"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "stockTransferItems_id": {
+          "name": "stockTransferItems_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "stockTransfers": {
+      "name": "stockTransfers",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "companyId": {
+          "name": "companyId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "transferNumber": {
+          "name": "transferNumber",
+          "type": "varchar(60)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sourceWarehouseId": {
+          "name": "sourceWarehouseId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "destinationWarehouseId": {
+          "name": "destinationWarehouseId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "enum('draft','in_transit','received','cancelled')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'draft'"
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "cancellationReason": {
+          "name": "cancellationReason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "createdByUserId": {
+          "name": "createdByUserId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "dispatchedByUserId": {
+          "name": "dispatchedByUserId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "receivedByUserId": {
+          "name": "receivedByUserId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "cancelledByUserId": {
+          "name": "cancelledByUserId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "dispatchedAt": {
+          "name": "dispatchedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "receivedAt": {
+          "name": "receivedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "cancelledAt": {
+          "name": "cancelledAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "onUpdate": true,
+          "default": "(now())"
+        }
+      },
+      "indexes": {
+        "stock_transfers_company_status_idx": {
+          "name": "stock_transfers_company_status_idx",
+          "columns": [
+            "companyId",
+            "status"
+          ],
+          "isUnique": false
+        },
+        "stock_transfers_company_created_idx": {
+          "name": "stock_transfers_company_created_idx",
+          "columns": [
+            "companyId",
+            "createdAt"
+          ],
+          "isUnique": false
+        },
+        "stock_transfers_source_idx": {
+          "name": "stock_transfers_source_idx",
+          "columns": [
+            "sourceWarehouseId"
+          ],
+          "isUnique": false
+        },
+        "stock_transfers_destination_idx": {
+          "name": "stock_transfers_destination_idx",
+          "columns": [
+            "destinationWarehouseId"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "stockTransfers_id": {
+          "name": "stockTransfers_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {
+        "stockTransfers_transferNumber_unique": {
+          "name": "stockTransfers_transferNumber_unique",
+          "columns": [
+            "transferNumber"
+          ]
+        }
+      },
       "checkConstraint": {}
     },
     "suppliers": {
@@ -3581,10 +3530,9 @@
         }
       },
       "uniqueConstraints": {
-        "suppliers_company_name_unique": {
-          "name": "suppliers_company_name_unique",
+        "suppliers_name_unique": {
+          "name": "suppliers_name_unique",
           "columns": [
-            "companyId",
             "name"
           ]
         }
@@ -3820,13 +3768,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": "(now())"
-        },
-        "emailVerifiedAt": {
-          "name": "emailVerifiedAt",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         }
       },
       "indexes": {
@@ -3854,14 +3795,291 @@
           "columns": [
             "openId"
           ]
+        }
+      },
+      "checkConstraint": {}
+    },
+    "vatRatePresets": {
+      "name": "vatRatePresets",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
         },
-        "users_email_unique": {
-          "name": "users_email_unique",
+        "companyId": {
+          "name": "companyId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "label": {
+          "name": "label",
+          "type": "varchar(80)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "rateBasisPoints": {
+          "name": "rateBasisPoints",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "onUpdate": true,
+          "default": "(now())"
+        }
+      },
+      "indexes": {
+        "vat_rate_presets_company_rate_idx": {
+          "name": "vat_rate_presets_company_rate_idx",
           "columns": [
-            "email"
+            "companyId",
+            "rateBasisPoints"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "vatRatePresets_id": {
+          "name": "vatRatePresets_id",
+          "columns": [
+            "id"
           ]
         }
       },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "warehouseStocks": {
+      "name": "warehouseStocks",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "companyId": {
+          "name": "companyId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "warehouseId": {
+          "name": "warehouseId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "productId": {
+          "name": "productId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "quantity": {
+          "name": "quantity",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "onUpdate": true,
+          "default": "(now())"
+        }
+      },
+      "indexes": {
+        "warehouse_stocks_warehouse_product_unique": {
+          "name": "warehouse_stocks_warehouse_product_unique",
+          "columns": [
+            "warehouseId",
+            "productId"
+          ],
+          "isUnique": true
+        },
+        "warehouse_stocks_company_warehouse_idx": {
+          "name": "warehouse_stocks_company_warehouse_idx",
+          "columns": [
+            "companyId",
+            "warehouseId"
+          ],
+          "isUnique": false
+        },
+        "warehouse_stocks_company_product_idx": {
+          "name": "warehouse_stocks_company_product_idx",
+          "columns": [
+            "companyId",
+            "productId"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "warehouseStocks_id": {
+          "name": "warehouseStocks_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "warehouses": {
+      "name": "warehouses",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "companyId": {
+          "name": "companyId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(160)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "code": {
+          "name": "code",
+          "type": "varchar(40)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "address": {
+          "name": "address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "isDefault": {
+          "name": "isDefault",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "createdByUserId": {
+          "name": "createdByUserId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "onUpdate": true,
+          "default": "(now())"
+        }
+      },
+      "indexes": {
+        "warehouses_company_code_unique": {
+          "name": "warehouses_company_code_unique",
+          "columns": [
+            "companyId",
+            "code"
+          ],
+          "isUnique": true
+        },
+        "warehouses_company_active_idx": {
+          "name": "warehouses_company_active_idx",
+          "columns": [
+            "companyId",
+            "active"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "warehouses_id": {
+          "name": "warehouses_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
       "checkConstraint": {}
     }
   },

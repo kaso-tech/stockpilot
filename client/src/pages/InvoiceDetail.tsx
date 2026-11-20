@@ -1,465 +1,71 @@
 import { paymentMethodLabel } from "@/lib/paymentMethods";
+import { can } from "@shared/permissions";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { usePermissions } from "@/hooks/usePermissions";
 import { CheckoutSheet } from "@/components/CheckoutSheet";
-import { ReturnItemsDialog } from "@/components/ReturnItemsDialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { invoiceEmailMessage, invoiceEmailSubject } from "@/lib/invoiceShare";
 import { trpc } from "@/lib/trpc";
-import { fileToBase64 } from "@/lib/emailDocument";
-import {
-  ArrowLeft,
-  Download,
-  Mail,
-  Printer,
-  ReceiptText,
-  Trash2,
-  Undo2,
-  WalletCards,
-} from "lucide-react";
+import { DocumentSendMenu } from "@/components/DocumentSendMenu";
+import { ReturnItemsDialog } from "@/components/ReturnItemsDialog";
+import { ArrowLeft, Download, Printer, ReceiptText, Trash2, Undo2, WalletCards } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useLocation, useRoute } from "wouter";
-import {
-  InvoiceDocument,
-  StatusBadge,
-  createInvoicePdf,
-  downloadFile,
-} from "./Invoices";
+import { InvoiceDocument, StatusBadge, createInvoicePdf, downloadFile } from "./Invoices";
 
-export default function InvoiceDetail() {
-  const [, params] = useRoute("/factures/:id");
+export default function InvoiceDetail({ documentType = "invoice" }: { documentType?: "invoice" | "quote" | "ticket" }) {
+  const [, params] = useRoute(documentType === "quote" ? "/devis/:id" : documentType === "ticket" ? "/tickets/:id" : "/factures/:id");
   const [, setLocation] = useLocation();
   const { user } = useAuth();
-  const { can } = usePermissions();
   const id = Number(params?.id);
   const utils = trpc.useUtils();
-  const sendSaleByEmail = trpc.documents.sendSale.useMutation();
-  const { data: detail, isLoading } = trpc.commerce.sales.detail.useQuery(
-    { id },
-    { enabled: Number.isFinite(id) && id > 0 }
-  );
+  const { data: detail, isLoading } = trpc.commerce.sales.detail.useQuery({ id }, { enabled: Number.isFinite(id) && id > 0 });
   const { data: identity } = trpc.commerce.settings.get.useQuery();
   const { data: agents = [] } = trpc.commerce.agents.list.useQuery();
   const [checkout, setCheckout] = useState<any>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmRefund, setConfirmRefund] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
-  const removeDraft = trpc.transactions.removeDraft.useMutation({
-    onSuccess: () => {
-      utils.transactions.list.invalidate();
-      toast.success("Facture non encaissée annulée.");
-      setLocation("/factures");
-    },
-    onError: error => toast.error(error.message),
-  });
-  const refund = trpc.transactions.refund.useMutation({
-    onSuccess: result => {
-      utils.transactions.list.invalidate();
-      utils.movements.list.invalidate();
-      utils.products.list.invalidate();
-      utils.dashboard.get.invalidate();
-      setConfirmRefund(false);
-      toast.success(
-        `Remboursement enregistré (avoir ${result.creditNoteNumber}). Le stock a été réintégré.`
-      );
-    },
-    onError: error => toast.error(error.message),
-  });
-  if (isLoading || !detail)
-    return (
-      <div className="mx-auto max-w-[1440px] py-16 text-center text-sm text-muted-foreground">
-        Chargement de la facture…
-      </div>
-    );
+  const documentLabel = documentType === "quote" ? "Devis" : documentType === "ticket" ? "Ticket de caisse" : "Facture";
+  const collectionPath = documentType === "quote" ? "/devis" : documentType === "ticket" ? "/tickets" : "/factures";
+  const removeDraft = trpc.transactions.removeDraft.useMutation({ onSuccess: () => { utils.transactions.list.invalidate(); toast.success(documentType === "quote" ? "Devis supprimé." : `${documentLabel} annulé${documentType === "ticket" ? "" : "e"}.`); setLocation(collectionPath); }, onError: error => toast.error(error.message) });
+  const refreshAfterReturn = () => { void utils.commerce.sales.detail.invalidate({ id }); void utils.transactions.list.invalidate(); void utils.movements.list.invalidate(); void utils.products.list.invalidate(); void utils.dashboard.get.invalidate(); };
+  const refund = trpc.transactions.refund.useMutation({ onSuccess: result => { refreshAfterReturn(); setConfirmRefund(false); toast.success(`Remboursement enregistré (avoir ${result.creditNoteNumber}). Le stock a été réintégré.`); }, onError: error => toast.error(error.message) });
+  if (isLoading || !detail) return <div className="mx-auto max-w-6xl py-16 text-center text-sm text-muted-foreground">Chargement de la facture…</div>;
   const sale = detail.sale;
-  const canRefund =
-    (can("sales.refund") && user?.role !== "seller") ||
-    (user?.role === "seller" && Boolean(identity?.sellerCanRefund));
-  const print = (format: "a4" | "ticket") => {
-    const node = document.getElementById("invoice-print");
-    if (!node) return;
-    const popup = window.open("", "stockpilot-invoice", "width=900,height=700");
-    if (!popup) return;
-    const copy = node.cloneNode(true) as HTMLElement;
-    if (format === "ticket")
-      copy.querySelectorAll(".a4-only").forEach(element => element.remove());
-    popup.document.write(
-      `<!doctype html><html><head><title>Facture</title><style>@page{size:${format === "ticket" ? "80mm auto" : "A4"};margin:12mm}body{font-family:Arial,sans-serif;color:#172033;max-width:${format === "ticket" ? "80mm" : "100%"};margin:0 auto}.row{display:flex;justify-content:space-between;gap:12px}.muted{color:#64748b;font-size:12px}.line{border-top:1px solid #dbe3ea;padding-top:12px;margin-top:12px}.signature{margin-top:32px;text-align:right}.signature.center{text-align:center}.signature.left{text-align:left}.signature img{max-width:180px;max-height:80px;object-fit:contain}</style></head><body>${copy.innerHTML}</body></html>`
-    );
-    let printTriggered = false;
-    const triggerPrint = () => {
-      if (printTriggered) return;
-      printTriggered = true;
-      popup.focus();
-      popup.print();
-    };
-    popup.addEventListener("afterprint", () => popup.close(), { once: true });
-    popup.addEventListener("load", triggerPrint, { once: true });
-    popup.document.close();
-    window.setTimeout(triggerPrint, 350);
-  };
-  const downloadPdf = () => {
-    const file = createInvoicePdf(detail, identity);
-    downloadFile(file);
-    toast.success("PDF de la facture généré.");
-  };
-  const emailPdf = async () => {
-    const email = detail.customer?.email;
-    if (!email)
-      return toast.error("L’adresse e-mail du client n’est pas renseignée.");
-    const file = createInvoicePdf(detail, identity);
-    const subject = invoiceEmailSubject(sale.invoiceNumber);
-    const message = invoiceEmailMessage({
-      customerName: detail.customer?.name,
-      invoiceNumber: sale.invoiceNumber,
-      total: formatCurrency(sale.totalCents),
-    });
-    // Envoi direct par le serveur (pièce jointe PDF) ; partage local si aucun
-    // serveur d'e-mails n'est configuré.
-    try {
-      const result = await sendSaleByEmail.mutateAsync({
-        id: sale.id,
-        pdfBase64: await fileToBase64(file),
-        filename: file.name,
-        subject,
-        message,
-      });
-      if (result.delivered) {
-        toast.success(`Facture envoyée à ${email}.`);
-        return;
-      }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Envoi impossible.");
-      return;
-    }
-    if (navigator.canShare?.({ files: [file] })) {
-      try {
-        await navigator.share({ title: subject, text: message, files: [file] });
-        toast.success("La facture est prête à être envoyée par e-mail.");
-      } catch {
-        return;
-      }
-    } else {
-      downloadFile(file);
-      window.location.href = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(`${message}\n\nLe PDF de la facture a été téléchargé : joignez-le à ce message.`)}`;
-      toast.info(
-        "Le PDF est téléchargé. Joignez-le au message e-mail qui s’ouvre."
-      );
-    }
-  };
-  const paid = sale.amountPaidCents || 0;
-  const remaining = Math.max(0, sale.totalCents - paid);
-  return (
-    <div className="mx-auto max-w-[1440px] space-y-6">
-      <button
-        type="button"
-        onClick={() => setLocation("/factures")}
-        className="inline-flex w-fit items-center gap-1.5 text-[13px] font-medium text-muted-foreground hover:text-primary"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Retour aux factures
-      </button>
-      <section className="rounded-xl border border-border bg-card p-5 sm:p-6">
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <div className="flex flex-wrap items-center gap-2.5">
-              <h1 className="text-[22px] font-bold tracking-tight text-foreground">
-                {sale.invoiceNumber}
-              </h1>
-              <StatusBadge status={sale.status} />
-            </div>
-            <p className="mt-2 text-sm text-faint">
-              Émise le {formatDate(sale.createdAt, true)}
-            </p>
-            {sale.creditNoteNumber && (
-              <p className="mt-1 text-sm text-warning">
-                Remboursée — avoir {sale.creditNoteNumber}
-                {sale.refundedAt
-                  ? ` du ${formatDate(sale.refundedAt, true)}`
-                  : ""}
-              </p>
-            )}
-          </div>
-          <div className="grid grid-cols-2 gap-3 text-right">
-            <Info label="Total" value={formatCurrency(sale.totalCents)} />
-            <Info label="Solde" value={formatCurrency(remaining)} />
-          </div>
-        </div>
-        <div className="mt-6 grid gap-4 border-t border-border pt-5 sm:grid-cols-2 lg:grid-cols-4">
-          <Info
-            label="Client"
-            value={detail.customer?.name || "Client comptoir"}
-          />
-          <Info
-            label="Vendeur"
-            value={detail.participants?.seller?.name || "—"}
-          />
-          <Info
-            label="Agent commercial"
-            value={detail.participants?.salesAgent?.name || "Aucun"}
-          />
-          <Info
-            label="Caissier"
-            value={detail.participants?.cashier?.name || "Aucun"}
-          />
-        </div>
-        {sale.deliveryAddress && (
-          <div className="mt-4 rounded-xl border border-primary/25 bg-primary/5 p-3 text-sm text-muted-foreground">
-            <span className="font-medium text-primary">Livraison :</span>{" "}
-            {sale.deliveryAddress}
-          </div>
-        )}
-      </section>
-      <section className="grid gap-5 lg:grid-cols-[1.5fr_.75fr]">
-        <Card className="border-border bg-card gap-0 py-0">
-          <CardContent className="p-5">
-            <h2 className="font-semibold text-foreground">Articles facturés</h2>
-            <div className="mt-4 space-y-3">
-              {detail.items.map((item: any) => (
-                <div
-                  key={item.id}
-                  className="flex items-center justify-between gap-4 rounded-xl border border-border bg-muted/50 p-3"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate font-medium text-foreground">
-                      {item.productName}
-                    </p>
-                    <p className="mt-1 text-xs text-faint">
-                      {item.quantity} × {formatCurrency(item.unitPriceCents)}
-                      {item.productReference
-                        ? ` · ${item.productReference}`
-                        : ""}
-                    </p>
-                  </div>
-                  <p className="shrink-0 font-semibold text-primary">
-                    {formatCurrency(item.lineTotalCents)}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border bg-card gap-0 py-0">
-          <CardContent className="p-5">
-            <h2 className="font-semibold text-foreground">Règlements</h2>
-            <div className="mt-4 space-y-3">
-              <Info label="Encaissé" value={formatCurrency(paid)} />
-              <Info
-                label="Reste à encaisser"
-                value={formatCurrency(remaining)}
-              />
-              <div className="border-t border-border pt-3">
-                <p className="text-xs text-faint">Moyens utilisés</p>
-                <div className="mt-2 space-y-1 text-sm text-muted-foreground">
-                  {detail.payments.length ? (
-                    detail.payments.map((payment: any) => (
-                      <p key={payment.id}>
-                        {paymentMethodLabel(payment.method)} ·{" "}
-                        {formatCurrency(payment.amountCents)}
-                      </p>
-                    ))
-                  ) : (
-                    <p>Aucun règlement enregistré.</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-      <section className="rounded-xl border border-border bg-card p-5">
-        <div
-          id="invoice-print"
-          className="rounded-xl bg-card p-5 text-foreground"
-        >
-          <InvoiceDocument detail={detail} identity={identity} />
-        </div>
-      </section>
-      <section className="rounded-xl border border-border bg-card p-5">
-        <h2 className="font-semibold text-foreground">Actions</h2>
-        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          <Button variant="outline" onClick={downloadPdf}>
-            <Download className="mr-2 h-4 w-4" />
-            PDF
-          </Button>
-          <Button variant="outline" onClick={() => print("a4")}>
-            <Printer className="mr-2 h-4 w-4" />
-            Imprimer A4
-          </Button>
-          <Button variant="outline" onClick={() => print("ticket")}>
-            <ReceiptText className="mr-2 h-4 w-4" />
-            Imprimer ticket
-          </Button>
-          <Button variant="outline" onClick={emailPdf}>
-            <Mail className="mr-2 h-4 w-4" />
-            E-mail + PDF
-          </Button>
-          {(sale.status === "draft" || sale.status === "partial") && (
-            <Button
-              className="sm:col-span-2 lg:col-span-4 bg-primary text-primary-foreground hover:bg-primary/90"
-              onClick={() => setCheckout(sale)}
-            >
-              <WalletCards className="mr-2 h-4 w-4" />
-              Encaisser le solde
-            </Button>
-          )}
-          {sale.status === "draft" && (
-            <Button
-              variant="outline"
-              className="sm:col-span-2 lg:col-span-4 border-destructive/25 text-destructive"
-              onClick={() => setConfirmDelete(true)}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              {sale.channel === "pos"
-                ? "Annuler la vente"
-                : "Annuler la facture"}
-            </Button>
-          )}
-          {(sale.status === "paid" || sale.status === "partial") && (
-            <Button
-              variant="outline"
-              disabled={!canRefund}
-              className="sm:col-span-2 lg:col-span-4 border-warning/25 text-warning"
-              onClick={() =>
-                canRefund
-                  ? setConfirmRefund(true)
-                  : toast.error(
-                      "Le remboursement n’est pas autorisé pour les vendeurs."
-                    )
-              }
-            >
-              <Undo2 className="mr-2 h-4 w-4" />
-              Rembourser la facture
-            </Button>
-          )}
-          {sale.status === "paid" && canRefund && (
-            <Button
-              variant="outline"
-              className="sm:col-span-2 lg:col-span-4 border-primary/25 text-primary"
-              onClick={() => setReturnOpen(true)}
-            >
-              <Undo2 className="mr-2 h-4 w-4" />
-              Retourner des articles
-            </Button>
-          )}
-        </div>
-        {detail.returns?.length > 0 && (
-          <div className="mt-4 rounded-xl border border-border bg-card p-4">
-            <p className="text-sm font-semibold text-foreground">
-              Retours et avoirs
-            </p>
-            <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-              {detail.returns.map((item: any) => (
-                <li
-                  key={item.id}
-                  className="flex flex-wrap justify-between gap-2"
-                >
-                  <span>
-                    {item.creditNoteNumber} · {formatDate(item.createdAt, true)}
-                    {item.reason ? ` · ${item.reason}` : ""}
-                  </span>
-                  <span className="font-medium text-warning">
-                    −{formatCurrency(item.refundCents)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </section>
-      <ReturnItemsDialog
-        open={returnOpen}
-        onOpenChange={setReturnOpen}
-        saleId={sale.id}
-        items={detail.items}
-        defaultMethod={sale.paymentMethod}
-        onDone={() => {
-          utils.commerce.sales.detail.invalidate();
-          utils.transactions.list.invalidate();
-          utils.products.list.invalidate();
-          utils.dashboard.get.invalidate();
-        }}
-      />
-      <CheckoutSheet
-        open={Boolean(checkout)}
-        onOpenChange={open => !open && setCheckout(null)}
-        sale={checkout}
-        agents={agents}
-        settings={identity}
-        onComplete={() => {
-          setCheckout(null);
-          utils.transactions.list.invalidate();
-        }}
-      />
-      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {sale.channel === "pos"
-                ? "Annuler cette vente ?"
-                : "Annuler cette facture ?"}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {sale.channel === "pos" ? "La vente" : "La facture"} restera
-              visible avec le statut « annulée » afin de préserver la continuité
-              de la numérotation. Le stock n’est pas modifié : il n’est décompté
-              qu’à l’encaissement.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground"
-              onClick={() => removeDraft.mutate({ saleId: sale.id })}
-            >
-              {sale.channel === "pos"
-                ? "Annuler la vente"
-                : "Annuler la facture"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      <AlertDialog open={confirmRefund} onOpenChange={setConfirmRefund}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Rembourser cette facture ?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Le stock sera réintégré et les commissions associées seront
-              annulées.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-warning text-warning-foreground"
-              onClick={() => refund.mutate({ saleId: sale.id })}
-            >
-              Confirmer le remboursement
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
-  );
+  const canRefund = can(user?.role, "sales.refund") && (user?.role !== "seller" || Boolean(identity?.sellerCanRefund));
+  const print = (format: "a4" | "ticket") => { const node = document.getElementById("invoice-print"); if (!node) return; const popup = window.open("", "stockpilot-invoice", "width=900,height=700"); if (!popup) return; const copy = node.cloneNode(true) as HTMLElement; if (format === "ticket") copy.querySelectorAll(".a4-only").forEach(element => element.remove()); popup.document.write(`<!doctype html><html><head><title>Facture</title><style>@page{size:${format === "ticket" ? "80mm auto" : "A4"};margin:12mm}body{font-family:Arial,sans-serif;color:#172033;max-width:${format === "ticket" ? "80mm" : "100%"};margin:0 auto}.row{display:flex;justify-content:space-between;gap:12px}.muted{color:#64748b;font-size:12px}.line{border-top:1px solid #dbe3ea;padding-top:12px;margin-top:12px}.signature{margin-top:32px;text-align:right}.signature.center{text-align:center}.signature.left{text-align:left}.signature img{max-width:180px;max-height:80px;object-fit:contain}</style></head><body>${copy.innerHTML}</body></html>`); let printTriggered = false; const triggerPrint = () => { if (printTriggered) return; printTriggered = true; popup.focus(); popup.print(); }; popup.addEventListener("afterprint", () => popup.close(), { once: true }); popup.addEventListener("load", triggerPrint, { once: true }); popup.document.close(); window.setTimeout(triggerPrint, 350); };
+  const downloadPdf = () => { const file = createInvoicePdf(detail, identity); downloadFile(file); toast.success("PDF de la facture généré."); };
+  const emailPdf = async () => { const email = detail.customer?.email; if (!email) return toast.error("L’adresse e-mail du client n’est pas renseignée."); const file = createInvoicePdf(detail, identity); const subject = invoiceEmailSubject(sale.invoiceNumber); const message = invoiceEmailMessage({ customerName: detail.customer?.name, invoiceNumber: sale.invoiceNumber, total: formatCurrency(sale.totalCents) }); if (navigator.canShare?.({ files: [file] })) { try { await navigator.share({ title: subject, text: message, files: [file] }); toast.success("La facture est prête à être envoyée par e-mail."); } catch { return; } } else { downloadFile(file); window.location.href = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(`${message}\n\nLe PDF de la facture a été téléchargé : joignez-le à ce message.`)}`; toast.info("Le PDF est téléchargé. Joignez-le au message e-mail qui s’ouvre."); } };
+  const paid = sale.amountPaidCents || 0; const remaining = Math.max(0, sale.totalCents - (sale.returnedCents ?? 0) - paid);
+  return <div className="mx-auto max-w-6xl space-y-6">
+    <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <Button variant="outline" onClick={() => setLocation(collectionPath)}><ArrowLeft className="mr-2 h-4 w-4" />Retour aux {documentType === "quote" ? "devis" : documentType === "ticket" ? "tickets" : "factures"}</Button>
+      <StatusBadge status={sale.status} />
+    </header>
+    <section className="rounded-xl border border-border bg-card p-5 sm:p-6">
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+        <div><p className="text-xs font-semibold text-primary">{documentLabel}</p><h1 className="text-[22px] font-bold tracking-tight text-foreground">{sale.invoiceNumber}</h1><p className="mt-2 text-sm text-faint">Émis le {formatDate(sale.createdAt, true)}</p></div>
+        <div className="grid grid-cols-2 gap-3 text-right"><Info label="Total" value={formatCurrency(sale.totalCents)} /><Info label="Solde" value={formatCurrency(remaining)} /></div>
+      </div>
+      <div className="mt-6 grid gap-4 border-t border-border pt-5 sm:grid-cols-2 lg:grid-cols-4"><Info label="Client" value={detail.customer?.name || "Client comptoir"} /><Info label="Vendeur" value={detail.participants?.seller?.name || "—"} /><Info label="Agent commercial" value={detail.participants?.salesAgent?.name || "Aucun"} /><Info label="Caissier" value={detail.participants?.cashier?.name || "Aucun"} /></div>
+      {sale.creditNoteNumber && <p className="mt-4 text-sm font-medium text-warning">Remboursement total · avoir {sale.creditNoteNumber}</p>}
+      {sale.deliveryAddress && <div className="mt-4 rounded-xl border border-primary/25 bg-primary/5 p-3 text-sm text-muted-foreground"><span className="font-medium text-primary">Livraison :</span> {sale.deliveryAddress}</div>}
+    </section>
+    <section className="grid gap-5 lg:grid-cols-[1.5fr_.75fr]">
+      <Card className="border-border bg-card gap-0 py-0"><CardContent className="p-5"><h2 className="font-semibold text-foreground">Articles facturés</h2><div className="mt-4 space-y-3">{detail.items.map((item: any) => <div key={item.id} className="flex items-center justify-between gap-4 rounded-xl border border-border bg-muted/30 p-3"><div className="min-w-0"><p className="truncate font-medium text-foreground">{item.productName}</p><p className="mt-1 text-xs text-muted-foreground">{item.quantity} × {formatCurrency(item.unitPriceCents)}{item.productReference ? ` · ${item.productReference}` : ""}{(item.returnedQuantity ?? 0) > 0 ? ` · retourné : ${item.returnedQuantity}/${item.quantity}` : ""}{item.vatCents > 0 ? ` · TVA ${(item.vatRateBasisPoints / 100).toFixed(2)} % : ${formatCurrency(item.vatCents)}` : ""}</p></div><p className="shrink-0 font-semibold text-primary">{formatCurrency(item.lineTotalCents)}</p></div>)}</div></CardContent></Card>
+      <Card className="border-border bg-card gap-0 py-0"><CardContent className="p-5"><h2 className="font-semibold text-foreground">Règlements</h2><div className="mt-4 space-y-3"><Info label="Encaissé" value={formatCurrency(paid)} /><Info label="Reste à encaisser" value={formatCurrency(remaining)} /><div className="border-t border-border pt-3"><p className="text-xs text-faint">Moyens utilisés</p><div className="mt-2 space-y-1 text-sm text-muted-foreground">{detail.payments.length ? detail.payments.map((payment: any) => <p key={payment.id}>{paymentMethodLabel(payment.method)} · {formatCurrency(payment.amountCents)}</p>) : <p>Aucun règlement enregistré.</p>}</div></div></div></CardContent></Card>
+    </section>
+    <section className="rounded-xl border border-border bg-card p-5"><div id="invoice-print" className="rounded-xl bg-card p-5 text-foreground"><InvoiceDocument detail={detail} identity={identity} documentLabel={documentLabel} /></div></section>
+      <section className="rounded-xl border border-border bg-card p-5"><h2 className="font-semibold text-foreground">Actions</h2><div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4"><Button variant="outline" onClick={downloadPdf}><Download className="mr-2 h-4 w-4" />PDF</Button><Button variant="outline" onClick={() => print("a4")}><Printer className="mr-2 h-4 w-4" />Imprimer A4</Button><Button variant="outline" onClick={() => print("ticket")}><ReceiptText className="mr-2 h-4 w-4" />Imprimer ticket</Button>{documentType !== "ticket" && <DocumentSendMenu documentLabel={documentLabel} documentNumber={sale.invoiceNumber} total={formatCurrency(sale.totalCents)} customerName={detail.customer?.name} customerPhone={detail.customer?.phone} customerEmail={detail.customer?.email} documentId={sale.id} documentKind="sale" getPdfFile={() => createInvoicePdf(detail, identity)} />}{can(user?.role, "sales.create") && (sale.status === "draft" || sale.status === "partial") && <Button className="sm:col-span-2 lg:col-span-4 bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => setCheckout(sale)}><WalletCards className="mr-2 h-4 w-4" />Encaisser le solde</Button>}{can(user?.role, "sales.create") && sale.status === "draft" && <Button variant="outline" className="sm:col-span-2 lg:col-span-4 border-destructive/25 text-destructive" onClick={() => setConfirmDelete(true)}><Trash2 className="mr-2 h-4 w-4" />{documentType === "quote" ? "Supprimer le devis" : documentType === "ticket" ? "Annuler le ticket" : "Annuler la facture"}</Button>}{canRefund && (sale.status === "paid" || sale.status === "partial") && <Button variant="outline" disabled={!canRefund} className="sm:col-span-2 lg:col-span-4 border-warning/25 text-warning focus-visible:ring-2 focus-visible:ring-warning/20" onClick={() => canRefund ? setReturnOpen(true) : toast.error("Le remboursement n’est pas autorisé pour les vendeurs.")}><Undo2 className="mr-2 h-4 w-4" />Retour partiel / avoir</Button>}</div>{detail.returns?.length > 0 && <div className="mt-5 rounded-xl border border-border p-4"><h3 className="text-sm font-semibold text-foreground">Historique des retours et avoirs</h3><ul className="mt-2 space-y-2 text-sm text-muted-foreground">{detail.returns.map((item: any) => <li key={item.id} className="flex flex-wrap justify-between gap-2"><span>{item.creditNoteNumber} · {formatDate(item.createdAt, true)}{item.reason ? ` · ${item.reason}` : ""}</span><span className="font-medium text-warning">−{formatCurrency(item.refundCents)}</span></li>)}</ul></div>}</section>
+    <ReturnItemsDialog open={returnOpen} onOpenChange={setReturnOpen} saleId={sale.id} items={detail.items} defaultMethod={sale.paymentMethod} onDone={refreshAfterReturn} />
+    <CheckoutSheet open={Boolean(checkout)} onOpenChange={open => !open && setCheckout(null)} sale={checkout} agents={agents} settings={identity} onComplete={() => { setCheckout(null); utils.transactions.list.invalidate(); }} />
+    <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{documentType === "quote" ? "Supprimer ce devis ?" : documentType === "ticket" ? "Annuler ce ticket ?" : "Annuler cette facture ?"}</AlertDialogTitle><AlertDialogDescription>{documentType === "quote" ? "Le devis sera supprimé définitivement." : "Le document est conservé avec le statut « annulé » pour garder la numérotation continue. Aucun stock n’est modifié. Cette action est irréversible."}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Retour</AlertDialogCancel><AlertDialogAction className="bg-destructive text-destructive-foreground" onClick={() => removeDraft.mutate({ saleId: sale.id })}>{documentType === "quote" ? "Supprimer" : "Annuler le document"}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+    <AlertDialog open={confirmRefund} onOpenChange={setConfirmRefund}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Rembourser cette facture ?</AlertDialogTitle><AlertDialogDescription>Le stock sera réintégré et les commissions associées seront annulées.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Annuler</AlertDialogCancel><AlertDialogAction className="bg-warning text-warning-foreground" onClick={() => refund.mutate({ saleId: sale.id })}>Confirmer le remboursement</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+  </div>;
 }
-function Info({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-xs text-faint">{label}</p>
-      <p className="mt-1 truncate font-medium text-foreground">{value}</p>
-    </div>
-  );
-}
+function Info({ label, value }: { label: string; value: string }) { return <div><p className="text-xs text-faint">{label}</p><p className="mt-1 truncate font-medium text-foreground">{value}</p></div>; }

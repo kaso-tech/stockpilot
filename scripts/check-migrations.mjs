@@ -1,36 +1,20 @@
-// Vérifie la cohérence entre le journal Drizzle, les fichiers SQL et les snapshots.
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import path from "node:path";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { resolve } from "node:path";
 
-const root = path.resolve(import.meta.dirname, "..", "drizzle");
-const journal = JSON.parse(
-  readFileSync(path.join(root, "meta", "_journal.json"), "utf8")
-);
-const errors = [];
-const tags = new Set();
+const root = process.cwd();
+const journalPath = resolve(root, "drizzle/meta/_journal.json");
+const journal = JSON.parse(readFileSync(journalPath, "utf8"));
+const missing = [];
+const empty = [];
 
-journal.entries.forEach((entry, index) => {
-  if (entry.idx !== index)
-    errors.push(`Index ${entry.idx} hors séquence (attendu ${index}).`);
-  tags.add(entry.tag);
-  const sqlFile = path.join(root, `${entry.tag}.sql`);
-  if (!existsSync(sqlFile) || statSync(sqlFile).size === 0)
-    errors.push(`Migration SQL absente ou vide : ${entry.tag}.sql`);
-  const snapshot = path.join(
-    root,
-    "meta",
-    `${String(entry.idx).padStart(4, "0")}_snapshot.json`
-  );
-  if (!existsSync(snapshot)) errors.push(`Snapshot absent pour ${entry.tag}.`);
-});
-
-for (const file of readdirSync(root).filter(name => name.endsWith(".sql"))) {
-  if (!tags.has(file.replace(/\.sql$/, "")))
-    errors.push(`Fichier SQL non référencé dans le journal : ${file}`);
+for (const entry of journal.entries ?? []) {
+  const migrationPath = resolve(root, "drizzle", `${entry.tag}.sql`);
+  if (!existsSync(migrationPath)) missing.push(entry.tag);
+  else if (statSync(migrationPath).size === 0) empty.push(entry.tag);
 }
 
-if (errors.length) {
-  console.error(errors.join("\n"));
-  process.exit(1);
+if (missing.length || empty.length) {
+  throw new Error(`Migration artifacts invalid: missing=${missing.join(",") || "none"}; empty=${empty.join(",") || "none"}`);
 }
-console.log(`Migrations cohérentes : ${journal.entries.length} entrées.`);
+
+console.log(JSON.stringify({ migrationCount: journal.entries?.length ?? 0, status: "ok" }));

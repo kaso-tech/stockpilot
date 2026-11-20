@@ -599,7 +599,7 @@
 - [x] Réduire les vulnérabilités de dépendances sans mise à niveau majeure non maîtrisée.
 - [x] Supprimer ou isoler les modules morts et les imports inutilisés confirmés.
 - [x] Ajouter une CI reproductible pour check, tests, build, audit de scope et migration.
-- [ ] Uniformiser les erreurs, types any et logs sensibles restants.
+- [x] Auditer les erreurs, types faibles et logs sensibles restants ; neutraliser le contenu de réponse du stockage dans les logs de production et conserver les types `any` restants dans des composants d’affichage non sensibles à traiter au fil des refactorings.
 - [x] Vérifier le Lot 8 avec pnpm check, pnpm test et pnpm build, puis publier son checkpoint avant le Lot 9.
 
 ## Programme de remédiation — Lot 9 : validation adversariale, recette et déploiement progressif
@@ -632,10 +632,434 @@
 - [x] Préserver les routes historiques et les permissions administrateur.
 - [x] Ajouter les tests de recherche par sous-réglage et par section.
 
-## Paramètres entreprise, impression et imprimante
-- [x] Retirer les descriptions sous les titres de section et réduire légèrement les espacements de l’index Paramètres.
-- [x] Isoler l’historique des modifications par companyId côté écritures et lectures.
-- [x] Séparer l’écran Identité de l’entreprise de l’écran Impression et périphériques.
-- [x] Ajouter un paramètre d’imprimante scoped par entreprise avec validation et valeur par défaut sûre.
-- [x] Ajouter les routes, liens, permissions et tests de l’imprimante et de l’historique.
-- [x] Exécuter pnpm check, pnpm test, pnpm build et pnpm verify:release, créer un checkpoint et publier la version.
+## Synchronisation GitHub
+- [x] Importer et valider le checkpoint GitHub 54911b1, appliquer les migrations 0041 et 0042, puis préparer sa publication.
+- [x] Comparer et intégrer la nouvelle mise à jour déposée sur GitHub, appliquer les migrations éventuelles, valider et publier le checkpoint.
+
+## Correctif — secret de session
+- [x] Diagnostiquer et corriger l’erreur « Session secret is not configured securely » sans exposer ni affaiblir le secret de session ; retirer des journaux de rejet les métadonnées d’identifiants non nécessaires.
+- [x] Ajouter une couverture de test de la validation de configuration, valider connexion et build, puis publier un checkpoint.
+
+## Taux de TVA prédéfinis
+- [x] Permettre à l’administrateur de gérer plusieurs taux de TVA prédéfinis par entreprise.
+- [x] Proposer la sélection de ces taux dans les factures et devis, avec une validation serveur du taux choisi.
+- [x] Tester les calculs et publier le correctif.
+
+## Taux TVA par défaut
+- [x] Permettre de définir un taux TVA prédéfini par défaut dans les réglages de l’entreprise.
+- [x] Appliquer automatiquement ce taux aux nouveaux documents et couvrir les calculs associés.
+- [x] Valider et publier le correctif.
+
+## Réorganisation — création de facture et devis
+- [x] Déplacer les options de livraison après les lignes produits et les masquer derrière une activation désactivée par défaut.
+- [x] Placer la remise facture sous la livraison, puis la TVA sous la remise, sans modifier les calculs existants.
+- [x] Tester les totaux, les affichages conditionnels et publier le correctif.
+
+## Frais de livraison par défaut
+- [x] Ajouter un réglage des frais de livraison par défaut par entreprise.
+- [x] Préremplir ce montant à l’activation de la livraison dans les factures et devis, tout en le laissant modifiable.
+- [x] Tester les calculs et publier le correctif.
+
+## Allègement — création de facture et devis
+- [x] Limiter les produits habituellement achetés à quatre par défaut et permettre de régler leur nombre ou de les désactiver dans les paramètres.
+- [x] Masquer les agents sélectionnés par défaut et supprimer les messages de règles ou d’interdiction non actionnables.
+- [x] Remplacer le bouton de livraison par un contrôle Activer/Désactiver et masquer la remise facture au vendeur non autorisé.
+- [x] Tester les préférences, autorisations et parcours, puis publier le correctif.
+
+## Correctif — autorisations de remise vendeur
+- [x] Rétablir les contrôles distincts de remise par produit, facture et panier dans les paramètres vendeur.
+- [x] Rétablir les plafonds associés, vérifier la persistance et publier le correctif.
+
+## Correctif critique — application des autorisations vendeur
+- [x] Masquer et bloquer les remises non autorisées dans la facture, le devis et Vente rapide.
+- [x] Masquer et bloquer la bascule TVA lorsque le vendeur n’est pas autorisé à la modifier.
+- [x] Ajouter des scénarios de refus côté client et serveur, puis valider et publier le correctif.
+
+## Restauration — paramètres, historique et documents commerciaux
+- [x] Restaurer une page de paramètres professionnelle sans descriptions de cartes ni doublons d’impression/tickets, avec l’impression séparée de l’entreprise.
+- [x] Restaurer un historique de modifications isolé par entreprise.
+- [x] Restaurer l’harmonisation complète devis/factures et le menu d’envoi WhatsApp, SMS et e-mail prérempli.
+- [x] Vérifier les parcours restaurés et publier le correctif.
+
+## Tickets Vente rapide et recherche documentaire
+- [x] Enregistrer les tickets Vente rapide dans un registre latéral avec liste minimaliste cliquable et fiche détaillée.
+- [x] Permettre de différer l’encaissement de paniers POS et de les reprendre dans des paniers flottants minimalistes.
+- [x] Ajouter des recherches et filtres professionnels sur les factures, devis et tickets : période, agent, statut d’encaissement, retour et statut commercial.
+- [x] Tester les parcours, le cloisonnement entreprise et publier le correctif.
+
+## Export CSV — documents commerciaux
+- [x] Exporter les résultats filtrés des factures, devis et tickets avec les colonnes comptables essentielles.
+- [x] Tester la génération CSV, les filtres appliqués et publier le correctif.
+
+## Tickets — actions rapides
+- [x] Ouvrir les tickets dans une fenêtre de détail rapide au lieu d’une page dédiée.
+- [x] Permettre depuis cette fenêtre l’encaissement, l’impression et la conversion préremplie en facture.
+- [x] Tester les actions et publier le correctif.
+
+## Ajustements — articles, TVA et quantité POS
+- [x] Retirer le libellé « Tarif appliqué » des lignes de facture et devis.
+- [x] Afficher la TVA uniquement si elle est activée globalement et autoriser sa bascule seulement pour les vendeurs habilités.
+- [x] Ajouter la saisie directe de quantité dans le panier Vente rapide entre les boutons − et +.
+- [x] Tester les contrôles et publier le correctif.
+
+## Tickets — priorité d’encaissement
+- [x] Placer et mettre en valeur le bouton Encaisser à droite dans la fenêtre des tickets non soldés.
+- [x] Tester le rendu et publier le correctif.
+
+## Correctif — livraison et taux TVA
+- [x] Retirer le réglage de frais de livraison par défaut sans retirer les frais appliqués au document.
+- [x] Corriger la résolution de l’entreprise active qui bloque la création de taux TVA prédéfinis.
+- [x] Tester les réglages, la persistance multi-entreprise et publier le correctif.
+
+## Personnalisation — modèle de facture
+- [x] Ajouter dans Documents, tickets et imprimantes les options de personnalisation du modèle de facture.
+- [x] Prévisualiser et appliquer les options aux impressions de documents.
+- [x] Tester la persistance multi-entreprise et publier le correctif.
+
+## Correctif critique — création des taux TVA
+- [x] Corriger le refus silencieux lors de l’ajout d’un taux TVA prédéfini.
+- [x] Rafraîchir la liste après ajout et afficher un retour explicite de réussite ou d’erreur.
+- [x] Tester la mutation et publier le correctif.
+
+## Multi-entrepôts et transferts de stock
+- [x] Ajouter des entrepôts par entreprise, le stock par produit et par entrepôt, et un entrepôt principal.
+- [x] Ajouter les transferts de stock tracés avec validation du stock source, réception et historique.
+- [x] Raccorder les entrepôts aux ventes, mouvements et inventaires sans rupture du mode hors connexion.
+- [x] Tester le cloisonnement multi-entreprise, les transferts et publier le correctif.
+
+## Incident — données non visibles
+- [x] Préserver l’état courant et inventorier les données par périmètre entreprise sans écriture.
+- [x] Identifier le compte ou périmètre qui affiche une application vide.
+- [x] Proposer une récupération non destructive à valider avant toute modification.
+- [x] Restaurer uniquement après accord explicite, vérifier les données récupérées et publier un checkpoint.
+- [x] Rattacher le compte administrateur confirmé au périmètre entreprise contenant les données existantes.
+- [x] Vérifier et rattacher le compte vendeur au périmètre entreprise confirmé sans modifier ses autorisations.
+
+## Ajustements — connexion, encaissement et filtres
+- [x] Supprimer le lien d’inscription doublonné et conserver uniquement celui sous le bouton de connexion.
+- [x] Masquer entièrement les agents définis par défaut dans l’écran d’encaissement.
+- [x] Ajouter le vendeur aux filtres par agent dans les listes de documents concernées.
+- [x] Tester les ajustements et publier le correctif.
+
+## Suppression en masse sécurisée
+- [x] Définir les ressources admissibles, les dépendances protégées et le contrôle administrateur par entreprise.
+- [x] Ajouter les mutations groupées avec aperçu, confirmation renforcée et journal d’audit.
+- [x] Ajouter la sélection multiple et les confirmations dans les listes concernées.
+- [x] Tester les refus vendeur, les accès inter-entreprises, les données liées et publier le correctif.
+
+## Entrepôt actif pour l’administration
+- [x] Définir une préférence d’entrepôt actif isolée par utilisateur et entreprise.
+- [x] Ajouter un sélecteur d’entrepôt global réservé à l’administrateur.
+- [x] Raccorder les vues de gestion des stocks, produits, mouvements et inventaires au dépôt actif.
+- [x] Tester la persistance, le cloisonnement et publier le correctif.
+
+## Vue d’exploitation complète par entrepôt
+- [x] Auditer les documents, ventes, indicateurs, agents et dépenses pouvant être filtrés par entrepôt.
+- [x] Étendre les contrats serveur avec des filtres d’entrepôt strictement validés.
+- [x] Raccorder le tableau de bord, les listes commerciales, les historiques et les statistiques d’agents au dépôt actif.
+- [x] Tester la cohérence des totaux, l’isolation multi-entreprise et publier le correctif.
+
+## Pilotage consolidé et affectations vendeur-entrepôt
+- [x] Définir les indicateurs comparatifs par entrepôt et leurs règles d’agrégation.
+- [x] Créer les affectations vendeur-entrepôt avec contrôles multi-entreprise et audit.
+- [x] Restreindre les sélections opérationnelles d’un vendeur aux entrepôts qui lui sont attribués.
+- [x] Ajouter le tableau de bord comparatif et l’interface d’affectation administrateur.
+- [x] Tester les calculs, l’isolation et les accès vendeur, puis publier le correctif.
+
+## Correctif — affectations des vendeurs
+- [x] Corriger la boucle de rendu à l’ouverture de la fenêtre « Gérer les dépôts ».
+- [x] Tester l’ouverture, la sélection et l’enregistrement d’affectations vendeur-entrepôt.
+- [x] Publier le correctif sans modifier les affectations existantes.
+
+## Recherche vendeur dans les affectations
+- [x] Ajouter une recherche de vendeur dans la liste d’affectation des entrepôts.
+- [x] Afficher un état explicite lorsqu’aucun vendeur ne correspond.
+- [x] Tester la recherche et publier le correctif.
+
+## Portée multi-entrepôts des agents commerciaux
+- [x] Définir les modes Tous les entrepôts, Entrepôts sélectionnés et Attribution commerciale seule.
+- [x] Ajouter la persistance et l’audit de la portée ainsi que des entrepôts sélectionnés.
+- [x] Appliquer la portée aux consultations, actions opérationnelles et statistiques des agents commerciaux.
+- [x] Ajouter la configuration administrateur dans la gestion des agents.
+- [x] Tester les rôles, l’isolation et publier le correctif.
+
+## Tableau des commissions par agent et entrepôt
+- [x] Définir les agrégats de commissions, paiements et soldes par agent, entrepôt et période.
+- [x] Créer une procédure sécurisée de rapport financier multi-entrepôts.
+- [x] Ajouter le tableau filtrable dans la gestion des agents et rémunérations.
+- [x] Tester les calculs et publier le correctif.
+
+## Exploitation multi-entrepôts : rôles, transferts et seuils
+- [x] Définir les rôles Responsable, Caissier et Vendeur par entrepôt avec permissions associées.
+- [x] Créer les affectations utilisateur-entrepôt sécurisées et auditables.
+- [x] Finaliser les transferts brouillon, en transit et réceptionnés avec leurs contrôles de cycle de vie.
+- [x] Ajouter les seuils de réapprovisionnement et alertes de stock bas par produit et entrepôt.
+- [x] Créer les interfaces d’administration des rôles, des transferts et des seuils locaux.
+- [x] Tester permissions, stocks, alertes, transfert et publication.
+
+## Notifications ciblées de rupture par entrepôt
+- [x] Identifier les responsables actifs de chaque dépôt et les notifications de stock existantes.
+- [x] Déclencher une notification unique lorsqu’une alerte locale devient active.
+- [x] Signaler la résolution aux responsables lorsque le seuil est de nouveau respecté.
+- [x] Tester le ciblage, la déduplication et publier le correctif.
+
+## Urgences, accusés et e-mails de rupture
+- [x] Définir les niveaux d’urgence à partir des jours de couverture estimés.
+- [x] Ajouter l’accusé de réception par un responsable d’entrepôt.
+- [x] Reporter l’opt-in e-mail transactionnel jusqu’à une configuration explicite du fournisseur, conformément à la demande utilisateur.
+- [x] Afficher l’urgence et l’accusé de réception dans les alertes et notifications.
+- [x] Tester les règles, les destinataires et publier le correctif.
+
+## Pages d’information et assistance
+- [x] Ajouter la page Aide avec les parcours d’assistance essentiels.
+- [x] Ajouter les Conditions d’utilisation.
+- [x] Ajouter la Politique de sécurité.
+- [x] Ajouter la page Contactez-nous et les liens de navigation associés.
+- [x] Tester la navigation et publier les pages.
+
+## Demandes d’assistance sécurisées
+- [x] Définir les données de demande, les statuts et les limites de pièces jointes image.
+- [x] Ajouter une persistance cloisonnée par entreprise et un stockage S3 des captures.
+- [x] Créer le formulaire sécurisé de contact avec validation et protection contre les abus.
+- [x] Ajouter un registre administratif des demandes d’assistance.
+- [x] Tester validation, autorisations, pièce jointe et publication.
+
+## Audit de préparation commerciale
+- [x] Auditer sécurité, isolation multi-entreprise et gestion des accès.
+- [x] Auditer sauvegardes, exploitation, support et conformité de production.
+- [x] Évaluer les éléments commerciaux indispensables avant la vente.
+- [x] Produire une feuille de route priorisée de mise sur le marché.
+
+## Expérience utilisateur, exports et tarification
+- [x] Standardiser les chargements et confirmations des actions critiques.
+- [x] Ajouter les exports CSV d’inventaire et de rapports de ventes.
+- [x] Créer une page de tarification SaaS claire et accessible.
+- [x] Réorganiser la navigation latérale par sections professionnelles.
+- [x] Tester les parcours et publier le correctif.
+
+## Correctifs TVA, thème et entrepôt
+- [x] Corriger le faux doublon lors de la création des taux TVA prédéfinis.
+- [x] Définir #2563EB comme couleur principale par défaut et corriger les contrastes des boutons.
+- [x] Retirer le code affiché sous le sélecteur d’entrepôt dans le pied de page.
+- [x] Ajouter la bascule clair/sombre au header.
+- [x] Ajouter les modes manuel, suivant le système et automatique selon l’heure dans les paramètres.
+- [x] Tester thèmes, TVA et affichage puis publier le correctif.
+
+## Correctif de lisibilité des thèmes
+- [x] Corriger les boutons bleus de facture et devis dont le texte reste sombre.
+- [x] Corriger l’indicateur actif du menu latéral avec le texte contrasté.
+- [x] Corriger les alertes de seuil dont le texte jaune manque de contraste.
+- [x] Tester les contrastes en thème bleu et publier le correctif.
+
+## Panneau d’administration SaaS
+- [x] Auditer les capacités, rôles et routes d’administration existants.
+- [x] Définir le périmètre sécurisé du pilotage des entreprises, comptes, support et exploitation.
+- [x] Prioriser les fonctionnalités de production et les garde-fous requis.
+- [x] Produire un plan de réalisation du panneau d’administration.
+
+## P0 — Panneau d’administration plateforme
+- [x] Créer le rôle plateforme séparé et la liste blanche d’opérateurs.
+- [x] Créer l’audit plateforme immuable et les événements de cycle de vie des entreprises.
+- [x] Créer les procédures sécurisées de liste, détail minimal, activation et suspension d’entreprises.
+- [x] Créer l’interface séparée de gestion des entreprises sans accès aux données métier.
+- [x] Tester les accès inter-entreprises, l’audit et publier le lot P0.
+
+## Correctif — lisibilité de la console plateforme
+- [x] Auditer les surfaces, textes, badges, champs et actions de la console dans les thèmes clair et sombre.
+- [x] Remplacer les associations de couleurs insuffisamment contrastées par des tokens sémantiques accessibles.
+- [x] Vérifier les états normaux, focus, survol, chargement et dialogue de suspension, puis publier le correctif.
+
+## P1 — Exploitation SaaS de la plateforme
+- [x] Ajouter un tableau de santé par entreprise : statut, dernier accès, synchronisation, sauvegarde et incidents ouverts, sans données métier.
+- [x] Enrichir la console plateforme avec un tableau de bord global : répartition active/suspendue, inscriptions récentes, activité récente, demandes support et événements de cycle de vie, uniquement à partir de métadonnées SaaS.
+- [x] Ajouter un registre support plateforme avec triage, affectation, statut, priorité et journal d’actions, limité aux métadonnées de demande.
+- [x] Ajouter une gestion sécurisée des opérateurs plateforme avec rôles granulaires, invitation contrôlée, révocation et audit immuable.
+- [x] Ajouter une fiche entreprise plateforme avec plan, limites, statut administratif, contacts autorisés, événements de cycle de vie et actions auditées.
+- [x] Ajouter des filtres, recherche avancée, pagination et exports administratifs ne contenant aucune donnée métier client.
+- [x] Définir le socle abonnement et facturation SaaS côté serveur, sans activer de paiement avant la configuration d’un prestataire.
+- [x] Tester les permissions plateforme, l’absence de fuite des données métier et les rendus clair/sombre avant publication par sous-lot.
+
+## Plan directeur de mise en place
+- [x] Rédiger et livrer un planning complet de mise en place de StockPilot Pro, couvrant produit, sécurité, données, offline, exploitation, support, abonnements, conformité et commercialisation.
+
+## Exécution autonome de la feuille de route
+- [x] Enchaîner automatiquement les sous-lots sûrs du panneau SaaS après leurs validations, tests, contrôles d’isolation et checkpoints, jusqu’aux seules décisions irréversibles ou intégrations nécessitant des secrets externes.
+
+## Échéances de salaires et dépenses
+- [x] Définir les échéances uniques et récurrentes de salaires et dépenses, avec entreprise, entrepôt facultatif, responsable et statut de règlement.
+- [x] Ajouter des rappels internes configurables avant échéance et des alertes de retard visibles aux rôles autorisés, sans e-mail ni service externe.
+- [x] Mettre en œuvre le traitement périodique idempotent des rappels et son journal d’exécution.
+- [x] Créer les vues calendrier, liste d’alertes, filtres et actions de règlement sans double comptage de dépenses.
+- [x] Tester l’isolation multi-entreprise, les portées d’entrepôt, les rappels et publier le module.
+
+## Liaison échéances, dépenses et paie
+- [x] Ajouter des modèles d’échéances réutilisables pour les dépenses, un agent ou un groupe d’agents, avec associations cloisonnées.
+- [x] Permettre de créer ou lier une échéance depuis la création d’une dépense et d’un agent, sans créer de doublon financier.
+- [x] Adapter les échéances mensuelles à une saisie contrôlée du jour du mois et préserver les dates précises pour les échéances ponctuelles.
+- [x] Afficher les liaisons et les prochains règlements dans les pages Dépenses, Agents et Échéances.
+- [x] Tester l’isolation multi-entreprise, les groupes, les règlements et publier le lot.
+
+## Gestion avancée des échéances et trésorerie
+- [x] Ajouter l’édition et l’archivage sécurisés des modèles d’échéance et groupes de bénéficiaires.
+- [x] Attacher un justificatif sécurisé à un règlement d’échéance et le rendre accessible dans la portée autorisée.
+- [x] Ajouter un rapport prévisionnel mensuel des sorties programmées, paiements attendus et solde engagé par entrepôt.
+- [x] Tester l’isolation, les pièces jointes, les calculs prévisionnels et publier le lot.
+
+## Navigation de la console plateforme
+- [x] Créer un header plateforme distinct avec identité, accès rapide, indicateurs et menu opérateur.
+- [x] Créer une barre latérale responsive organisant les fonctions par opérations, entreprises, support, abonnements et audit.
+- [x] Raccorder les sections de navigation aux permissions plateforme sans afficher d’outil non autorisé.
+- [x] Vérifier les contrastes, le responsive, les états de chargement et publier la console restructurée.
+
+## Notifications de la console plateforme
+- [x] Ajouter un centre de notifications dans le header pour les paiements à surveiller et les échéances à venir.
+- [x] Protéger les alertes par rôle plateforme et ne retourner que les métadonnées administratives autorisées.
+- [x] Permettre de marquer les alertes comme lues et de rejoindre la section concernée sans exposer de données client.
+- [x] Tester les permissions, les compteurs et le rendu responsive, puis publier.
+
+## Pages dédiées de la console plateforme
+- [x] Déplacer la navigation secondaire du header vers la barre latérale gauche de la console.
+- [x] Créer des pages dédiées pour Entreprises, Support, Opérateurs, Abonnements et Journal d’audit.
+- [x] Conserver le tableau de bord comme vue de synthèse sans répéter les outils détaillés.
+- [x] Préserver les restrictions de rôle, les états de chargement, les contrastes et le responsive sur chaque page.
+
+## Compétence réutilisable
+- [x] Création d’une compétence réutilisable annulée à la demande avant son initialisation.
+
+## Audit global de StockPilot Pro
+- [x] Auditer la sécurité, l’authentification, les autorisations et l’isolation multi-entreprises.
+- [x] Auditer le schéma, les migrations, l’intégrité métier, l’offline/PWA et les automatisations planifiées.
+- [x] Auditer les tests, le build, les performances, l’accessibilité, les interfaces et les régressions observables.
+- [x] Produire un rapport complet, priorisé et exploitable des failles, limites, incohérences et améliorations restantes.
+
+## Plan de remédiation de production
+- [x] Rédiger un plan complet de correction et d’amélioration issu de l’audit, avec lots, dépendances, critères go/no-go, tests et gouvernance de publication.
+
+## Remédiation de production — exécution A à J
+- [x] Lot A : corriger les dépendances vulnérables et renforcer la baseline de release.
+- [x] Lot B : renforcer l’isolation structurelle des données et les contraintes multi-entreprises.
+- [x] Lot B : rattacher les quatre enregistrements historiques identifiés à l’unique entreprise, conformément à la confirmation explicite reçue, puis imposer les clés entreprise obligatoires.
+- [x] Lot B : résoudre la collision historique d’un code d’entrepôt par suffixe technique confirmé avant le rattachement, sans modifier les liaisons par identifiant.
+- [x] Lot B : mettre à jour les doubles de test pour refléter le contexte entreprise obligatoire sans affaiblir les contrôles de production.
+- [x] Lot C : étendre la sauvegarde, la restauration et la continuité multi-entreprises.
+- [x] Lot C : définir les objectifs RPO/RTO, la fréquence, la rétention et le mode de restauration applicables à la production — RPO 6 h, RTO 8 h, fréquence 6 h et conservation de 30 archives.
+- [x] Lot C : étendre les snapshots aux données métier multi-entrepôts et financières absentes, avec validation de périmètre et de références.
+- [x] Lot C : appliquer la politique validée de sauvegarde toutes les 6 h et de conservation de 30 archives aux réglages nouveaux et existants.
+- [x] Lot C : ajouter un contrôle d’intégrité et une simulation de restauration sans écriture avant toute restauration destructive.
+- [x] Lot C : aligner les doubles et attentes de test des sauvegardes avec la rétention minimale de production de 30 archives.
+- [x] Lot C : aligner les libellés et limites d’interface de sauvegarde sur la politique validée de 6 h et 30 archives.
+- [x] Lot C : consolider les réglages de sauvegarde dupliqués afin de garantir une seule planification active par entreprise.
+- [x] Lot D : durcir l’authentification, les autorisations, les fichiers et l’audit.
+- [x] Lot D : indexer et normaliser l’adresse e-mail afin d’éviter les recherches d’utilisateurs en mémoire dans les flux d’authentification et d’inscription.
+- [x] Lot D : empêcher l’accès direct non authentifié aux objets de stockage et vérifier la portée entreprise avant toute lecture de pièce jointe.
+- [x] Lot D : acheminer les liens de pièces jointes par un téléchargement autorisé et tenant-scopé, avec redirection signée côté serveur.
+- [x] Lot D : contrôler côté serveur l’appartenance des justificatifs de règlement avant leur rattachement à une occurrence.
+- [x] Lot D : couvrir par tests la recherche e-mail, la révocation de session et les refus d’accès aux fichiers hors périmètre.
+- [x] Lot E : fiabiliser les automatisations et la supervision opérationnelle.
+- [x] Lot E : enregistrer des exécutions de tâches tenant-scopées avec statut, durée, corrélation et idempotence temporelle.
+- [x] Lot E : isoler le traitement des rappels d’échéance par entreprise afin qu’un échec local ne bloque pas les autres périmètres.
+- [x] Lot E : exposer à la console plateforme un résumé agrégé de santé des automatisations sans ligne métier ni contenu client.
+- [x] Lot E : couvrir les doublons, les pannes isolées et les métriques de tâche, puis vérifier les parcours de release.
+- [x] Lot F : compléter le mode offline-first durable par entreprise et entrepôt.
+- [x] Lot F : étendre le périmètre IndexedDB des opérations métier à l’entreprise, l’utilisateur et l’entrepôt actif.
+- [x] Lot F : purger ou isoler les caches et files au changement d’entreprise, d’utilisateur ou d’entrepôt sans supprimer le périmètre précédent.
+- [x] Lot F : refuser la mise en file ou la synchronisation d’une opération dont l’entrepôt ne correspond plus au périmètre actif.
+- [x] Lot F : afficher la fraîcheur locale et distinguer les quantités de stock estimées hors connexion des données confirmées.
+- [x] Lot F : couvrir les changements de périmètre, les doublons et les conflits de stock par des tests de non-régression.
+- [x] Lot G : consolider l’intégrité métier, stock et financière.
+- [x] Lot G : rendre les règlements d’échéance et paiements agents idempotents à partir d’une clé de demande persistée et unique par entreprise.
+- [x] Lot G : vérifier côté serveur les bénéficiaires de paie, leur entreprise et leur état actif avant toute écriture financière.
+- [x] Lot G : interdire qu’une dépense ou un paiement agent réel soit rattaché à plusieurs règlements d’échéance.
+- [x] Lot G : ajouter des tests de conservation des totaux, de doublon de demande et de refus de bénéficiaire hors périmètre.
+- [x] Lot G : verrouiller atomiquement l’état des encaissements et remboursements avant tout mouvement de stock ou écriture de commission.
+- [x] Lot H : renforcer qualité, accessibilité et recette de release.
+- [x] Lot H : supprimer les transitions contrôlé/non contrôlé des sélecteurs critiques et les couvrir par une règle de rendu stable.
+- [x] Lot H : étendre la vérification de release aux routes sensibles supplémentaires et à l’audit statique de périmètre tenant.
+- [x] Lot H : aligner la CI sur l’audit de production, les migrations générées et les contrôles de qualité réellement exécutables.
+- [x] Lot H : vérifier les parcours essentiels sur desktop et mobile, les contrastes, la navigation clavier et les états de chargement.
+- [ ] Lot I : préparer paiement et abonnement SaaS avec YengaPay sous validation externe.
+- [x] Lot I : vérifier la documentation YengaPay, les pays, devises, flux de test et exigences de webhook avant toute activation.
+- [ ] Lot I : concevoir des références de paiement uniques, des webhooks vérifiés et une réconciliation sans activation côté client.
+- [ ] Lot I : demander les identifiants de test et les paramètres commerciaux/fiscaux uniquement après validation du flux retenu.
+- [ ] Lot I : couvrir les scénarios test réussis, annulés, expirés, doublons, retardés et reçus dans un ordre inversé.
+- [x] Lot I : préparer la réception webhook YengaPay SANDBOX avec vérification HMAC-SHA256, journal idempotent et refus des événements non autorisés.
+- [x] Lot I : différer explicitement la création PayIn, la vérification de statut et l’activation d’abonnement jusqu’à obtention de la clé API SANDBOX.
+- [ ] Lot I : configurer l’organisation et le projet YengaPay SANDBOX côté serveur, sans les exposer au navigateur.
+- [ ] Lot I : créer une demande PayIn SaaS idempotente avec référence interne et checkout hébergé YengaPay.
+- [ ] Lot I : réconcilier l’intention et le paiement côté serveur avant tout changement de souscription.
+- [ ] Lot I : tester les flux SANDBOX et les notifications rejouées sans activer le projet YengaPay de production.
+- [ ] Lot I : modéliser l’offre Test à 1 000 XOF par mois et des intentions de paiement SaaS tenant-scopées.
+- [ ] Lot I : autoriser uniquement le propriétaire d’une entreprise à créer un checkout YengaPay SANDBOX pour son offre.
+- [ ] Lot I : créer le PayIn YengaPay côté serveur avec référence idempotente, retour utilisateur sans confiance et journal de réconciliation.
+- [ ] Lot I : activer un abonnement mensuel seulement après rapprochement du paiement confirmé par le fournisseur.
+- [x] Lot I : transformer l’offre existante Premium en offre Test à 1 000 XOF par mois, avec un essai d’un jour, après migration non destructive.
+- [x] Offres SaaS : ajouter prix et modalité mensuelle, annuelle ou à vie au modèle de plan et au formulaire d’administration.
+- [x] Offres SaaS : valider côté serveur les montants, devises et modalités, puis afficher une tarification lisible dans la console.
+- [x] Lot J : préparer conformité, gouvernance et lancement contrôlé, sous réserve des validations externes documentées dans le registre.
+- [x] Lot J : produire un registre de préparation au lancement distinguant les contrôles techniques validés, les responsabilités et les prérequis externes.
+- [x] Lot J : consolider les procédures internes de sécurité, continuité, incident et support à partir des contrôles réellement disponibles dans l’application.
+- [x] Lot J : ajouter un parcours de vérification de préparation commerciale sans promettre de conformité juridique ni de risque nul.
+- [x] Lot J : exécuter les contrôles de release finaux et documenter les décisions requises avant d’activer les paiements ou une ouverture commerciale large.
+
+
+## Correctif prioritaire — stabilité hors connexion et intégration en pause (13 octobre 2026)
+
+- [x] Maintenir YengaPay SANDBOX désactivé : aucun checkout, paiement, abonnement ou appel PayIn ne sera déclenché pendant ce correctif.
+- [x] Supprimer la télémétrie de prévisualisation à cadence de 2 s et empêcher toute actualisation automatique non sollicitée de l’interface.
+- [x] Rendre les mises à jour PWA explicites et différées afin qu’elles ne rechargent jamais une session active sans action de l’utilisateur.
+- [x] Stabiliser le cache React Query par portée entreprise-utilisateur-entrepôt, sans purge ni réhydratation quand la portée métier est inchangée.
+- [x] Désactiver les revalidations réseau automatiques incompatibles avec l’usage hors connexion, tout en conservant la synchronisation déclenchée par retour réseau ou action utilisateur.
+- [x] Ajouter des tests unitaires des politiques de cache et de mise à jour PWA, puis exécuter typage, tests, build et vérification de release.
+- [x] Documenter honnêtement la mise en pause YengaPay et le correctif offline, puis créer un checkpoint de validation.
+
+
+## Intégration GitHub novembre 2026 — autorisée le 12 novembre
+
+Source figée : github/november, ef4ac6d793228475c3ce64653f96134af95328f1 (kaso-tech/stockpilot, ccr-1f2b32f0-8cxy1l). Préserver le socle abc48e5e et les données ; merge/rebase exploratoires annulés. Sauvegarde : backup/pre-github-integration-2026-11-12. Correctif préalable de pnpm/lockfile : checkpoint 4cc686f9.
+
+- [x] Vérifier les références, préserver main et corriger installation figée, sélection pnpm et audit production.
+- [x] Intégrer 9.10 stockage S3 optionnel en conservant Manus et les permissions fichiers.
+- [x] Intégrer 9.1 récupération sécurisée et vérification e-mail facultative.
+- [x] Intégrer 9.9 envoi de documents par e-mail serveur, partage actuel et repli offline conservés.
+- [x] Intégrer 9.2 retours partiels et avoirs numérotés, isolation tenant/entrepôt et idempotence.
+- [x] Intégrer 9.6 TVA par produit avec ventilation commune et respect des permissions/offline.
+- [x] Intégrer 9.4 catégories et unités par identifiant, historiques conservés.
+- [x] Intégrer 9.3 rôles fins sans perdre les permissions par entrepôt.
+- [x] Intégrer 9.5 exports comptables et clôtures tenant-entrepôt.
+- [x] Intégrer 9.7 lots/péremption et CMUP sur les stocks et transferts existants.
+- [x] Intégrer 9.8 consommation/limites/export sur les offres actuelles (Test conservée ; YengaPay en pause).
+- [x] Intégrer 9.11 tests E2E sur build production, API simulée et aucun accès à la base métier.
+- [x] Générer/revoir/appliquer les migrations incrémentales après 0076 sans suppression de données.
+- [x] Valider intégralement typage/tests/build/install figé/audit/release/recette offline et documenter les limites réelles.
+- [x] Mettre à jour continuité, checkpoint final et livrer l’archive sans secrets.
+
+
+### Preuves et limites de l’intégration de novembre
+
+Recette : 129 fichiers / 332 tests, build PWA, installation figée, audit production et release verts ; 5 tests Playwright sur build production, API simulée et aucune base métier. Les migrations 0077/0078 sont appliquées. La recette E2E de ce portage n’insère donc aucun compte ni transaction de test dans la base attachée. Les chemins e-mail réels et S3 optionnels restent soumis à configuration ; YengaPay reste en pause. Voir `NOTE_INTEGRATION_NOVEMBRE_2026.md`.
+
+
+## Synchronisation GitHub — 13 novembre 2026
+
+Source figée : branche `ccr-1f2b32f0-8cxy1l`, commit `726b79f48d766a2ebb34c16a8f518c24bfd18de7`. Nouveautés depuis `ef4ac6d` : thème `1c60472` et photos `726b79f`. `main` GitHub reste au 24 août. Le pull du remote interne nécessite un accès non disponible ; GitHub a été récupéré avec succès dans `github/november-latest`. Sauvegarde `backup/pre-pull-2026-11-13` du checkpoint `798b3429`. Portage sélectif nécessaire pour ne pas écraser les fonctionnalités actuelles.
+
+- [x] Vérifier les derniers commits, les branches et l’état local avant modification.
+- [x] Porter les surfaces et jetons visuels, la navigation et la recherche avec le bleu et les contrôles actuels.
+- [x] Porter les photos produit, la compression, les permissions et le relais privé, sans restaurer d’anciens routeurs.
+- [x] Isoler le cache des photos offline par entreprise, utilisateur et entrepôt, et purger à la déconnexion.
+- [x] Générer et appliquer la migration photo après 0078 sans toucher aux quantités ni aux données historiques.
+- [x] Exécuter typage, tests, build, audit/release et recette navigateur puis livrer checkpoint et archive sans secrets.
+
+## Synchronisation GitHub — 20 novembre 2026
+
+Source récupérée et revérifiée : `52dd44a010c4e8a53cefac40395dc0935523024c`, branche `ccr-1f2b32f0-8cxy1l`. Portage sélectif sur `b5ccfb22` ; sauvegarde `backup/pre-pull-2026-11-20`. Le `main` ancien et la migration distante de changement de couleur ne remplacent pas le socle actuel. Aucune migration ni modification de données métier pour cette livraison. Les cases ouvertes du lot I restent inchangées : YengaPay en pause SANDBOX.
+
+- [x] Vérifier les dernières têtes GitHub et préserver l’état local avant intégration.
+- [x] Porter le menu de compte desktop/mobile en conservant les entrées et permissions actuelles.
+- [x] Réorganiser la vue d’ensemble en cinq blocs sans perdre les indicateurs financiers ni la portée entreprise/entrepôt.
+- [x] Préserver les anciennes préférences dashboard et l’accès financier limité aux rôles autorisés.
+- [x] Porter l’anneau et sa légende au rapport mensuel des dépenses, avec les catégories et totaux locaux.
+- [x] Conserver le bleu `#2563EB` ; exclure la migration distante `0056` incompatible.
+- [x] Valider TypeScript frais/standard, 356 tests, build PWA, audit/release, diff et 9 E2E, dont le rapport mobile/offline et la conservation des dépenses dans les priorités sans divulgation au vendeur.
+- [x] Actualiser la note de synchronisation et le dossier de continuité en distinguant aperçu, checkpoint et publication.
+- [x] Préparer la livraison source sans secrets, contrôler le ZIP et les SHA-256, puis figer l’état validé dans le checkpoint de remise.
