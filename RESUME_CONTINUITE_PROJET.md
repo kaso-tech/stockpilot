@@ -4,8 +4,9 @@
 **Projet Manus :** StockPilot SaaS
 **Chemin de travail :** `/home/ubuntu/stockpilot-pro`
 **Domaine publié :** `https://stockpilot-gpaoheuz.manus.space`
-**Dernier checkpoint fonctionnel avant cette synchronisation :** `b5ccfb22`
-**Archive source de cette livraison :** `/home/ubuntu/stockpilot-pro-latest-2026-11-20.zip`
+**Dernier checkpoint fonctionnel avant ce portage :** `651bd0f9`
+**Archive source de cette livraison :** `/home/ubuntu/stockpilot-pro-selective-0184f30-2026-11-20.zip`
+**Note actuelle :** `NOTE_PORTAGE_MAIN_0184f30_2026-11-20.md` (les sections antérieures restent historiques).
 
 ## 1. Objectif produit
 
@@ -408,3 +409,15 @@ Sauvegarde : `backup/pre-pull-2026-11-20`. Branche : `integrate/github-latest-20
 Recette finale : TypeScript frais réussi, puis `pnpm check` réussi après suppression du seul cache incrémental TypeScript périmé ; **135 fichiers / 356 tests Vitest**, build PWA (**124 entrées**), audit production/release, `git diff --check` et **9 E2E** sur build production avec API simulée réussis. Les scénarios supplémentaires vérifient le rapport des dépenses alimenté, la portée d’entrepôt, la lecture mobile/offline et la conservation des dépenses/paie dans les priorités quand les autres blocs sont masqués, sans les divulguer au vendeur. L’aperçu desktop/mobile a été inspecté sans écriture dans les données. Le watcher peut encore afficher d’anciens diagnostics ; ne pas les confondre avec le contrôle frais validé. La CI distante était en échec `quality` sans journal exploitable ; aucun succès distant n’est revendiqué.
 
 Note : `NOTE_SYNCHRONISATION_2026-11-20.md`. Archive source : `/home/ubuntu/stockpilot-pro-latest-2026-11-20.zip`, avec continuité, tests et migrations, sans secrets ni données métier. Le checkpoint final est livré séparément. Aucun push GitHub ni publication du domaine n’est effectué. YengaPay reste en pause SANDBOX ; les 12 cases ouvertes du lot I ne sont pas clôturées par cette synchronisation. SMTP/S3 externes et prérequis commerciaux restent à valider. Les limites offline décrites dans la note restent applicables.
+
+## Livraison complémentaire — portage sélectif de main `0184f30` (20 novembre 2026, soirée)
+
+Après correction du choix de remplacement intégral par l’utilisateur, le projet est revenu au socle `651bd0f9`, branche `integrate/github-latest-2026-11-13`. GitHub `main` est désormais revérifié à `0184f30428349de4629a04948142f1548c7fdbd2` (20:20 UTC). Le remote interne `origin` demeure inchangé et inaccessible depuis le terminal ; la source GitHub est séparée sous `github`. Aucun pull réussi depuis `origin`, push GitHub ou publication n’est revendiqué.
+
+Les styles compatibles de `5f32871` et `0184f30` sont portés seulement sous forme de transitions courtes et de relief sur sept boutons-cartes existants. Bleu `#2563EB`, thèmes, dimensions, permissions, chargements, cache offline et portées entreprise/entrepôt sont conservés. Les cartes Agents et Devis adoptent un fond de survol sémantique pour rester lisibles en clair. Le shell, le POS et les ancêtres de leurs éléments fixes ne sont pas animés. Le mode mouvement réduit est vérifié sur CSS compilé ; les anciens déplacements Tailwind doublés sont retirés.
+
+Les refontes complètes `a460482`, les nouvelles annulations POS `347726f`, l’import distant de photos `574df54` et la suppression/réinitialisation d’entrepôt `840e767` ne sont pas copiés en bloc. Ils présentent des incompatibilités de conservation, de portée vendeur/entrepôt, de SSRF/correspondance ou de suppression destructive. Les effets d’entrée/stagger globaux, palette distante et shimmer sont également exclus. Aucun ajout métier n’est présenté comme livré par ce portage.
+
+Aucune migration ni écriture métier ; schéma local `0079` inchangé. Installation figée sans changement de manifeste/lockfile, typage frais, **136 fichiers / 359 tests Vitest**, build PWA (**124 ressources**), audit production sans vulnérabilité connue, recette de release, diff et **12 E2E** avec API simulée/base vide réussis. Trois nouvelles gardes unitaires et trois scénarios navigateur couvrent motion réduite, contraste de titre, absence de transform sur shell, et placement du panier fixe en desktop/mobile. Le test historique Dépenses offline attend maintenant le contrôle PWA et le chargement des deux pages avant coupure, sans masquer les erreurs. Captures Devis clair/sombre et POS desktop/mobile inspectées.
+
+Note : `NOTE_PORTAGE_MAIN_0184f30_2026-11-20.md`. Archive : `/home/ubuntu/stockpilot-pro-selective-0184f30-2026-11-20.zip`, sans secrets, base, objets externes, dépendances installées, build ou traces de recette. Le checkpoint WebDev final est communiqué séparément ; il ne faut pas confondre sauvegarde et publication. YengaPay reste en pause SANDBOX, les 12 tâches ouvertes ne sont pas clôturées ; SMTP/S3 externes et prérequis commerciaux restent à valider. La recette ne garantit pas le fonctionnement offline de plusieurs jours pour toutes les actions/appareils.

@@ -25,6 +25,10 @@ test("le rapport des dépenses conserve son anneau, sa portée et sa lecture mob
     "expenses.budget.get": null,
   });
   await page.goto("/depenses");
+  // Le premier chargement installe la PWA mais n'est pas encore contrôlé.
+  await page.evaluate(async () => { await navigator.serviceWorker.ready; });
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
   await expect(page.getByRole("heading", { name: "Dépenses", exact: true })).toBeVisible();
   const chart = page.getByRole("img", { name: /^Répartition des dépenses, total/ });
   await expect(chart).toBeVisible();
@@ -37,10 +41,14 @@ test("le rapport des dépenses conserve son anneau, sa portée et sa lecture mob
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(chart).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  await page.evaluate(async () => { await navigator.serviceWorker.ready; });
+  await pushRoute(page, "/produits");
+  await expect(page.getByText("Produit de recette", { exact: true })).toBeVisible();
+  await pushRoute(page, "/depenses");
+  await expect(chart).toBeVisible();
   await page.unroute("**/api/trpc/**");
   await context.setOffline(true);
   await pushRoute(page, "/produits");
+  await expect(page.getByText("Produit de recette", { exact: true })).toBeVisible();
   await pushRoute(page, "/depenses");
   await expect(chart).toBeVisible();
   await expect(chart.locator(".recharts-sector")).toHaveCount(2);

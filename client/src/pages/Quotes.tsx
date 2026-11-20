@@ -67,7 +67,7 @@ export default function Quotes() {
               key={quote.id}
               type="button"
               onClick={() => setLocation(`/devis/${quote.id}`)}
-              className="group flex min-w-0 items-center gap-3 rounded-xl border border-border bg-card px-3 py-2.5 text-left shadow-sm transition hover:border-primary/45 hover:bg-[#141e2d]"
+              className="lift surface group flex min-w-0 items-center gap-3 rounded-xl border border-border bg-card px-3 py-2.5 text-left shadow-sm transition hover:border-primary/45 hover:bg-accent"
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
