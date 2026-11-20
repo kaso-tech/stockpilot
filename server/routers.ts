@@ -103,6 +103,7 @@ import {
 } from "./authSessions";
 import { conflictOr } from "./dbErrors";
 import { storagePut } from "./storage";
+import { RemoteImageError, fetchRemoteImage } from "./remoteImage";
 import {
   PRODUCT_IMAGE_MAX_BYTES,
   PRODUCT_THUMB_MAX_BYTES,
@@ -1673,6 +1674,22 @@ export const appRouter = router({
           `Photo de ${current.name} mise à jour`
         );
         return { imageUrl: stored.url, imageThumbUrl: storedThumb.url };
+      }),
+    /** Import en masse (colonne photo_url) : télécharge la photo, le navigateur la compresse ensuite. */
+    fetchRemoteImage: permissionProcedure("catalog.manage")
+      .input(z.object({ url: z.string().trim().min(8).max(2000) }))
+      .mutation(async ({ input }) => {
+        try {
+          return await fetchRemoteImage(input.url);
+        } catch (error) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              error instanceof RemoteImageError
+                ? error.message
+                : "photo inaccessible",
+          });
+        }
       }),
     removeImage: permissionProcedure("catalog.manage")
       .input(z.object({ productId: z.number().int().positive() }))

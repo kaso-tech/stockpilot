@@ -1,4 +1,6 @@
 import { ImportExportControls } from "@/components/ImportExportControls";
+import { BulkPhotoImport } from "@/components/BulkPhotoImport";
+import { compressProductImage } from "@/lib/productImage";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatPriceTiers, parsePriceTiers, type CsvRow } from "@/lib/csv";
@@ -15,6 +17,17 @@ export default function DataExchange() {
   const { data: suppliers = [] } = trpc.suppliers.list.useQuery();
   const { data: customers = [] } = trpc.commerce.customers.list.useQuery();
   const createProduct = trpc.products.create.useMutation();
+  const fetchRemoteImage = trpc.products.fetchRemoteImage.useMutation();
+  const uploadImage = trpc.products.uploadImage.useMutation();
+  /** Colonne photo_url : téléchargée par le serveur, compressée ici, puis enregistrée. */
+  const attachRemotePhoto = async (productId: number, url: string) => {
+    const { dataUrl } = await fetchRemoteImage.mutateAsync({ url });
+    const blob = await (await fetch(dataUrl)).blob();
+    const compressed = await compressProductImage(
+      new File([blob], "photo", { type: blob.type })
+    );
+    await uploadImage.mutateAsync({ productId, ...compressed });
+  };
   const createSupplier = trpc.suppliers.create.useMutation();
   const createCustomer = trpc.commerce.customers.create.useMutation();
   const importProducts = async (rows: CsvRow[]) => {
@@ -25,6 +38,27 @@ export default function DataExchange() {
       try {
         const reference = row.reference?.trim();
         const name = row.name?.trim();
+        const photoUrl = (row.photo_url || row.photourl || "").trim();
+        // Référence déjà au catalogue : la ligne sert seulement à ajouter sa photo.
+        const existing = reference
+          ? products.find(
+              product =>
+                product.reference.toLowerCase() === reference.toLowerCase()
+            )
+          : undefined;
+        if (existing) {
+          if (!photoUrl)
+            throw new Error(`la référence ${reference} existe déjà`);
+          try {
+            await attachRemotePhoto(existing.id, photoUrl);
+          } catch (error) {
+            throw new Error(
+              `photo non ajoutée (${error instanceof Error ? error.message : "échec"})`
+            );
+          }
+          imported += 1;
+          continue;
+        }
         if (!reference || !name || !row.category || !row.unit)
           throw new Error("référence, nom, catégorie et unité requis");
         const quantity = Number(row.quantity || 0);
@@ -33,7 +67,7 @@ export default function DataExchange() {
         );
         if (!Number.isInteger(quantity) || !Number.isInteger(minimumQuantity))
           throw new Error("quantités entières requises");
-        await createProduct.mutateAsync({
+        const created = await createProduct.mutateAsync({
           reference,
           name,
           description: row.description || null,
@@ -51,6 +85,14 @@ export default function DataExchange() {
           wholesalePriceTiers: parsePriceTiers(row.wholesale_tiers),
         });
         imported += 1;
+        if (photoUrl)
+          try {
+            await attachRemotePhoto(created.id, photoUrl);
+          } catch (error) {
+            errors.push(
+              `ligne ${index + 2} — produit créé, photo non ajoutée (${error instanceof Error ? error.message : "échec"})`
+            );
+          }
       } catch (error) {
         errors.push(
           `ligne ${index + 2} — ${error instanceof Error ? error.message : "invalide"}`
@@ -124,7 +166,7 @@ export default function DataExchange() {
       </div>
     );
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="max-w-5xl space-y-6">
       <header>
         <h1 className="text-[22px] font-bold tracking-tight text-foreground">
           Import & export
@@ -152,6 +194,7 @@ export default function DataExchange() {
                 "supplier_id",
                 "retail_tiers",
                 "wholesale_tiers",
+                "photo_url",
               ]}
               rows={products.map(product => [
                 product.reference,
@@ -169,6 +212,8 @@ export default function DataExchange() {
                   product.retailPriceTiers || product.priceTiers
                 ),
                 formatPriceTiers(product.wholesalePriceTiers),
+                // Les photos enregistrées sont privées à l'entreprise : pas d'adresse exportable.
+                "",
               ])}
               onImport={importProducts}
             />
@@ -235,14 +280,18 @@ export default function DataExchange() {
           }
         />
       </div>
+      <BulkPhotoImport products={products} />
       <Card className="border-primary/20 bg-primary/[0.04] gap-0 py-0">
         <CardContent className="flex gap-3 p-4 text-sm text-muted-foreground">
           <FileSpreadsheet className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
           <p>
             Pour les produits, utilisez le format de palier{" "}
             <strong>seuil:prix|seuil:prix</strong>, par exemple{" "}
-            <strong>5:115000|10:110000</strong>. Exportez d’abord un modèle vide
-            ou une liste pour vérifier les colonnes attendues.
+            <strong>5:115000|10:110000</strong>. La colonne{" "}
+            <strong>photo_url</strong> accepte l’adresse https d’une photo
+            (JPEG, PNG ou WEBP, 8 Mo maximum) ; pour une référence déjà au
+            catalogue, la ligne ajoute seulement sa photo. Exportez d’abord un
+            modèle vide ou une liste pour vérifier les colonnes attendues.
           </p>
         </CardContent>
       </Card>
