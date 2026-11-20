@@ -247,7 +247,7 @@ export default function AgentDetail() {
           </Button>
         </div>
       </section>
-      <section className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+      <section className="stagger grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <Metric
           label="Ventes associées"
           value={summary.salesCount}
@@ -372,7 +372,7 @@ export default function AgentDetail() {
                 key={sale.id}
                 type="button"
                 onClick={() => setLocation(`/factures?facture=${sale.id}`)}
-                className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/50 p-3 text-left hover:border-primary/25"
+                className="lift surface flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/50 p-3 text-left hover:border-primary/25"
               >
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-medium text-foreground">

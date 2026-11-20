@@ -243,7 +243,7 @@ export default function CustomerDetail() {
                       onClick={() =>
                         setLocation(`/factures?facture=${invoice.id}`)
                       }
-                      className="flex w-full items-center justify-between gap-3 rounded-xl border border-border bg-muted/50 p-4 text-left transition hover:border-primary/40 hover:bg-primary/[0.04]"
+                      className="lift surface flex w-full items-center justify-between gap-3 rounded-xl border border-border bg-muted/50 p-4 text-left hover:border-primary/40 hover:bg-primary/[0.04]"
                     >
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-foreground">

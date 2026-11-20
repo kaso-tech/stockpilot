@@ -181,6 +181,15 @@
   h3 {
     letter-spacing: -0.015em;
   }
+  /* Survol en douceur des lignes, liens et boutons (les cartes « lift » ont leur propre transition). */
+  a,
+  button,
+  [role="button"],
+  tr {
+    transition-property: color, background-color, border-color;
+    transition-duration: 150ms;
+    transition-timing-function: ease;
+  }
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),
   [type="button"]:not(:disabled),

@@ -74,7 +74,7 @@ export default function Quotes() {
               key={quote.id}
               type="button"
               onClick={() => setSelectedId(quote.id)}
-              className="group rounded-xl border border-border bg-card p-4 text-left transition hover:border-primary/45"
+              className="lift surface group rounded-xl border border-border bg-card p-4 text-left hover:border-primary/45"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">

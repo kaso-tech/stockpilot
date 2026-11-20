@@ -314,7 +314,7 @@ export default function Agents() {
           </Button>
         )}
       </header>
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+      <section className="stagger grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
         <Metric
           label="Solde total dû"
           value={formatCurrency(totalDue)}
@@ -342,7 +342,7 @@ export default function Agents() {
           return (
             <div
               key={`${beneficiary.type}-${beneficiary.id}`}
-              className="group flex min-w-0 items-center gap-2 rounded-xl border border-border bg-card p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/25 hover:bg-card"
+              className="lift surface group flex min-w-0 items-center gap-2 rounded-xl border border-border bg-card p-4  hover:border-primary/25 hover:bg-card"
             >
               <button
                 type="button"

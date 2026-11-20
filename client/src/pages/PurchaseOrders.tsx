@@ -223,7 +223,7 @@ export default function PurchaseOrders() {
           </Button>
         )}
       </div>
-      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+      <div className="stagger grid grid-cols-3 gap-2 sm:gap-3">
         <Metric
           icon={<ClipboardList className="h-4 w-4" />}
           label="Bons actifs"
@@ -501,7 +501,7 @@ function OrderCard({ order, onOpen }: { order: Order; onOpen: () => void }) {
     <button
       type="button"
       onClick={onOpen}
-      className={`rounded-xl border p-5 text-left transition hover:-translate-y-0.5 hover:border-primary/45 hover:bg-primary/[0.045] ${overdue ? "border-destructive/25 bg-destructive-soft" : "border-border bg-card"}`}
+      className={`lift surface rounded-xl border p-5 text-left  hover:border-primary/45 hover:bg-primary/[0.045] ${overdue ? "border-destructive/25 bg-destructive-soft" : "border-border bg-card"}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">

@@ -943,7 +943,7 @@ export default function InvoiceCreate({
               <button
                 key={product.id}
                 onClick={() => add(product.id)}
-                className="rounded-xl border border-border p-4 text-left hover:border-primary/40 hover:bg-primary/5"
+                className="lift surface rounded-xl border border-border p-4 text-left hover:border-primary/40 hover:bg-primary/5"
               >
                 <p className="font-medium">{product.name}</p>
                 <p className="mt-1 text-xs text-muted-foreground">

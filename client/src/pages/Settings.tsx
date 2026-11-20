@@ -374,7 +374,7 @@ export default function Settings({ section }: { section: SettingsSection }) {
                   <button
                     key={item.code}
                     onClick={() => updateCurrency(item.code)}
-                    className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition ${currency === item.code ? "border-primary bg-primary/10" : "border-border hover:bg-muted"}`}
+                    className={`lift surface flex w-full items-center gap-3 rounded-xl border p-3 text-left ${currency === item.code ? "border-primary bg-primary/10" : "border-border hover:bg-muted"}`}
                   >
                     <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
                       {item.symbol}
@@ -410,7 +410,7 @@ export default function Settings({ section }: { section: SettingsSection }) {
                       key={option.value}
                       type="button"
                       onClick={() => updateGrouping(option.value)}
-                      className={`rounded-xl border p-3 text-left transition ${priceGrouping === option.value ? "border-primary bg-primary/10" : "border-border hover:bg-muted"}`}
+                      className={`lift surface rounded-xl border p-3 text-left ${priceGrouping === option.value ? "border-primary bg-primary/10" : "border-border hover:bg-muted"}`}
                     >
                       <span className="block text-sm font-medium">
                         {option.label}
@@ -844,7 +844,7 @@ function ThemeOption({
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className={`relative rounded-xl border p-3 text-left transition ${active ? "border-primary ring-1 ring-primary" : "border-border hover:bg-accent"}`}
+      className={`lift surface relative rounded-xl border p-3 text-left ${active ? "border-primary ring-1 ring-primary" : "border-border hover:bg-accent"}`}
     >
       <span
         aria-hidden="true"

@@ -120,7 +120,7 @@ export default function SyncJournal() {
           </Button>
         </div>
       )}
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <section className="stagger grid grid-cols-2 gap-3 sm:grid-cols-3">
         <SummaryCard
           label="En attente"
           value={pendingCount}

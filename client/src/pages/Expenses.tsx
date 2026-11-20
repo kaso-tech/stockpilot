@@ -266,7 +266,7 @@ export default function Expenses() {
           Ajouter une dépense
         </Button>
       </header>
-      <section className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+      <section className="stagger grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <Metric
           icon={CalendarDays}
           label="Dépenses du mois"

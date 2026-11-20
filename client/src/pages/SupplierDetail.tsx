@@ -532,7 +532,7 @@ function SupplierOrderCard({
     <button
       type="button"
       onClick={onOpen}
-      className={`w-full rounded-xl border p-4 text-left transition hover:-translate-y-0.5 hover:border-primary/45 hover:bg-primary/[0.05] ${overdue ? "border-destructive/25 bg-destructive-soft" : "border-border bg-muted/50"}`}
+      className={`lift surface w-full rounded-xl border p-4 text-left  hover:border-primary/45 hover:bg-primary/[0.05] ${overdue ? "border-destructive/25 bg-destructive-soft" : "border-border bg-muted/50"}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">

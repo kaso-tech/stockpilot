@@ -243,7 +243,7 @@ export default function ProductDetail() {
           </Button>
         </section>
       )}
-      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <section className="stagger grid grid-cols-2 gap-3 xl:grid-cols-4">
         {metrics.map(metric => (
           <MetricCard key={metric.label} {...metric} />
         ))}

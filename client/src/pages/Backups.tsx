@@ -159,7 +159,7 @@ export default function Backups() {
           {runNow.isPending ? "Sauvegarde…" : "Sauvegarder maintenant"}
         </Button>
       </header>
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
+      <div className="stagger grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
         <StatusCard
           icon={History}
           label="Dernière sauvegarde"
