@@ -1,10 +1,30 @@
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { usePermissions } from "@/hooks/usePermissions";
 import { trpc } from "@/lib/trpc";
-import { ArrowRightLeft, CalendarClock, Plus, Warehouse } from "lucide-react";
+import {
+  ArrowRightLeft,
+  CalendarClock,
+  MoreHorizontal,
+  Plus,
+  RotateCcw,
+  Trash2,
+  Warehouse,
+} from "lucide-react";
+import { PageHeader, Panel, PanelHeader } from "@/components/page";
+import { StatusPill } from "@/components/StatusPill";
+import {
+  WarehouseDangerDialog,
+  type WarehouseDangerAction,
+} from "@/components/WarehouseDangerDialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -12,6 +32,12 @@ import { toast } from "sonner";
 export default function Warehouses() {
   const { can } = usePermissions();
   const canManage = can("inventory.manage");
+  // Réinitialisation et suppression : actions irréversibles, réservées aux administrateurs.
+  const canDestroy = can("settings.manage");
+  const [danger, setDanger] = useState<{
+    warehouse: { id: number; name: string; isDefault: boolean };
+    action: WarehouseDangerAction;
+  } | null>(null);
   const utils = trpc.useUtils();
   const { data: warehouses = [] } = trpc.warehouses.list.useQuery();
   const { data: stock = [] } = trpc.warehouses.stock.useQuery();
@@ -65,41 +91,58 @@ export default function Warehouses() {
       ),
     [stock, search]
   );
+  const unitsByWarehouse = useMemo(() => {
+    const totals = new Map<number, number>();
+    for (const product of stock)
+      for (const item of product.stocks)
+        totals.set(
+          item.warehouseId,
+          (totals.get(item.warehouseId) ?? 0) + item.quantity
+        );
+    return totals;
+  }, [stock]);
   const nameOf = (id: number) =>
     warehouses.find(item => item.id === id)?.name ?? "—";
   return (
     <div className="mx-auto max-w-[1440px] space-y-6">
-      <header>
-        <h1 className="text-[22px] font-bold tracking-tight text-foreground">
-          Dépôts
-        </h1>
-        <p className="mt-0.5 text-[13px] text-muted-foreground">
-          Ventes, réceptions et corrections utilisent le dépôt par défaut, sauf
-          choix contraire. La valorisation se fait au coût moyen pondéré, mis à
-          jour à chaque réception.
-        </p>
-      </header>
-      <Card className="border-border bg-card gap-0 py-0">
-        <CardContent className="space-y-3 p-6">
-          <h2 className="font-semibold">Dépôts et magasins</h2>
+      <PageHeader
+        title="Dépôts"
+        description="Ventes, réceptions et corrections utilisent le dépôt par défaut, sauf choix contraire. La valorisation se fait au coût moyen pondéré, mis à jour à chaque réception."
+      />
+      <Panel>
+        <PanelHeader
+          title="Dépôts et magasins"
+          detail={`${warehouses.length} dépôt${warehouses.length > 1 ? "s" : ""}`}
+        />
+        <div className="divide-y divide-border border-t border-border">
           {warehouses.map(item => (
             <div
               key={item.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border p-3"
+              className="flex flex-wrap items-center gap-3 px-5 py-3"
             >
-              <span className="flex items-center gap-2">
-                <Warehouse className="h-4 w-4 text-primary" />
-                {item.name}
-                {item.isDefault && (
-                  <Badge className="border-0 bg-primary/10 text-primary">
-                    Par défaut
-                  </Badge>
-                )}
-                {!item.active && <Badge variant="outline">Inactif</Badge>}
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary-soft text-primary">
+                <Warehouse className="h-4 w-4" />
               </span>
-              {canManage && !item.isDefault && (
-                <span className="flex gap-2">
-                  {item.active && (
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="truncate text-sm font-semibold text-foreground">
+                    {item.name}
+                  </span>
+                  {item.isDefault && (
+                    <StatusPill tone="info">Par défaut</StatusPill>
+                  )}
+                  {!item.active && (
+                    <StatusPill tone="neutral">Inactif</StatusPill>
+                  )}
+                </div>
+                <p className="mt-0.5 text-xs text-faint">
+                  {(unitsByWarehouse.get(item.id) ?? 0).toLocaleString("fr-FR")}{" "}
+                  unité(s) en stock
+                </p>
+              </div>
+              {canManage && (
+                <div className="flex items-center gap-1.5">
+                  {!item.isDefault && item.active && (
                     <Button
                       size="sm"
                       variant="outline"
@@ -115,48 +158,101 @@ export default function Warehouses() {
                       Définir par défaut
                     </Button>
                   )}
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() =>
-                      update.mutate({
-                        id: item.id,
-                        name: item.name,
-                        active: !item.active,
-                        isDefault: false,
-                      })
-                    }
-                  >
-                    {item.active ? "Désactiver" : "Réactiver"}
-                  </Button>
-                </span>
+                  {!item.isDefault && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() =>
+                        update.mutate({
+                          id: item.id,
+                          name: item.name,
+                          active: !item.active,
+                          isDefault: false,
+                        })
+                      }
+                    >
+                      {item.active ? "Désactiver" : "Réactiver"}
+                    </Button>
+                  )}
+                  {canDestroy && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          size="icon-sm"
+                          variant="ghost"
+                          aria-label={`Autres actions pour ${item.name}`}
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-64">
+                        <DropdownMenuItem
+                          onClick={() =>
+                            setDanger({ warehouse: item, action: "reset" })
+                          }
+                          className="cursor-pointer"
+                        >
+                          <RotateCcw className="mr-2 h-4 w-4" />
+                          Réinitialiser (vider toutes les données)
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          disabled={item.isDefault}
+                          onClick={() =>
+                            setDanger({ warehouse: item, action: "remove" })
+                          }
+                          className="cursor-pointer text-destructive focus:bg-destructive-soft focus:text-destructive"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          {item.isDefault
+                            ? "Suppression impossible (dépôt par défaut)"
+                            : "Supprimer définitivement"}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
               )}
             </div>
           ))}
-          {canManage && (
-            <form
-              className="flex gap-2"
-              onSubmit={event => {
-                event.preventDefault();
-                create.mutate({ name: newName });
-              }}
+        </div>
+        {canManage && (
+          <form
+            className="flex gap-2 border-t border-border p-4"
+            onSubmit={event => {
+              event.preventDefault();
+              create.mutate({ name: newName });
+            }}
+          >
+            <Input
+              placeholder="Nom du nouveau dépôt"
+              value={newName}
+              onChange={event => setNewName(event.target.value)}
+            />
+            <Button
+              type="submit"
+              disabled={newName.trim().length < 2 || create.isPending}
             >
-              <Input
-                placeholder="Nom du nouveau dépôt"
-                value={newName}
-                onChange={event => setNewName(event.target.value)}
-              />
-              <Button
-                type="submit"
-                disabled={newName.trim().length < 2 || create.isPending}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Ajouter
-              </Button>
-            </form>
-          )}
-        </CardContent>
-      </Card>
+              <Plus className="h-4 w-4" />
+              Ajouter
+            </Button>
+          </form>
+        )}
+      </Panel>
+      <WarehouseDangerDialog
+        warehouse={danger?.warehouse ?? null}
+        action={danger?.action ?? "reset"}
+        onClose={() => setDanger(null)}
+        onDone={() => {
+          setDanger(null);
+          void Promise.all([
+            refresh(),
+            utils.warehouses.expiringLots.invalidate(),
+            utils.movements.list.invalidate(),
+            utils.dashboard.get.invalidate(),
+          ]);
+        }}
+      />
       {canManage && active.length > 1 && (
         <Card className="border-border bg-card gap-0 py-0">
           <CardContent className="space-y-3 p-6">

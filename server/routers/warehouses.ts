@@ -15,6 +15,7 @@ import { conflictOr } from "../dbErrors";
 import { assertPlanLimit } from "../subscription";
 import { MAX_QUANTITY } from "../numericLimits";
 import { defaultWarehouseId, lockProducts } from "../stockLedger";
+import { resetWarehouseData, warehouseImpact } from "../warehouseReset";
 import { permissionProcedure, protectedProcedure, router } from "../_core/trpc";
 
 async function dbOrThrow() {
@@ -43,6 +44,18 @@ async function ownedWarehouse(db: any, id: number, companyId: number | null) {
   if (!row)
     throw new TRPCError({ code: "NOT_FOUND", message: "Dépôt introuvable." });
   return row as typeof warehouses.$inferSelect;
+}
+
+/** Action destructrice : l'utilisateur doit retaper le nom exact du dépôt. */
+function assertConfirmed(
+  warehouse: typeof warehouses.$inferSelect,
+  confirmName: string
+) {
+  if (confirmName.trim() !== warehouse.name.trim())
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Le nom saisi ne correspond pas au nom du dépôt.",
+    });
 }
 
 /** Dépôts, stock par dépôt, transferts et lots (9.7). */
@@ -150,6 +163,74 @@ export const warehousesRouter = router({
         conflictOr(error, "Un dépôt porte déjà ce nom.");
       }
       return { success: true } as const;
+    }),
+  /** Ce que supprimerait une réinitialisation ou une suppression du dépôt. */
+  impact: permissionProcedure("inventory.manage")
+    .input(z.object({ id: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      const db = await dbOrThrow();
+      await ownedWarehouse(db, input.id, ctx.user.companyId);
+      return warehouseImpact(db, ctx.user.companyId, input.id);
+    }),
+  /** Vide le dépôt de toutes ses données ; le dépôt lui-même est conservé. */
+  reset: permissionProcedure("settings.manage")
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        confirmName: z.string().trim().min(1).max(120),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = await dbOrThrow();
+      const warehouse = await ownedWarehouse(db, input.id, ctx.user.companyId);
+      assertConfirmed(warehouse, input.confirmName);
+      return db.transaction(async tx =>
+        resetWarehouseData(tx, ctx.user.companyId, warehouse, ctx.user.id)
+      );
+    }),
+  /** Supprime définitivement le dépôt et toutes ses données. */
+  remove: permissionProcedure("settings.manage")
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        confirmName: z.string().trim().min(1).max(120),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = await dbOrThrow();
+      const warehouse = await ownedWarehouse(db, input.id, ctx.user.companyId);
+      assertConfirmed(warehouse, input.confirmName);
+      if (warehouse.isDefault)
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message:
+            "Le dépôt par défaut ne peut pas être supprimé : désignez d’abord un autre dépôt par défaut.",
+        });
+      return db.transaction(async tx => {
+        const impact = await resetWarehouseData(
+          tx,
+          ctx.user.companyId,
+          warehouse,
+          ctx.user.id
+        );
+        await tx
+          .delete(warehouses)
+          .where(
+            and(
+              eq(warehouses.id, warehouse.id),
+              companyScope(warehouses.companyId, ctx.user.companyId)
+            )
+          );
+        await tx.insert(auditLogs).values({
+          companyId: ctx.user.companyId,
+          actorUserId: ctx.user.id,
+          action: "Suppression",
+          entityType: "Dépôt",
+          entityId: String(warehouse.id),
+          detail: `Dépôt ${warehouse.name} supprimé définitivement`,
+        });
+        return impact;
+      });
     }),
   /** Stock par dépôt pour un produit (ou tous les produits si omis). */
   stock: protectedProcedure
