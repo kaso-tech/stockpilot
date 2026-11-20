@@ -1,3 +1,4 @@
+import { PAYMENT_METHOD_LABELS } from "@/lib/paymentMethods";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,13 +10,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Restricted } from "./AuditLog";
 
-const METHOD_LABELS: Record<string, string> = {
-  cash: "Espèces",
-  card: "Carte",
-  mobile_money: "Mobile money",
-  bank_transfer: "Virement",
-  credit: "Crédit client",
-};
+const METHOD_LABELS = PAYMENT_METHOD_LABELS;
 const toCents = (value: string) =>
   Math.max(0, Math.round((Number(value.replace(",", ".")) || 0) * 100));
 const monthStart = () => {
@@ -36,12 +31,11 @@ export default function Accounting() {
       />
     );
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="max-w-5xl space-y-6">
       <header>
-        <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
-          Finance
-        </p>
-        <h1 className="mt-2 text-3xl font-semibold">Caisse & comptabilité</h1>
+        <h1 className="text-[22px] font-bold tracking-tight text-foreground">
+          Caisse & comptabilité
+        </h1>
       </header>
       {can("cash.close") && <CashClosure />}
       {can("accounting.export") && <Exports />}
@@ -75,7 +69,7 @@ function CashClosure() {
   });
   const expected = toCents(openingFloat) + (summary?.totals.cash ?? 0);
   return (
-    <Card className="border-border bg-card">
+    <Card className="border-border bg-card gap-0 py-0">
       <CardContent className="space-y-5 p-6">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
@@ -224,7 +218,7 @@ function Exports() {
   const run = (format: "sales_csv" | "payments_csv" | "fec") =>
     exportFile.mutate({ from, to, format, referential });
   return (
-    <Card className="border-border bg-card">
+    <Card className="border-border bg-card gap-0 py-0">
       <CardContent className="space-y-4 p-6">
         <div>
           <h2 className="font-semibold">Exports comptables</h2>

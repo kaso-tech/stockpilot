@@ -86,13 +86,10 @@ export default function Suppliers() {
       });
   };
   return (
-    <div className="mx-auto max-w-[1500px] space-y-6">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div className="mx-auto max-w-[1440px] space-y-6">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
-            Approvisionnement
-          </p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+          <h1 className="text-[22px] font-bold tracking-tight text-foreground">
             Fournisseurs
           </h1>
         </div>
@@ -144,7 +141,7 @@ export default function Suppliers() {
                         supplier.email ||
                         "Coordonnées à compléter"}
                     </p>
-                    <p className="mt-2 flex items-center gap-1.5 text-[11px] text-faint">
+                    <p className="mt-2 flex items-center gap-1.5 text-xs text-faint">
                       <PackageCheck className="h-3.5 w-3.5 text-primary" />
                       {supplies.length} entrée{supplies.length > 1 ? "s" : ""}
                     </p>

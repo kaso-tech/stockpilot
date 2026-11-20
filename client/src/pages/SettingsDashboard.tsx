@@ -62,7 +62,7 @@ export default function SettingsDashboard() {
     saveMutation.mutate({ preferencesJson: JSON.stringify(preset) });
   };
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="max-w-3xl space-y-6">
       <Link
         href="/parametres"
         className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
@@ -71,14 +71,11 @@ export default function SettingsDashboard() {
         Retour aux paramètres
       </Link>
       <header>
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-          Préférences
-        </p>
-        <h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">
+        <h1 className="text-[22px] font-bold tracking-tight text-foreground">
           Tableau de bord
         </h1>
       </header>
-      <Card className="border-border bg-card">
+      <Card className="border-border bg-card gap-0 py-0">
         <CardContent className="p-5 sm:p-6">
           <div className="mb-5 flex items-center gap-3">
             <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary">

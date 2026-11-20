@@ -12,14 +12,16 @@ function tokenFromUrl() {
 function Shell({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="grid min-h-screen place-items-center bg-background px-6 text-foreground">
-      <div className="w-full max-w-md rounded-3xl border border-border bg-card p-8 shadow-2xl">
+      <div className="w-full max-w-md rounded-xl border border-border bg-card p-8 shadow-2xl">
         <div className="mb-8 flex items-center gap-3">
-          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-primary text-primary-foreground">
+          <div className="grid h-11 w-11 place-items-center rounded-xl bg-primary text-primary-foreground">
             <Boxes className="h-6 w-6" />
           </div>
           <p className="text-lg font-semibold tracking-tight">StockPilot</p>
         </div>
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+        <h1 className="text-[22px] font-bold tracking-tight text-foreground">
+          {title}
+        </h1>
         <div className="mt-6 space-y-4">{children}</div>
         <Link
           href="/"

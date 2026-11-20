@@ -114,7 +114,7 @@ export function ImportExportControls({
           </p>
           <div className="overflow-x-auto rounded-xl border border-border">
             <table className="min-w-full text-left text-xs">
-              <thead className="bg-muted/50 text-muted-foreground">
+              <thead className="bg-muted text-muted-foreground">
                 <tr>
                   {headers.map(header => (
                     <th key={header} className="px-3 py-2 font-medium">

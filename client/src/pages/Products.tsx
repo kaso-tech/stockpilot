@@ -1,3 +1,5 @@
+import { StatusPill } from "@/components/StatusPill";
+import { StatCard } from "@/components/page";
 import {
   NewProductPhotoPicker,
   ProductImage,
@@ -350,14 +352,11 @@ export default function Products() {
     filterSupplier !== "all" ||
     filterStatus !== "all";
   return (
-    <div className="mx-auto max-w-[1500px] space-y-6">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div className="mx-auto max-w-[1440px] space-y-6">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
-            Catalogue
-          </p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-            Produits & références
+          <h1 className="text-[22px] font-bold tracking-tight text-foreground">
+            Produits
           </h1>
         </div>
         {canManage && (
@@ -373,7 +372,7 @@ export default function Products() {
           </Button>
         )}
       </header>
-      <Card className="border-border bg-card shadow-none">
+      <Card className="border-border bg-card shadow-none gap-0 py-0">
         <CardContent className="p-0">
           <div className="border-b border-border p-4">
             <div className="flex flex-col gap-3 xl:flex-row">
@@ -488,13 +487,10 @@ export default function Products() {
   );
   return (
     <div className="mx-auto max-w-[1500px] space-y-6">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
-            Catalogue
-          </p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-            Produits & références
+          <h1 className="text-[22px] font-bold tracking-tight text-foreground">
+            Produits
           </h1>
         </div>
         {canManage && (
@@ -510,7 +506,7 @@ export default function Products() {
           </Button>
         )}
       </header>
-      <Card className="border-border bg-card shadow-none">
+      <Card className="border-border bg-card shadow-none gap-0 py-0">
         <CardContent className="p-0">
           <div className="border-b border-border p-4">
             <div className="flex flex-col gap-3 xl:flex-row">
@@ -581,7 +577,7 @@ export default function Products() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1040px] text-left">
-                <thead className="bg-muted/50 text-[10px] font-semibold uppercase tracking-[0.13em] text-faint">
+                <thead className="bg-muted text-xs font-semibold text-muted-foreground">
                   <tr>
                     <th className="px-6 py-3">Produit</th>
                     <th className="px-4 py-3">Achat</th>
@@ -611,7 +607,7 @@ export default function Products() {
                               {product.reference} · {product.category}
                             </p>
                             {retail.length || wholesale.length ? (
-                              <p className="mt-1 text-[11px] text-primary">
+                              <p className="mt-1 text-xs text-primary">
                                 {retail.length
                                   ? `Détail : ${retail.map(tier => `${tier.minQuantity}+`).join(" · ")}`
                                   : ""}
@@ -638,7 +634,7 @@ export default function Products() {
                           >
                             {product.quantity} {product.unit}
                           </Badge>
-                          <p className="mt-1 text-[10px] text-faint">
+                          <p className="mt-1 text-xs text-faint">
                             Alerte à {product.minimumQuantity} {product.unit}
                           </p>
                         </td>
@@ -776,7 +772,7 @@ function ProductCards({
   onRemove: (product: any) => void;
 }) {
   return (
-    <div className="space-y-2 p-3 sm:p-4">
+    <div className="divide-y divide-border">
       {products.map(product => {
         const low = product.quantity <= product.minimumQuantity;
         return (
@@ -791,7 +787,7 @@ function ProductCards({
                 onOpen(product.id);
               }
             }}
-            className="group flex cursor-pointer items-center gap-3 rounded-xl border border-border bg-muted px-3 py-3 text-left transition hover:border-primary/35 hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:px-4"
+            className="group flex cursor-pointer items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/60 focus:outline-none focus-visible:bg-accent sm:px-5"
           >
             <ProductImage product={product} className="h-11 w-11 text-sm" />
             <div className="min-w-0 flex-1">
@@ -803,22 +799,21 @@ function ProductCards({
               </p>
             </div>
             <div className="hidden min-w-28 text-right sm:block">
-              <p className="text-[10px] uppercase tracking-wide text-faint">
-                Détail
-              </p>
-              <p className="mt-0.5 text-sm font-semibold text-primary">
+              <p className="text-sm font-semibold text-foreground">
                 {formatCurrency(product.retailPriceCents)}
               </p>
+              <p className="mt-0.5 text-xs text-faint">Prix détail</p>
             </div>
-            <div className="min-w-20 text-right">
-              <p
-                className={`text-sm font-semibold ${low ? "text-warning" : "text-foreground"}`}
+            <div className="flex min-w-24 justify-end">
+              <StatusPill
+                tone={
+                  product.quantity <= 0 ? "danger" : low ? "warning" : "success"
+                }
               >
-                {product.quantity} {product.unit}
-              </p>
-              <p className="mt-0.5 text-[10px] text-faint">
-                {low ? "Seuil atteint" : "En stock"}
-              </p>
+                {product.quantity <= 0
+                  ? "Rupture"
+                  : `${product.quantity} ${product.unit}`}
+              </StatusPill>
             </div>
             <ChevronRight className="h-4 w-4 shrink-0 text-faint transition group-hover:text-primary" />
           </article>
@@ -990,17 +985,13 @@ function Metric({
   value: string;
   tone: "primary" | "warning" | "neutral";
 }) {
-  const classes =
-    tone === "primary"
-      ? "bg-primary/10 text-primary"
-      : tone === "warning"
-        ? "bg-warning-soft text-warning"
-        : "bg-muted/50 text-foreground";
   return (
-    <div className={`rounded-xl p-3 ${classes}`}>
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-1 truncate text-lg font-semibold">{value}</p>
-    </div>
+    <StatCard
+      compact
+      label={label}
+      value={value}
+      tone={tone === "warning" ? "warning" : "default"}
+    />
   );
 }
 

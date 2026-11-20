@@ -38,21 +38,18 @@ export default function Quotes() {
   const identity = trpc.commerce.settings.get.useQuery().data;
   if (!user)
     return (
-      <div className="mx-auto max-w-5xl py-16 text-center text-muted-foreground">
+      <div className="max-w-5xl py-16 text-center text-muted-foreground">
         Accès réservé aux utilisateurs autorisés.
       </div>
     );
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
+    <div className="mx-auto max-w-[1440px] space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-            Documents commerciaux
-          </p>
-          <h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">
+          <h1 className="text-[22px] font-bold tracking-tight text-foreground">
             Devis
           </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className="mt-0.5 text-[13px] text-muted-foreground">
             Créez des propositions commerciales avec TVA et frais de livraison
             figés.
           </p>

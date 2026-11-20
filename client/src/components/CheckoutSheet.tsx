@@ -464,7 +464,7 @@ export function CheckoutSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="w-full overflow-y-auto border-border bg-card p-0 text-foreground sm:!inset-y-auto sm:!left-1/2 sm:!right-auto sm:!top-1/2 sm:!h-auto sm:!max-h-[88vh] sm:!w-[min(94vw,620px)] sm:!max-w-none sm:!-translate-x-1/2 sm:!-translate-y-1/2 sm:!rounded-2xl"
+        className="w-full overflow-y-auto border-border bg-card p-0 text-foreground sm:!inset-y-auto sm:!left-1/2 sm:!right-auto sm:!top-1/2 sm:!h-auto sm:!max-h-[88vh] sm:!w-[min(94vw,620px)] sm:!max-w-none sm:!-translate-x-1/2 sm:!-translate-y-1/2 sm:!rounded-xl"
       >
         <SheetHeader className="border-b border-border px-5 py-4 text-left">
           <SheetTitle className="text-lg text-foreground">
@@ -476,7 +476,7 @@ export function CheckoutSheet({
         </SheetHeader>
         <div className="space-y-4 p-5">
           <section className="rounded-xl border border-primary/25 bg-primary/5 p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
+            <p className="text-xs font-semibold text-primary">
               Total à encaisser
             </p>
             <p className="mt-1 text-2xl font-semibold text-foreground">
@@ -546,7 +546,7 @@ export function CheckoutSheet({
                             inputMode="decimal"
                             className="h-8 border-border bg-muted pr-9 text-right text-sm"
                           />
-                          <span className="absolute right-2 top-2 text-[10px] text-faint">
+                          <span className="absolute right-2 top-2 text-xs text-faint">
                             FCFA
                           </span>
                         </div>
@@ -650,7 +650,7 @@ function AgentReadOnly({ label, name }: { label: string; name: string }) {
     <div className="space-y-1.5">
       <Label className="text-muted-foreground">{label}</Label>
       <div className="rounded-lg border border-primary/25 bg-primary/[0.07] px-3 py-2 text-sm text-foreground">
-        <span className="mr-2 text-[10px] font-semibold uppercase tracking-wide text-primary">
+        <span className="mr-2 text-xs font-semibold text-primary">
           Par défaut
         </span>
         {name}

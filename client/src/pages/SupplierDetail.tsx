@@ -190,7 +190,7 @@ export default function SupplierDetail() {
 
   if (isLoading)
     return (
-      <div className="mx-auto max-w-[1500px] py-24 text-center text-sm text-faint">
+      <div className="mx-auto max-w-[1440px] py-24 text-center text-sm text-faint">
         Chargement du fournisseur…
       </div>
     );
@@ -225,21 +225,19 @@ export default function SupplierDetail() {
         <ArrowLeft className="mr-2 h-4 w-4" />
         Retour aux fournisseurs
       </Button>
-      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
+      <section className="rounded-xl border border-border bg-card p-5 shadow-sm sm:p-6">
         <div className="flex min-w-0 items-start gap-4">
-          <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary">
+          <span className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
             <Building2 className="h-7 w-7" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
-              Fournisseur
-            </p>
+            <p className="text-xs font-medium text-primary">Fournisseur</p>
             <div className="mt-1 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
-                <h1 className="truncate text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+                <h1 className="text-[22px] font-bold tracking-tight text-foreground truncate">
                   {supplier.name}
                 </h1>
-                <p className="mt-2 text-sm text-muted-foreground">
+                <p className="mt-0.5 text-[13px] text-muted-foreground">
                   {supplier.address || "Adresse non renseignée"}
                 </p>
               </div>
@@ -312,7 +310,7 @@ export default function SupplierDetail() {
       <SupplierNotes notes={supplier.notes} />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,.8fr)]">
         <section className="space-y-6">
-          <Card className="border-border bg-card shadow-none">
+          <Card className="border-border bg-card shadow-none gap-0 py-0">
             <CardContent className="p-5 sm:p-6">
               <div className="flex items-center gap-2">
                 <ShoppingCart className="h-5 w-5 text-primary" />
@@ -721,7 +719,7 @@ function StatusBadge({ status }: { status: OrderStatus }) {
   const meta = statusMeta[status];
   return (
     <span
-      className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] ${meta.className}`}
+      className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${meta.className}`}
     >
       {meta.label}
     </span>
@@ -903,7 +901,7 @@ function Info({
 }) {
   return (
     <div className="rounded-xl border border-border bg-muted/50 p-3">
-      <p className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.11em] text-faint">
+      <p className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
         {icon}
         {label}
       </p>
@@ -915,7 +913,7 @@ function Info({
 }
 function SupplierNotes({ notes }: { notes: string | null }) {
   return (
-    <Card className="border-border bg-card shadow-none">
+    <Card className="border-border bg-card shadow-none gap-0 py-0">
       <CardContent className="p-5 sm:p-6">
         <div className="flex items-center gap-2">
           <MapPin className="h-5 w-5 text-primary" />
@@ -940,7 +938,7 @@ function History({
   children: ReactNode;
 }) {
   return (
-    <Card className="border-border bg-card shadow-none">
+    <Card className="border-border bg-card shadow-none gap-0 py-0">
       <CardContent className="p-5 sm:p-6">
         <div className="flex items-center gap-2">
           {icon}

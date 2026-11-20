@@ -1,3 +1,5 @@
+import { EmptyState, PageHeader, Panel } from "@/components/page";
+import { StatusPill } from "@/components/StatusPill";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
   AlertDialog,
@@ -9,9 +11,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -31,7 +31,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import {
-  ArrowUpRight,
+  ChevronRight,
   Building2,
   Edit3,
   Plus,
@@ -174,76 +174,67 @@ export default function Customers() {
   );
 
   return (
-    <div className="mx-auto max-w-[1300px] space-y-6">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
-            Ventes
-          </p>
-          <h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">
-            Clients & tarifs
-          </h1>
-        </div>
-        {canManage && (
-          <Button
-            onClick={() => {
-              reset();
-              setOpen(true);
-            }}
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Nouveau client
-          </Button>
-        )}
-      </header>
-      <div className="grid gap-3 rounded-2xl border border-border bg-card p-4 md:grid-cols-[minmax(0,1fr)_170px]">
-        <div className="relative">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-faint" />
-          <Input
-            value={search}
-            onChange={event => setSearch(event.target.value)}
-            placeholder="Rechercher nom, téléphone ou fiscal"
-            className="border-border bg-muted/50 pl-9"
-          />
-        </div>
-        <Select
-          value={typeFilter}
-          onValueChange={value => setTypeFilter(value as typeof typeFilter)}
-        >
-          <SelectTrigger className="border-border bg-muted/50">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Tous les types</SelectItem>
-            <SelectItem value="ordinary">Détail</SelectItem>
-            <SelectItem value="wholesale">Grossistes</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <p className="text-sm text-faint">
-        {visible.length} client{visible.length > 1 ? "s" : ""} affiché
-        {visible.length > 1 ? "s" : ""}
-      </p>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {visible.length ? (
-          visible.map(customer => (
-            <Card
-              key={customer.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => setLocation(`/clients/${customer.id}`)}
-              onKeyDown={event => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  setLocation(`/clients/${customer.id}`);
-                }
+    <div className="mx-auto max-w-[1440px] space-y-6">
+      <PageHeader
+        title="Clients"
+        description={`${visible.length} client${visible.length > 1 ? "s" : ""}${typeFilter !== "all" || search ? " correspondant aux critères" : ""}`}
+        actions={
+          canManage ? (
+            <Button
+              onClick={() => {
+                reset();
+                setOpen(true);
               }}
-              className="cursor-pointer border-border bg-card shadow-none transition hover:border-primary/40 hover:bg-primary/[0.04]"
             >
-              <CardContent className="flex min-h-24 items-center gap-3 p-4">
+              <Plus className="h-4 w-4" />
+              Nouveau client
+            </Button>
+          ) : undefined
+        }
+      />
+      <Panel>
+        <div className="grid gap-2 border-b border-border p-4 sm:grid-cols-[minmax(0,1fr)_200px]">
+          <div className="relative">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-faint" />
+            <Input
+              value={search}
+              onChange={event => setSearch(event.target.value)}
+              placeholder="Rechercher un nom, un téléphone ou un numéro fiscal"
+              className="pl-9"
+            />
+          </div>
+          <Select
+            value={typeFilter}
+            onValueChange={value => setTypeFilter(value as typeof typeFilter)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous les types</SelectItem>
+              <SelectItem value="ordinary">Détail</SelectItem>
+              <SelectItem value="wholesale">Grossistes</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {visible.length ? (
+          <div className="divide-y divide-border">
+            {visible.map(customer => (
+              <div
+                key={customer.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => setLocation(`/clients/${customer.id}`)}
+                onKeyDown={event => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setLocation(`/clients/${customer.id}`);
+                  }
+                }}
+                className="group flex cursor-pointer items-center gap-3 px-4 py-3 hover:bg-accent/60 focus:outline-none focus-visible:bg-accent sm:px-5"
+              >
                 <span
-                  className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${customer.type === "wholesale" ? "bg-info-soft text-info" : "bg-primary/10 text-primary"}`}
+                  className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg ${customer.type === "wholesale" ? "bg-info-soft text-info" : "bg-primary-soft text-primary"}`}
                 >
                   {customer.type === "wholesale" ? (
                     <Building2 className="h-5 w-5" />
@@ -251,71 +242,81 @@ export default function Customers() {
                     <UsersRound className="h-5 w-5" />
                   )}
                 </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="truncate font-semibold text-foreground">
-                      {customer.name}
-                    </p>
-                    <Badge
-                      className={`shrink-0 border-0 text-[10px] ${customer.type === "wholesale" ? "bg-info-soft text-info" : "bg-primary/10 text-primary"}`}
-                    >
-                      {customer.type === "wholesale" ? "Gros" : "Détail"}
-                    </Badge>
+                <div className="min-w-0 flex-1 sm:grid sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,0.8fr)] sm:items-center sm:gap-4">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-sm font-semibold text-foreground group-hover:text-primary">
+                        {customer.name}
+                      </p>
+                      <StatusPill
+                        tone={
+                          customer.type === "wholesale" ? "info" : "neutral"
+                        }
+                      >
+                        {customer.type === "wholesale" ? "Grossiste" : "Détail"}
+                      </StatusPill>
+                    </div>
                   </div>
-                  <p className="mt-1 truncate text-xs text-muted-foreground">
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground sm:mt-0 sm:text-[13px]">
                     {customer.phone ||
                       customer.email ||
                       customer.address ||
                       "Coordonnées à compléter"}
                   </p>
-                  <p className="mt-2 text-[11px] text-faint">
+                  <p className="hidden truncate text-[13px] text-faint sm:block">
                     {customer.taxNumber
-                      ? `Fiscal : ${customer.taxNumber}`
-                      : "Fiche client"}
+                      ? `N° fiscal ${customer.taxNumber}`
+                      : "—"}
                   </p>
                 </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  {canManage && (
-                    <>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        aria-label={`Modifier ${customer.name}`}
-                        onClick={event => {
-                          event.stopPropagation();
-                          edit(customer);
-                        }}
-                        className="h-8 w-8 text-muted-foreground hover:text-primary"
-                      >
-                        <Edit3 className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        aria-label={`Supprimer ${customer.name}`}
-                        onClick={event => {
-                          event.stopPropagation();
-                          setDeleteTarget(customer);
-                        }}
-                        className="h-8 w-8 text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </>
-                  )}
-                  <ArrowUpRight className="h-4 w-4 text-faint" />
-                </div>
-              </CardContent>
-            </Card>
-          ))
+                {canManage && (
+                  <div className="hidden shrink-0 items-center gap-0.5 sm:flex">
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      aria-label={`Modifier ${customer.name}`}
+                      onClick={event => {
+                        event.stopPropagation();
+                        edit(customer);
+                      }}
+                      className="text-muted-foreground hover:text-primary"
+                    >
+                      <Edit3 className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      aria-label={`Supprimer ${customer.name}`}
+                      onClick={event => {
+                        event.stopPropagation();
+                        setDeleteTarget(customer);
+                      }}
+                      className="text-destructive hover:bg-destructive-soft hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+                <ChevronRight className="h-4 w-4 shrink-0 text-faint" />
+              </div>
+            ))}
+          </div>
         ) : (
-          <Card className="col-span-full border-dashed border-border bg-card">
-            <CardContent className="py-16 text-center text-faint">
-              Aucun client ne correspond à ces critères.
-            </CardContent>
-          </Card>
+          <EmptyState
+            icon={UsersRound}
+            title={
+              customers.length
+                ? "Aucun client ne correspond à ces critères"
+                : "Aucun client pour le moment"
+            }
+            detail={
+              customers.length
+                ? "Modifiez la recherche ou le filtre."
+                : "Ajoutez vos clients pour les facturer et suivre leurs soldes."
+            }
+          />
         )}
-      </div>
+      </Panel>
       <CustomerDialog
         open={open}
         onOpenChange={value => !value && close()}

@@ -30,12 +30,11 @@ export default function Platform() {
       />
     );
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
+    <div className="mx-auto max-w-[1440px] space-y-6">
       <header>
-        <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
-          Plateforme
-        </p>
-        <h1 className="mt-2 text-3xl font-semibold">Entreprises clientes</h1>
+        <h1 className="text-[22px] font-bold tracking-tight text-foreground">
+          Entreprises clientes
+        </h1>
       </header>
       <Card className="border-border bg-card">
         <CardContent className="overflow-x-auto p-0">

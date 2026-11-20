@@ -233,12 +233,9 @@ export default function SettingsIndex() {
       />
     );
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
+    <div className="max-w-5xl space-y-4">
       <header>
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-          Organisation
-        </p>
-        <h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">
+        <h1 className="text-[22px] font-bold tracking-tight text-foreground">
           Paramètres
         </h1>
       </header>
@@ -262,7 +259,7 @@ export default function SettingsIndex() {
               <div className="mb-1 px-1">
                 <h2
                   id={`settings-section-${section.id}`}
-                  className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground"
+                  className="text-sm font-semibold text-muted-foreground"
                 >
                   {section.label}
                 </h2>

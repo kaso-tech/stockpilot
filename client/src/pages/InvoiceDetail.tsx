@@ -1,3 +1,4 @@
+import { paymentMethodLabel } from "@/lib/paymentMethods";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
 import { CheckoutSheet } from "@/components/CheckoutSheet";
@@ -79,7 +80,7 @@ export default function InvoiceDetail() {
   });
   if (isLoading || !detail)
     return (
-      <div className="mx-auto max-w-6xl py-16 text-center text-sm text-muted-foreground">
+      <div className="mx-auto max-w-[1440px] py-16 text-center text-sm text-muted-foreground">
         Chargement de la facture…
       </div>
     );
@@ -162,23 +163,24 @@ export default function InvoiceDetail() {
   const paid = sale.amountPaidCents || 0;
   const remaining = Math.max(0, sale.totalCents - paid);
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Button variant="outline" onClick={() => setLocation("/factures")}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Retour aux factures
-        </Button>
-        <StatusBadge status={sale.status} />
-      </header>
-      <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+    <div className="mx-auto max-w-[1440px] space-y-6">
+      <button
+        type="button"
+        onClick={() => setLocation("/factures")}
+        className="inline-flex w-fit items-center gap-1.5 text-[13px] font-medium text-muted-foreground hover:text-primary"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Retour aux factures
+      </button>
+      <section className="rounded-xl border border-border bg-card p-5 sm:p-6">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-              Facture
-            </p>
-            <h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">
-              {sale.invoiceNumber}
-            </h1>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h1 className="text-[22px] font-bold tracking-tight text-foreground">
+                {sale.invoiceNumber}
+              </h1>
+              <StatusBadge status={sale.status} />
+            </div>
             <p className="mt-2 text-sm text-faint">
               Émise le {formatDate(sale.createdAt, true)}
             </p>
@@ -222,7 +224,7 @@ export default function InvoiceDetail() {
         )}
       </section>
       <section className="grid gap-5 lg:grid-cols-[1.5fr_.75fr]">
-        <Card className="border-border bg-card">
+        <Card className="border-border bg-card gap-0 py-0">
           <CardContent className="p-5">
             <h2 className="font-semibold text-foreground">Articles facturés</h2>
             <div className="mt-4 space-y-3">
@@ -250,7 +252,7 @@ export default function InvoiceDetail() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-border bg-card">
+        <Card className="border-border bg-card gap-0 py-0">
           <CardContent className="p-5">
             <h2 className="font-semibold text-foreground">Règlements</h2>
             <div className="mt-4 space-y-3">
@@ -265,7 +267,8 @@ export default function InvoiceDetail() {
                   {detail.payments.length ? (
                     detail.payments.map((payment: any) => (
                       <p key={payment.id}>
-                        {payment.method} · {formatCurrency(payment.amountCents)}
+                        {paymentMethodLabel(payment.method)} ·{" "}
+                        {formatCurrency(payment.amountCents)}
                       </p>
                     ))
                   ) : (
@@ -277,7 +280,7 @@ export default function InvoiceDetail() {
           </CardContent>
         </Card>
       </section>
-      <section className="rounded-2xl border border-border bg-card p-5">
+      <section className="rounded-xl border border-border bg-card p-5">
         <div
           id="invoice-print"
           className="rounded-xl bg-card p-5 text-foreground"
@@ -285,7 +288,7 @@ export default function InvoiceDetail() {
           <InvoiceDocument detail={detail} identity={identity} />
         </div>
       </section>
-      <section className="rounded-2xl border border-border bg-card p-5">
+      <section className="rounded-xl border border-border bg-card p-5">
         <h2 className="font-semibold text-foreground">Actions</h2>
         <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           <Button variant="outline" onClick={downloadPdf}>
@@ -352,7 +355,7 @@ export default function InvoiceDetail() {
           )}
         </div>
         {detail.returns?.length > 0 && (
-          <div className="mt-4 rounded-2xl border border-border bg-card p-4">
+          <div className="mt-4 rounded-xl border border-border bg-card p-4">
             <p className="text-sm font-semibold text-foreground">
               Retours et avoirs
             </p>

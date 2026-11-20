@@ -31,7 +31,7 @@ export default function SettingsHistory() {
       log.action.includes("Paramètres")
   );
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="max-w-4xl space-y-6">
       <Link
         href="/parametres"
         className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
@@ -40,14 +40,11 @@ export default function SettingsHistory() {
         Retour aux paramètres
       </Link>
       <header>
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-          Traçabilité
-        </p>
-        <h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">
+        <h1 className="text-[22px] font-bold tracking-tight text-foreground">
           Historique des paramètres
         </h1>
       </header>
-      <Card className="border-border bg-card">
+      <Card className="border-border bg-card gap-0 py-0">
         <CardContent className="p-0">
           {isLoading ? (
             <p className="p-8 text-center text-sm text-faint">Chargement…</p>

@@ -1,3 +1,4 @@
+import { StatCard } from "@/components/page";
 import { ExpenseDonut, expenseColors } from "@/components/ExpenseDonut";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Button } from "@/components/ui/button";
@@ -252,9 +253,9 @@ export default function Expenses() {
       />
     );
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
+    <div className="mx-auto max-w-[1440px] space-y-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-semibold text-foreground sm:text-3xl">
+        <h1 className="text-[22px] font-bold tracking-tight text-foreground">
           Dépenses
         </h1>
         <Button
@@ -265,7 +266,7 @@ export default function Expenses() {
           Ajouter une dépense
         </Button>
       </header>
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <Metric
           icon={CalendarDays}
           label="Dépenses du mois"
@@ -346,36 +347,15 @@ export default function Expenses() {
 }
 
 function Metric({
-  icon: Icon,
   label,
   value,
-  tone,
 }: {
-  icon: typeof CalendarDays;
+  icon?: typeof CalendarDays;
   label: string;
   value: string;
-  tone: "primary" | "amber" | "violet";
+  tone?: "primary" | "amber" | "violet";
 }) {
-  const colors = {
-    primary: "bg-primary/10 text-primary",
-    amber: "bg-warning-soft text-warning",
-    violet: "bg-info-soft text-info",
-  };
-  return (
-    <Card className="border-border bg-card">
-      <CardContent className="flex items-start justify-between p-5">
-        <div>
-          <p className="text-xs text-faint">{label}</p>
-          <p className="mt-2 text-xl font-semibold text-foreground">{value}</p>
-        </div>
-        <span
-          className={`grid h-10 w-10 place-items-center rounded-xl ${colors[tone]}`}
-        >
-          <Icon className="h-5 w-5" />
-        </span>
-      </CardContent>
-    </Card>
-  );
+  return <StatCard label={label} value={value} />;
 }
 function BudgetCard({
   monthKey,
@@ -394,7 +374,7 @@ function BudgetCard({
 }) {
   const exceeded = remaining !== null && remaining < 0;
   return (
-    <Card className="border-border bg-card">
+    <Card className="border-border bg-card gap-0 py-0">
       <CardContent className="p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
@@ -475,7 +455,7 @@ function MonthlyReport({
   };
 }) {
   return (
-    <Card className="border-border bg-card">
+    <Card className="border-border bg-card gap-0 py-0">
       <CardContent className="p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -564,7 +544,7 @@ function ExpenseList({
   remove: ReturnType<typeof trpc.expenses.remove.useMutation>;
 }) {
   return (
-    <Card className="border-border bg-card">
+    <Card className="border-border bg-card gap-0 py-0">
       <CardContent className="p-0">
         <div className="border-b border-border px-5 py-5">
           <p className="text-sm font-semibold text-foreground">
@@ -592,7 +572,7 @@ function ExpenseList({
                     <p className="font-medium text-foreground">
                       {expense.description}
                     </p>
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
                       {categoryLabel(expense.category)}
                     </span>
                   </div>

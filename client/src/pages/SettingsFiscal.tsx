@@ -51,7 +51,7 @@ export default function SettingsFiscal() {
       vatRateBasisPoints: Math.round(normalizedPercent * 100),
     });
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="max-w-4xl space-y-6">
       <Link
         href="/parametres"
         className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
@@ -60,18 +60,15 @@ export default function SettingsFiscal() {
         Retour aux paramètres
       </Link>
       <header>
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-          Organisation
-        </p>
-        <h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">
+        <h1 className="text-[22px] font-bold tracking-tight text-foreground">
           Fiscalité
         </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="mt-0.5 text-[13px] text-muted-foreground">
           Configurez la TVA appliquée aux nouveaux documents commerciaux. Le
           taux est figé dans chaque document à sa création.
         </p>
       </header>
-      <Card className="border-border bg-card">
+      <Card className="border-border bg-card gap-0 py-0">
         <CardContent className="space-y-6 p-6">
           <div className="flex items-start gap-3">
             <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary">

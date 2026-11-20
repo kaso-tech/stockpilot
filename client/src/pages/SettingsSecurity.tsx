@@ -76,7 +76,7 @@ export default function SettingsSecurity() {
 
   const returnPath = isAdmin ? "/parametres" : "/";
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="max-w-2xl space-y-6">
       <Link
         href={returnPath}
         className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
@@ -85,14 +85,11 @@ export default function SettingsSecurity() {
         {isAdmin ? "Retour aux paramètres" : "Retour au tableau de bord"}
       </Link>
       <header>
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-          Sécurité
-        </p>
-        <h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">
+        <h1 className="text-[22px] font-bold tracking-tight text-foreground">
           Sécurité du compte
         </h1>
       </header>
-      <Card className="border-border bg-card">
+      <Card className="border-border bg-card gap-0 py-0">
         <CardContent className="p-5 sm:p-6">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">
@@ -138,7 +135,7 @@ export default function SettingsSecurity() {
                         {session.deviceLabel}
                       </span>
                       {session.isCurrent && (
-                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
                           Cet appareil
                         </span>
                       )}
@@ -178,7 +175,7 @@ export default function SettingsSecurity() {
         </CardContent>
       </Card>
       {
-        <Card className="border-border bg-card">
+        <Card className="border-border bg-card gap-0 py-0">
           <CardContent className="p-5 sm:p-6">
             <div className="mb-6 flex items-start gap-3">
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">

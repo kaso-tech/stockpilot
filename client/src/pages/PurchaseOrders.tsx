@@ -1,3 +1,4 @@
+import { StatCard } from "@/components/page";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -205,13 +206,10 @@ export default function PurchaseOrders() {
     });
   };
   return (
-    <div className="mx-auto max-w-[1500px] space-y-6">
+    <div className="mx-auto max-w-[1440px] space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <span className="grid h-11 w-11 place-items-center rounded-2xl bg-primary/10 text-primary">
-            <ClipboardList className="h-5 w-5" />
-          </span>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+          <h1 className="text-[22px] font-bold tracking-tight text-foreground">
             Bons de commande
           </h1>
         </div>
@@ -225,7 +223,7 @@ export default function PurchaseOrders() {
           </Button>
         )}
       </div>
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
         <Metric
           icon={<ClipboardList className="h-4 w-4" />}
           label="Bons actifs"
@@ -244,7 +242,7 @@ export default function PurchaseOrders() {
           tone={statusCounts.late ? "danger" : "default"}
         />
       </div>
-      <Card className="border-border bg-card shadow-none">
+      <Card className="border-border bg-card shadow-none gap-0 py-0">
         <CardContent className="p-4 sm:p-5">
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_minmax(180px,1fr)_minmax(160px,.8fr)]">
             <div className="relative">
@@ -253,11 +251,11 @@ export default function PurchaseOrders() {
                 value={search}
                 onChange={event => setSearch(event.target.value)}
                 placeholder="Rechercher une référence ou un fournisseur"
-                className="h-10 border-border bg-muted pl-9"
+                className="h-10 pl-9"
               />
             </div>
             <Select value={supplierFilter} onValueChange={setSupplierFilter}>
-              <SelectTrigger className="h-10 border-border bg-muted">
+              <SelectTrigger className="h-10 w-full">
                 <SelectValue placeholder="Fournisseur" />
               </SelectTrigger>
               <SelectContent>
@@ -275,7 +273,7 @@ export default function PurchaseOrders() {
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="h-10 border-border bg-muted">
+              <SelectTrigger className="h-10 w-full">
                 <SelectValue placeholder="Statut" />
               </SelectTrigger>
               <SelectContent>
@@ -503,7 +501,7 @@ function OrderCard({ order, onOpen }: { order: Order; onOpen: () => void }) {
     <button
       type="button"
       onClick={onOpen}
-      className={`rounded-2xl border p-5 text-left transition hover:-translate-y-0.5 hover:border-primary/45 hover:bg-primary/[0.045] ${overdue ? "border-destructive/25 bg-destructive-soft" : "border-border bg-card"}`}
+      className={`rounded-xl border p-5 text-left transition hover:-translate-y-0.5 hover:border-primary/45 hover:bg-primary/[0.045] ${overdue ? "border-destructive/25 bg-destructive-soft" : "border-border bg-card"}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -512,7 +510,7 @@ function OrderCard({ order, onOpen }: { order: Order; onOpen: () => void }) {
               {order.orderNumber}
             </span>
             <span
-              className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] ${meta.className}`}
+              className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${meta.className}`}
             >
               {meta.label}
             </span>
@@ -552,37 +550,16 @@ function OrderCard({ order, onOpen }: { order: Order; onOpen: () => void }) {
   );
 }
 function Metric({
-  icon,
   label,
   value,
   tone = "default",
 }: {
-  icon: React.ReactNode;
+  icon?: React.ReactNode;
   label: string;
   value: number;
   tone?: "default" | "success" | "danger";
 }) {
-  const style =
-    tone === "success"
-      ? "text-success"
-      : tone === "danger"
-        ? "text-destructive"
-        : "text-foreground";
-  return (
-    <Card className="border-border bg-card shadow-none">
-      <CardContent className="flex items-center justify-between p-4">
-        <div>
-          <p className="text-xs text-faint">{label}</p>
-          <p className={`mt-1 text-xl font-semibold ${style}`}>{value}</p>
-        </div>
-        <span
-          className={`grid h-9 w-9 place-items-center rounded-xl ${tone === "danger" ? "bg-destructive-soft text-destructive" : "bg-primary/10 text-primary"}`}
-        >
-          {icon}
-        </span>
-      </CardContent>
-    </Card>
-  );
+  return <StatCard label={label} value={value} tone={tone} />;
 }
 function EmptyState({
   filtered,
@@ -596,7 +573,7 @@ function EmptyState({
   return (
     <Card className="border-dashed border-border bg-card shadow-none">
       <CardContent className="py-16 text-center">
-        <span className="mx-auto grid h-11 w-11 place-items-center rounded-2xl bg-muted/50 text-faint">
+        <span className="mx-auto grid h-11 w-11 place-items-center rounded-xl bg-muted/50 text-faint">
           <SlidersHorizontal className="h-5 w-5" />
         </span>
         <p className="mt-4 font-medium text-foreground">

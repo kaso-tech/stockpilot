@@ -25,9 +25,9 @@ export default function LegalPage({
             Retour à StockPilot
           </Button>
         </Link>
-        <header className="mt-7 rounded-3xl border border-border bg-card p-7 sm:p-10">
+        <header className="mt-7 rounded-xl border border-border bg-card p-7 sm:p-10">
           <div className="flex items-center gap-3">
-            <span className="grid h-11 w-11 place-items-center rounded-2xl bg-primary text-primary-foreground">
+            <span className="grid h-11 w-11 place-items-center rounded-xl bg-primary text-primary-foreground">
               <Boxes className="h-6 w-6" />
             </span>
             <div>
@@ -37,14 +37,14 @@ export default function LegalPage({
               </p>
             </div>
           </div>
-          <h1 className="mt-8 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+          <h1 className="text-[22px] font-bold tracking-tight text-foreground">
             {title}
           </h1>
-          <p className="mt-3 text-sm text-muted-foreground">
+          <p className="mt-0.5 text-[13px] text-muted-foreground">
             Dernière mise à jour : {updatedAt}
           </p>
         </header>
-        <div className="mt-6 space-y-5 rounded-3xl border border-border bg-card p-7 sm:p-10">
+        <div className="mt-6 space-y-5 rounded-xl border border-border bg-card p-7 sm:p-10">
           <p className="rounded-xl border border-warning/25 bg-warning-soft p-4 text-sm leading-6 text-warning">
             Ce document constitue une base d’information générale pour
             l’application. Faites-le relire et adapter par un professionnel du

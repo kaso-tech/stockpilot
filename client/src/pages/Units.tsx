@@ -75,13 +75,10 @@ export default function Units() {
       />
     );
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="max-w-5xl space-y-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-            Catalogue
-          </p>
-          <h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">
+          <h1 className="text-[22px] font-bold tracking-tight text-foreground">
             Unités de mesure
           </h1>
         </div>
@@ -97,7 +94,7 @@ export default function Units() {
           Nouvelle unité
         </Button>
       </header>
-      <Card className="border-border bg-card">
+      <Card className="border-border bg-card gap-0 py-0">
         <CardContent className="p-0">
           {isLoading ? (
             <div className="px-6 py-16 text-center text-sm text-faint">

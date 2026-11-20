@@ -1,3 +1,4 @@
+import { StatCard } from "@/components/page";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -160,7 +161,7 @@ export default function PurchaseOrderDetail() {
   });
   if (isLoading)
     return (
-      <div className="mx-auto max-w-[1500px] py-24 text-center text-sm text-faint">
+      <div className="mx-auto max-w-[1440px] py-24 text-center text-sm text-faint">
         Chargement du bon de commande…
       </div>
     );
@@ -264,18 +265,16 @@ export default function PurchaseOrderDetail() {
         {backLabel}
       </Button>
       <section
-        className={`rounded-2xl border p-5 shadow-sm sm:p-6 ${overdue ? "border-destructive/25 bg-destructive-soft" : "border-border bg-card"}`}
+        className={`rounded-xl border p-5 shadow-sm sm:p-6 ${overdue ? "border-destructive/25 bg-destructive-soft" : "border-border bg-card"}`}
       >
         <div className="flex min-w-0 items-start gap-4">
-          <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary">
+          <span className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
             <ClipboardList className="h-7 w-7" />
           </span>
           <div className="min-w-0">
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
-              Bon de commande
-            </p>
+            <p className="text-xs font-medium text-primary">Bon de commande</p>
             <div className="mt-1 flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+              <h1 className="text-[22px] font-bold tracking-tight text-foreground">
                 {order.orderNumber}
               </h1>
               <StatusBadge status={order.status} />
@@ -319,7 +318,7 @@ export default function PurchaseOrderDetail() {
         )}
       </section>
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,.8fr)]">
-        <Card className="border-border bg-card shadow-none">
+        <Card className="border-border bg-card shadow-none gap-0 py-0">
           <CardContent className="p-5 sm:p-6">
             <div className="flex items-center gap-2">
               <Truck className="h-5 w-5 text-primary" />
@@ -328,7 +327,7 @@ export default function PurchaseOrderDetail() {
               </h2>
             </div>
             <div className="mt-5 overflow-hidden rounded-xl border border-border">
-              <div className="grid grid-cols-[minmax(0,1fr)_70px_90px] gap-3 border-b border-border bg-muted/50 px-4 py-3 text-[10px] font-medium uppercase tracking-[0.1em] text-faint sm:grid-cols-[minmax(0,1fr)_100px_100px_110px]">
+              <div className="grid grid-cols-[minmax(0,1fr)_70px_90px] gap-3 border-b border-border bg-muted/50 px-4 py-3 text-xs font-semibold text-muted-foreground sm:grid-cols-[minmax(0,1fr)_100px_100px_110px]">
                 <span>Produit</span>
                 <span className="text-right">Qté</span>
                 <span className="text-right">Reçu</span>
@@ -366,9 +365,9 @@ export default function PurchaseOrderDetail() {
           </CardContent>
         </Card>
         <aside className="space-y-6">
-          <Card className="border-border bg-card shadow-none">
+          <Card className="border-border bg-card shadow-none gap-0 py-0">
             <CardContent className="p-5">
-              <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-faint">
+              <p className="text-xs font-semibold text-muted-foreground">
                 Montant commandé
               </p>
               <p className="mt-2 text-2xl font-semibold text-foreground">
@@ -395,7 +394,7 @@ export default function PurchaseOrderDetail() {
             </CardContent>
           </Card>
           {order.cancellationReason && (
-            <Card className="border-destructive/25 bg-destructive-soft shadow-none">
+            <Card className="border-destructive/25 bg-destructive-soft shadow-none gap-0 py-0">
               <CardContent className="p-5">
                 <div className="flex items-center gap-2 text-destructive">
                   <AlertTriangle className="h-5 w-5" />
@@ -852,37 +851,22 @@ function CancelDialog({
   );
 }
 function Metric({
-  icon,
   label,
   value,
   tone = "default",
 }: {
-  icon: React.ReactNode;
+  icon?: React.ReactNode;
   label: string;
   value: string;
   tone?: "default" | "danger" | "success";
 }) {
-  const text =
-    tone === "danger"
-      ? "text-destructive"
-      : tone === "success"
-        ? "text-success"
-        : "text-foreground";
-  return (
-    <div className="rounded-xl border border-border bg-muted/50 p-3">
-      <p className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.11em] text-faint">
-        {icon}
-        {label}
-      </p>
-      <p className={`mt-1 truncate text-sm font-medium ${text}`}>{value}</p>
-    </div>
-  );
+  return <StatCard compact label={label} value={value} tone={tone} />;
 }
 function StatusBadge({ status }: { status: Status }) {
   const meta = statusMeta[status];
   return (
     <span
-      className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] ${meta.className}`}
+      className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${meta.className}`}
     >
       {meta.label}
     </span>

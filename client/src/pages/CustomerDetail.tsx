@@ -1,3 +1,4 @@
+import { StatCard } from "@/components/page";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -99,7 +100,7 @@ export default function CustomerDetail() {
   });
   if (isLoading)
     return (
-      <div className="mx-auto max-w-[1500px] py-24 text-center text-sm text-faint">
+      <div className="mx-auto max-w-[1440px] py-24 text-center text-sm text-faint">
         Chargement de la fiche client…
       </div>
     );
@@ -118,10 +119,10 @@ export default function CustomerDetail() {
         <ArrowLeft className="mr-2 h-4 w-4" />
         Retour aux clients
       </Button>
-      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
+      <section className="rounded-xl border border-border bg-card p-5 shadow-sm sm:p-6">
         <div className="flex min-w-0 items-start gap-4">
           <span
-            className={`grid h-14 w-14 shrink-0 place-items-center rounded-2xl ${customer.type === "wholesale" ? "bg-info-soft text-info" : "bg-primary/10 text-primary"}`}
+            className={`grid h-14 w-14 shrink-0 place-items-center rounded-xl ${customer.type === "wholesale" ? "bg-info-soft text-info" : "bg-primary/10 text-primary"}`}
           >
             {customer.type === "wholesale" ? (
               <Building2 className="h-7 w-7" />
@@ -130,15 +131,15 @@ export default function CustomerDetail() {
             )}
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
+            <p className="text-xs font-medium text-primary">
               Client {customer.type === "wholesale" ? "grossiste" : "détail"}
             </p>
             <div className="mt-1 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
-                <h1 className="truncate text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+                <h1 className="text-[22px] font-bold tracking-tight text-foreground truncate">
                   {customer.name}
                 </h1>
-                <p className="mt-2 text-sm text-muted-foreground">
+                <p className="mt-0.5 text-[13px] text-muted-foreground">
                   {customer.address || "Adresse non renseignée"}
                 </p>
               </div>
@@ -225,7 +226,7 @@ export default function CustomerDetail() {
       <CustomerNotes notes={customer.notes} />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,.8fr)]">
         <section>
-          <Card className="border-border bg-card shadow-none">
+          <Card className="border-border bg-card shadow-none gap-0 py-0">
             <CardContent className="p-5 sm:p-6">
               <div className="flex items-center gap-2">
                 <FileText className="h-5 w-5 text-primary" />
@@ -487,7 +488,7 @@ function Info({
 }) {
   return (
     <div className="rounded-xl border border-border bg-muted/50 p-3">
-      <p className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.11em] text-faint">
+      <p className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
         {icon}
         {label}
       </p>
@@ -499,7 +500,7 @@ function Info({
 }
 function CustomerNotes({ notes }: { notes: string | null }) {
   return (
-    <Card className="border-border bg-card shadow-none">
+    <Card className="border-border bg-card shadow-none gap-0 py-0">
       <CardContent className="p-5 sm:p-6">
         <div className="flex items-center gap-2">
           <MapPin className="h-5 w-5 text-primary" />
@@ -523,21 +524,12 @@ function Metric({
   value: string;
   tone: "primary" | "success" | "warning" | "default";
 }) {
-  const style =
-    tone === "success"
-      ? "text-success"
-      : tone === "warning"
-        ? "text-warning"
-        : tone === "primary"
-          ? "text-primary"
-          : "text-foreground";
   return (
-    <Card className="border-border bg-card shadow-none">
-      <CardContent className="p-5">
-        <p className="text-xs text-faint">{label}</p>
-        <p className={`mt-2 text-xl font-semibold ${style}`}>{value}</p>
-      </CardContent>
-    </Card>
+    <StatCard
+      label={label}
+      value={value}
+      tone={tone === "primary" ? "default" : tone}
+    />
   );
 }
 function Empty({ text }: { text: string }) {

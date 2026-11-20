@@ -72,7 +72,7 @@ export default function SettingsPrinting() {
     });
 
   return (
-    <div className="mx-auto max-w-4xl space-y-5">
+    <div className="max-w-4xl space-y-5">
       <Link
         href="/parametres"
         className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
@@ -81,14 +81,11 @@ export default function SettingsPrinting() {
         Retour aux paramètres
       </Link>
       <header>
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-          Périphériques
-        </p>
-        <h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">
+        <h1 className="text-[22px] font-bold tracking-tight text-foreground">
           Impression et imprimante
         </h1>
       </header>
-      <Card className="border-border bg-card">
+      <Card className="border-border bg-card gap-0 py-0">
         <CardContent className="space-y-5 p-6">
           <div className="flex items-center gap-3">
             <ReceiptText className="h-5 w-5 text-primary" />
@@ -131,7 +128,7 @@ export default function SettingsPrinting() {
           </Field>
         </CardContent>
       </Card>
-      <Card className="border-border bg-card">
+      <Card className="border-border bg-card gap-0 py-0">
         <CardContent className="space-y-5 p-6">
           <div className="flex items-center gap-3">
             <Printer className="h-5 w-5 text-primary" />

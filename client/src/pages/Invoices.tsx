@@ -1,3 +1,4 @@
+import { EmptyState, PageHeader, Panel, table } from "@/components/page";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
 import { vatRatesLabel } from "@shared/pricing";
@@ -13,7 +14,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -206,85 +206,154 @@ export default function Invoices() {
   };
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <header className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[.16em] text-primary">
-            Facturation
-          </p>
-          <h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">
-            Factures
-          </h1>
-        </div>
-        <Button
-          onClick={() => setLocation("/factures/nouvelle")}
-          className="bg-primary text-primary-foreground hover:bg-primary/90"
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Créer une facture
-        </Button>
-      </header>
+    <div className="mx-auto max-w-[1440px] space-y-6">
+      <PageHeader
+        title="Factures"
+        description={
+          invoices.length
+            ? `${invoices.length} facture${invoices.length > 1 ? "s" : ""}`
+            : undefined
+        }
+        actions={
+          <Button onClick={() => setLocation("/factures/nouvelle")}>
+            <Plus className="h-4 w-4" />
+            Créer une facture
+          </Button>
+        }
+      />
 
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <Panel>
         {isLoading ? (
-          <Card className="md:col-span-2 xl:col-span-3">
-            <CardContent className="py-12 text-center text-sm text-muted-foreground">
-              Chargement…
-            </CardContent>
-          </Card>
+          <div className="py-12 text-center text-sm text-muted-foreground">
+            Chargement…
+          </div>
         ) : invoices.length ? (
-          invoices.map(invoice => {
-            const remaining = Math.max(
-              0,
-              invoice.totalCents - invoice.amountPaidCents
-            );
-            return (
-              <button
-                key={invoice.id}
-                type="button"
-                onClick={() => setLocation(`/factures/${invoice.id}`)}
-                className="group flex min-w-0 items-center gap-3 rounded-xl border border-border bg-card px-3 py-2.5 text-left shadow-sm transition hover:border-primary/45 hover:bg-card"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="truncate text-sm font-semibold text-foreground">
-                      {invoice.invoiceNumber}
-                    </p>
-                    <StatusBadge status={invoice.status} />
-                  </div>
-                  <p className="mt-1 truncate text-xs text-muted-foreground">
-                    {invoice.customerName || "Client comptoir"} ·{" "}
-                    {formatDate(invoice.createdAt, true)}
-                  </p>
-                </div>
-                <div className="shrink-0 text-right">
-                  <p className="text-sm font-semibold text-primary">
-                    {formatCurrency(invoice.totalCents)}
-                  </p>
-                  <p className="mt-0.5 text-[11px] text-faint">
-                    {remaining > 0
-                      ? `Solde ${formatCurrency(remaining)}`
-                      : "Réglée"}
-                  </p>
-                </div>
-                <Eye className="h-4 w-4 shrink-0 text-faint transition group-hover:text-primary" />
-              </button>
-            );
-          })
+          <>
+            <div className="divide-y divide-border sm:hidden">
+              {invoices.map(invoice => {
+                const remaining = Math.max(
+                  0,
+                  invoice.totalCents - invoice.amountPaidCents
+                );
+                return (
+                  <button
+                    key={invoice.id}
+                    type="button"
+                    onClick={() => setLocation(`/factures/${invoice.id}`)}
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-accent/60"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold text-primary">
+                        {invoice.invoiceNumber}
+                      </span>
+                      <span className="mt-0.5 block truncate text-xs text-faint">
+                        {invoice.customerName || "Client comptoir"} ·{" "}
+                        {formatDate(invoice.createdAt)}
+                      </span>
+                    </span>
+                    <span className="flex shrink-0 flex-col items-end gap-1">
+                      <span className="text-sm font-semibold text-foreground">
+                        {formatCurrency(invoice.totalCents)}
+                      </span>
+                      {remaining > 0 ? (
+                        <span className="text-xs text-warning">
+                          Solde {formatCurrency(remaining)}
+                        </span>
+                      ) : (
+                        <StatusBadge status={invoice.status} />
+                      )}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className={`hidden sm:block ${table.wrapper}`}>
+              <table className={`${table.table} min-w-[760px]`}>
+                <thead className={table.head}>
+                  <tr>
+                    <th scope="col" className={table.th}>
+                      Numéro
+                    </th>
+                    <th scope="col" className={table.th}>
+                      Client
+                    </th>
+                    <th scope="col" className={table.th}>
+                      Date
+                    </th>
+                    <th scope="col" className={table.th}>
+                      Statut
+                    </th>
+                    <th scope="col" className={`${table.th} text-right`}>
+                      Montant TTC
+                    </th>
+                    <th scope="col" className={`${table.th} text-right`}>
+                      Reste dû
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoices.map(invoice => {
+                    const remaining = Math.max(
+                      0,
+                      invoice.totalCents - invoice.amountPaidCents
+                    );
+                    return (
+                      <tr
+                        key={invoice.id}
+                        onClick={() => setLocation(`/factures/${invoice.id}`)}
+                        className={`${table.row} cursor-pointer`}
+                      >
+                        <td
+                          className={`${table.td} font-semibold text-primary`}
+                        >
+                          {invoice.invoiceNumber}
+                        </td>
+                        <td className={`${table.td} text-foreground`}>
+                          {invoice.customerName || "Client comptoir"}
+                        </td>
+                        <td className={`${table.td} text-muted-foreground`}>
+                          {formatDate(invoice.createdAt, true)}
+                        </td>
+                        <td className={table.td}>
+                          <StatusBadge status={invoice.status} />
+                        </td>
+                        <td
+                          className={`${table.td} text-right font-semibold text-foreground`}
+                        >
+                          {formatCurrency(invoice.totalCents)}
+                        </td>
+                        <td
+                          className={`${table.td} text-right ${remaining > 0 ? "font-semibold text-warning" : "text-faint"}`}
+                        >
+                          {remaining > 0 ? formatCurrency(remaining) : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         ) : (
-          <Card className="md:col-span-2 xl:col-span-3">
-            <CardContent className="py-16 text-center text-sm text-muted-foreground">
-              Aucune facture créée.
-            </CardContent>
-          </Card>
+          <EmptyState
+            icon={ReceiptText}
+            title="Aucune facture pour le moment"
+            detail="Les factures émises et les ventes de caisse apparaîtront ici."
+            action={
+              <Button onClick={() => setLocation("/factures/nouvelle")}>
+                <Plus className="h-4 w-4" />
+                Créer une facture
+              </Button>
+            }
+          />
         )}
-      </section>
+      </Panel>
 
-      <Card className="hidden">
+      <Card className="hidden gap-0 py-0">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-left text-sm">
-              <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+              <thead className="bg-muted/40 text-xs text-muted-foreground">
                 <tr>
                   <th className="px-5 py-3">Facture</th>
                   <th className="px-4 py-3">Client</th>
@@ -545,9 +614,11 @@ export const invoiceStatusMeta = {
 
 export function StatusBadge({ status }: { status: Invoice["status"] }) {
   return (
-    <Badge className={`border-0 ${invoiceStatusMeta[status][1]}`}>
+    <span
+      className={`inline-flex h-6 items-center whitespace-nowrap rounded-full px-2.5 text-xs font-semibold ${invoiceStatusMeta[status][1]}`}
+    >
       {invoiceStatusMeta[status][0]}
-    </Badge>
+    </span>
   );
 }
 

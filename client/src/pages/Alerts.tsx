@@ -71,15 +71,12 @@ export default function Alerts() {
     days: 30,
   });
   return (
-    <div className="mx-auto max-w-[1200px] space-y-6">
+    <div className="mx-auto max-w-[1440px] space-y-6">
       <header>
-        <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
-          Surveillance
-        </p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+        <h1 className="text-[22px] font-bold tracking-tight text-foreground">
           Alertes de seuil
         </h1>
-        <p className="mt-1.5 text-sm text-muted-foreground">
+        <p className="mt-0.5 text-[13px] text-muted-foreground">
           Les alertes s’actualisent dès qu’un niveau de stock atteint ou descend
           sous son seuil personnalisé.
         </p>
@@ -100,7 +97,7 @@ export default function Alerts() {
           {expiringLots.length > 3 ? "…" : ""} — voir les dépôts →
         </Link>
       )}
-      <Card className="border-warning/25 bg-gradient-to-r to-transparent shadow-none">
+      <Card className="border-warning/25 bg-gradient-to-r to-transparent shadow-none gap-0 py-0">
         <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-warning-soft text-warning">
@@ -136,7 +133,7 @@ export default function Alerts() {
           </div>
         </CardContent>
       </Card>
-      <Card className="border-border bg-card shadow-none">
+      <Card className="border-border bg-card shadow-none gap-0 py-0">
         <CardContent className="p-0">
           <div className="divide-y divide-border">
             {isLoading ? (
@@ -166,7 +163,7 @@ export default function Alerts() {
                     </div>
                     <div className="flex items-center gap-6 sm:gap-10">
                       <span className="text-right">
-                        <span className="block text-[10px] font-medium uppercase tracking-[0.12em] text-faint">
+                        <span className="block text-xs font-semibold text-muted-foreground">
                           Disponible
                         </span>
                         <span className="mt-1 block text-sm font-semibold text-warning">
@@ -174,7 +171,7 @@ export default function Alerts() {
                         </span>
                       </span>
                       <span className="text-right">
-                        <span className="block text-[10px] font-medium uppercase tracking-[0.12em] text-faint">
+                        <span className="block text-xs font-semibold text-muted-foreground">
                           Seuil personnalisé
                         </span>
                         <span className="mt-1 block text-sm text-muted-foreground">
@@ -190,7 +187,7 @@ export default function Alerts() {
               })
             ) : (
               <div className="px-6 py-16 text-center">
-                <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-success-soft text-success">
+                <span className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-success-soft text-success">
                   <ShieldCheck className="h-6 w-6" />
                 </span>
                 <p className="mt-4 font-medium text-foreground">

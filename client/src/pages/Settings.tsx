@@ -246,7 +246,7 @@ export default function Settings({ section }: { section: SettingsSection }) {
         ? "Devise"
         : "Identité de l’entreprise";
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="max-w-5xl space-y-6">
       <Link
         href="/parametres"
         className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
@@ -255,40 +255,47 @@ export default function Settings({ section }: { section: SettingsSection }) {
         Retour aux paramètres
       </Link>
       <header>
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-          Paramètres
-        </p>
-        <h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">
+        <h1 className="text-[22px] font-bold tracking-tight text-foreground">
           {title}
         </h1>
       </header>
       {section === "appearance" && (
         <div className="space-y-6">
-          <Card className="border-border bg-card">
+          <Card className="border-border bg-card gap-0 py-0">
             <CardContent className="p-6">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <ThemeOption
+                  active={theme === "light"}
+                  onClick={() => setTheme("light")}
+                  icon={Sun}
+                  label="Clair"
+                  detail="Recommandé : fond clair, lisible en journée"
+                  palette={{
+                    background: "#F7F8FA",
+                    surface: "#FFFFFF",
+                    line: "#E3E7EC",
+                    text: "#0F172A",
+                  }}
+                />
                 <ThemeOption
                   active={theme === "dark"}
                   onClick={() => setTheme("dark")}
                   icon={Moon}
                   label="Sombre"
-                  detail="Cockpit nuit"
-                  preview="bg-background"
-                />
-                <ThemeOption
-                  active={theme === "light"}
-                  onClick={() => setTheme("light")}
-                  icon={Sun}
-                  label="Clair bleu"
-                  detail="Lisibilité renforcée"
-                  preview="bg-primary/10"
+                  detail="Pour les lieux peu éclairés ou le soir"
+                  palette={{
+                    background: "#0B0F14",
+                    surface: "#12171E",
+                    line: "#263040",
+                    text: "#E6EAF0",
+                  }}
                 />
               </div>
             </CardContent>
           </Card>
           {isAdmin && (
             <>
-              <Card className="border-border bg-card">
+              <Card className="border-border bg-card gap-0 py-0">
                 <CardContent className="space-y-5 p-6">
                   <div className="flex items-center gap-3">
                     <Palette className="h-5 w-5 text-primary" />
@@ -360,7 +367,7 @@ export default function Settings({ section }: { section: SettingsSection }) {
       )}
       {section === "currency" && (
         <div className="max-w-2xl space-y-6">
-          <Card className="border-border bg-card">
+          <Card className="border-border bg-card gap-0 py-0">
             <CardContent className="p-6">
               <div className="space-y-2">
                 {currencies.map(item => (
@@ -388,7 +395,7 @@ export default function Settings({ section }: { section: SettingsSection }) {
               </div>
             </CardContent>
           </Card>
-          <Card className="border-border bg-card">
+          <Card className="border-border bg-card gap-0 py-0">
             <CardContent className="space-y-6 p-6">
               <div>
                 <h2 className="font-semibold">Affichage des prix</h2>
@@ -439,9 +446,7 @@ export default function Settings({ section }: { section: SettingsSection }) {
                 </div>
               </div>
               <div className="rounded-xl border border-primary/20 bg-primary/[0.06] p-4">
-                <p className="text-xs font-medium uppercase tracking-[0.14em] text-primary">
-                  Aperçu
-                </p>
+                <p className="text-xs font-medium text-primary">Aperçu</p>
                 <p className="mt-2 text-2xl font-semibold text-foreground">
                   {formatCurrency(2_568_730)}
                 </p>
@@ -452,7 +457,7 @@ export default function Settings({ section }: { section: SettingsSection }) {
               </div>
             </CardContent>
           </Card>
-          <Card className="border-border bg-card">
+          <Card className="border-border bg-card gap-0 py-0">
             <CardContent className="space-y-3 p-6">
               <div>
                 <h2 className="font-semibold">Fuseau horaire</h2>
@@ -478,7 +483,7 @@ export default function Settings({ section }: { section: SettingsSection }) {
         </div>
       )}
       {section === "identity" && (
-        <Card className="border-border bg-card">
+        <Card className="border-border bg-card gap-0 py-0">
           <CardContent className="p-6">
             <div className="grid gap-5 sm:grid-cols-[180px_minmax(0,1fr)]">
               <div className="space-y-4">
@@ -634,7 +639,7 @@ function InvoiceColorPreview({
   const [format, setFormat] = useState<"a4" | "ticket">("a4");
   const foreground = primaryForeground(color);
   return (
-    <Card className="border-border bg-card">
+    <Card className="border-border bg-card gap-0 py-0">
       <CardContent className="p-6">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
@@ -720,10 +725,10 @@ function InvoiceColorPreview({
             </div>
           </article>
         ) : (
-          <article className="mx-auto max-w-[280px] rounded-md bg-card p-4 font-mono text-[11px] text-foreground shadow-sm ring-1 ring-border">
+          <article className="mx-auto max-w-[280px] rounded-md bg-card p-4 font-mono text-xs text-foreground shadow-sm ring-1 ring-border">
             <div className="mb-3 border-b border-dashed border-border pb-3 text-center">
               <div
-                className="mx-auto mb-2 inline-block rounded-full px-3 py-1 text-[10px] font-bold tracking-[0.14em]"
+                className="mx-auto mb-2 inline-block rounded-full px-3 py-1 text-xs font-bold tracking-[0.14em]"
                 style={{ backgroundColor: color, color: foreground }}
               >
                 TICKET DE CAISSE
@@ -747,7 +752,7 @@ function InvoiceColorPreview({
               <span>TOTAL</span>
               <span style={{ color }}>{formatCurrency(250_000)}</span>
             </div>
-            <div className="mt-3 border-t border-dashed border-border pt-3 text-center text-[10px] text-faint">
+            <div className="mt-3 border-t border-dashed border-border pt-3 text-center text-xs text-faint">
               Merci de votre achat · À bientôt
             </div>
           </article>
@@ -796,7 +801,7 @@ function UploadPanel({
           onChange={event => onFile(event.target.files?.[0])}
         />
       </label>
-      <p className="mt-2 text-[10px] text-muted-foreground">
+      <p className="mt-2 text-xs text-muted-foreground">
         {hint} · PNG, JPEG, WEBP ou SVG · 2 Mo max.
       </p>
     </div>
@@ -824,24 +829,56 @@ function ThemeOption({
   icon: Icon,
   label,
   detail,
-  preview,
+  palette,
 }: {
   active: boolean;
   onClick: () => void;
   icon: typeof Moon;
   label: string;
   detail: string;
-  preview: string;
+  /** Couleurs fixes de l'aperçu : elles montrent l'autre thème quel que soit le thème actif. */
+  palette: { background: string; surface: string; line: string; text: string };
 }) {
   return (
     <button
+      type="button"
+      aria-pressed={active}
       onClick={onClick}
-      className={`relative rounded-xl border p-3 text-left transition ${active ? "border-primary bg-primary/10" : "border-border hover:bg-muted"}`}
+      className={`relative rounded-xl border p-3 text-left transition ${active ? "border-primary ring-1 ring-primary" : "border-border hover:bg-accent"}`}
     >
       <span
-        className={`mb-4 block h-14 rounded-lg ${preview} ring-1 ring-inset ring-border`}
-      />
-      <span className="flex items-center gap-2 text-sm font-semibold">
+        aria-hidden="true"
+        className="mb-3 flex h-20 gap-1.5 overflow-hidden rounded-lg border p-1.5"
+        style={{ background: palette.background, borderColor: palette.line }}
+      >
+        <span
+          className="w-1/4 rounded-md"
+          style={{
+            background: palette.surface,
+            border: `1px solid ${palette.line}`,
+          }}
+        />
+        <span className="flex flex-1 flex-col gap-1.5">
+          <span
+            className="h-2.5 w-1/2 rounded-full"
+            style={{ background: palette.text, opacity: 0.8 }}
+          />
+          <span className="flex flex-1 gap-1.5">
+            {[0, 1].map(index => (
+              <span
+                key={index}
+                className="flex-1 rounded-md"
+                style={{
+                  background: palette.surface,
+                  border: `1px solid ${palette.line}`,
+                }}
+              />
+            ))}
+          </span>
+          <span className="h-2 w-1/3 rounded-full bg-primary" />
+        </span>
+      </span>
+      <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
         <Icon className="h-4 w-4 text-primary" />
         {label}
       </span>

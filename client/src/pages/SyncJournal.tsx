@@ -1,3 +1,4 @@
+import { StatCard } from "@/components/page";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useOffline, type SyncLogEntry } from "@/contexts/OfflineContext";
@@ -67,13 +68,10 @@ export default function SyncJournal() {
     [filter, syncLog]
   );
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div className="mx-auto max-w-[1440px] space-y-6">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
-            Mode hors connexion
-          </p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+          <h1 className="text-[22px] font-bold tracking-tight text-foreground">
             Journal de synchronisation
           </h1>
         </div>
@@ -100,7 +98,7 @@ export default function SyncJournal() {
       {persistenceError && (
         <div
           role="alert"
-          className="flex flex-col gap-3 rounded-2xl border border-destructive/25 bg-destructive-soft px-4 py-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between"
+          className="flex flex-col gap-3 rounded-xl border border-destructive/25 bg-destructive-soft px-4 py-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between"
         >
           <div>
             <p className="font-medium">Persistance locale indisponible</p>
@@ -122,7 +120,7 @@ export default function SyncJournal() {
           </Button>
         </div>
       )}
-      <section className="grid gap-3 sm:grid-cols-3">
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <SummaryCard
           label="En attente"
           value={pendingCount}
@@ -187,7 +185,7 @@ export default function SyncJournal() {
             />
           ))
         ) : (
-          <div className="rounded-2xl border border-dashed border-border px-6 py-16 text-center text-sm text-faint">
+          <div className="rounded-xl border border-dashed border-border px-6 py-16 text-center text-sm text-faint">
             Aucune synchronisation à afficher.
           </div>
         )}
@@ -199,31 +197,24 @@ function SummaryCard({
   label,
   value,
   tone,
-  icon: Icon,
 }: {
   label: string;
   value: string | number;
   tone: "cyan" | "rose" | "emerald" | "amber";
-  icon: typeof CloudUpload;
+  icon?: typeof CloudUpload;
 }) {
-  const classes = {
-    cyan: "bg-primary/10 text-primary",
-    rose: "bg-destructive-soft text-destructive",
-    emerald: "bg-success-soft text-success",
-    amber: "bg-warning-soft text-warning",
-  };
   return (
-    <div className="rounded-2xl border border-border bg-card p-4">
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <span
-          className={`grid h-9 w-9 place-items-center rounded-xl ${classes[tone]}`}
-        >
-          <Icon className="h-4 w-4" />
-        </span>
-      </div>
-      <p className="mt-3 text-xl font-semibold text-foreground">{value}</p>
-    </div>
+    <StatCard
+      label={label}
+      value={value}
+      tone={
+        tone === "rose" && Number(value) > 0
+          ? "danger"
+          : tone === "amber" && Number(value) > 0
+            ? "warning"
+            : "default"
+      }
+    />
   );
 }
 function SyncCard({
@@ -243,7 +234,7 @@ function SyncCard({
     entry.error ?? ""
   );
   return (
-    <article className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+    <article className="rounded-xl border border-border bg-card p-4 shadow-sm">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">

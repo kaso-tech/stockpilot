@@ -119,17 +119,14 @@ export default function DataExchange() {
   };
   if (!can("catalog.manage"))
     return (
-      <div className="mx-auto max-w-3xl py-20 text-center text-muted-foreground">
+      <div className="max-w-3xl py-20 text-center text-muted-foreground">
         Cette fonctionnalité est réservée aux administrateurs.
       </div>
     );
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <header>
-        <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
-          Outils
-        </p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+        <h1 className="text-[22px] font-bold tracking-tight text-foreground">
           Import & export
         </h1>
       </header>
@@ -238,7 +235,7 @@ export default function DataExchange() {
           }
         />
       </div>
-      <Card className="border-primary/20 bg-primary/[0.04]">
+      <Card className="border-primary/20 bg-primary/[0.04] gap-0 py-0">
         <CardContent className="flex gap-3 p-4 text-sm text-muted-foreground">
           <FileSpreadsheet className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
           <p>

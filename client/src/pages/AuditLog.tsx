@@ -23,24 +23,21 @@ export default function AuditLog() {
       />
     );
   return (
-    <div className="mx-auto max-w-[1400px] space-y-6">
+    <div className="mx-auto max-w-[1440px] space-y-6">
       <header>
-        <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
-          Conformité
-        </p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+        <h1 className="text-[22px] font-bold tracking-tight text-foreground">
           Journal des opérations
         </h1>
-        <p className="mt-1.5 text-sm text-muted-foreground">
+        <p className="mt-0.5 text-[13px] text-muted-foreground">
           Conservez une trace horodatée de chaque action structurante de
           l’espace stock.
         </p>
       </header>
-      <Card className="border-border bg-card shadow-none">
+      <Card className="border-border bg-card shadow-none gap-0 py-0">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[850px] text-left">
-              <thead className="bg-muted/50 text-[10px] font-semibold uppercase tracking-[0.13em] text-faint">
+              <thead className="bg-muted text-xs font-semibold text-muted-foreground">
                 <tr>
                   <th className="px-6 py-3">Action</th>
                   <th className="px-4 py-3">Détail</th>
@@ -120,10 +117,12 @@ export function Restricted({
   return (
     <div className="mx-auto grid min-h-[65vh] max-w-xl place-items-center text-center">
       <div>
-        <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-info-soft text-info">
+        <span className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-info-soft text-info">
           <LockKeyhole className="h-6 w-6" />
         </span>
-        <h1 className="mt-5 text-2xl font-semibold text-foreground">{title}</h1>
+        <h1 className="text-[22px] font-bold tracking-tight text-foreground">
+          {title}
+        </h1>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
           {description}
         </p>

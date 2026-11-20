@@ -1,3 +1,4 @@
+import { StatCard } from "@/components/page";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -92,7 +93,7 @@ export default function AgentDetail() {
   });
   if (isLoading || !data)
     return (
-      <div className="mx-auto max-w-6xl py-16 text-center text-sm text-muted-foreground">
+      <div className="mx-auto max-w-[1440px] py-16 text-center text-sm text-muted-foreground">
         Chargement de la fiche agent…
       </div>
     );
@@ -196,16 +197,14 @@ export default function AgentDetail() {
           </Button>
         </div>
       </header>
-      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
+      <section className="rounded-xl border border-border bg-card p-5 shadow-sm sm:p-6">
         <div className="flex min-w-0 gap-4">
-          <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-primary/10 text-xl font-semibold text-primary">
+          <span className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-primary/10 text-xl font-semibold text-primary">
             {agent.name.slice(0, 2).toUpperCase()}
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
-              {agent.role}
-            </p>
-            <h1 className="mt-1 truncate text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+            <p className="text-xs font-medium text-primary">{agent.role}</p>
+            <h1 className="text-[22px] font-bold tracking-tight text-foreground truncate">
               {agent.name}
             </h1>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -248,7 +247,7 @@ export default function AgentDetail() {
           </Button>
         </div>
       </section>
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <Metric
           label="Ventes associées"
           value={summary.salesCount}
@@ -271,7 +270,7 @@ export default function AgentDetail() {
         />
       </section>
       <section className="grid gap-5 lg:grid-cols-2">
-        <Card className="border-border bg-card">
+        <Card className="border-border bg-card gap-0 py-0">
           <CardContent className="p-5">
             <h2 className="font-semibold text-foreground">
               Rémunération & commissions
@@ -303,7 +302,7 @@ export default function AgentDetail() {
               />
             </div>
             <div className="mt-5 border-t border-border pt-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-faint">
+              <p className="text-xs font-semibold text-faint">
                 Dernières commissions
               </p>
               <div className="mt-3 space-y-2">
@@ -331,7 +330,7 @@ export default function AgentDetail() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-border bg-card">
+        <Card className="border-border bg-card gap-0 py-0">
           <CardContent className="p-5">
             <h2 className="font-semibold text-foreground">
               Historique des paiements
@@ -364,7 +363,7 @@ export default function AgentDetail() {
           </CardContent>
         </Card>
       </section>
-      <section className="rounded-2xl border border-border bg-card p-5">
+      <section className="rounded-xl border border-border bg-card p-5">
         <h2 className="font-semibold text-foreground">Ventes associées</h2>
         <div className="mt-4 grid gap-2 md:grid-cols-2">
           {data.sales.length ? (
@@ -482,23 +481,12 @@ function Contact({
 function Metric({
   label,
   value,
-  icon,
 }: {
   label: string;
   value: string | number;
-  icon: React.ReactNode;
+  icon?: React.ReactNode;
 }) {
-  return (
-    <Card className="border-border bg-card">
-      <CardContent className="flex items-start justify-between p-5">
-        <div>
-          <p className="text-xs text-faint">{label}</p>
-          <p className="mt-2 text-lg font-semibold text-foreground">{value}</p>
-        </div>
-        <span className="text-primary">{icon}</span>
-      </CardContent>
-    </Card>
-  );
+  return <StatCard label={label} value={value} />;
 }
 function Value({ label, value }: { label: string; value: string }) {
   return (

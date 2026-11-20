@@ -1,3 +1,4 @@
+import { StatCard } from "@/components/page";
 import { ProductImageField } from "@/components/ProductImage";
 import { Badge } from "@/components/ui/badge";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -123,7 +124,7 @@ export default function ProductDetail() {
   );
   if (isLoading)
     return (
-      <div className="mx-auto max-w-6xl py-20 text-center text-sm text-faint">
+      <div className="mx-auto max-w-[1440px] py-20 text-center text-sm text-faint">
         Chargement de la fiche produit…
       </div>
     );
@@ -138,7 +139,7 @@ export default function ProductDetail() {
           <ArrowLeft className="mr-2 h-4 w-4" />
           Retour aux produits
         </Button>
-        <div className="mt-6 rounded-2xl border border-destructive/25 bg-destructive-soft p-6 text-destructive">
+        <div className="mt-6 rounded-xl border border-destructive/25 bg-destructive-soft p-6 text-destructive">
           {error?.message || "Produit introuvable."}
         </div>
       </div>
@@ -159,7 +160,7 @@ export default function ProductDetail() {
             <ProductImageField product={product} canEdit={isAdmin} />
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="truncate text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+            <h1 className="text-[22px] font-bold tracking-tight text-foreground truncate">
               {product.name}
             </h1>
             <Badge
@@ -215,12 +216,12 @@ export default function ProductDetail() {
         </div>
       </header>
       {product.description && (
-        <section className="rounded-2xl border border-border bg-card p-5 text-sm leading-6 text-muted-foreground">
+        <section className="rounded-xl border border-border bg-card p-5 text-sm leading-6 text-muted-foreground">
           {product.description}
         </section>
       )}
       {lowStock && (
-        <section className="flex flex-col gap-3 rounded-2xl border border-warning/25 bg-warning-soft p-4 sm:flex-row sm:items-center sm:justify-between">
+        <section className="flex flex-col gap-3 rounded-xl border border-warning/25 bg-warning-soft p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex gap-3">
             <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
             <div>
@@ -242,7 +243,7 @@ export default function ProductDetail() {
           </Button>
         </section>
       )}
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         {metrics.map(metric => (
           <MetricCard key={metric.label} {...metric} />
         ))}
@@ -428,33 +429,19 @@ export default function ProductDetail() {
 function MetricCard({
   label,
   value,
-  icon: Icon,
   tone,
 }: {
   label: string;
   value: string;
-  icon: typeof Package;
+  icon?: typeof Package;
   tone: string;
 }) {
-  const colors = {
-    cyan: "bg-primary/10 text-primary",
-    violet: "bg-info-soft text-info",
-    emerald: "bg-success-soft text-success",
-    amber: "bg-warning-soft text-warning",
-    slate: "bg-muted text-muted-foreground",
-  };
   return (
-    <div className="rounded-2xl border border-border bg-card p-4">
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <span
-          className={`grid h-9 w-9 place-items-center rounded-xl ${colors[tone as keyof typeof colors]}`}
-        >
-          <Icon className="h-4 w-4" />
-        </span>
-      </div>
-      <p className="mt-3 text-lg font-semibold text-foreground">{value}</p>
-    </div>
+    <StatCard
+      label={label}
+      value={value}
+      tone={tone === "amber" ? "warning" : "default"}
+    />
   );
 }
 function Panel({
@@ -469,7 +456,7 @@ function Panel({
   action?: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-border bg-card p-5">
+    <section className="rounded-xl border border-border bg-card p-5">
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 font-semibold text-foreground">
           <Icon className="h-4 w-4 text-primary" />
@@ -498,9 +485,7 @@ function TierList({
 }) {
   return (
     <div className="mb-4 last:mb-0">
-      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-faint">
-        {title}
-      </p>
+      <p className="mb-2 text-xs font-medium text-faint">{title}</p>
       {tiers.length ? (
         <div className="space-y-2">
           {tiers.map(tier => (

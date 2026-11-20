@@ -1,3 +1,4 @@
+import { StatCard } from "@/components/page";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -292,13 +293,10 @@ export default function Agents() {
     0
   );
   return (
-    <div className="mx-auto max-w-[1320px] space-y-6">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div className="mx-auto max-w-[1440px] space-y-6">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-            Ressources humaines
-          </p>
-          <h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">
+          <h1 className="text-[22px] font-bold tracking-tight text-foreground">
             Agents & rémunérations
           </h1>
         </div>
@@ -316,7 +314,7 @@ export default function Agents() {
           </Button>
         )}
       </header>
-      <section className="grid gap-4 sm:grid-cols-3">
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
         <Metric
           label="Solde total dû"
           value={formatCurrency(totalDue)}
@@ -344,7 +342,7 @@ export default function Agents() {
           return (
             <div
               key={`${beneficiary.type}-${beneficiary.id}`}
-              className="group flex min-w-0 items-center gap-2 rounded-2xl border border-border bg-card p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/25 hover:bg-card"
+              className="group flex min-w-0 items-center gap-2 rounded-xl border border-border bg-card p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/25 hover:bg-card"
             >
               <button
                 type="button"
@@ -361,7 +359,7 @@ export default function Agents() {
                     <span className="truncate font-semibold text-foreground">
                       {beneficiary.name}
                     </span>
-                    <Badge className="shrink-0 border-0 bg-muted text-[10px] text-muted-foreground">
+                    <Badge className="shrink-0 border-0 bg-muted text-xs text-muted-foreground">
                       {beneficiary.role}
                     </Badge>
                   </span>
@@ -529,9 +527,7 @@ export function AgentDialog({
             </>
           )}
           <div className="space-y-4 rounded-xl border border-border p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.13em] text-primary">
-              Rémunération
-            </p>
+            <p className="text-xs font-semibold text-primary">Rémunération</p>
             <Field label="Système">
               <Select
                 value={form.remunerationMode}
@@ -623,23 +619,12 @@ export function AgentDialog({
 function Metric({
   label,
   value,
-  icon: Icon,
 }: {
   label: string;
   value: string | number;
-  icon: typeof Banknote;
+  icon?: typeof Banknote;
 }) {
-  return (
-    <Card className="border-border bg-card">
-      <CardContent className="flex items-start justify-between p-5">
-        <div>
-          <p className="text-xs text-faint">{label}</p>
-          <p className="mt-2 text-xl font-semibold text-foreground">{value}</p>
-        </div>
-        <Icon className="h-5 w-5 text-primary" />
-      </CardContent>
-    </Card>
-  );
+  return <StatCard label={label} value={value} />;
 }
 function Field({
   label,

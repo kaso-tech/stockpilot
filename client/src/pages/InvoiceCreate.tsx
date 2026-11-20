@@ -467,14 +467,11 @@ export default function InvoiceCreate({
     agent => agent.type === "cashier" && agent.active
   );
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="max-w-5xl space-y-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-            Documents commerciaux
-          </p>
-          <h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">
-            Créer un {documentType === "quote" ? "devis" : "facture"}
+          <h1 className="text-[22px] font-bold tracking-tight text-foreground">
+            {documentType === "quote" ? "Nouveau devis" : "Nouvelle facture"}
           </h1>
         </div>
         <Button variant="outline" onClick={() => setLocation(documentPath)}>
@@ -482,7 +479,7 @@ export default function InvoiceCreate({
         </Button>
       </header>
       <section className="grid gap-5 lg:grid-cols-2">
-        <div className="space-y-4 rounded-2xl border border-border bg-card p-5">
+        <div className="space-y-4 rounded-xl border border-border bg-card p-5">
           <h2 className="font-semibold">Client et intervenants</h2>
           <div className="space-y-2">
             <Label>
@@ -574,7 +571,7 @@ export default function InvoiceCreate({
                       <span className="block truncate text-sm font-medium">
                         {item.name}
                       </span>
-                      <span className="block text-[11px] text-muted-foreground">
+                      <span className="block text-xs text-muted-foreground">
                         {item.purchaseCount} achat
                         {item.purchaseCount > 1 ? "s" : ""} · Stock{" "}
                         {item.availableQuantity}
@@ -653,7 +650,7 @@ export default function InvoiceCreate({
             </div>
           )}
         </div>
-        <div className="rounded-2xl border border-border bg-card p-5">
+        <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="font-semibold">Produits</h2>
@@ -849,16 +846,16 @@ export default function InvoiceCreate({
                 </div>
               )}
             </div>
-            <div className="flex items-end justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">
-                  Total de la facture
+            <div className="flex flex-col gap-3">
+              <div className="flex items-baseline justify-between gap-3 border-t border-border pt-3">
+                <p className="text-base font-semibold text-foreground">
+                  Total TTC
                 </p>
-                <p className="text-2xl font-semibold">
+                <p className="whitespace-nowrap text-[26px] font-bold tracking-tight text-foreground">
                   {formatCurrency(totalCents)}
                 </p>
               </div>
-              <div className="flex flex-wrap justify-end gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
                 <Button
                   variant="outline"
                   onClick={() => {
@@ -985,9 +982,7 @@ export default function InvoiceCreate({
 function DefaultAssignment({ label, name }: { label: string; name: string }) {
   return (
     <div className="rounded-xl border border-primary/25 bg-primary/5 p-3">
-      <p className="text-xs font-semibold uppercase tracking-[0.1em] text-primary">
-        {label}
-      </p>
+      <p className="text-xs font-semibold text-primary">{label}</p>
       <p className="mt-1 font-medium text-foreground">{name}</p>
       <p className="mt-1 text-xs text-muted-foreground">
         Rattachement automatique

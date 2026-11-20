@@ -51,16 +51,13 @@ export default function Inventories() {
     },
   });
   return (
-    <div className="mx-auto max-w-[1400px] space-y-6">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div className="mx-auto max-w-[1440px] space-y-6">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
-            Stock
-          </p>
-          <h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">
+          <h1 className="text-[22px] font-bold tracking-tight text-foreground">
             Inventaires
           </h1>
-          <p className="mt-1.5 text-sm text-muted-foreground">
+          <p className="mt-0.5 text-[13px] text-muted-foreground">
             Comptez le stock physique puis validez les écarts de façon traçable.
           </p>
         </div>
@@ -74,7 +71,7 @@ export default function Inventories() {
         )}
       </header>
       <section className="grid gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
-        <Card className="h-fit border-border bg-card">
+        <Card className="h-fit border-border bg-card gap-0 py-0">
           <CardContent className="p-3">
             {inventories.length ? (
               inventories.map(item => (
@@ -94,7 +91,7 @@ export default function Inventories() {
                   <p className="mt-1 text-xs text-faint">
                     {formatDate(item.createdAt)}
                   </p>
-                  <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-faint">
+                  <p className="mt-2 text-xs font-semibold text-muted-foreground">
                     {item.status === "validated" ? "Validé" : "Brouillon"}
                   </p>
                 </button>
@@ -106,7 +103,7 @@ export default function Inventories() {
             )}
           </CardContent>
         </Card>
-        <Card className="border-border bg-card">
+        <Card className="border-border bg-card gap-0 py-0">
           <CardContent className="p-0">
             {detail ? (
               <>
@@ -137,7 +134,7 @@ export default function Inventories() {
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[700px] text-left">
-                    <thead className="bg-muted/50 text-[10px] uppercase tracking-[0.13em] text-faint">
+                    <thead className="bg-muted text-xs text-faint">
                       <tr>
                         <th className="px-5 py-3">Produit</th>
                         <th className="px-4 py-3">Théorique</th>

@@ -1,3 +1,4 @@
+import { StatCard } from "@/components/page";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -141,13 +142,10 @@ export default function Backups() {
         archive.trigger === "manual" && archive.createdByRole === "seller"
     ) ?? [];
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div className="mx-auto max-w-[1440px] space-y-6">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-            Protection des données
-          </p>
-          <h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">
+          <h1 className="text-[22px] font-bold tracking-tight text-foreground">
             Sauvegardes
           </h1>
         </div>
@@ -160,7 +158,7 @@ export default function Backups() {
           {runNow.isPending ? "Sauvegarde…" : "Sauvegarder maintenant"}
         </Button>
       </header>
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
         <StatusCard
           icon={History}
           label="Dernière sauvegarde"
@@ -210,7 +208,7 @@ export default function Backups() {
         />
       </div>
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(340px,0.8fr)]">
-        <Card className="border-border bg-card">
+        <Card className="border-border bg-card gap-0 py-0">
           <CardContent className="space-y-6 p-6">
             <div className="flex items-center gap-3">
               <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary">
@@ -290,7 +288,7 @@ export default function Backups() {
           </CardContent>
         </Card>
         <div className="space-y-6">
-          <Card className="border-border bg-card">
+          <Card className="border-border bg-card gap-0 py-0">
             <CardContent className="space-y-4 p-6">
               <div className="flex items-center gap-3">
                 <span className="grid h-10 w-10 place-items-center rounded-xl bg-info-soft text-info">
@@ -327,7 +325,7 @@ export default function Backups() {
               )}
             </CardContent>
           </Card>
-          <Card className="border-warning/25 bg-warning-soft">
+          <Card className="border-warning/25 bg-warning-soft gap-0 py-0">
             <CardContent className="flex gap-3 p-5">
               <ShieldAlert className="h-5 w-5 shrink-0 text-warning" />
               <p className="text-sm leading-6 text-warning">
@@ -339,7 +337,7 @@ export default function Backups() {
           </Card>
         </div>
       </div>
-      <Card className="border-border bg-card">
+      <Card className="border-border bg-card gap-0 py-0">
         <CardContent className="p-6">
           <div className="mb-5 flex items-center gap-3">
             <ArchiveRestore className="h-5 w-5 text-primary" />
@@ -412,7 +410,7 @@ export default function Backups() {
           </div>
         </CardContent>
       </Card>
-      <Card className="border-border bg-card">
+      <Card className="border-border bg-card gap-0 py-0">
         <CardContent className="p-6">
           <div className="mb-5 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -475,7 +473,7 @@ export default function Backups() {
           )}
         </CardContent>
       </Card>
-      <Card className="border-border bg-card">
+      <Card className="border-border bg-card gap-0 py-0">
         <CardContent className="p-6">
           <div className="mb-5 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -542,38 +540,25 @@ export default function Backups() {
 }
 
 function StatusCard({
-  icon: Icon,
   label,
   value,
   detail,
   tone,
 }: {
-  icon: typeof History;
+  icon?: typeof History;
   label: string;
   value: string;
   detail: string;
   tone: "cyan" | "green" | "rose" | "slate";
 }) {
-  const tones = {
-    cyan: "bg-primary/10 text-primary",
-    green: "bg-success-soft text-success",
-    rose: "bg-destructive-soft text-destructive",
-    slate: "bg-muted text-muted-foreground",
-  };
   return (
-    <Card className="border-border bg-card">
-      <CardContent className="p-5">
-        <span
-          className={`mb-4 grid h-9 w-9 place-items-center rounded-xl ${tones[tone]}`}
-        >
-          <Icon className="h-4.5 w-4.5" />
-        </span>
-        <p className="text-xs font-medium uppercase tracking-[0.12em] text-faint">
-          {label}
-        </p>
-        <p className="mt-2 text-lg font-semibold text-foreground">{value}</p>
-        <p className="mt-1 text-xs text-faint">{detail}</p>
-      </CardContent>
-    </Card>
+    <StatCard
+      label={label}
+      value={value}
+      note={detail}
+      tone={
+        tone === "rose" ? "danger" : tone === "green" ? "success" : "default"
+      }
+    />
   );
 }

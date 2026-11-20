@@ -68,19 +68,18 @@ export default function Warehouses() {
   const nameOf = (id: number) =>
     warehouses.find(item => item.id === id)?.name ?? "—";
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
+    <div className="mx-auto max-w-[1440px] space-y-6">
       <header>
-        <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
-          Stock
-        </p>
-        <h1 className="mt-2 text-3xl font-semibold">Dépôts</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <h1 className="text-[22px] font-bold tracking-tight text-foreground">
+          Dépôts
+        </h1>
+        <p className="mt-0.5 text-[13px] text-muted-foreground">
           Ventes, réceptions et corrections utilisent le dépôt par défaut, sauf
           choix contraire. La valorisation se fait au coût moyen pondéré, mis à
           jour à chaque réception.
         </p>
       </header>
-      <Card className="border-border bg-card">
+      <Card className="border-border bg-card gap-0 py-0">
         <CardContent className="space-y-3 p-6">
           <h2 className="font-semibold">Dépôts et magasins</h2>
           {warehouses.map(item => (
@@ -159,7 +158,7 @@ export default function Warehouses() {
         </CardContent>
       </Card>
       {canManage && active.length > 1 && (
-        <Card className="border-border bg-card">
+        <Card className="border-border bg-card gap-0 py-0">
           <CardContent className="space-y-3 p-6">
             <h2 className="flex items-center gap-2 font-semibold">
               <ArrowRightLeft className="h-4 w-4" />
@@ -249,7 +248,7 @@ export default function Warehouses() {
           </CardContent>
         </Card>
       )}
-      <Card className="border-border bg-card">
+      <Card className="border-border bg-card gap-0 py-0">
         <CardContent className="space-y-3 p-6">
           <h2 className="flex items-center gap-2 font-semibold">
             <CalendarClock className="h-4 w-4" />
@@ -282,7 +281,7 @@ export default function Warehouses() {
           )}
         </CardContent>
       </Card>
-      <Card className="border-border bg-card">
+      <Card className="border-border bg-card gap-0 py-0">
         <CardContent className="overflow-x-auto p-6">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-semibold">Stock par dépôt</h2>

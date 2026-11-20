@@ -45,7 +45,7 @@ export default function SettingsUsers() {
     );
   const permissions = Object.keys(PERMISSION_LABELS) as Permission[];
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="max-w-5xl space-y-6">
       <Link
         href="/parametres"
         className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
@@ -53,11 +53,10 @@ export default function SettingsUsers() {
         <ChevronLeft className="h-4 w-4" /> Retour aux paramètres
       </Link>
       <header>
-        <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
-          Paramètres
-        </p>
-        <h1 className="mt-2 text-3xl font-semibold">Utilisateurs et rôles</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <h1 className="text-[22px] font-bold tracking-tight text-foreground">
+          Utilisateurs et rôles
+        </h1>
+        <p className="mt-0.5 text-[13px] text-muted-foreground">
           Les comptes se créent depuis « Agents & paie » ; attribuez ici leur
           rôle. Un changement de rôle ferme les sessions ouvertes de
           l’utilisateur.
@@ -105,7 +104,7 @@ export default function SettingsUsers() {
           )}
         </CardContent>
       </Card>
-      <Card className="border-border bg-card">
+      <Card className="border-border bg-card gap-0 py-0">
         <CardContent className="overflow-x-auto p-6">
           <h2 className="font-semibold">Droits par rôle</h2>
           <table className="mt-4 w-full min-w-[640px] text-sm">

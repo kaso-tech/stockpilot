@@ -80,7 +80,7 @@ export default function Movements() {
   };
 
   const registry = (
-    <Card className="border-border bg-card shadow-none">
+    <Card className="border-border bg-card shadow-none gap-0 py-0">
       <CardContent className="p-0">
         <div className="border-b border-border px-5 py-5">
           <p className="text-sm font-semibold text-foreground">
@@ -108,7 +108,7 @@ export default function Movements() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[800px] text-left">
-              <thead className="bg-muted/50 text-[10px] font-semibold uppercase tracking-[0.13em] text-faint">
+              <thead className="bg-muted text-xs font-semibold text-muted-foreground">
                 <tr>
                   <th className="px-5 py-3">Produit</th>
                   <th className="px-4 py-3">Mouvement</th>
@@ -159,17 +159,14 @@ export default function Movements() {
   );
 
   return (
-    <div className="mx-auto max-w-[1500px] space-y-6">
+    <div className="mx-auto max-w-[1440px] space-y-6">
       <header>
-        <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
-          Opérations
-        </p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+        <h1 className="text-[22px] font-bold tracking-tight text-foreground">
           Mouvements de stock
         </h1>
       </header>
       {!canManage && (
-        <Card className="border-primary/20 bg-primary/[0.06] shadow-none">
+        <Card className="border-primary/20 bg-primary/[0.06] shadow-none gap-0 py-0">
           <CardContent className="flex items-center gap-3 p-4">
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
               <SlidersHorizontal className="h-5 w-5" />
@@ -197,7 +194,7 @@ export default function Movements() {
         }
       >
         {canRecordMovement && (
-          <Card className="h-fit border-border bg-card shadow-none">
+          <Card className="h-fit border-border bg-card shadow-none gap-0 py-0">
             <CardContent className="p-5">
               <div className="mb-5 flex items-center gap-3">
                 <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">

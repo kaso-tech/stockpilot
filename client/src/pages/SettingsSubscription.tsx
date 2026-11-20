@@ -52,7 +52,7 @@ export default function SettingsSubscription() {
   if (!data)
     return <p className="text-sm text-muted-foreground">Chargement…</p>;
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="max-w-4xl space-y-6">
       <Link
         href="/parametres"
         className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
@@ -60,12 +60,11 @@ export default function SettingsSubscription() {
         <ChevronLeft className="h-4 w-4" /> Retour aux paramètres
       </Link>
       <header>
-        <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
-          Paramètres
-        </p>
-        <h1 className="mt-2 text-3xl font-semibold">Abonnement</h1>
+        <h1 className="text-[22px] font-bold tracking-tight text-foreground">
+          Abonnement
+        </h1>
       </header>
-      <Card className="border-border bg-card">
+      <Card className="border-border bg-card gap-0 py-0">
         <CardContent className="space-y-4 p-6">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-xl font-semibold">{data.planLabel}</h2>
@@ -127,7 +126,7 @@ export default function SettingsSubscription() {
           </p>
         </CardContent>
       </Card>
-      <Card className="border-border bg-card">
+      <Card className="border-border bg-card gap-0 py-0">
         <CardContent className="space-y-3 p-6">
           <h2 className="font-semibold">Vos données</h2>
           <p className="text-sm text-muted-foreground">
@@ -144,7 +143,7 @@ export default function SettingsSubscription() {
           </Button>
         </CardContent>
       </Card>
-      <Card className="border-destructive/25 bg-card">
+      <Card className="border-destructive/25 bg-card gap-0 py-0">
         <CardContent className="space-y-3 p-6">
           <h2 className="font-semibold text-destructive">
             Supprimer l’entreprise

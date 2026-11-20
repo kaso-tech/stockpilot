@@ -168,7 +168,7 @@ export default function SettingsPosSection({
     section === "all" || section === value;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="max-w-4xl space-y-6">
       <Link
         href="/parametres"
         className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
@@ -177,18 +177,15 @@ export default function SettingsPosSection({
         Retour aux paramètres
       </Link>
       <header>
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-          Vente rapide
-        </p>
-        <h1 className="mt-2 text-2xl font-semibold text-foreground sm:text-3xl">
+        <h1 className="text-[22px] font-bold tracking-tight text-foreground">
           {titles[section]}
         </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="mt-0.5 text-[13px] text-muted-foreground">
           {descriptions[section]}
         </p>
       </header>
       {show("assignment") && (
-        <Card className="border-border bg-card">
+        <Card className="border-border bg-card gap-0 py-0">
           <CardContent className="space-y-6 p-6">
             <div className="flex items-center gap-3">
               <UsersRound className="h-5 w-5 text-primary" />
@@ -230,7 +227,7 @@ export default function SettingsPosSection({
       {(show("ticket") || show("payments")) && (
         <div className="grid gap-6 lg:grid-cols-2">
           {show("ticket") && (
-            <Card className="border-border bg-card">
+            <Card className="border-border bg-card gap-0 py-0">
               <CardContent className="space-y-5 p-6">
                 <div className="flex items-center gap-3">
                   <ReceiptText className="h-5 w-5 text-primary" />
@@ -272,7 +269,7 @@ export default function SettingsPosSection({
             </Card>
           )}
           {show("payments") && (
-            <Card className="border-border bg-card">
+            <Card className="border-border bg-card gap-0 py-0">
               <CardContent className="space-y-5 p-6">
                 <div className="flex items-center gap-3">
                   <Settings2 className="h-5 w-5 text-primary" />
@@ -311,7 +308,7 @@ export default function SettingsPosSection({
         </div>
       )}
       {show("seller") && (
-        <Card className="border-primary/20 bg-primary/[0.04]">
+        <Card className="border-primary/20 bg-primary/[0.04] gap-0 py-0">
           <CardContent className="space-y-5 p-6">
             <div className="flex items-center gap-3">
               <ShieldCheck className="h-5 w-5 text-primary" />
@@ -411,7 +408,7 @@ function AssignmentCard({
   agentNoun: string;
 }) {
   return (
-    <section className="space-y-4 rounded-2xl border border-border bg-muted/50 p-5">
+    <section className="space-y-4 rounded-xl border border-border bg-muted/50 p-5">
       <div>
         <h3 className="font-semibold text-foreground">{title}</h3>
         <p className="mt-1 text-sm text-muted-foreground">{description}</p>
