@@ -64,3 +64,17 @@ test("le rôle lecture seule ne voit pas de création produit et ne peut ouvrir 
   await pushRoute(page, "/factures/nouvelle");
   await expect(page.getByRole("heading", { name: "Accès limité par votre rôle" })).toBeVisible();
 });
+
+test("le header reste disponible sans menu lorsque le rôle n’est pas encore chargé", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await mockApi(page, "");
+  await page.goto("/");
+
+  await expect(page.locator("header.app-header").getByText("Vue d’ensemble", { exact: true })).toBeVisible();
+  await expect(page.locator('[data-sidebar="menu-button"]')).toHaveCount(0);
+  await expect(page.getByText("An unexpected error occurred.", { exact: true })).not.toBeVisible();
+  await page.getByRole("button", { name: "Rechercher une page (Ctrl+K)", exact: true }).click();
+  await expect(page.getByText("Aucune page trouvée.", { exact: true })).toBeVisible();
+  expect(errors).toEqual([]);
+});
