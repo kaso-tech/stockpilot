@@ -228,7 +228,9 @@ function SyncCard({
   onRetry: () => void;
   onDiscard: () => void;
 }) {
-  const meta = statusMeta[entry.status];
+  // Une entrée enregistrée par une autre version de l'application peut porter
+  // un statut inconnu : on l'affiche « En attente » plutôt que de planter.
+  const meta = statusMeta[entry.status] ?? statusMeta.queued;
   const Icon = meta.icon;
   const stockConflict = /stock|quantit|rupture|insuffisant/i.test(
     entry.error ?? ""
