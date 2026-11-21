@@ -464,8 +464,8 @@ export default function Invoices() {
           <AlertDialogHeader>
             <AlertDialogTitle>Annuler cette facture ?</AlertDialogTitle>
             <AlertDialogDescription>
-              La facture est conservée avec le statut « annulée » pour garder la
-              numérotation continue. Aucun stock n’est modifié. Cette action est
+              La facture est conservée avec le statut « annulée », car elle a pu
+              être remise au client. Aucun stock n’est modifié. Cette action est
               irréversible.
             </AlertDialogDescription>
           </AlertDialogHeader>

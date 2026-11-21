@@ -47,6 +47,7 @@ import {
   ShoppingCart,
   TicketCheck,
   Trash2,
+  XCircle,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -112,6 +113,10 @@ export default function PointOfSale() {
     useState<DiscountForm>(noDiscount);
   const [posApplyVat, setPosApplyVat] = useState(true);
   const [checkoutSale, setCheckoutSale] = useState<CheckoutSale | null>(null);
+  // Ticket en attente rappelé dans le panier : modifiable, encaissable sous le même numéro, ou annulable.
+  const [recalled, setRecalled] = useState<{ id: number; invoiceNumber: string } | null>(null);
+  // Quand le panneau du panier apparaît, la grille se réorganise : on ignore brièvement les touches suivantes.
+  const tapGuardUntil = useRef(0);
   const pendingTickets = useMemo(() => transactions.filter(ticket => ticket.channel === "pos" && (ticket.status === "draft" || ticket.status === "partial") && (!selectedWarehouseId || ticket.warehouseId === selectedWarehouseId)).slice(0, 4), [selectedWarehouseId, transactions]);
 
   const isLowStock = useCallback(
@@ -241,7 +246,9 @@ export default function PointOfSale() {
   const vatCents = vatBreakdown.vatCents;
   const totalCents = taxableSubtotalCents + vatCents;
 
-  const add = (productId: number) =>
+  const add = (productId: number) => {
+    if (Date.now() < tapGuardUntil.current) return;
+    if (!cart.length && typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches) tapGuardUntil.current = Date.now() + 450;
     setCart(current => {
       const product = products.find(item => item.id === productId);
       const item = current.find(value => value.productId === productId);
@@ -264,6 +271,7 @@ export default function PointOfSale() {
           ? [...current, { productId, quantity: 1, discount: noDiscount }]
           : current;
     });
+  };
   const quantity = (productId: number, next: number) =>
     setCart(current =>
       next <= 0
@@ -295,6 +303,7 @@ export default function PointOfSale() {
     setCart([]);
     setInvoiceDiscount(noDiscount);
     setCartCollapsed(true);
+    setRecalled(null);
   };
   // Vente numérotée créée par « Encaisser » : annulée (et tracée) si l'encaissement est abandonné.
   // Un ticket mis en attente puis repris n'est jamais annulé automatiquement.
@@ -303,7 +312,9 @@ export default function PointOfSale() {
   const draft = trpc.transactions.createDraft.useMutation({
     onSuccess: result => {
       utils.transactions.list.invalidate();
-      freshDraftId.current = result.id;
+      // Un ticket rappelé reste en attente si l'encaissement est abandonné : il n'est jamais supprimé automatiquement.
+      if (recalled) setRecalled({ id: result.id, invoiceNumber: result.invoiceNumber });
+      else freshDraftId.current = result.id;
       setCheckoutSale({ ...result, channel: "pos" });
     },
     onError: error => toast.error(error.message),
@@ -312,7 +323,7 @@ export default function PointOfSale() {
     onSuccess: result => {
       utils.transactions.list.invalidate();
       clearCart();
-      toast.success(`${result.invoiceNumber} est enregistré à encaisser plus tard.`);
+      toast.success(recalled ? `${result.invoiceNumber} mis à jour, toujours à encaisser.` : `${result.invoiceNumber} est enregistré à encaisser plus tard.`);
     },
     onError: error => toast.error(error.message),
   });
@@ -343,6 +354,7 @@ export default function PointOfSale() {
         discount: discountPayload(line.discount),
       })),
     };
+    if (!isOnline && recalled) return toast.error("Connectez-vous pour encaisser un ticket mis en attente.");
     if (!isOnline) {
       setCheckoutSale({
         id: null,
@@ -355,6 +367,7 @@ export default function PointOfSale() {
     }
     draft.mutate({
       channel: "pos",
+      replacesSaleId: recalled?.id,
       warehouseId: selectedWarehouseId ?? undefined,
       customerId: null,
       salesAgentId: null,
@@ -369,7 +382,31 @@ export default function PointOfSale() {
         discount: discountPayload(item.discount),
       })),
     });
-  }, [cart, draft, invoiceDiscount, isOnline, lines, selectedWarehouseId, totalCents]);
+  }, [cart, draft, invoiceDiscount, isOnline, lines, recalled, selectedWarehouseId, totalCents]);
+  const cancelTicket = trpc.transactions.removeDraft.useMutation({
+    onSuccess: () => { toast.success(`Ticket ${recalled?.invoiceNumber ?? ""} annulé et supprimé.`); void utils.transactions.list.invalidate(); clearCart(); },
+    onError: error => toast.error(error.message),
+  });
+  const confirmCancelTicket = () => {
+    if (!recalled) return;
+    if (window.confirm(`Annuler le ticket ${recalled.invoiceNumber} ? Il n’a pas été encaissé : il sera supprimé (une trace reste dans le journal d’audit).`)) cancelTicket.mutate({ saleId: recalled.id });
+  };
+  /** Rappelle un ticket en attente dans le panier ; un ticket déjà partiellement réglé s'encaisse directement. */
+  const recallTicket = async (ticket: (typeof pendingTickets)[number]) => {
+    if (ticket.amountPaidCents > 0 || ticket.status !== "draft") { freshDraftId.current = null; setCheckoutSale({ id: ticket.id, totalCents: ticket.totalCents, invoiceNumber: ticket.invoiceNumber, channel: "pos" }); return; }
+    if (cart.length && !window.confirm(recalled ? `Laisser ${recalled.invoiceNumber} en attente sans enregistrer vos changements et ouvrir ${ticket.invoiceNumber} ?` : "Le panier en cours sera remplacé par ce ticket. Continuer ?")) return;
+    try {
+      const detail = await utils.commerce.sales.detail.fetch({ id: ticket.id });
+      const toForm = (type: string | null | undefined, value: number | null | undefined): DiscountForm => type === "percent" || type === "fixed" ? { type, value: String((value ?? 0) / 100) } : noDiscount;
+      const items = detail.items.filter((item: any) => products.some(product => product.id === item.productId));
+      if (items.length < detail.items.length) toast.warning("Certains produits du ticket ne sont plus disponibles dans cet entrepôt.");
+      setCart(items.map((item: any) => ({ productId: item.productId, quantity: item.quantity, discount: toForm(item.discountType, item.discountValue) })));
+      setInvoiceDiscount(toForm(detail.sale.invoiceDiscountType, detail.sale.invoiceDiscountValue));
+      if (settings?.vatEnabled) setPosApplyVat(detail.sale.vatCents > 0);
+      setRecalled({ id: ticket.id, invoiceNumber: ticket.invoiceNumber });
+      setCartCollapsed(false);
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Ticket introuvable."); }
+  };
   const handleCode = (code: string) => {
     const product = products.find(
       item => item.reference.toLowerCase() === code.trim().toLowerCase()
@@ -384,6 +421,7 @@ export default function PointOfSale() {
     if (!isOnline) return toast.error("Connectez-vous pour enregistrer un ticket à encaisser plus tard.");
     savePendingTicket.mutate({
       channel: "pos",
+      replacesSaleId: recalled?.id,
       warehouseId: selectedWarehouseId ?? undefined,
       customerId: null,
       salesAgentId: null,
@@ -420,6 +458,8 @@ export default function PointOfSale() {
   }, [cart.length, draft.isPending, openCheckout]);
 
   const cartUnits = cart.reduce((sum, item) => sum + item.quantity, 0);
+  // Le panneau n’apparaît que s’il contient quelque chose (ou un ticket rappelé, même vidé).
+  const showCart = cart.length > 0 || recalled !== null;
   const closeCheckout = (abandoned: boolean) => {
     const id = freshDraftId.current;
     freshDraftId.current = null;
@@ -463,36 +503,37 @@ export default function PointOfSale() {
       </div>
       <div className="flex items-baseline justify-between"><span className="text-sm font-medium text-foreground">Total TTC</span><span className="text-2xl font-bold tracking-tight text-foreground">{formatCurrency(totalCents)}</span></div>
       <Button onClick={openCheckout} disabled={!cart.length || draft.isPending} className="h-12 w-full text-base">{draft.isPending ? "Préparation…" : <><Keyboard className="h-4 w-4" />{isOnline ? "Encaisser" : "Encaisser hors connexion"}<span className="ml-1 rounded bg-primary-foreground/15 px-1.5 py-0.5 text-xs">F9</span></>}</Button>
-      <Button variant="outline" onClick={holdTicket} disabled={!cart.length || savePendingTicket.isPending || !isOnline} className="h-10 w-full"><TicketCheck className="h-4 w-4" />{savePendingTicket.isPending ? "Enregistrement…" : "Mettre en attente"}</Button>
+      <Button variant="outline" onClick={holdTicket} disabled={!cart.length || savePendingTicket.isPending || !isOnline} className="h-10 w-full"><TicketCheck className="h-4 w-4" />{savePendingTicket.isPending ? "Enregistrement…" : recalled ? "Enregistrer et remettre en attente" : "Mettre en attente"}</Button>
+      {recalled && <Button variant="ghost" onClick={confirmCancelTicket} disabled={cancelTicket.isPending || !isOnline} className="h-10 w-full text-destructive hover:bg-destructive-soft hover:text-destructive"><XCircle className="h-4 w-4" />{cancelTicket.isPending ? "Annulation…" : "Annuler le ticket"}</Button>}
     </div>
   );
   const cartHeader = (onClose?: () => void) => (
     <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
       <div className="flex items-center gap-2.5">
         <span className="relative grid h-9 w-9 place-items-center rounded-lg bg-primary-soft text-primary"><ShoppingCart className="h-[18px] w-[18px]" />{cartUnits > 0 && <span key={cartUnits} className="animate-pop absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[11px] font-bold text-primary-foreground">{cartUnits}</span>}</span>
-        <div><h2 className="text-base font-semibold text-foreground">Panier</h2><p className="text-xs text-muted-foreground">{cart.length ? `${cart.length} article${cart.length > 1 ? "s" : ""}` : "Vide"}</p></div>
+        <div className="min-w-0"><h2 className="truncate text-base font-semibold text-foreground">{recalled ? `Ticket ${recalled.invoiceNumber}` : "Panier"}</h2><p className="text-xs text-muted-foreground">{recalled ? "En attente · " : ""}{cart.length ? `${cart.length} article${cart.length > 1 ? "s" : ""}` : "Vide"}</p></div>
       </div>
       <div className="flex items-center gap-1">
-        {cart.length > 0 && <Button variant="ghost" size="sm" onClick={clearCart} className="text-destructive hover:bg-destructive-soft hover:text-destructive"><Trash2 className="h-4 w-4" />Vider</Button>}
+        {!recalled && cart.length > 0 && <Button variant="ghost" size="sm" onClick={clearCart} className="text-destructive hover:bg-destructive-soft hover:text-destructive"><Trash2 className="h-4 w-4" />Vider</Button>}
         {onClose && <Button variant="outline" size="sm" onClick={onClose}><ChevronDown className="h-4 w-4" />Continuer</Button>}
       </div>
     </div>
   );
   return (
     <div className="mx-auto max-w-[1600px] pb-24 md:pb-0">
-      <div className="grid items-start gap-5 md:grid-cols-[minmax(0,1fr)_320px] lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_400px]">
+      <div className={`grid items-start gap-5 ${showCart ? "md:grid-cols-[minmax(0,1fr)_320px] lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_400px]" : ""}`}>
         <div className="min-w-0 space-y-4">
           <header className="flex flex-wrap items-end justify-between gap-3">
             <div className="min-w-0">
               <h1 className="text-[22px] font-bold tracking-tight text-foreground">Vente rapide</h1>
-              <p className="mt-0.5 text-[13px] text-muted-foreground">Touchez un produit pour l’ajouter au panier.</p>
+              <p className="mt-0.5 text-[13px] text-muted-foreground">Touchez un produit pour l’ajouter au panier.{!showCart && <span className="ml-2 hidden items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground md:inline-flex"><ShoppingCart className="h-3 w-3" />Panier vide</span>}</p>
             </div>
             <label className="flex min-w-0 items-center gap-2 text-[13px] text-muted-foreground">Entrepôt<select value={selectedWarehouseId ? String(selectedWarehouseId) : ""} onChange={event => { const nextId = Number(event.target.value); if (nextId && nextId !== selectedWarehouseId && cart.length && !window.confirm("Changer d’entrepôt videra le panier en cours. Continuer ?")) return; if (nextId !== selectedWarehouseId) clearCart(); if (isAdmin && nextId) setActiveWarehouseId(nextId); setSelectedWarehouseId(nextId || null); }} className="min-w-0 rounded-lg border border-border bg-card px-2.5 py-1.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary" disabled={!warehouses.length}>{warehouses.filter(warehouse => warehouse.active).map(warehouse => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}{warehouse.isDefault ? " · Principal" : ""}</option>)}</select></label>
           </header>
-          {pendingTickets.length > 0 && (
+          {pendingTickets.some(ticket => ticket.id !== recalled?.id) && (
             <section aria-label="Tickets à encaisser" className="surface rounded-xl border border-border bg-card px-4 py-3">
               <div className="mb-2 flex items-center justify-between"><span className="flex items-center gap-2 text-sm font-semibold text-foreground"><TicketCheck className="h-4 w-4 text-warning" />En attente d’encaissement</span><button type="button" onClick={() => setLocation("/tickets?statut=unpaid")} className="text-[13px] font-medium text-primary hover:underline">Voir tout</button></div>
-              <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">{pendingTickets.map(ticket => <button key={ticket.id} type="button" onClick={() => { freshDraftId.current = null; setCheckoutSale({ id: ticket.id, totalCents: ticket.totalCents, invoiceNumber: ticket.invoiceNumber, channel: "pos" }); }} className="lift shrink-0 rounded-lg border border-border bg-background px-3 py-2 text-left hover:border-warning/40"><span className="block text-xs font-semibold text-foreground">{ticket.invoiceNumber}</span><span className="mt-0.5 block text-sm font-semibold text-warning">{formatCurrency(ticket.totalCents - ticket.amountPaidCents)}</span></button>)}</div>
+              <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">{pendingTickets.filter(ticket => ticket.id !== recalled?.id).map(ticket => <button key={ticket.id} type="button" onClick={() => void recallTicket(ticket)} className="lift shrink-0 rounded-lg border border-border bg-background px-3 py-2 text-left hover:border-warning/40"><span className="block text-xs font-semibold text-foreground">{ticket.invoiceNumber}</span><span className="mt-0.5 block text-sm font-semibold text-warning">{formatCurrency(ticket.totalCents - ticket.amountPaidCents)}</span></button>)}</div>
             </section>
           )}
           <section className="surface rounded-xl border border-border bg-card p-4">
@@ -509,7 +550,7 @@ export default function PointOfSale() {
               </div>
             </div>
             {lowStockOnly && <p className="mt-3 text-xs text-muted-foreground">La liste d’achats regroupe les produits filtrés et propose une quantité suffisante pour dépasser le seuil de sécurité.</p>}
-            <div className="stagger mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+            <div className="stagger mt-4 grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(168px,1fr))]">
               {available.map(product => {
                 const productIsLowStock = isLowStock(product);
                 const pendingQuantity = pendingProductQuantities[product.id] ?? 0;
@@ -536,28 +577,28 @@ export default function PointOfSale() {
           </section>
         </div>
         {/* Tablette et ordinateur : panier toujours visible à droite, les produits restent accessibles. */}
-        <aside aria-label="Panier de vente" className="surface sticky top-4 hidden max-h-[calc(100dvh-2rem)] flex-col overflow-hidden rounded-xl border border-border bg-card md:flex">
+        {showCart && <aside aria-label="Panier de vente" className="animate-slide-in surface sticky top-20 hidden max-h-[calc(100dvh-7rem)] flex-col overflow-hidden rounded-xl border border-border bg-card md:flex">
           {cartHeader()}
-          <div className="min-h-0 flex-1 overflow-y-auto">{cart.length ? cartLines : <p className="px-6 py-12 text-center text-sm text-muted-foreground">Le panier est vide.<br />Touchez un produit pour l’ajouter.</p>}</div>
-          {cart.length > 0 && cartFooter}
-        </aside>
+          <div className="min-h-0 flex-1 overflow-y-auto">{cart.length ? cartLines : <p className="px-6 py-12 text-center text-sm text-muted-foreground">Le ticket ne contient plus d’article.</p>}</div>
+          {cartFooter}
+        </aside>}
       </div>
       {/* Téléphone : barre de total en bas, panier plein écran à la demande. */}
-      {cart.length > 0 && cartCollapsed && !checkoutSale && (
+      {showCart && cartCollapsed && !checkoutSale && (
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 px-4 py-3 backdrop-blur md:hidden" style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
           <div className="flex items-center gap-3">
             <button type="button" onClick={() => setCartCollapsed(false)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
               <span className="relative grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary-soft text-primary"><ShoppingCart className="h-5 w-5" /><span key={cartUnits} className="animate-pop absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[11px] font-bold text-primary-foreground">{cartUnits}</span></span>
-              <span className="min-w-0"><span className="block text-xs text-muted-foreground">Voir le panier <ChevronUp className="inline h-3 w-3" /></span><span className="block truncate text-lg font-bold text-foreground">{formatCurrency(totalCents)}</span></span>
+              <span className="min-w-0"><span className="block text-xs text-muted-foreground">{recalled ? `Ticket ${recalled.invoiceNumber}` : "Voir le panier"} <ChevronUp className="inline h-3 w-3" /></span><span className="block truncate text-lg font-bold text-foreground">{formatCurrency(totalCents)}</span></span>
             </button>
             <Button onClick={openCheckout} disabled={draft.isPending} className="h-11 px-5">{draft.isPending ? "Préparation…" : "Encaisser"}</Button>
           </div>
         </div>
       )}
-      {cart.length > 0 && !cartCollapsed && !checkoutSale && (
+      {showCart && !cartCollapsed && !checkoutSale && (
         <div role="dialog" aria-modal="true" aria-label="Panier de vente" className="animate-enter fixed inset-0 z-40 flex flex-col bg-card md:hidden">
           {cartHeader(() => setCartCollapsed(true))}
-          <div className="min-h-0 flex-1 overflow-y-auto">{cartLines}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto">{cart.length ? cartLines : <p className="px-6 py-12 text-center text-sm text-muted-foreground">Le ticket ne contient plus d’article.</p>}</div>
           {cartFooter}
         </div>
       )}
