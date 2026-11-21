@@ -1,7 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { dashboardPreferenceKeys, dashboardPreferenceLabels, dashboardPreferencesForRole, normalizeDashboardPreferences, sellerHiddenDashboardPreferenceKeys, type DashboardPreferences } from "@/lib/dashboardPreferences";
+import { dashboardPreferenceLabels, homeDashboardPreferenceKeys, dashboardPreferencesForRole, normalizeDashboardPreferences, sellerHiddenDashboardPreferenceKeys, type DashboardPreferences } from "@/lib/dashboardPreferences";
 import { trpc } from "@/lib/trpc";
 import { Check, ChevronLeft, LayoutDashboard, RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -16,7 +16,7 @@ export default function SettingsDashboard() {
   const [preferences, setPreferences] = useState<DashboardPreferences>(() => dashboardPreferencesForRole(role));
   useEffect(() => { if (!isLoading) { try { setPreferences(data?.preferencesJson ? normalizeDashboardPreferences(JSON.parse(data.preferencesJson), role) : dashboardPreferencesForRole(role)); } catch { setPreferences(dashboardPreferencesForRole(role)); } } }, [data?.preferencesJson, isLoading, role]);
   const saveMutation = trpc.dashboardPreferences.save.useMutation({ onSuccess: () => { utils.dashboardPreferences.get.invalidate(); toast.success("Préférences du tableau de bord enregistrées."); }, onError: error => toast.error(error.message) });
-  const visiblePreferenceKeys = role === "seller" ? dashboardPreferenceKeys.filter(key => !sellerHiddenDashboardPreferenceKeys.includes(key)) : dashboardPreferenceKeys;
+  const visiblePreferenceKeys = role === "seller" ? homeDashboardPreferenceKeys.filter(key => !sellerHiddenDashboardPreferenceKeys.includes(key)) : homeDashboardPreferenceKeys;
   const toggle = (key: keyof DashboardPreferences) => setPreferences(current => ({ ...current, [key]: !current[key] }));
   const save = () => saveMutation.mutate({ preferencesJson: JSON.stringify(preferences) });
   const reset = () => { const preset = dashboardPreferencesForRole(role); setPreferences(preset); saveMutation.mutate({ preferencesJson: JSON.stringify(preset) }); };

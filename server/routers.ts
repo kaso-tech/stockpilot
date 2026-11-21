@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, inArray, isNull, ne, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, lte, ne, or } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import {
@@ -20,6 +20,7 @@ import {
   purchaseOrders,
   saleCommissions,
   saleItems,
+  paymentDueOccurrences,
   saleSettings,
   sales,
   sellerCredentials,
@@ -560,6 +561,25 @@ export const appRouter = router({
       });
       const salesTrend = dayKeys.map(day => ({ day, revenueCents: paidSales.filter(sale => sale.createdAt.toISOString().slice(0, 10) === day).reduce((sum, sale) => sum + sale.totalCents, 0), invoices: paidSales.filter(sale => sale.createdAt.toISOString().slice(0, 10) === day).length }));
       const customerMap = new Map(customerRows.map(customer => [customer.id, customer]));
+      // Accueil : comparaison au même nombre de jours du mois précédent, tendance sur 30 jours
+      // (tickets et factures encaissés), meilleures ventes du mois et échéances proches.
+      const now = new Date();
+      const previousMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+      const previousMonthCutoff = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, now.getUTCDate(), 23, 59, 59, 999));
+      const previousMonthToDateRevenueCents = paidSales.filter(sale => sale.createdAt >= previousMonthStart && sale.createdAt <= previousMonthCutoff && sale.createdAt.getUTCMonth() === previousMonthStart.getUTCMonth()).reduce((sum, sale) => sum + sale.totalCents, 0);
+      const days30 = Array.from({ length: 30 }, (_, index) => { const date = new Date(); date.setDate(date.getDate() - (29 - index)); return date.toISOString().slice(0, 10); });
+      const revenueByDay = new Map<string, { revenueCents: number; count: number }>();
+      for (const sale of paidSales) { const day = sale.createdAt.toISOString().slice(0, 10); const current = revenueByDay.get(day) ?? { revenueCents: 0, count: 0 }; current.revenueCents += sale.totalCents; current.count += 1; revenueByDay.set(day, current); }
+      const salesTrend30 = days30.map(day => ({ day, revenueCents: revenueByDay.get(day)?.revenueCents ?? 0, count: revenueByDay.get(day)?.count ?? 0 }));
+      const monthlySaleIds = monthlySales.map(sale => sale.id);
+      const monthlyItems = canSeeFinance && monthlySaleIds.length ? await db.select({ productId: saleItems.productId, productName: saleItems.productName, quantity: saleItems.quantity, returnedQuantity: saleItems.returnedQuantity, lineTotalCents: saleItems.lineTotalCents }).from(saleItems).where(inArray(saleItems.saleId, monthlySaleIds)) : [];
+      const topByProduct = new Map<number, { productId: number; name: string; quantity: number; revenueCents: number }>();
+      for (const item of monthlyItems) { const current = topByProduct.get(item.productId) ?? { productId: item.productId, name: item.productName, quantity: 0, revenueCents: 0 }; current.quantity += item.quantity - (item.returnedQuantity ?? 0); current.revenueCents += item.lineTotalCents; topByProduct.set(item.productId, current); }
+      const topProducts = Array.from(topByProduct.values()).sort((a, b) => b.revenueCents - a.revenueCents).slice(0, 5);
+      const receivables = saleRows.filter(isReceivableInvoice);
+      const overdueLimit = Date.now() - 30 * 86_400_000;
+      const receivableOverdueCount = receivables.filter(sale => sale.createdAt.getTime() < overdueLimit).length;
+      const dueSoon = canSeeFinance ? await db.select({ amountCents: paymentDueOccurrences.amountCents, paidCents: paymentDueOccurrences.paidCents }).from(paymentDueOccurrences).where(and(companyScope(paymentDueOccurrences.companyId, companyId), input?.warehouseId ? eq(paymentDueOccurrences.warehouseId, input.warehouseId) : undefined, inArray(paymentDueOccurrences.status, ["upcoming", "due", "overdue", "partially_paid"]), lte(paymentDueOccurrences.dueAt, new Date(Date.now() + 7 * 86_400_000)))) : [];
       return {
         summary: {
           ...(canSeeFinance ? { totalValueCents } : {}),
@@ -567,13 +587,13 @@ export const appRouter = router({
           activeAlerts: lowStock.length,
           movementCount: movements.length,
           ...(canSeeFinance ? { monthlyRevenueCents, monthlyMarginCents, monthlyExpenseCents, monthlyOperatingProfitCents, expenseBreakdown: expenseBreakdownByCategory([...expenseRows, ...agentExpenseRows], month), monthlyManualExpenseCents, monthlyAgentPaymentCents, expenseBudget, duePayrollCents } : {}),
-          ...(canSeeFinance ? { todaySaleCount: todaySales.length, receivableCount: saleRows.filter(isReceivableInvoice).length, receivableCents: saleRows.filter(isReceivableInvoice).reduce((sum, sale) => sum + Math.max(0, sale.totalCents - sale.amountPaidCents), 0), monthlyInvoiceCount: monthlySales.length, todayRevenueCents: todaySales.reduce((sum, sale) => sum + sale.totalCents, 0), averageBasketCents: monthlySales.length ? Math.round(monthlyRevenueCents / monthlySales.length) : 0 } : {}),
+          ...(canSeeFinance ? { todaySaleCount: todaySales.length, previousMonthToDateRevenueCents, receivableOverdueCount, dueSoonCount: dueSoon.length, dueSoonCents: dueSoon.reduce((sum, row) => sum + Math.max(0, row.amountCents - row.paidCents), 0), receivableCount: saleRows.filter(isReceivableInvoice).length, receivableCents: saleRows.filter(isReceivableInvoice).reduce((sum, sale) => sum + Math.max(0, sale.totalCents - sale.amountPaidCents), 0), monthlyInvoiceCount: monthlySales.length, todayRevenueCents: todaySales.reduce((sum, sale) => sum + sale.totalCents, 0), averageBasketCents: monthlySales.length ? Math.round(monthlyRevenueCents / monthlySales.length) : 0 } : {}),
           draftInventories: inventories.filter(inventory => inventory.status === "draft").length,
         },
         lowStock: lowStock.slice(0, 6),
         recentMovements: movements.slice(0, 6),
         trend,
-        ...(canSeeFinance ? { salesTrend,
+        ...(canSeeFinance ? { salesTrend, salesTrend30, topProducts,
         recentSales: paidSales.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 5).map(sale => { const customer = sale.customerId ? customerMap.get(sale.customerId) : undefined; return { id: sale.id, invoiceNumber: sale.invoiceNumber, channel: sale.channel, status: sale.status, totalCents: sale.totalCents, netProfitCents: sale.netProfitCents, createdAt: sale.createdAt, customerName: customer?.name ?? "Vente comptoir", customerType: customer?.type ?? "ordinary" }; }),
         unpaidInvoices: saleRows.filter(isReceivableInvoice).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 5).map(sale => { const customer = sale.customerId ? customerMap.get(sale.customerId) : undefined; return { id: sale.id, invoiceNumber: sale.invoiceNumber, totalCents: sale.totalCents, amountPaidCents: sale.amountPaidCents, balanceCents: Math.max(0, sale.totalCents - sale.amountPaidCents), status: sale.status, createdAt: sale.createdAt, customerName: customer?.name ?? "Client" }; }) } : {}),
       };
