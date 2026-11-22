@@ -16,14 +16,15 @@ import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Restricted } from "./AuditLog";
 
-const categories = [{ value: "rent", label: "Loyer" }, { value: "energy", label: "Énergie" }, { value: "connection", label: "Connexion" }, { value: "salary", label: "Salaire" }, { value: "marketing", label: "Marketing" }, { value: "supplies", label: "Fournitures" }, { value: "taxes", label: "Impôts" }, { value: "other", label: "Autre" }] as const;
+const categories = [{ value: "rent", label: "Loyer" }, { value: "energy", label: "Énergie" }, { value: "connection", label: "Connexion" }, { value: "salary", label: "Salaire" }, { value: "marketing", label: "Marketing" }, { value: "supplies", label: "Fournitures" }, { value: "taxes", label: "Impôts" }, { value: "food", label: "Alimentation" }, { value: "other", label: "Autre" }] as const;
 type ExpenseCategory = (typeof categories)[number]["value"];
 type ExpenseForm = { category: ExpenseCategory; description: string; amount: string; spentAt: string; dueDay: string; mode: "record" | "monthly"; paymentDueOccurrenceId: string; paymentDueTemplateId: string; reminderDays: string; receiptUrl: string | null; receiptName: string | null; receiptMimeType: string | null };
 type PendingReceipt = { dataUrl: string; filename: string };
 const today = () => new Date().toISOString().slice(0, 10);
 const blankForm = (): ExpenseForm => ({ category: "other", description: "", amount: "", spentAt: today(), dueDay: String(new Date().getDate()), mode: "record", paymentDueOccurrenceId: "", paymentDueTemplateId: "", reminderDays: "7, 3, 1", receiptUrl: null, receiptName: null, receiptMimeType: null });
-const categoryLabel = (category: string) => categories.find(item => item.value === category)?.label ?? "Autre";
-const categoryLabels = Object.fromEntries(categories.map(item => [item.value, item.label])) as Record<string, string>;
+/** Libellés du rapport : catégories saisissables, plus les paiements d'agents ajoutés par le serveur. */
+const categoryLabels = { ...Object.fromEntries(categories.map(item => [item.value, item.label])), agent_payments: "Paiements agents" } as Record<string, string>;
+const categoryLabel = (category: string) => categoryLabels[category] ?? "Autre";
 
 export default function Expenses() {
   const { user } = useAuth(); const isAdmin = can(user?.role, "expenses.manage"); const { activeWarehouseId, activeWarehouse } = useActiveWarehouse(); const utils = trpc.useUtils(); const monthKey = new Date().toISOString().slice(0, 7);

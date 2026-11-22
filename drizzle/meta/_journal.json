@@ -568,6 +568,13 @@
       "when": 1795213556780,
       "tag": "0080_default_primary_color",
       "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "5",
+      "when": 1795307258316,
+      "tag": "0081_daily_weekly_food_allowance",
+      "breakpoints": true
     }
   ]
 }

@@ -51,7 +51,8 @@ export const payrollRouter = router({
       rows.set(key, current);
     }
     for (const payment of paymentRows) {
-      if (payment.periodLabel !== periodLabel || payment.warehouseId === null) continue;
+      // La prime d'alimentation n'entre pas dans le solde de paie (salaire et commissions).
+      if (payment.periodLabel !== periodLabel || payment.warehouseId === null || payment.paymentKind === "food_allowance") continue;
       const key = `${payment.beneficiaryType}:${payment.beneficiaryId}:${payment.warehouseId}`;
       const current = rows.get(key) ?? { beneficiaryType: payment.beneficiaryType, beneficiaryId: payment.beneficiaryId, warehouseId: payment.warehouseId, generatedCents: 0, commissionPaidCents: 0, salaryPaidCents: 0, mixedPaidCents: 0, saleCount: 0, lastCommissionAt: null };
       if (payment.paymentKind === "commission") current.commissionPaidCents += payment.amountCents;

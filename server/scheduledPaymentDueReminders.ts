@@ -20,7 +20,7 @@ export async function processPaymentDueRemindersForCompany(db: any, companyId: n
     if (status !== row.occurrence.status) await db.update(paymentDueOccurrences).set({ status }).where(eq(paymentDueOccurrences.id, row.occurrence.id));
     const reminderKind = reminderKindFor({ dueAt: row.occurrence.dueAt, status, reminderDays: normalizeReminderDays(JSON.parse(row.schedule.reminderDaysJson)) }, now);
     if (!reminderKind) continue;
-    await db.insert(paymentDueReminderEvents).values({ occurrenceId: row.occurrence.id, companyId: row.occurrence.companyId, reminderKind, triggeredForDate: dayKey(now) }).onDuplicateKeyUpdate({ set: {} });
+    await db.insert(paymentDueReminderEvents).values({ occurrenceId: row.occurrence.id, companyId: row.occurrence.companyId, reminderKind, triggeredForDate: dayKey(now) }).onDuplicateKeyUpdate({ set: { reminderKind } }); // Rappel déjà noté ce jour : sans effet (une mise à jour vide est refusée).
     reminders += 1;
   }
   return { schedules: schedules.length, reminders };

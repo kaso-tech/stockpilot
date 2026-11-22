@@ -1,4 +1,4 @@
-export const expenseCategories = ["rent", "energy", "connection", "salary", "marketing", "supplies", "taxes", "other"] as const;
+export const expenseCategories = ["rent", "energy", "connection", "salary", "marketing", "supplies", "taxes", "other", "food"] as const;
 export type ExpenseCategory = (typeof expenseCategories)[number];
 
 export function expenseTotalCents(rows: Array<{ amountCents: number }>) {
@@ -9,8 +9,9 @@ export function monthlyExpenseTotalCents(rows: Array<{ amountCents: number; spen
   return expenseTotalCents(rows.filter(row => row.spentAt.toISOString().slice(0, 7) === yearMonth));
 }
 
-export function agentPaymentExpenseRows(rows: Array<{ amountCents: number; paidAt: Date }>) {
-  return rows.map(row => ({ category: "agent_payments", amountCents: row.amountCents, spentAt: row.paidAt }));
+/** Paiements aux agents vus comme des dépenses ; la prime d'alimentation est classée « Alimentation ». */
+export function agentPaymentExpenseRows(rows: Array<{ amountCents: number; paidAt: Date; paymentKind?: string | null }>) {
+  return rows.map(row => ({ category: row.paymentKind === "food_allowance" ? "food" : "agent_payments", amountCents: row.amountCents, spentAt: row.paidAt }));
 }
 
 export function expenseBreakdownByCategory(rows: Array<{ category: string; amountCents: number; spentAt: Date }>, yearMonth: string) {

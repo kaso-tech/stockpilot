@@ -10,6 +10,7 @@ export const expenseColors: Record<string, string> = {
   marketing: "#C11574",
   supplies: "#157F4F",
   taxes: "#B42318",
+  food: "#CA8504",
   other: "#667085",
 };
 

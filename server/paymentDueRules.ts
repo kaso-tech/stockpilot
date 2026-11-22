@@ -39,3 +39,41 @@ export function reminderKindFor(input: { dueAt: Date; status: PaymentDueStatus; 
   const daysUntilDue = Math.round((midnightDue - midnightNow) / 86_400_000);
   return input.reminderDays.includes(daysUntilDue) ? "upcoming" : null;
 }
+
+export type PaymentDueRecurrence = "once" | "monthly" | "daily" | "weekly";
+
+/** Jour de la semaine au format 1 = lundi … 7 = dimanche. */
+export function isoWeekday(date: Date): number { const day = date.getUTCDay(); return day === 0 ? 7 : day; }
+
+/**
+ * Sens de `dueDay` selon la fréquence :
+ * - mensuelle : jour du mois (1 à 31) ;
+ * - hebdomadaire : jour de la semaine (1 = lundi … 7 = dimanche) ;
+ * - journalière : 6 = du lundi au samedi (dimanche exclu), 7 = tous les jours.
+ */
+export function nextDueAt(recurrence: PaymentDueRecurrence, previousDueAt: Date, dueDay?: number | null): Date {
+  if (recurrence === "monthly") return nextMonthlyDueAt(previousDueAt, dueDay ?? previousDueAt.getUTCDate());
+  const next = new Date(previousDueAt);
+  if (recurrence === "weekly") { next.setUTCDate(next.getUTCDate() + 7); return next; }
+  next.setUTCDate(next.getUTCDate() + 1);
+  if (recurrence === "daily" && dueDay === 6 && isoWeekday(next) === 7) next.setUTCDate(next.getUTCDate() + 1);
+  return next;
+}
+
+/** Première échéance à partir d'aujourd'hui (ou de la date de début) pour les fréquences journalière et hebdomadaire. */
+export function initialRecurringDueAt(recurrence: "daily" | "weekly", dueDay: number, from: Date): Date {
+  const start = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate(), 12));
+  if (recurrence === "weekly") { const delta = (Math.min(7, Math.max(1, dueDay)) - isoWeekday(start) + 7) % 7; start.setUTCDate(start.getUTCDate() + delta); return start; }
+  if (dueDay === 6 && isoWeekday(start) === 7) start.setUTCDate(start.getUTCDate() + 1);
+  return start;
+}
+
+/** Combien d'échéances préparer à l'avance : assez pour planifier sans encombrer la liste. */
+export function materializationHorizonDays(recurrence: PaymentDueRecurrence): number {
+  return recurrence === "daily" ? 14 : recurrence === "weekly" ? 56 : 120;
+}
+
+/** Rappels par défaut : le jour même pour un paiement quotidien, la veille pour un hebdomadaire. */
+export function defaultReminderDays(recurrence: PaymentDueRecurrence): number[] {
+  return recurrence === "daily" ? [0] : recurrence === "weekly" ? [1, 0] : [7, 3, 1];
+}

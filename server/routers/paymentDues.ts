@@ -4,7 +4,7 @@ import { z } from "zod";
 import { agentPayments, agents, auditLogs, expenses, paymentDueBeneficiaryGroupMembers, paymentDueBeneficiaryGroups, paymentDueOccurrences, paymentDueReminderEvents, paymentDueSchedules, paymentDueSettlements, paymentDueTemplates, sellerWarehouseAssignments, users, warehouses } from "../../drizzle/schema";
 import { companyScope } from "../companyScope";
 import { getDb } from "../db";
-import { initialMonthlyDueAt, nextMonthlyDueAt, normalizeReminderDays, resolvePaymentDueStatus } from "../paymentDueRules";
+import { defaultReminderDays, initialMonthlyDueAt, initialRecurringDueAt, materializationHorizonDays, nextDueAt, normalizeReminderDays, resolvePaymentDueStatus } from "../paymentDueRules";
 import { buildPaymentDueForecast, paymentDueForecastMonths } from "../paymentDueForecast";
 import { isPaymentDueReceiptKeyInScope } from "../paymentReceiptRules";
 import { getDefaultWarehouse, getScopedWarehouse } from "../warehouseStock";
@@ -12,7 +12,17 @@ import { storagePut } from "../storage";
 import { permissionProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 
-const expenseCategories = ["rent", "energy", "connection", "salary", "marketing", "supplies", "taxes", "other"] as const;
+const expenseCategories = ["rent", "energy", "connection", "salary", "marketing", "supplies", "taxes", "other", "food"] as const;
+const scheduleTypes = ["expense", "salary", "food_allowance"] as const;
+const recurrences = ["once", "monthly", "daily", "weekly"] as const;
+/** Salaire et prime d'alimentation sont versés à un agent ou un vendeur. */
+const paidToBeneficiary = (type: string) => type === "salary" || type === "food_allowance";
+/** Règles de date communes aux échéances et aux modèles. */
+function validateRecurrence(input: { recurrence: (typeof recurrences)[number]; dueDay?: number | null }, validation: z.RefinementCtx) {
+  if (input.recurrence === "monthly" && !input.dueDay) validation.addIssue({ code: z.ZodIssueCode.custom, message: "Le jour du mois est requis pour une échéance mensuelle." });
+  if (input.recurrence === "weekly" && (!input.dueDay || input.dueDay > 7)) validation.addIssue({ code: z.ZodIssueCode.custom, message: "Le jour de la semaine est requis pour une échéance hebdomadaire." });
+  if (input.recurrence === "daily" && input.dueDay != null && input.dueDay !== 6 && input.dueDay !== 7) validation.addIssue({ code: z.ZodIssueCode.custom, message: "Pour une échéance journalière, indiquez 6 (sauf dimanche) ou 7 (tous les jours)." });
+}
 const occurrenceStatuses = ["upcoming", "due", "overdue", "partially_paid", "paid", "cancelled"] as const;
 const settlementReceiptInput = z.object({ receiptKey: z.string().trim().max(720).nullable().optional(), receiptName: z.string().trim().max(180).nullable().optional(), receiptMimeType: z.string().trim().max(80).nullable().optional() }).superRefine((input, validation) => {
   const present = [input.receiptKey, input.receiptName, input.receiptMimeType].filter(Boolean).length;
@@ -22,7 +32,7 @@ export const paymentDueSettlementInput = z.object({ occurrenceId: z.number().int
 
 const scheduleInput = z.object({
   id: z.number().int().positive().optional(),
-  scheduleType: z.enum(["expense", "salary"]),
+  scheduleType: z.enum(scheduleTypes),
   title: z.string().trim().min(2).max(180),
   expenseCategory: z.enum(expenseCategories).nullable().optional(),
   beneficiaryType: z.enum(["user", "agent"]).nullable().optional(),
@@ -31,17 +41,17 @@ const scheduleInput = z.object({
   templateId: z.number().int().positive().nullable().optional(),
   amountCents: z.number().int().positive().max(1_000_000_000),
   warehouseId: z.number().int().positive().optional(),
-  recurrence: z.enum(["once", "monthly"]),
+  recurrence: z.enum(recurrences),
   startsAt: z.coerce.date().nullable().optional(),
   dueDay: z.number().int().min(1).max(31).nullable().optional(),
   endsAt: z.coerce.date().nullable().optional(),
-  reminderDays: z.array(z.number().int().min(0).max(90)).max(8).default([7, 3, 1]),
+  reminderDays: z.array(z.number().int().min(0).max(90)).max(8).optional(),
   responsibleUserId: z.number().int().positive().nullable().optional(),
 }).superRefine((input, validation) => {
   if (input.scheduleType === "expense" && !input.expenseCategory) validation.addIssue({ code: z.ZodIssueCode.custom, message: "Une catégorie est requise pour une dépense." });
-  if (input.scheduleType === "salary" && ((!input.beneficiaryType || !input.beneficiaryId) && !input.beneficiaryGroupId)) validation.addIssue({ code: z.ZodIssueCode.custom, message: "Un bénéficiaire ou groupe est requis pour un salaire." });
+  if (paidToBeneficiary(input.scheduleType) && ((!input.beneficiaryType || !input.beneficiaryId) && !input.beneficiaryGroupId)) validation.addIssue({ code: z.ZodIssueCode.custom, message: input.scheduleType === "food_allowance" ? "Un agent ou un groupe est requis pour une prime d’alimentation." : "Un bénéficiaire ou groupe est requis pour un salaire." });
   if (input.beneficiaryGroupId && (input.beneficiaryType || input.beneficiaryId)) validation.addIssue({ code: z.ZodIssueCode.custom, message: "Choisissez un bénéficiaire individuel ou un groupe, pas les deux." });
-  if (input.recurrence === "monthly" && !input.dueDay) validation.addIssue({ code: z.ZodIssueCode.custom, message: "Le jour du mois est requis pour une échéance mensuelle." });
+  validateRecurrence(input, validation);
   if (input.recurrence === "once" && !input.startsAt) validation.addIssue({ code: z.ZodIssueCode.custom, message: "La date est requise pour une échéance ponctuelle." });
   if (input.endsAt && input.startsAt && input.endsAt < input.startsAt) validation.addIssue({ code: z.ZodIssueCode.custom, message: "La fin ne peut pas précéder la première échéance." });
 });
@@ -56,15 +66,15 @@ function periodLabelFor(date: Date) { return date.toISOString().slice(0, 7); }
 
 export async function materializePaymentDueOccurrences(db: any, schedule: typeof paymentDueSchedules.$inferSelect, now = new Date()) {
   if (schedule.status !== "active") return 0;
-  const horizon = new Date(now); horizon.setUTCDate(horizon.getUTCDate() + 120);
+  const horizon = new Date(now); horizon.setUTCDate(horizon.getUTCDate() + materializationHorizonDays(schedule.recurrence));
   let dueAt = new Date(schedule.startsAt);
   let created = 0;
   while (dueAt <= horizon && (!schedule.endsAt || dueAt <= schedule.endsAt)) {
     const status = resolvePaymentDueStatus({ dueAt, amountCents: schedule.amountCents, paidCents: 0 }, now);
-    await db.insert(paymentDueOccurrences).values({ scheduleId: schedule.id, companyId: schedule.companyId, warehouseId: schedule.warehouseId, dueAt, periodLabel: periodLabelFor(dueAt), amountCents: schedule.amountCents, status }).onDuplicateKeyUpdate({ set: {} });
+    await db.insert(paymentDueOccurrences).values({ scheduleId: schedule.id, companyId: schedule.companyId, warehouseId: schedule.warehouseId, dueAt, periodLabel: periodLabelFor(dueAt), amountCents: schedule.amountCents, status }).onDuplicateKeyUpdate({ set: { scheduleId: schedule.id } }); // Déjà générée : on n’y touche pas (mise à jour sans effet, une mise à jour vide est refusée).
     created += 1;
     if (schedule.recurrence === "once") break;
-    dueAt = nextMonthlyDueAt(dueAt, schedule.dueDay ?? dueAt.getUTCDate());
+    dueAt = nextDueAt(schedule.recurrence, dueAt, schedule.dueDay);
   }
   return created;
 }
@@ -75,13 +85,13 @@ async function assertScheduleReferences(db: any, companyId: number | null, input
     const responsible = (await db.select({ id: users.id }).from(users).where(and(eq(users.id, input.responsibleUserId), companyScope(users.companyId, companyId), eq(users.active, true))).limit(1))[0];
     if (!responsible) throw new TRPCError({ code: "BAD_REQUEST", message: "Le responsable sélectionné n’appartient pas à cette entreprise." });
   }
-  if (input.scheduleType === "salary" && input.beneficiaryId && input.beneficiaryType) {
+  if (paidToBeneficiary(input.scheduleType) && input.beneficiaryId && input.beneficiaryType) {
     const beneficiary = input.beneficiaryType === "agent"
       ? (await db.select({ id: agents.id }).from(agents).where(and(eq(agents.id, input.beneficiaryId), companyScope(agents.companyId, companyId))).limit(1))[0]
       : (await db.select({ id: users.id }).from(users).where(and(eq(users.id, input.beneficiaryId), companyScope(users.companyId, companyId))).limit(1))[0];
     if (!beneficiary) throw new TRPCError({ code: "BAD_REQUEST", message: "Le bénéficiaire n’appartient pas à cette entreprise." });
   }
-  if (input.scheduleType === "salary" && input.beneficiaryGroupId) {
+  if (paidToBeneficiary(input.scheduleType) && input.beneficiaryGroupId) {
     const group = (await db.select({ id: paymentDueBeneficiaryGroups.id, warehouseId: paymentDueBeneficiaryGroups.warehouseId }).from(paymentDueBeneficiaryGroups).where(and(eq(paymentDueBeneficiaryGroups.id, input.beneficiaryGroupId), companyScope(paymentDueBeneficiaryGroups.companyId, companyId), eq(paymentDueBeneficiaryGroups.active, true))).limit(1))[0];
     if (!group) throw new TRPCError({ code: "BAD_REQUEST", message: "Le groupe sélectionné n’appartient pas à cette entreprise ou est inactif." });
     if (group.warehouseId && group.warehouseId !== warehouse.id) throw new TRPCError({ code: "BAD_REQUEST", message: "Le groupe doit appartenir à l’entrepôt sélectionné." });
@@ -95,9 +105,10 @@ async function assertScheduleReferences(db: any, companyId: number | null, input
 }
 
 function scheduleValues(input: z.infer<typeof scheduleInput>, companyId: number, warehouseId: number) {
-  const dueDay = input.recurrence === "monthly" ? input.dueDay! : input.startsAt!.getUTCDate();
-  const startsAt = input.recurrence === "monthly" ? initialMonthlyDueAt(dueDay) : input.startsAt!;
-  return { companyId, warehouseId, scheduleType: input.scheduleType, title: input.title, expenseCategory: input.scheduleType === "expense" ? input.expenseCategory ?? "other" : null, beneficiaryType: input.scheduleType === "salary" ? input.beneficiaryType ?? null : null, beneficiaryId: input.scheduleType === "salary" ? input.beneficiaryId ?? null : null, beneficiaryGroupId: input.scheduleType === "salary" ? input.beneficiaryGroupId ?? null : null, templateId: input.templateId ?? null, amountCents: input.amountCents, recurrence: input.recurrence, dueDay, startsAt, endsAt: input.endsAt ?? null, reminderDaysJson: JSON.stringify(normalizeReminderDays(input.reminderDays)), responsibleUserId: input.responsibleUserId ?? null };
+  const dueDay = input.recurrence === "monthly" || input.recurrence === "weekly" ? input.dueDay! : input.recurrence === "daily" ? input.dueDay ?? 6 : input.startsAt!.getUTCDate();
+  const startsAt = input.recurrence === "monthly" ? initialMonthlyDueAt(dueDay) : input.recurrence === "once" ? input.startsAt! : initialRecurringDueAt(input.recurrence, dueDay, input.startsAt && input.startsAt > new Date() ? input.startsAt : new Date());
+  const beneficiary = paidToBeneficiary(input.scheduleType);
+  return { companyId, warehouseId, scheduleType: input.scheduleType, title: input.title, expenseCategory: input.scheduleType === "expense" ? input.expenseCategory ?? "other" : null, beneficiaryType: beneficiary ? input.beneficiaryType ?? null : null, beneficiaryId: beneficiary ? input.beneficiaryId ?? null : null, beneficiaryGroupId: beneficiary ? input.beneficiaryGroupId ?? null : null, templateId: input.templateId ?? null, amountCents: input.amountCents, recurrence: input.recurrence, dueDay, startsAt, endsAt: input.endsAt ?? null, reminderDaysJson: JSON.stringify(normalizeReminderDays(input.reminderDays ?? defaultReminderDays(input.recurrence))), responsibleUserId: input.responsibleUserId ?? null };
 }
 
 export const paymentDuesRouter = router({
@@ -116,7 +127,15 @@ export const paymentDuesRouter = router({
     if (input?.status) conditions.push(eq(paymentDueOccurrences.status, input.status));
     const rows = await db.select({ occurrence: paymentDueOccurrences, schedule: paymentDueSchedules, warehouseName: warehouses.name }).from(paymentDueOccurrences).innerJoin(paymentDueSchedules, eq(paymentDueOccurrences.scheduleId, paymentDueSchedules.id)).leftJoin(warehouses, eq(paymentDueOccurrences.warehouseId, warehouses.id)).where(and(...conditions)).orderBy(paymentDueOccurrences.dueAt).limit(300);
     const now = new Date();
-    return rows.map(row => ({ ...row.occurrence, title: row.schedule.title, scheduleType: row.schedule.scheduleType, recurrence: row.schedule.recurrence, dueDay: row.schedule.dueDay, expenseCategory: row.schedule.expenseCategory, beneficiaryType: row.schedule.beneficiaryType, beneficiaryId: row.schedule.beneficiaryId, beneficiaryGroupId: row.schedule.beneficiaryGroupId, templateId: row.schedule.templateId, responsibleUserId: row.schedule.responsibleUserId, warehouseName: row.warehouseName, computedStatus: resolvePaymentDueStatus({ dueAt: row.occurrence.dueAt, amountCents: row.occurrence.amountCents, paidCents: row.occurrence.paidCents, cancelled: row.occurrence.status === "cancelled" }, now) }));
+    // Nom du bénéficiaire (salaire, prime d'alimentation) pour distinguer les échéances d'un même groupe.
+    const agentIds = Array.from(new Set(rows.filter(row => row.schedule.beneficiaryType === "agent" && row.schedule.beneficiaryId).map(row => row.schedule.beneficiaryId!)));
+    const userIds = Array.from(new Set(rows.filter(row => row.schedule.beneficiaryType === "user" && row.schedule.beneficiaryId).map(row => row.schedule.beneficiaryId!)));
+    const [agentNames, userNames] = await Promise.all([
+      agentIds.length ? db.select({ id: agents.id, name: agents.name }).from(agents).where(and(companyScope(agents.companyId, ctx.user.companyId), inArray(agents.id, agentIds))) : Promise.resolve([]),
+      userIds.length ? db.select({ id: users.id, name: users.name }).from(users).where(and(companyScope(users.companyId, ctx.user.companyId), inArray(users.id, userIds))) : Promise.resolve([]),
+    ]);
+    const names = new Map<string, string>([...agentNames.map(item => [`agent:${item.id}`, item.name] as [string, string]), ...userNames.map(item => [`user:${item.id}`, item.name ?? "Vendeur"] as [string, string])]);
+    return rows.map(row => ({ ...row.occurrence, title: row.schedule.title, beneficiaryName: row.schedule.beneficiaryId ? names.get(`${row.schedule.beneficiaryType}:${row.schedule.beneficiaryId}`) ?? null : null, scheduleType: row.schedule.scheduleType, recurrence: row.schedule.recurrence, dueDay: row.schedule.dueDay, expenseCategory: row.schedule.expenseCategory, beneficiaryType: row.schedule.beneficiaryType, beneficiaryId: row.schedule.beneficiaryId, beneficiaryGroupId: row.schedule.beneficiaryGroupId, templateId: row.schedule.templateId, responsibleUserId: row.schedule.responsibleUserId, warehouseName: row.warehouseName, computedStatus: resolvePaymentDueStatus({ dueAt: row.occurrence.dueAt, amountCents: row.occurrence.amountCents, paidCents: row.occurrence.paidCents, cancelled: row.occurrence.status === "cancelled" }, now) }));
   }),
   schedules: router({
     list: permissionProcedure("payroll.manage").input(z.object({ warehouseId: z.number().int().positive().optional() }).optional()).query(async ({ ctx, input }) => {
@@ -161,7 +180,7 @@ export const paymentDuesRouter = router({
     }),
   }),
   templates: router({
-    list: permissionProcedure("payroll.manage").input(z.object({ scheduleType: z.enum(["expense", "salary"]).optional(), warehouseId: z.number().int().positive().optional(), includeInactive: z.boolean().optional() }).optional()).query(async ({ ctx, input }) => {
+    list: permissionProcedure("payroll.manage").input(z.object({ scheduleType: z.enum(scheduleTypes).optional(), warehouseId: z.number().int().positive().optional(), includeInactive: z.boolean().optional() }).optional()).query(async ({ ctx, input }) => {
       const db = await dbOrThrow();
       if (input?.warehouseId) await getScopedWarehouse(db, ctx.user.companyId, input.warehouseId, { requireActive: true });
       const conditions = [companyScope(paymentDueTemplates.companyId, ctx.user.companyId), ...(input?.includeInactive ? [] : [eq(paymentDueTemplates.active, true)])];
@@ -169,15 +188,15 @@ export const paymentDuesRouter = router({
       if (input?.warehouseId) conditions.push(eq(paymentDueTemplates.warehouseId, input.warehouseId));
       return db.select().from(paymentDueTemplates).where(and(...conditions)).orderBy(paymentDueTemplates.name);
     }),
-    save: permissionProcedure("payroll.manage").input(z.object({ name: z.string().trim().min(2).max(120), scheduleType: z.enum(["expense", "salary"]), expenseCategory: z.enum(expenseCategories).nullable().optional(), amountCents: z.number().int().positive(), recurrence: z.enum(["once", "monthly"]), dueDay: z.number().int().min(1).max(31).nullable().optional(), reminderDays: z.array(z.number().int().min(0).max(90)).max(8).default([7, 3, 1]), warehouseId: z.number().int().positive().optional(), responsibleUserId: z.number().int().positive().nullable().optional() }).superRefine((input, validation) => { if (input.scheduleType === "expense" && !input.expenseCategory) validation.addIssue({ code: z.ZodIssueCode.custom, message: "Une catégorie est requise pour un modèle de dépense." }); if (input.recurrence === "monthly" && !input.dueDay) validation.addIssue({ code: z.ZodIssueCode.custom, message: "Le jour du mois est requis." }); })).mutation(async ({ ctx, input }) => {
+    save: permissionProcedure("payroll.manage").input(z.object({ name: z.string().trim().min(2).max(120), scheduleType: z.enum(scheduleTypes), expenseCategory: z.enum(expenseCategories).nullable().optional(), amountCents: z.number().int().positive(), recurrence: z.enum(recurrences), dueDay: z.number().int().min(1).max(31).nullable().optional(), reminderDays: z.array(z.number().int().min(0).max(90)).max(8).optional(), warehouseId: z.number().int().positive().optional(), responsibleUserId: z.number().int().positive().nullable().optional() }).superRefine((input, validation) => { if (input.scheduleType === "expense" && !input.expenseCategory) validation.addIssue({ code: z.ZodIssueCode.custom, message: "Une catégorie est requise pour un modèle de dépense." }); validateRecurrence(input, validation); })).mutation(async ({ ctx, input }) => {
       const db = await dbOrThrow(); const warehouse = input.warehouseId ? await getScopedWarehouse(db, ctx.user.companyId, input.warehouseId, { requireActive: true }) : await getDefaultWarehouse(db, ctx.user.companyId);
-      const result = await db.insert(paymentDueTemplates).values({ companyId: ctx.user.companyId!, warehouseId: warehouse.id, name: input.name, scheduleType: input.scheduleType, expenseCategory: input.scheduleType === "expense" ? input.expenseCategory ?? "other" : null, amountCents: input.amountCents, recurrence: input.recurrence, dueDay: input.recurrence === "monthly" ? input.dueDay : null, reminderDaysJson: JSON.stringify(normalizeReminderDays(input.reminderDays)), responsibleUserId: input.responsibleUserId ?? null, createdByUserId: ctx.user.id });
+      const result = await db.insert(paymentDueTemplates).values({ companyId: ctx.user.companyId!, warehouseId: warehouse.id, name: input.name, scheduleType: input.scheduleType, expenseCategory: input.scheduleType === "expense" ? input.expenseCategory ?? "other" : null, amountCents: input.amountCents, recurrence: input.recurrence, dueDay: input.recurrence === "once" ? null : input.recurrence === "daily" ? input.dueDay ?? 6 : input.dueDay, reminderDaysJson: JSON.stringify(normalizeReminderDays(input.reminderDays ?? defaultReminderDays(input.recurrence))), responsibleUserId: input.responsibleUserId ?? null, createdByUserId: ctx.user.id });
       const id = Number(result[0].insertId); await db.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Modèle d’échéance créé", entityType: "Modèle échéance", entityId: String(id), detail: `Modèle « ${input.name} » créé.` }); return { id };
     }),
-    update: permissionProcedure("payroll.manage").input(z.object({ id: z.number().int().positive(), name: z.string().trim().min(2).max(120), scheduleType: z.enum(["expense", "salary"]), expenseCategory: z.enum(expenseCategories).nullable().optional(), amountCents: z.number().int().positive(), recurrence: z.enum(["once", "monthly"]), dueDay: z.number().int().min(1).max(31).nullable().optional(), reminderDays: z.array(z.number().int().min(0).max(90)).max(8).default([7, 3, 1]), warehouseId: z.number().int().positive().optional(), responsibleUserId: z.number().int().positive().nullable().optional() }).superRefine((input, validation) => { if (input.scheduleType === "expense" && !input.expenseCategory) validation.addIssue({ code: z.ZodIssueCode.custom, message: "Une catégorie est requise pour un modèle de dépense." }); if (input.recurrence === "monthly" && !input.dueDay) validation.addIssue({ code: z.ZodIssueCode.custom, message: "Le jour du mois est requis." }); })).mutation(async ({ ctx, input }) => {
+    update: permissionProcedure("payroll.manage").input(z.object({ id: z.number().int().positive(), name: z.string().trim().min(2).max(120), scheduleType: z.enum(scheduleTypes), expenseCategory: z.enum(expenseCategories).nullable().optional(), amountCents: z.number().int().positive(), recurrence: z.enum(recurrences), dueDay: z.number().int().min(1).max(31).nullable().optional(), reminderDays: z.array(z.number().int().min(0).max(90)).max(8).optional(), warehouseId: z.number().int().positive().optional(), responsibleUserId: z.number().int().positive().nullable().optional() }).superRefine((input, validation) => { if (input.scheduleType === "expense" && !input.expenseCategory) validation.addIssue({ code: z.ZodIssueCode.custom, message: "Une catégorie est requise pour un modèle de dépense." }); validateRecurrence(input, validation); })).mutation(async ({ ctx, input }) => {
       const db = await dbOrThrow(); const existing = (await db.select({ id: paymentDueTemplates.id }).from(paymentDueTemplates).where(and(eq(paymentDueTemplates.id, input.id), companyScope(paymentDueTemplates.companyId, ctx.user.companyId))).limit(1))[0]; if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Modèle introuvable." });
       const warehouse = input.warehouseId ? await getScopedWarehouse(db, ctx.user.companyId, input.warehouseId, { requireActive: true }) : await getDefaultWarehouse(db, ctx.user.companyId);
-      await db.update(paymentDueTemplates).set({ warehouseId: warehouse.id, name: input.name, scheduleType: input.scheduleType, expenseCategory: input.scheduleType === "expense" ? input.expenseCategory ?? "other" : null, amountCents: input.amountCents, recurrence: input.recurrence, dueDay: input.recurrence === "monthly" ? input.dueDay : null, reminderDaysJson: JSON.stringify(normalizeReminderDays(input.reminderDays)), responsibleUserId: input.responsibleUserId ?? null }).where(eq(paymentDueTemplates.id, existing.id));
+      await db.update(paymentDueTemplates).set({ warehouseId: warehouse.id, name: input.name, scheduleType: input.scheduleType, expenseCategory: input.scheduleType === "expense" ? input.expenseCategory ?? "other" : null, amountCents: input.amountCents, recurrence: input.recurrence, dueDay: input.recurrence === "once" ? null : input.recurrence === "daily" ? input.dueDay ?? 6 : input.dueDay, reminderDaysJson: JSON.stringify(normalizeReminderDays(input.reminderDays ?? defaultReminderDays(input.recurrence))), responsibleUserId: input.responsibleUserId ?? null }).where(eq(paymentDueTemplates.id, existing.id));
       await db.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Modèle d’échéance modifié", entityType: "Modèle échéance", entityId: String(existing.id), detail: `Modèle « ${input.name} » mis à jour.` }); return { success: true };
     }),
     setActive: permissionProcedure("payroll.manage").input(z.object({ id: z.number().int().positive(), active: z.boolean() })).mutation(async ({ ctx, input }) => {
@@ -241,7 +260,7 @@ export const paymentDuesRouter = router({
         expenseId = Number(result[0].insertId);
       } else {
         if (!row.schedule.beneficiaryType || !row.schedule.beneficiaryId) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Le bénéficiaire de salaire est incomplet." });
-        const result = await tx.insert(agentPayments).values({ companyId: ctx.user.companyId, warehouseId: warehouse.id, beneficiaryType: row.schedule.beneficiaryType, beneficiaryId: row.schedule.beneficiaryId, paymentKind: "salary", amountCents: input.amountCents, paidAt: input.settledAt, periodLabel: row.occurrence.periodLabel, note: input.note ?? null, createdByUserId: ctx.user.id });
+        const result = await tx.insert(agentPayments).values({ companyId: ctx.user.companyId, warehouseId: warehouse.id, beneficiaryType: row.schedule.beneficiaryType, beneficiaryId: row.schedule.beneficiaryId, paymentKind: row.schedule.scheduleType === "food_allowance" ? "food_allowance" : "salary", amountCents: input.amountCents, paidAt: input.settledAt, periodLabel: row.occurrence.periodLabel, note: input.note ?? null, createdByUserId: ctx.user.id });
         agentPaymentId = Number(result[0].insertId);
       }
       const paidCents = row.occurrence.paidCents + input.amountCents;

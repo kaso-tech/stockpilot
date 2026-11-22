@@ -3,7 +3,8 @@ export type ForecastOccurrence = {
   amountCents: number;
   paidCents: number;
   status: "upcoming" | "due" | "overdue" | "partially_paid" | "paid" | "cancelled";
-  scheduleType: "expense" | "salary";
+  /** La prime d’alimentation est comptée avec les rémunérations. */
+  scheduleType: "expense" | "salary" | "food_allowance";
 };
 
 export type MonthlyPaymentDueForecast = {
