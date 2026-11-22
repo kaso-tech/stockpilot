@@ -5,6 +5,7 @@ describe("règles commerciales", () => {
   it("applique automatiquement le tarif correspondant au type de client", () => {
     expect(priceForCustomer("ordinary", 1250, 900)).toBe(1250);
     expect(priceForCustomer("wholesale", 1250, 900)).toBe(900);
+    expect(priceForCustomer("wholesale", 1250, 0)).toBe(1250);
   });
 
   it("retient le palier de quantité le plus élevé applicable", () => {

@@ -147,8 +147,10 @@ export default function InvoiceCreate({
     }
   }, [customers, documentType, products]);
   const customer = customers.find(item => item.id === Number(customerId));
-  const priceType =
-    customer?.type === "wholesale" ? "wholesalePriceCents" : "retailPriceCents";
+  const isWholesaleCustomer = customer?.type === "wholesale";
+  // Prix grossiste non défini (0) : le prix détail s’applique.
+  const basePrice = (product: { retailPriceCents: number; wholesalePriceCents: number }) =>
+    isWholesaleCustomer && product.wholesalePriceCents > 0 ? product.wholesalePriceCents : product.retailPriceCents;
   const defaultSalesAgent = agents.find(
     agent =>
       agent.id === settings?.defaultSalesAgentId &&
@@ -189,7 +191,7 @@ export default function InvoiceCreate({
       const product = products.find(item => item.id === line.productId);
       if (!product) return null;
       const pricing = priceForQuantityTier(
-        product[priceType],
+        basePrice(product),
         line.quantity,
         customer?.type === "wholesale"
           ? product.wholesalePriceTiers
@@ -933,7 +935,7 @@ export default function InvoiceCreate({
                   {product.reference} · Stock {product.quantity}
                 </p>
                 <p className="mt-3 font-semibold text-primary">
-                  {formatCurrency(product[priceType])}
+                  {formatCurrency(basePrice(product))}
                 </p>
               </button>
             ))}

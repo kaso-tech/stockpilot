@@ -2,8 +2,9 @@ export type CustomerType = "ordinary" | "wholesale";
 export type RemunerationMode = "fixed" | "commission" | "fixed_plus_commission";
 export type CommissionBasis = "revenue" | "net_profit";
 
+/** Prix de base d’un client. Un prix grossiste à 0 signifie « non défini » : le grossiste paie alors le prix détail. */
 export function priceForCustomer(customerType: CustomerType, retailPriceCents: number, wholesalePriceCents: number) {
-  return customerType === "wholesale" ? wholesalePriceCents : retailPriceCents;
+  return customerType === "wholesale" && wholesalePriceCents > 0 ? wholesalePriceCents : retailPriceCents;
 }
 
 export function priceForQuantityTier(basePriceCents: number, quantity: number, tiers: Array<{ minQuantity: number; unitPriceCents: number }>) {
