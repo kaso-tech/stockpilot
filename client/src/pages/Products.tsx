@@ -25,7 +25,7 @@ type PriceTierForm = { minQuantity: string; unitPrice: string };
 type ProductForm = { reference: string; name: string; description: string; category: string; unit: string; purchasePrice: string; retailPrice: string; wholesalePrice: string; quantity: string; minimumQuantity: string; vatPercent: string; supplierId: string; retailTiersEnabled: boolean; wholesaleTiersEnabled: boolean; retailPriceTiers: PriceTierForm[]; wholesalePriceTiers: PriceTierForm[] };
 type NamedEntity = { id: number; name: string };
 
-const emptyProduct: ProductForm = { reference: "", name: "", description: "", category: "", unit: "unité", purchasePrice: "", retailPrice: "", wholesalePrice: "", quantity: "0", minimumQuantity: "0", vatPercent: "", supplierId: "none", retailTiersEnabled: false, wholesaleTiersEnabled: false, retailPriceTiers: [], wholesalePriceTiers: [] };
+const emptyProduct: ProductForm = { reference: "", name: "", description: "", category: "", unit: "", purchasePrice: "", retailPrice: "", wholesalePrice: "", quantity: "0", minimumQuantity: "0", vatPercent: "", supplierId: "none", retailTiersEnabled: false, wholesaleTiersEnabled: false, retailPriceTiers: [], wholesalePriceTiers: [] };
 
 export default function Products() {
   const { user } = useAuth();
