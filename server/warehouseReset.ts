@@ -8,7 +8,7 @@
 // utilisateurs et leur accès à l'entrepôt, et le journal d'activité (trace de l'opération).
 // Le stock total des produits est diminué du stock effacé, avec un ajustement tracé hors entrepôt.
 import { TRPCError } from "@trpc/server";
-import { and, eq, inArray, ne, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import {
   agentPayments, agents, auditLogs, cashClosures, expenseBudgets, expenses, inventoryItems, inventorySessions,
   paymentDueBeneficiaryGroupMembers, paymentDueBeneficiaryGroups, paymentDueOccurrences, paymentDueReminderEvents, paymentDueSchedules, paymentDueSettlements, paymentDueTemplates,
@@ -93,14 +93,14 @@ export async function resetWarehouseData(tx: Tx, companyId: number | null, wareh
   const productIds = stockRows.filter(row => row.quantity !== 0).map(row => row.productId);
   const productRows: Array<typeof products.$inferSelect> = productIds.length ? await tx.select().from(products).where(and(inArray(products.id, productIds), companyScope(products.companyId, companyId))).for("update") : [];
   const byId = new Map(productRows.map(product => [product.id, product]));
-  await tx.delete(stockMovements).where(and(companyScope(stockMovements.companyId, companyId), eq(stockMovements.warehouseId, id)));
+  // Mouvements de l'entrepôt ; pour l'entrepôt principal, aussi les mouvements anciens sans entrepôt (antérieurs au multi-entrepôts) et les traces des réinitialisations précédentes.
+  await tx.delete(stockMovements).where(and(companyScope(stockMovements.companyId, companyId), warehouse.isDefault ? or(eq(stockMovements.warehouseId, id), isNull(stockMovements.warehouseId)) : eq(stockMovements.warehouseId, id)));
   for (const row of stockRows) {
     const product = byId.get(row.productId);
     if (!product || row.quantity === 0) continue;
     const resulting = Math.max(0, product.quantity - row.quantity);
-    const delta = resulting - product.quantity;
     await tx.update(products).set({ quantity: resulting }).where(and(eq(products.id, product.id), companyScope(products.companyId, companyId)));
-    if (delta !== 0) await tx.insert(stockMovements).values({ companyId, productId: product.id, warehouseId: null, type: "adjustment", quantity: delta, previousQuantity: product.quantity, resultingQuantity: resulting, reason: `Réinitialisation de l’entrepôt ${warehouse.name}`, createdByUserId: actorUserId });
+    // Pas de mouvement de trace : il bloquerait la suppression du produit ; la réinitialisation figure au journal d'audit.
     if (resulting <= product.minimumQuantity) await tx.insert(stockAlerts).values({ companyId, productId: product.id, threshold: product.minimumQuantity, observedQuantity: resulting, status: "active" }).onDuplicateKeyUpdate({ set: { observedQuantity: resulting, threshold: product.minimumQuantity, status: "active", resolvedAt: null } });
   }
   await tx.delete(warehouseStocks).where(and(companyScope(warehouseStocks.companyId, companyId), eq(warehouseStocks.warehouseId, id)));

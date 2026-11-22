@@ -1,6 +1,6 @@
 import { moneyLabel } from "./moneyLabel";
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, inArray, isNull, lte, ne, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, like, lte, ne, not, or, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import {
@@ -752,11 +752,18 @@ export const appRouter = router({
       const db = await requireDb();
       const product = (await db.select({ id: products.id, imageUrl: products.imageUrl, imageThumbUrl: products.imageThumbUrl }).from(products).where(and(eq(products.id, input.id), companyScope(products.companyId, ctx.user.companyId))).limit(1))[0];
       if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Produit introuvable." });
-      const movement = await db.select({ id: stockMovements.id }).from(stockMovements).where(and(eq(stockMovements.productId, input.id), companyScope(stockMovements.companyId, ctx.user.companyId))).limit(1);
-      if (movement.length) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Un produit avec des mouvements ne peut pas être supprimé." });
+      // Les traces laissées par d'anciennes réinitialisations d'entrepôt ne comptent pas comme un historique.
+      const resetTrace = and(isNull(stockMovements.warehouseId), eq(stockMovements.type, "adjustment"), like(stockMovements.reason, "Réinitialisation de l’entrepôt%"));
+      const blocking = await db.select({ warehouseId: stockMovements.warehouseId, count: sql<number>`count(*)` }).from(stockMovements).where(and(eq(stockMovements.productId, input.id), companyScope(stockMovements.companyId, ctx.user.companyId), not(resetTrace!))).groupBy(stockMovements.warehouseId);
+      if (blocking.length) {
+        const warehouseRows = await db.select({ id: warehouses.id, name: warehouses.name }).from(warehouses).where(companyScope(warehouses.companyId, ctx.user.companyId));
+        const names = blocking.map(row => row.warehouseId == null ? "historique antérieur aux entrepôts" : warehouseRows.find(w => w.id === row.warehouseId)?.name ?? `entrepôt n°${row.warehouseId}`);
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: `Ce produit a des mouvements de stock (${names.join(", ")}) et ne peut pas être supprimé. Réinitialisez l’entrepôt concerné ou conservez le produit.` });
+      }
       await db.transaction(async (tx: any) => {
         const locked = (await tx.select({ id: products.id, imageUrl: products.imageUrl, imageThumbUrl: products.imageThumbUrl }).from(products).where(and(eq(products.id, input.id), companyScope(products.companyId, ctx.user.companyId))).for("update").limit(1))[0];
         if (!locked) throw new TRPCError({ code: "NOT_FOUND", message: "Produit introuvable." });
+        await tx.delete(stockMovements).where(and(eq(stockMovements.productId, input.id), companyScope(stockMovements.companyId, ctx.user.companyId), resetTrace!));
         await tx.delete(products).where(and(eq(products.id, input.id), companyScope(products.companyId, ctx.user.companyId)));
       });
       const { deleteProductImageFiles } = await import("./productImages");
