@@ -14,6 +14,7 @@ import {
   type OfflineScope,
 } from "@/lib/offlineStore";
 import { createSingleFlight } from "@/lib/singleFlight";
+import { SERVER_REACHABILITY_EVENT, isServerReachable, probeServer, trackedFetch } from "@/lib/serverReachability";
 
 type Discount = { type: "none" | "percent" | "fixed"; value: number };
 export type OfflinePayment = { method: "cash" | "card" | "mobile_money" | "bank_transfer" | "credit"; amountCents: number };
@@ -26,7 +27,7 @@ export type SyncLogEntry = { id: string; ownerUserId: number; companyId: number;
 const maxLogEntries = 150;
 function summaryFor(item: OfflineSale) { const quantity = item.draft.items.reduce((sum, line) => sum + line.quantity, 0); const title = item.kind === "pos_sale" ? "Vente comptoir" : item.draft.channel === "quote" ? "Devis" : item.checkout?.settlementMode === "partial" ? "Facture · règlement partiel" : "Brouillon de facture"; return `${title} · ${quantity} article${quantity > 1 ? "s" : ""}`; }
 function authHeaders() { try { const raw = sessionStorage.getItem("manus-cookie"); const cookie = raw?.split(";").find(value => value.trim().startsWith("manus_session=")); const token = cookie?.trim().slice("manus_session=".length); return token ? { Authorization: `Bearer ${token}` } : {}; } catch { return {}; } }
-const syncClient = createTRPCProxyClient<AppRouter>({ links: [httpBatchLink({ url: "/api/trpc", transformer: superjson, headers: authHeaders, fetch: (input, init) => globalThis.fetch(input, { ...(init ?? {}), credentials: "include" }) })] });
+const syncClient = createTRPCProxyClient<AppRouter>({ links: [httpBatchLink({ url: "/api/trpc", transformer: superjson, headers: authHeaders, fetch: trackedFetch })] });
 
 export type PersistenceStatus = "idle" | "saving" | "saved" | "error";
 type OfflineContextValue = { isOnline: boolean; sales: OfflineSale[]; syncLog: SyncLogEntry[]; pendingCount: number; failedCount: number; pendingProductQuantitiesByWarehouse: Record<number, Record<number, number>>; persistenceStatus: PersistenceStatus; persistenceError: string | null; lastLocalSnapshotAt: number | null; retryPersistence: () => void; queuePosSale: (draft: OfflinePosDraft, checkout: OfflineCheckout) => void; queueInvoiceDraft: (draft: OfflineInvoiceDraft) => void; queueInvoiceSale: (draft: OfflineInvoiceDraft, checkout: OfflineCheckout) => void; syncNow: () => Promise<void>; retryOperation: (operationId: string) => Promise<void>; clearCompletedSyncLog: () => void };
@@ -44,7 +45,10 @@ function normalizeScopedRecord<T extends ScopedRecord>(value: unknown, scope: Of
 export function OfflineProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { activeWarehouseId, isReady: isWarehouseReady } = useActiveWarehouse();
-  const [isOnline, setIsOnline] = useState(() => navigator.onLine);
+  const [browserOnline, setIsOnline] = useState(() => navigator.onLine);
+  // En ligne = le navigateur a du réseau ET le serveur répond.
+  const [serverReachable, setServerReachable] = useState(() => isServerReachable());
+  const isOnline = browserOnline && serverReachable;
   const [sales, setSales] = useState<OfflineSale[]>([]);
   const [syncLog, setSyncLog] = useState<SyncLogEntry[]>([]);
   const [hydratedScopeKey, setHydratedScopeKey] = useState<string | null>(null);
@@ -192,7 +196,7 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
   }, [offlineScope, user]);
 
   const syncNow = useCallback(() => syncSingleFlightRef.current(async () => {
-    if (!navigator.onLine || !user) return;
+    if (!navigator.onLine || !isServerReachable() || !user) return;
     const queue = offlineScope ? salesRef.current.filter(item => belongsToOfflineScope(item, offlineScope) && item.draft.warehouseId === offlineScope.warehouseId) : [];
     let synced = 0;
     for (const item of queue) if (await syncOperation(item)) synced += 1;
@@ -203,7 +207,7 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
   const retryOperation = useCallback((operationId: string) => syncSingleFlightRef.current(async () => {
     const item = offlineScope ? salesRef.current.find(record => record.id === operationId && belongsToOfflineScope(record, offlineScope) && record.draft.warehouseId === offlineScope.warehouseId) : undefined;
     if (!item) { toast.error("Cette opération n’est plus disponible."); return; }
-    if (!navigator.onLine) { toast.error("Reconnectez-vous avant de relancer la synchronisation."); return; }
+    if (!navigator.onLine || !(await probeServer())) { toast.error("Serveur injoignable : reconnectez-vous avant de relancer la synchronisation."); return; }
     if (await syncOperation(item)) { window.dispatchEvent(new Event("stockpilot-offline-sync")); toast.success("Synchronisation relancée avec succès."); }
   }), [offlineScope?.warehouseId, syncOperation, user]);
 
@@ -211,8 +215,29 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
     if (hydratedScopeKey && navigator.onLine) void syncNow();
   }, [hydratedScopeKey, syncNow]);
 
+  // État réel du serveur dès l'ouverture : les données gardées s'affichent sans requête,
+  // une panne ne serait sinon découverte qu'à la première action.
+  useEffect(() => { if (navigator.onLine) void probeServer(); }, []);
+  // Serveur injoignable : sonde toutes les 15 s ; à son retour, synchronisation immédiate.
+  useEffect(() => {
+    const onChange = (event: Event) => { const value = (event as CustomEvent<boolean>).detail; setServerReachable(value); if (value) void syncNow(); };
+    window.addEventListener(SERVER_REACHABILITY_EVENT, onChange);
+    return () => window.removeEventListener(SERVER_REACHABILITY_EVENT, onChange);
+  }, [syncNow]);
+  useEffect(() => {
+    if (serverReachable || !browserOnline) return;
+    const timer = window.setInterval(() => void probeServer(), 15_000);
+    return () => window.clearInterval(timer);
+  }, [serverReachable, browserOnline]);
+  // Opérations en attente : nouvelle tentative chaque minute (au cas où un retour du réseau serait passé inaperçu).
+  useEffect(() => {
+    if (!sales.length) return;
+    const timer = window.setInterval(() => { if (navigator.onLine) void probeServer().then(ok => { if (ok) void syncNow(); }); }, 60_000);
+    return () => window.clearInterval(timer);
+  }, [sales.length, syncNow]);
+
   const clearCompletedSyncLog = useCallback(() => persistState(salesRef.current, logRef.current.filter(entry => entry.status !== "succeeded")), [persistState]);
-  useEffect(() => { const online = () => { setIsOnline(true); void syncNow(); }; const offline = () => setIsOnline(false); window.addEventListener("online", online); window.addEventListener("offline", offline); if (navigator.onLine) void syncNow(); return () => { window.removeEventListener("online", online); window.removeEventListener("offline", offline); }; }, [syncNow]);
+  useEffect(() => { const online = () => { setIsOnline(true); void probeServer().then(ok => { if (ok) void syncNow(); }); }; const offline = () => setIsOnline(false); window.addEventListener("online", online); window.addEventListener("offline", offline); if (navigator.onLine) void syncNow(); return () => { window.removeEventListener("online", online); window.removeEventListener("offline", offline); }; }, [syncNow]);
   const accountSales = useMemo(() => offlineScope ? sales.filter(sale => belongsToOfflineScope(sale, offlineScope) && sale.draft.warehouseId === offlineScope.warehouseId) : [], [offlineScope, sales]);
   const accountLog = useMemo(() => offlineScope ? syncLog.filter(entry => belongsToOfflineScope(entry, offlineScope)).sort((a, b) => b.updatedAt - a.updatedAt) : [], [offlineScope, syncLog]);
   const pendingProductQuantitiesByWarehouse = useMemo(() => accountSales.reduce<Record<number, Record<number, number>>>((totals, sale) => { if (sale.kind !== "pos_sale" || sale.status === "failed" || !Number.isInteger(sale.draft.warehouseId)) return totals; const warehouseTotals = totals[sale.draft.warehouseId] ?? {}; for (const item of sale.draft.items) warehouseTotals[item.productId] = (warehouseTotals[item.productId] ?? 0) + item.quantity; totals[sale.draft.warehouseId] = warehouseTotals; return totals; }, {}), [accountSales]);

@@ -30,7 +30,7 @@ test("la photo déjà chargée reste décodable hors réseau dans son périmètr
   await context.setOffline(false);
 });
 
-test("la recherche Ctrl+K utilise les routes autorisées sans nouveau document et le bleu reste personnalisable", async ({ page }) => {
+test("la recherche Ctrl+K utilise les routes autorisées sans nouveau document et l’ancien bleu par défaut devient le pétrole", async ({ page }) => {
   await mockApi(page, "viewer");
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Bonjour Compte" })).toBeVisible();
@@ -39,7 +39,7 @@ test("la recherche Ctrl+K utilise les routes autorisées sans nouveau document e
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText("Caisse & comptabilité", { exact: true })).not.toBeVisible();
   await page.keyboard.press("Escape");
-  await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--app-primary").trim().toLowerCase())).toBe("#2563eb");
+  await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--app-primary").trim().toLowerCase())).toBe("#0b6e76");
   await page.getByRole("button", { name: "Passer au thème clair" }).click();
   await expect(page.getByRole("button", { name: "Passer au thème sombre" })).toBeVisible();
   await page.getByRole("button", { name: "Passer au thème sombre" }).click();

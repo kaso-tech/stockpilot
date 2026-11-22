@@ -51,7 +51,7 @@ test("le relief des cartes reste léger, contrasté et indépendant du shell en 
   expect(await card.evaluate(el => getComputedStyle(el).boxShadow)).not.toBe(initialShadow);
   expect(await card.evaluate(el => getComputedStyle(el).translate)).toBe("none");
   expect(await page.evaluate(() => getComputedStyle(document.querySelector("main")!).transform)).toBe("none");
-  expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--app-primary").trim().toLowerCase())).toBe("#2563eb");
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--app-primary").trim().toLowerCase())).toBe("#0b6e76");
   await expect.poll(() => titleContrast(card)).toBeGreaterThanOrEqual(4.5);
   await page.screenshot({ path: testInfo.outputPath("desktop-light.png"), fullPage: true });
   await setTheme(page, true);
@@ -79,31 +79,36 @@ test("les cartes restent immobiles en motion réduite et accessibles sur mobile"
   await page.screenshot({ path: testInfo.outputPath("mobile-dark.png"), fullPage: true });
 });
 
-test("le panier POS reste fixé au viewport sans ancêtre transformé en desktop et mobile", async ({ page }, testInfo) => {
+test("le panier POS reste visible sans ancêtre transformé : panneau latéral sur ordinateur, barre fixe sur téléphone", async ({ page }, testInfo) => {
+  const noTransformedAncestor = (el: Element) => {
+    let ancestor = el.parentElement;
+    while (ancestor) {
+      const style = getComputedStyle(ancestor);
+      if (style.transform !== "none" || style.translate !== "none" || style.perspective !== "none") return false;
+      ancestor = ancestor.parentElement;
+    }
+    return true;
+  };
   await mockApi(page);
+  await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto("/");
   await pushRoute(page, "/pos");
   await page.getByRole("button", { name: /Produit de recette/ }).click();
   const cart = page.getByRole("complementary", { name: "Panier de vente", exact: true });
   await expect(cart).toBeVisible();
-  for (const [width, height] of [[1280, 720], [390, 844]]) {
-    await page.setViewportSize({ width, height });
-    await expect.poll(() => cart.evaluate(el => {
-      let ancestor = el.parentElement;
-      while (ancestor) {
-        const style = getComputedStyle(ancestor);
-        if (style.transform !== "none" || style.translate !== "none" || style.perspective !== "none") return false;
-        ancestor = ancestor.parentElement;
-      }
-      return true;
-    })).toBe(true);
-    expect(await cart.evaluate(el => getComputedStyle(el).position)).toBe("fixed");
-    const box = await cart.boundingBox();
-    expect(box).not.toBeNull();
-    expect(box!.x).toBeGreaterThanOrEqual(0);
-    expect(box!.x + box!.width).toBeLessThanOrEqual(width + 1);
-    expect(box!.y + box!.height).toBeLessThanOrEqual(height + 1);
-    expect(height - (box!.y + box!.height)).toBeCloseTo(width < 640 ? 0 : 20, 0);
-    await page.screenshot({ path: testInfo.outputPath(width < 640 ? "pos-mobile.png" : "pos-desktop.png") });
-  }
+  await expect.poll(() => cart.evaluate(noTransformedAncestor)).toBe(true);
+  expect(await cart.evaluate(el => getComputedStyle(el).position)).toBe("sticky");
+  const box = await cart.boundingBox();
+  expect(box!.x + box!.width).toBeLessThanOrEqual(1280 + 1);
+  expect(box!.y + box!.height).toBeLessThanOrEqual(720 + 1);
+  await page.screenshot({ path: testInfo.outputPath("pos-desktop.png") });
+  await page.setViewportSize({ width: 390, height: 844 });
+  const bar = page.getByRole("region", { name: "Total du panier" });
+  await expect(bar).toBeVisible();
+  await expect.poll(() => bar.evaluate(noTransformedAncestor)).toBe(true);
+  expect(await bar.evaluate(el => getComputedStyle(el).position)).toBe("fixed");
+  const barBox = await bar.boundingBox();
+  expect(barBox!.x).toBeGreaterThanOrEqual(0);
+  expect(844 - (barBox!.y + barBox!.height)).toBeCloseTo(0, 0);
+  await page.screenshot({ path: testInfo.outputPath("pos-mobile.png") });
 });

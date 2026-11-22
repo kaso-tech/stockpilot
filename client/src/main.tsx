@@ -7,6 +7,7 @@ import superjson from "superjson";
 import { registerSW } from "virtual:pwa-register";
 import App from "./App";
 import { requestPersistentOfflineStorage } from "./lib/offlineStore";
+import { trackedFetch } from "./lib/serverReachability";
 import { announcePwaUpdateAvailable, createOfflineFirstQueryClient, shouldRegisterServiceWorker } from "./lib/offlineRuntime";
 import "./index.css";
 
@@ -77,12 +78,8 @@ const trpcClient = trpc.createClient({
         }
         return {};
       },
-      fetch(input, init) {
-        return globalThis.fetch(input, {
-          ...(init ?? {}),
-          credentials: "include",
-        });
-      },
+      // Suit la disponibilité réelle du serveur (bascule hors connexion si aucune réponse).
+      fetch: trackedFetch,
     }),
   ],
 });

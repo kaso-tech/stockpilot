@@ -44,7 +44,9 @@ export function ActiveWarehouseProvider({ children }: { children: React.ReactNod
   const warehouses = useMemo(() => rows.filter(warehouse => warehouse.active).map(warehouse => ({ id: warehouse.id, name: warehouse.name, code: warehouse.code, isDefault: warehouse.isDefault })), [rows]);
   useEffect(() => {
     setLocalActiveWarehouseId(user ? active?.warehouseId ?? readStoredWarehouse(user) : null);
-  }, [active?.warehouseId, user]);
+    // Entrepôt confirmé par le serveur : mémorisé pour rouvrir l'application sans réseau.
+    if (user && active?.warehouseId) writeStoredWarehouse(user, active.warehouseId);
+  }, [active?.warehouseId, user?.id, user?.companyId]);
   const setActive = trpc.warehouses.setActive.useMutation({
     onSuccess: result => { if (user) writeStoredWarehouse(user, result.warehouseId); setLocalActiveWarehouseId(result.warehouseId); void utils.warehouses.active.invalidate(); void utils.products.list.invalidate(); void utils.movements.list.invalidate(); void utils.inventory.list.invalidate(); void utils.dashboard.get.invalidate(); void utils.transactions.list.invalidate(); void utils.expenses.list.invalidate(); void utils.expenses.report.invalidate(); void utils.payroll.overview.invalidate(); void utils.commerce.agents.detail.invalidate(); },
     onError: error => toast.error(error.message),

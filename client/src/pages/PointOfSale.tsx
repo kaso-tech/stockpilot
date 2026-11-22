@@ -52,6 +52,8 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
+import { isNetworkFailure } from "@/lib/offlineSession";
+import { markServerReachable } from "@/lib/serverReachability";
 
 type CartItem = { productId: number; quantity: number; discount: DiscountForm };
 type PurchaseItem = {
@@ -309,6 +311,8 @@ export default function PointOfSale() {
   // Un ticket mis en attente puis repris n'est jamais annulé automatiquement.
   const freshDraftId = useRef<number | null>(null);
   const abandonDraft = trpc.transactions.removeDraft.useMutation({ onSuccess: () => utils.transactions.list.invalidate(), onError: () => undefined });
+  // Brouillon hors connexion préparé à chaque encaissement : utilisé si le serveur ne répond pas.
+  const offlineDraftRef = useRef<{ draft: OfflinePosDraft; totalCents: number } | null>(null);
   const draft = trpc.transactions.createDraft.useMutation({
     onSuccess: result => {
       utils.transactions.list.invalidate();
@@ -317,7 +321,16 @@ export default function PointOfSale() {
       else freshDraftId.current = result.id;
       setCheckoutSale({ ...result, channel: "pos" });
     },
-    onError: error => toast.error(error.message),
+    onError: error => {
+      const fallback = offlineDraftRef.current;
+      if (isNetworkFailure(error) && fallback && !recalled) {
+        markServerReachable(false);
+        toast.warning("Serveur injoignable : la vente est enregistrée hors connexion et sera envoyée au retour du réseau.");
+        setCheckoutSale({ id: null, totalCents: fallback.totalCents, invoiceNumber: "Vente hors connexion", channel: "pos", offlineDraft: fallback.draft });
+        return;
+      }
+      toast.error(error.message);
+    },
   });
   const savePendingTicket = trpc.transactions.createDraft.useMutation({
     onSuccess: result => {
@@ -354,6 +367,7 @@ export default function PointOfSale() {
         discount: discountPayload(line.discount),
       })),
     };
+    offlineDraftRef.current = { draft: offlineDraft, totalCents };
     if (!isOnline && recalled) return toast.error("Connectez-vous pour encaisser un ticket mis en attente.");
     if (!isOnline) {
       setCheckoutSale({
@@ -585,7 +599,7 @@ export default function PointOfSale() {
       </div>
       {/* Téléphone : barre de total en bas, panier plein écran à la demande. */}
       {showCart && cartCollapsed && !checkoutSale && (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 px-4 py-3 backdrop-blur md:hidden" style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
+        <div role="region" aria-label="Total du panier" className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 px-4 py-3 backdrop-blur md:hidden" style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
           <div className="flex items-center gap-3">
             <button type="button" onClick={() => setCartCollapsed(false)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
               <span className="relative grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary-soft text-primary"><ShoppingCart className="h-5 w-5" /><span key={cartUnits} className="animate-pop absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[11px] font-bold text-primary-foreground">{cartUnits}</span></span>

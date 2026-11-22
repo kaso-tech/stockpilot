@@ -56,32 +56,31 @@ test("le rapport des dépenses conserve son anneau, sa portée et sa lecture mob
   expect(errors).toEqual([]);
 });
 
-test("les priorités conservent les dépenses quand les autres blocs sont masqués sans les divulguer au vendeur", async ({ page, context }) => {
-  const preferencesJson = JSON.stringify({ metrics: false, expenses: false, budget: false, salesTrend: false, recentSales: false, lowStock: false, unpaidInvoices: false, priorities: true });
+test("« À traiter » reste seul quand les autres blocs sont masqués, sans montant financier pour le vendeur", async ({ page, context }) => {
+  // Les dépenses et le budget sont sur la page Dépenses ; l'accueil ne garde que ce qui demande une action.
+  const preferencesJson = JSON.stringify({ hero: true, metrics: false, salesTrend: false, recentSales: false, lowStock: false, todo: true });
   const overrides = {
     "dashboardPreferences.get": { preferencesJson },
-    "expenses.report": { totalCents: 0, count: 0, agentPaymentCents: 0, agentPaymentCount: 0, breakdown: [] },
-    "expenses.budget.get": null,
     "dashboard.get": {
-      summary: { monthlyExpenseCents: 100000, monthlyAgentPaymentCents: 25000 },
-      salesTrend: [], unpaidInvoices: [], recentSales: [], lowStock: [],
+      summary: { receivableCount: 2, receivableCents: 150000, receivableOverdueCount: 1, monthlyExpenseCents: 100000, monthlyAgentPaymentCents: 25000, activeAlerts: 1 },
+      salesTrend30: [], unpaidInvoices: [], recentSales: [], lowStock: [], topProducts: [],
     },
   };
   await mockApi(page, "admin", true, false, overrides);
   await page.goto("/");
   await expect(page.getByText("À traiter", { exact: true })).toBeVisible();
   await expect(page.getByRole("region", { name: "Indicateurs" })).not.toBeVisible();
-  const expenses = page.getByRole("button", { name: /^Dépenses du mois/ });
-  await expect(expenses).toBeVisible();
-  await expect(expenses).toContainText(/1\s?000/);
-  await expect(page.getByText(/^Dont paie/)).toBeVisible();
-  await expenses.click();
-  await expect(page).toHaveURL(/\/depenses$/);
+  const receivables = page.getByRole("button", { name: /Factures à encaisser/ });
+  await expect(receivables).toBeVisible();
+  await expect(receivables).toContainText(/1\s?500/);
+  await expect(page.getByText(/Dépenses du mois/)).not.toBeVisible();
+  await receivables.click();
+  await expect(page).toHaveURL(/\/factures$/);
 
   const sellerPage = await context.newPage();
   await mockApi(sellerPage, "seller", true, false, overrides);
   await sellerPage.goto("/");
   await expect(sellerPage.getByText("À traiter", { exact: true })).toBeVisible();
-  await expect(sellerPage.getByRole("button", { name: /^Dépenses du mois/ })).not.toBeVisible();
-  await expect(sellerPage.getByText(/^Dont paie/)).not.toBeVisible();
+  await expect(sellerPage.getByRole("button", { name: /Factures à encaisser/ })).not.toBeVisible();
+  await expect(sellerPage.getByText(/1\s?500/)).not.toBeVisible();
 });
