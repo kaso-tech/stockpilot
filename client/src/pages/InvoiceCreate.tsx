@@ -166,7 +166,7 @@ export default function InvoiceCreate({
   const { data: customerContext } =
     trpc.commerce.customers.invoiceContext.useQuery(
       { id: Number(customerId) },
-      { enabled: Boolean(customerId) }
+      { enabled: Number(customerId) > 0 }
     );
   useEffect(() => {
     const address = customerContext?.deliveryAddress || customer?.address || "";

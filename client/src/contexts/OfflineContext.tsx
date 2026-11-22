@@ -21,16 +21,37 @@ export type OfflinePayment = { method: "cash" | "card" | "mobile_money" | "bank_
 export type OfflinePosDraft = { channel: "pos"; warehouseId: number; customerId: null; salesAgentId: null; cashierId: null; salesAgentSelectionMade: boolean; cashierSelectionMade: boolean; note: null; deliveryAddress: null; invoiceDiscount: Discount; applyVat?: boolean; vatRateBasisPoints?: number; items: Array<{ productId: number; productName: string; productReference: string; unitPriceCents: number; lineTotalCents: number; quantity: number; discount: Discount; vatRateBasisPoints?: number }> };
 export type OfflineInvoiceDraft = { channel: "invoice" | "quote"; warehouseId: number; customerId: number; salesAgentId: number | null; cashierId: number | null; salesAgentSelectionMade: boolean; cashierSelectionMade: boolean; note: null; deliveryAddress: string | null; deliveryFeeCents: number; invoiceDiscount: Discount; applyVat?: boolean; vatRateBasisPoints?: number; items: Array<{ productId: number; quantity: number; manualUnitPriceCents: number | null; discount: Discount; vatRateBasisPoints?: number }> };
 export type OfflineCheckout = { settlementMode: "full" | "partial"; payments: OfflinePayment[]; salesAgentId: number | null; cashierId: number | null; note: null };
-export type OfflineSale = { id: string; ownerUserId: number; companyId: number; warehouseId: number; kind: "pos_sale" | "invoice_draft"; createdAt: number; status: "pending" | "syncing" | "failed"; error?: string; draft: OfflinePosDraft | OfflineInvoiceDraft; checkout?: OfflineCheckout };
+/** Client créé hors connexion : il reçoit un identifiant provisoire négatif, remplacé à l'envoi. */
+export type OfflineCustomerInput = { name: string; otherReference: null; type: "ordinary" | "wholesale"; email: string | null; phone: string | null; address: string | null; taxNumber: string | null; notes: string | null };
+export type OfflineExpenseInput = { warehouseId: number; category: "rent" | "energy" | "connection" | "salary" | "marketing" | "supplies" | "taxes" | "other" | "food"; description: string; amountCents: number; spentAt: string };
+export type OfflineDueSettlementInput = { occurrenceId: number; operationId: string; amountCents: number; settledAt: string; note: string | null; label: string };
+export type OfflineFoodDayInput = { day: string; warehouseId: number; operationId: string; settledAt: string; count: number; totalCents: number };
+/** Opérations sans panier : le « brouillon » ne porte que l'entrepôt (pour le périmètre). */
+type OfflineOtherDraft = { channel: "other"; warehouseId: number; items: never[] };
+export type OfflineOperationPayload =
+  | { type: "customer_create"; tempCustomerId: number; input: OfflineCustomerInput }
+  | { type: "expense_create"; input: OfflineExpenseInput }
+  | { type: "due_settlement"; input: OfflineDueSettlementInput }
+  | { type: "food_day_settlement"; input: OfflineFoodDayInput };
+export type OfflineSale = { id: string; ownerUserId: number; companyId: number; warehouseId: number; kind: "pos_sale" | "invoice_draft" | "customer_create" | "expense_create" | "due_settlement" | "food_day_settlement"; createdAt: number; status: "pending" | "syncing" | "failed"; error?: string; draft: OfflinePosDraft | OfflineInvoiceDraft | OfflineOtherDraft; checkout?: OfflineCheckout; operation?: OfflineOperationPayload };
 export type SyncLogEntry = { id: string; ownerUserId: number; companyId: number; warehouseId: number; operationId: string; kind: OfflineSale["kind"]; summary: string; status: "queued" | "syncing" | "succeeded" | "failed"; createdAt: number; updatedAt: number; attemptCount: number; error?: string };
 
 const maxLogEntries = 150;
-function summaryFor(item: OfflineSale) { const quantity = item.draft.items.reduce((sum, line) => sum + line.quantity, 0); const title = item.kind === "pos_sale" ? "Vente comptoir" : item.draft.channel === "quote" ? "Devis" : item.checkout?.settlementMode === "partial" ? "Facture · règlement partiel" : "Brouillon de facture"; return `${title} · ${quantity} article${quantity > 1 ? "s" : ""}`; }
+function operationSummary(item: OfflineSale): string | null {
+  const operation = item.operation;
+  if (!operation) return null;
+  const money = (cents: number) => `${(cents / 100).toLocaleString("fr-FR")} FCFA`;
+  if (operation.type === "customer_create") return `Nouveau client · ${operation.input.name}`;
+  if (operation.type === "expense_create") return `Dépense · ${operation.input.description} · ${money(operation.input.amountCents)}`;
+  if (operation.type === "due_settlement") return `Règlement d’échéance · ${operation.input.label} · ${money(operation.input.amountCents)}`;
+  return `Primes d’alimentation du ${operation.input.day} · ${operation.input.count} agent(s) · ${money(operation.input.totalCents)}`;
+}
+function summaryFor(item: OfflineSale) { const special = operationSummary(item); if (special) return special; const quantity = item.draft.items.reduce((sum, line) => sum + line.quantity, 0); const title = item.kind === "pos_sale" ? "Vente comptoir" : item.draft.channel === "quote" ? "Devis" : item.checkout?.settlementMode === "partial" ? "Facture · règlement partiel" : "Brouillon de facture"; return `${title} · ${quantity} article${quantity > 1 ? "s" : ""}`; }
 function authHeaders() { try { const raw = sessionStorage.getItem("manus-cookie"); const cookie = raw?.split(";").find(value => value.trim().startsWith("manus_session=")); const token = cookie?.trim().slice("manus_session=".length); return token ? { Authorization: `Bearer ${token}` } : {}; } catch { return {}; } }
 const syncClient = createTRPCProxyClient<AppRouter>({ links: [httpBatchLink({ url: "/api/trpc", transformer: superjson, headers: authHeaders, fetch: trackedFetch })] });
 
 export type PersistenceStatus = "idle" | "saving" | "saved" | "error";
-type OfflineContextValue = { isOnline: boolean; sales: OfflineSale[]; syncLog: SyncLogEntry[]; pendingCount: number; failedCount: number; pendingProductQuantitiesByWarehouse: Record<number, Record<number, number>>; persistenceStatus: PersistenceStatus; persistenceError: string | null; lastLocalSnapshotAt: number | null; retryPersistence: () => void; queuePosSale: (draft: OfflinePosDraft, checkout: OfflineCheckout) => void; queueInvoiceDraft: (draft: OfflineInvoiceDraft) => void; queueInvoiceSale: (draft: OfflineInvoiceDraft, checkout: OfflineCheckout) => void; syncNow: () => Promise<void>; retryOperation: (operationId: string) => Promise<void>; clearCompletedSyncLog: () => void };
+type OfflineContextValue = { isOnline: boolean; sales: OfflineSale[]; syncLog: SyncLogEntry[]; pendingCount: number; failedCount: number; pendingProductQuantitiesByWarehouse: Record<number, Record<number, number>>; persistenceStatus: PersistenceStatus; persistenceError: string | null; lastLocalSnapshotAt: number | null; retryPersistence: () => void; queuePosSale: (draft: OfflinePosDraft, checkout: OfflineCheckout) => void; queueInvoiceDraft: (draft: OfflineInvoiceDraft) => void; queueInvoiceSale: (draft: OfflineInvoiceDraft, checkout: OfflineCheckout) => void; syncNow: () => Promise<void>; retryOperation: (operationId: string) => Promise<void>; clearCompletedSyncLog: () => void; queueCustomer: (input: OfflineCustomerInput) => number; queueExpense: (input: OfflineExpenseInput) => void; queueDueSettlement: (input: OfflineDueSettlementInput) => void; queueFoodDaySettlement: (input: OfflineFoodDayInput) => void };
 const OfflineContext = createContext<OfflineContextValue | null>(null);
 
 type ScopedRecord = { ownerUserId?: unknown; companyId?: unknown; warehouseId?: unknown; draft?: { warehouseId?: unknown } };
@@ -162,12 +183,55 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
   const queueInvoiceDraft = useCallback((draft: OfflineInvoiceDraft) => { assertDraftScope(draft.warehouseId); const id = globalThis.crypto?.randomUUID?.() ?? `offline-${Date.now()}-${Math.random().toString(36).slice(2)}`; appendQueue({ id, ownerUserId: user!.id, companyId: offlineScope!.companyId, warehouseId: offlineScope!.warehouseId, kind: "invoice_draft", createdAt: Date.now(), status: "pending", draft }); }, [appendQueue, assertDraftScope, offlineScope, user]);
   const queueInvoiceSale = useCallback((draft: OfflineInvoiceDraft, checkout: OfflineCheckout) => { assertDraftScope(draft.warehouseId); const id = globalThis.crypto?.randomUUID?.() ?? `offline-${Date.now()}-${Math.random().toString(36).slice(2)}`; appendQueue({ id, ownerUserId: user!.id, companyId: offlineScope!.companyId, warehouseId: offlineScope!.warehouseId, kind: "invoice_draft", createdAt: Date.now(), status: "pending", draft, checkout }); }, [appendQueue, assertDraftScope, offlineScope, user]);
 
+  const newOperationId = () => globalThis.crypto?.randomUUID?.() ?? `offline-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const queueOther = useCallback((operation: OfflineOperationPayload) => {
+    if (!user || !offlineScope || !isWarehouseReady) throw new Error("Sélectionnez un entrepôt actif avant d’enregistrer une opération hors connexion.");
+    const id = newOperationId();
+    appendQueue({ id, ownerUserId: user.id, companyId: offlineScope.companyId, warehouseId: offlineScope.warehouseId, kind: operation.type, createdAt: Date.now(), status: "pending", draft: { channel: "other", warehouseId: offlineScope.warehouseId, items: [] }, operation });
+    return id;
+  }, [appendQueue, isWarehouseReady, offlineScope, user]);
+  /** Renvoie l'identifiant provisoire (négatif) du client, utilisable aussitôt dans une facture. */
+  const queueCustomer = useCallback((input: OfflineCustomerInput) => { const tempCustomerId = -Date.now(); queueOther({ type: "customer_create", tempCustomerId, input }); return tempCustomerId; }, [queueOther]);
+  const queueExpense = useCallback((input: OfflineExpenseInput) => { queueOther({ type: "expense_create", input }); }, [queueOther]);
+  const queueDueSettlement = useCallback((input: OfflineDueSettlementInput) => { queueOther({ type: "due_settlement", input }); }, [queueOther]);
+  const queueFoodDaySettlement = useCallback((input: OfflineFoodDayInput) => { queueOther({ type: "food_day_settlement", input }); }, [queueOther]);
+
+  // Clients créés hors connexion : correspondance identifiant provisoire → définitif, gardée par périmètre.
+  const customerMapKey = scopeKey ? `stockpilot-offline-customers:${scopeKey}` : null;
+  const readCustomerMap = useCallback((): Record<string, number> => { try { return customerMapKey ? JSON.parse(localStorage.getItem(customerMapKey) ?? "{}") : {}; } catch { return {}; } }, [customerMapKey]);
+  const rememberCustomer = useCallback((tempId: number, realId: number) => { if (!customerMapKey) return; try { localStorage.setItem(customerMapKey, JSON.stringify({ ...readCustomerMap(), [String(tempId)]: realId })); } catch { /* sans effet */ } }, [customerMapKey, readCustomerMap]);
+
+  const runOperation = useCallback(async (item: OfflineSale) => {
+    const operation = item.operation!;
+    if (operation.type === "customer_create") {
+      const existing = readCustomerMap()[String(operation.tempCustomerId)];
+      if (!existing) { const created = await syncClient.commerce.customers.create.mutate(operation.input); rememberCustomer(operation.tempCustomerId, created.id); }
+      return;
+    }
+    if (operation.type === "expense_create") { await syncClient.expenses.create.mutate({ ...operation.input, spentAt: new Date(operation.input.spentAt) }); return; }
+    if (operation.type === "due_settlement") { const { label: _label, ...input } = operation.input; await syncClient.paymentDues.settle.mutate({ ...input, settledAt: new Date(input.settledAt) }); return; }
+    await syncClient.paymentDues.settleFoodAllowancesForDay.mutate({ day: operation.input.day, warehouseId: operation.input.warehouseId, operationId: operation.input.operationId, settledAt: new Date(operation.input.settledAt) });
+  }, [readCustomerMap, rememberCustomer]);
+
   const syncOperation = useCallback(async (item: OfflineSale) => {
     if (!navigator.onLine || !offlineScope || item.warehouseId !== offlineScope.warehouseId || item.draft.warehouseId !== offlineScope.warehouseId) return false;
     persistState(salesRef.current.map(record => record.id === item.id ? { ...record, status: "syncing", error: undefined } : record), logRef.current);
     upsertLog(item, "syncing", { increaseAttempt: true });
     try {
-      const sale = await syncClient.transactions.createDraft.mutate({ ...item.draft, offlineOperationId: item.id });
+      if (item.operation) {
+        await runOperation(item);
+        persistState(salesRef.current.filter(record => record.id !== item.id), logRef.current);
+        upsertLog(item, "succeeded");
+        return true;
+      }
+      let draft = item.draft as OfflinePosDraft | OfflineInvoiceDraft;
+      // Facture pour un client créé hors connexion : identifiant définitif une fois le client envoyé.
+      if (draft.channel !== "pos" && draft.customerId < 0) {
+        const realId = readCustomerMap()[String(draft.customerId)];
+        if (!realId) throw new Error("Le client créé hors connexion n’est pas encore envoyé ; nouvelle tentative automatique.");
+        draft = { ...draft, customerId: realId };
+      }
+      const sale = await syncClient.transactions.createDraft.mutate({ ...draft, offlineOperationId: item.id });
       if (item.checkout) await syncClient.transactions.checkout.mutate({ ...item.checkout, saleId: sale.id, offlineOperationId: `${item.id}-payment` });
       persistState(salesRef.current.filter(record => record.id !== item.id), logRef.current);
       upsertLog(item, "succeeded");
@@ -179,7 +243,7 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
       upsertLog(item, "failed", { error: message });
       return false;
     }
-  }, [offlineScope, persistState, upsertLog]);
+  }, [offlineScope, persistState, readCustomerMap, runOperation, upsertLog]);
 
   const reportSyncHealth = useCallback(async () => {
     if (!navigator.onLine || !user || !offlineScope) return;
@@ -241,7 +305,7 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
   const accountSales = useMemo(() => offlineScope ? sales.filter(sale => belongsToOfflineScope(sale, offlineScope) && sale.draft.warehouseId === offlineScope.warehouseId) : [], [offlineScope, sales]);
   const accountLog = useMemo(() => offlineScope ? syncLog.filter(entry => belongsToOfflineScope(entry, offlineScope)).sort((a, b) => b.updatedAt - a.updatedAt) : [], [offlineScope, syncLog]);
   const pendingProductQuantitiesByWarehouse = useMemo(() => accountSales.reduce<Record<number, Record<number, number>>>((totals, sale) => { if (sale.kind !== "pos_sale" || sale.status === "failed" || !Number.isInteger(sale.draft.warehouseId)) return totals; const warehouseTotals = totals[sale.draft.warehouseId] ?? {}; for (const item of sale.draft.items) warehouseTotals[item.productId] = (warehouseTotals[item.productId] ?? 0) + item.quantity; totals[sale.draft.warehouseId] = warehouseTotals; return totals; }, {}), [accountSales]);
-  const value = useMemo(() => ({ isOnline, sales: accountSales, syncLog: accountLog, pendingCount: accountSales.length, failedCount: accountLog.filter(entry => entry.status === "failed").length, pendingProductQuantitiesByWarehouse, persistenceStatus, persistenceError, lastLocalSnapshotAt, retryPersistence, queuePosSale, queueInvoiceDraft, queueInvoiceSale, syncNow, retryOperation, clearCompletedSyncLog }), [accountLog, accountSales, clearCompletedSyncLog, isOnline, lastLocalSnapshotAt, pendingProductQuantitiesByWarehouse, persistenceError, persistenceStatus, queueInvoiceDraft, queueInvoiceSale, queuePosSale, retryOperation, retryPersistence, syncNow]);
+  const value = useMemo(() => ({ isOnline, sales: accountSales, syncLog: accountLog, pendingCount: accountSales.length, failedCount: accountLog.filter(entry => entry.status === "failed").length, pendingProductQuantitiesByWarehouse, persistenceStatus, persistenceError, lastLocalSnapshotAt, retryPersistence, queuePosSale, queueInvoiceDraft, queueInvoiceSale, queueCustomer, queueExpense, queueDueSettlement, queueFoodDaySettlement, syncNow, retryOperation, clearCompletedSyncLog }), [accountLog, accountSales, clearCompletedSyncLog, isOnline, lastLocalSnapshotAt, pendingProductQuantitiesByWarehouse, persistenceError, persistenceStatus, queueInvoiceDraft, queueInvoiceSale, queuePosSale, retryOperation, retryPersistence, syncNow, queueCustomer, queueExpense, queueDueSettlement, queueFoodDaySettlement]);
   return <OfflineContext.Provider value={value}>{children}</OfflineContext.Provider>;
 }
 

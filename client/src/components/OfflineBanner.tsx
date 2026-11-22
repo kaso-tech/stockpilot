@@ -29,7 +29,7 @@ export function OfflineBanner() {
       <span className="font-semibold">Hors connexion</span>
       <span className="text-muted-foreground">{preparedAt ? `Données du ${formatter.format(preparedAt)}` : "Données gardées sur l’appareil"}</span>
       <span className="text-muted-foreground">· {pendingCount ? `${pendingCount} opération${pendingCount > 1 ? "s" : ""} en attente d’envoi` : "aucune opération en attente"}</span>
-      <span className="w-full text-xs text-muted-foreground sm:w-auto">Vente et facturation possibles ; les autres pages affichent les dernières données consultées.</span>
+      <span className="w-full text-xs text-muted-foreground sm:w-auto">Ventes, factures, nouveaux clients, dépenses et règlements d’échéances restent possibles ; les autres pages affichent les dernières données consultées.</span>
     </div>
   );
 }

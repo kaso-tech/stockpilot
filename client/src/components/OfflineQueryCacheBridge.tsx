@@ -7,6 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { markOfflineDataPrepared } from "@/lib/offlinePreparation";
+import { can } from "@shared/permissions";
 
 /** Restores and persists only the React Query data belonging to the active tenant, user and warehouse. */
 export function OfflineQueryCacheBridge() {
@@ -60,6 +61,13 @@ export function OfflineQueryCacheBridge() {
         utils.suppliers.list.prefetch(),
         ...(role === "seller" ? [utils.sellerDiscountPermissions.get.prefetch()] : []),
         ...(finance ? [utils.dashboard.get.prefetch({ warehouseId })] : []),
+        // Dépenses et échéances, pour les saisir et les régler sans réseau.
+        ...(can(role as any, "expenses.manage") ? (() => { const yearMonth = new Date().toISOString().slice(0, 7); return [
+          utils.expenses.list.prefetch({ warehouseId }), utils.expenses.budget.get.prefetch({ yearMonth, warehouseId }), utils.expenses.report.prefetch({ yearMonth, warehouseId }),
+          utils.paymentDues.list.prefetch({ warehouseId }), utils.paymentDues.schedules.list.prefetch({ warehouseId }), utils.paymentDues.groups.list.prefetch({ warehouseId }),
+          utils.paymentDues.templates.list.prefetch({ warehouseId, includeInactive: true }), utils.paymentDues.templates.list.prefetch({ scheduleType: "expense", warehouseId }),
+          utils.paymentDues.forecast.prefetch({ warehouseId, months: 6 }), utils.payroll.overview.prefetch({ warehouseId }),
+        ]; })() : []),
       ];
       const results = await Promise.allSettled(tasks);
       if (!cancelled && results.every(result => result.status === "fulfilled")) markOfflineDataPrepared(scope);
@@ -70,6 +78,12 @@ export function OfflineQueryCacheBridge() {
     window.addEventListener("online", online);
     return () => { cancelled = true; window.clearTimeout(first); window.clearInterval(timer); window.removeEventListener("online", online); };
   }, [scope?.companyId, scope?.userId, scope?.warehouseId, role, utils]);
+
+  useEffect(() => {
+    const refresh = () => void queryClient.invalidateQueries();
+    window.addEventListener("stockpilot-offline-sync", refresh);
+    return () => window.removeEventListener("stockpilot-offline-sync", refresh);
+  }, [queryClient]);
 
   return null;
 }
