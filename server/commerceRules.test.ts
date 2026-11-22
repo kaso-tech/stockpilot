@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { commissionCents, fixedRemunerationCents, priceForCustomer, priceForQuantityTier } from "./commerceRules";
+import { commissionCents, effectiveCustomerType, fixedRemunerationCents, priceForCustomer, priceForQuantityTier } from "./commerceRules";
 
 describe("règles commerciales", () => {
   it("applique automatiquement le tarif correspondant au type de client", () => {
     expect(priceForCustomer("ordinary", 1250, 900)).toBe(1250);
     expect(priceForCustomer("wholesale", 1250, 900)).toBe(900);
     expect(priceForCustomer("wholesale", 1250, 0)).toBe(1250);
+  });
+  it("n’applique le tarif grossiste que dans un entrepôt qui vend en gros", () => {
+    expect(effectiveCustomerType("wholesale", true)).toBe("wholesale");
+    expect(effectiveCustomerType("wholesale", false)).toBe("ordinary");
+    expect(effectiveCustomerType("ordinary", true)).toBe("ordinary");
+    expect(effectiveCustomerType(null, true)).toBe("ordinary");
   });
 
   it("retient le palier de quantité le plus élevé applicable", () => {

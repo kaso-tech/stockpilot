@@ -381,6 +381,8 @@ export const warehouses = mysqlTable("warehouses", {
   address: text("address"),
   active: boolean("active").notNull().default(true),
   isDefault: boolean("isDefault").notNull().default(false),
+  /** Vente en gros autorisée : tarifs grossiste appliqués aux clients grossistes de cet entrepôt. */
+  wholesaleEnabled: boolean("wholesaleEnabled").notNull().default(true),
   createdByUserId: int("createdByUserId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

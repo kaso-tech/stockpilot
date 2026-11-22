@@ -147,7 +147,9 @@ export default function InvoiceCreate({
     }
   }, [customers, documentType, products]);
   const customer = customers.find(item => item.id === Number(customerId));
-  const isWholesaleCustomer = customer?.type === "wholesale";
+  const selectedWarehouse = warehouses.find(warehouse => warehouse.id === selectedWarehouseId);
+  // Le tarif grossiste ne s’applique que si l’entrepôt de la vente pratique la vente en gros.
+  const isWholesaleCustomer = customer?.type === "wholesale" && selectedWarehouse?.wholesaleEnabled !== false;
   // Prix grossiste non défini (0) : le prix détail s’applique.
   const basePrice = (product: { retailPriceCents: number; wholesalePriceCents: number }) =>
     isWholesaleCustomer && product.wholesalePriceCents > 0 ? product.wholesalePriceCents : product.retailPriceCents;
@@ -193,7 +195,7 @@ export default function InvoiceCreate({
       const pricing = priceForQuantityTier(
         basePrice(product),
         line.quantity,
-        customer?.type === "wholesale"
+        isWholesaleCustomer
           ? product.wholesalePriceTiers
           : (product.retailPriceTiers ?? product.priceTiers)
       );
@@ -562,7 +564,7 @@ export default function InvoiceCreate({
             {customer && (
               <div className="flex flex-wrap items-center gap-2">
                 <Badge className="border-0 bg-primary/10 text-primary">
-                  Tarif {customer.type === "wholesale" ? "grossiste" : "détail"}{" "}
+                  Tarif {isWholesaleCustomer ? "grossiste" : "détail"}{" "}
                   appliqué
                 </Badge>
                 {prefilledCustomerId && (

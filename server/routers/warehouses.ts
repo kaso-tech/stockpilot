@@ -17,6 +17,7 @@ const warehouseInput = z.object({
   code: z.string().trim().min(2).max(40).regex(/^[A-Za-z0-9_-]+$/, "Le code ne peut contenir que des lettres, chiffres, tirets et tirets bas."),
   address: z.string().trim().max(1000).nullable().optional(),
   isDefault: z.boolean().optional().default(false),
+  wholesaleEnabled: z.boolean().optional(),
 });
 
 async function dbOrThrow() {
@@ -76,6 +77,7 @@ export const warehousesRouter = router({
       address: warehouses.address,
       active: warehouses.active,
       isDefault: warehouses.isDefault,
+      wholesaleEnabled: warehouses.wholesaleEnabled,
       createdAt: warehouses.createdAt,
       updatedAt: warehouses.updatedAt,
       productCount: sql<number>`count(distinct ${warehouseStocks.productId})`,
@@ -239,7 +241,7 @@ export const warehousesRouter = router({
         const existing = await tx.select({ id: warehouses.id }).from(warehouses).where(companyScope(warehouses.companyId, ctx.user.companyId)).limit(1);
         const shouldBeDefault = input.isDefault || existing.length === 0;
         if (shouldBeDefault) await tx.update(warehouses).set({ isDefault: false }).where(companyScope(warehouses.companyId, ctx.user.companyId));
-        const result = await tx.insert(warehouses).values({ companyId: ctx.user.companyId, name: input.name, code: input.code.toUpperCase(), address: input.address?.trim() || null, isDefault: shouldBeDefault, createdByUserId: ctx.user.id });
+        const result = await tx.insert(warehouses).values({ companyId: ctx.user.companyId, name: input.name, code: input.code.toUpperCase(), address: input.address?.trim() || null, isDefault: shouldBeDefault, wholesaleEnabled: input.wholesaleEnabled ?? true, createdByUserId: ctx.user.id });
         const warehouseId = Number(result[0].insertId);
         await audit(tx, ctx.user.companyId, ctx.user.id, "Création", warehouseId, `Entrepôt ${input.name} créé${shouldBeDefault ? " comme dépôt principal" : ""}.`);
         return warehouseId;
@@ -258,7 +260,7 @@ export const warehousesRouter = router({
         const current = await getScopedWarehouse(tx, ctx.user.companyId, id);
         if (isDefault && !current.active) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Réactivez l’entrepôt avant de le définir comme principal." });
         if (isDefault) await tx.update(warehouses).set({ isDefault: false }).where(companyScope(warehouses.companyId, ctx.user.companyId));
-        await tx.update(warehouses).set({ name: values.name, code: values.code.toUpperCase(), address: values.address?.trim() || null, isDefault: isDefault || current.isDefault }).where(and(eq(warehouses.id, id), companyScope(warehouses.companyId, ctx.user.companyId)));
+        await tx.update(warehouses).set({ name: values.name, code: values.code.toUpperCase(), address: values.address?.trim() || null, isDefault: isDefault || current.isDefault, ...(values.wholesaleEnabled === undefined ? {} : { wholesaleEnabled: values.wholesaleEnabled }) }).where(and(eq(warehouses.id, id), companyScope(warehouses.companyId, ctx.user.companyId)));
         await audit(tx, ctx.user.companyId, ctx.user.id, "Modification", id, `Entrepôt ${values.name} mis à jour.`);
       });
       return { success: true };

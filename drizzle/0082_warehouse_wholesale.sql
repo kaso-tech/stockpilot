@@ -1,0 +1,1 @@
+ALTER TABLE `warehouses` ADD `wholesaleEnabled` boolean DEFAULT true NOT NULL;
