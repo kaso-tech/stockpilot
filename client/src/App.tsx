@@ -1,3 +1,4 @@
+import { InstallPrompt } from "./components/InstallPrompt";
 import { PageSkeleton } from "@/components/page";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -154,7 +155,7 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider defaultTheme="dark" switchable>
         <TooltipProvider>
-          <PreferencesProvider><ActiveWarehouseProvider><OfflineProvider><OfflineQueryCacheBridge /><ProductPhotoCacheBridge /><Toaster richColors closeButton position="top-right" /><PwaUpdateNotice /><Router /></OfflineProvider></ActiveWarehouseProvider></PreferencesProvider>
+          <PreferencesProvider><ActiveWarehouseProvider><OfflineProvider><OfflineQueryCacheBridge /><ProductPhotoCacheBridge /><Toaster richColors closeButton position="top-right" /><PwaUpdateNotice /><InstallPrompt /><Router /></OfflineProvider></ActiveWarehouseProvider></PreferencesProvider>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

@@ -170,7 +170,18 @@ const plugins = [
       display: "standalone",
       theme_color: "#0B6E76",
       background_color: "#F7F8FA",
+      id: "/",
+      orientation: "any",
+      categories: ["business", "productivity"],
+      // Icônes obligatoires pour que Chrome, Edge et Android proposent « Installer l'application »
+      // (sans elles, seul « Créer un raccourci » est disponible).
+      icons: [
+        { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+        { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+        { src: "/icons/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+      ],
     },
+    includeAssets: ["favicon.svg", "icons/apple-touch-icon.png", "icons/favicon-32.png"],
     workbox: {
       navigateFallback: "/index.html",
       navigateFallbackDenylist: [/^\/api\//, /^\/manus-storage\//],
