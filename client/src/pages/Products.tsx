@@ -64,11 +64,12 @@ export default function Products() {
   const detailProduct = products.find(product => product.id === detailId) ?? null;
   const refresh = () => { utils.products.list.invalidate(); utils.movements.list.invalidate(); utils.dashboard.get.invalidate(); };
   const create = trpc.products.create.useMutation({ onSuccess: async result => { if (newPhoto) { try { await photoUpload.mutateAsync({ productId: result.id, ...newPhoto }); } catch { /* Le produit reste créé ; le toast précise l’échec photo. */ } } refresh(); setOpen(false); reset(); toast.success("Produit créé.", { description: "La référence est disponible dans le catalogue et la Vente Rapide." }); }, onError: error => toast.error(error.message) });
-  const update = trpc.products.update.useMutation({ onSuccess: () => { refresh(); close(); toast.success("Produit mis à jour.", { description: "Les niveaux de stock et tarifs ont été actualisés." }); }, onError: error => toast.error(error.message) });
+  const update = trpc.products.update.useMutation({ onSuccess: () => { refresh(); finish(); toast.success("Produit mis à jour.", { description: "Les niveaux de stock et tarifs ont été actualisés." }); }, onError: error => toast.error(error.message) });
   const updatePurchasePrice = trpc.products.updatePurchasePrice.useMutation({ onSuccess: () => { refresh(); setPurchasePriceTarget(null); toast.success("Coût d’achat mis à jour."); }, onError: error => toast.error(error.message) });
   const remove = trpc.products.remove.useMutation({ onSuccess: () => { refresh(); toast.success("Produit supprimé."); }, onError: error => toast.error(error.message) });
   const reset = () => { setForm(emptyProduct); setEditingId(null); setNewPhoto(null); };
-  const close = () => { if (create.isPending || update.isPending || photoUpload.isPending || photoPreparing) return; setOpen(false); reset(); };
+  const finish = () => { setOpen(false); reset(); };
+  const close = () => { if (create.isPending || update.isPending || photoUpload.isPending || photoPreparing) return; finish(); };
   const edit = (product: typeof products[number]) => {
     const retail = product.retailPriceTiers ?? product.priceTiers ?? []; const wholesale = product.wholesalePriceTiers ?? [];
     setNewPhoto(null);
