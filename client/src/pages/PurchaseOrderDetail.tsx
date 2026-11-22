@@ -12,7 +12,7 @@ import { trpc } from "@/lib/trpc";
 import { DocumentSendMenu } from "@/components/DocumentSendMenu";
 import { AlertTriangle, ArrowLeft, CalendarCheck2, CalendarClock, CheckCircle2, ClipboardList, Edit3, Mail, MessageCircle, PackageCheck, Printer, RotateCcw, Send, Trash2, Truck } from "lucide-react";
 import { jsPDF } from "jspdf";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useLocation, useRoute } from "wouter";
 
@@ -32,10 +32,19 @@ export default function PurchaseOrderDetail() {
   const [, setLocation] = useLocation();
   const orderId = Number(params?.id);
   const returnToOrders = new URLSearchParams(window.location.search).get("origine") === "bons";
+  // « Enregistrer et imprimer » depuis la fiche produit : impression dès que le bon est affiché.
+  const printRequested = useRef(new URLSearchParams(window.location.search).get("imprimer") === "1");
   const { user } = useAuth();
   const canManage = can(user?.role, "purchasing.manage");
   const utils = trpc.useUtils();
   const { data, isLoading } = trpc.purchaseOrders.get.useQuery({ id: orderId }, { enabled: Number.isInteger(orderId) && orderId > 0 });
+  useEffect(() => {
+    if (!data || !printRequested.current) return;
+    printRequested.current = false;
+    window.history.replaceState(null, "", window.location.pathname);
+    const timer = window.setTimeout(() => window.print(), 400);
+    return () => window.clearTimeout(timer);
+  }, [data]);
   const order = data as Order | undefined;
   const [editOpen, setEditOpen] = useState(false);
   const [receiveOpen, setReceiveOpen] = useState(false);

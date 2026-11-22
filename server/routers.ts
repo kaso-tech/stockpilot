@@ -899,7 +899,7 @@ export const appRouter = router({
       const catalog = await db.select().from(products).where(companyScope(products.companyId, ctx.user.companyId));
       const selected = input.items.map(item => {
         const product = catalog.find(value => value.id === item.productId);
-        if (!product || product.supplierId !== input.supplierId) throw new TRPCError({ code: "BAD_REQUEST", message: "Chaque produit doit être rattaché à ce fournisseur." });
+        if (!product || (product.supplierId != null && product.supplierId !== input.supplierId)) throw new TRPCError({ code: "BAD_REQUEST", message: "Chaque produit doit être rattaché à ce fournisseur." });
         return { product, quantity: item.quantity, lineTotalCents: item.quantity * product.purchasePriceCents };
       });
       const subtotalCents = selected.reduce((sum, item) => sum + item.lineTotalCents, 0);
