@@ -31,6 +31,8 @@ import {
   suppliers,
   warehouses,
   warehouseStocks,
+  sellerWarehouseAssignments,
+  salesAgentWarehouseAssignments,
   userDashboardPreferences,
   userSessions,
   users,
@@ -521,7 +523,10 @@ export const appRouter = router({
       const expenseScope = input?.warehouseId ? and(companyScope(expenses.companyId, companyId), eq(expenses.warehouseId, input.warehouseId)) : companyScope(expenses.companyId, companyId);
       const paymentScope = input?.warehouseId ? and(companyScope(agentPayments.companyId, companyId), eq(agentPayments.warehouseId, input.warehouseId)) : companyScope(agentPayments.companyId, companyId);
       const [productRows, movements, saleRows, customerRows, inventories, profiles, commissions, payments, expenseRows, budgetRows] = await Promise.all([listProducts(companyId, input?.warehouseId), listMovements(companyId, 250, input?.warehouseId), db.select().from(sales).where(salesScope), db.select().from(customers).where(companyScope(customers.companyId, companyId)), db.select().from(inventorySessions).where(inventoryScope), db.select().from(remunerationProfiles).where(companyScope(remunerationProfiles.companyId, companyId)), companyId === null ? db.select().from(saleCommissions) : Promise.resolve([]), db.select().from(agentPayments).where(paymentScope), db.select().from(expenses).where(expenseScope), db.select().from(expenseBudgets).where(companyScope(expenseBudgets.companyId, companyId))]);
-      const lowStock = productRows.filter(product => product.quantity <= product.minimumQuantity);
+      // Entrepôt affiché : seuls les produits réellement stockés ici peuvent être « sous le seuil »
+      // (un entrepôt neuf ou remis à zéro ne signale pas tout le catalogue).
+      const stockedHere = input?.warehouseId ? new Set((await db.select({ productId: warehouseStocks.productId }).from(warehouseStocks).where(and(companyScope(warehouseStocks.companyId, companyId), eq(warehouseStocks.warehouseId, input.warehouseId)))).map(row => row.productId)) : null;
+      const lowStock = productRows.filter(product => product.quantity <= product.minimumQuantity && (!stockedHere || stockedHere.has(product.id)));
       const totalValueCents = productRows.reduce(
         (sum, product) => sum + product.quantity * product.purchasePriceCents,
         0,
@@ -541,10 +546,26 @@ export const appRouter = router({
       const currentBudget = budgetRows.find(budget => budget.yearMonth === month && (!input?.warehouseId || budget.warehouseId === input.warehouseId));
       const expenseBudget = budgetComparison(currentBudget?.amountCents ?? null, monthlyExpenseCents, currentBudget?.warningPercent ?? 80);
       const canSeeFinance = ["admin", "manager", "accountant"].includes(ctx.user.role);
-      const duePayrollCents = profiles.reduce((sum, profile) => {
+      // Paie à régler de l'entrepôt affiché : agents et vendeurs qui y sont rattachés (les personnes sans
+      // rattachement comptent pour l'entrepôt principal) ; leurs paiements comptent quel que soit l'entrepôt.
+      let payrollProfiles = profiles;
+      let payrollPayments = payments;
+      if (input?.warehouseId) {
+        const [agentLinks, sellerLinks, allPayments, warehouseRow] = await Promise.all([
+          db.select({ agentId: salesAgentWarehouseAssignments.agentId, warehouseId: salesAgentWarehouseAssignments.warehouseId }).from(salesAgentWarehouseAssignments).where(companyScope(salesAgentWarehouseAssignments.companyId, companyId)),
+          db.select({ userId: sellerWarehouseAssignments.sellerUserId, warehouseId: sellerWarehouseAssignments.warehouseId }).from(sellerWarehouseAssignments).where(companyScope(sellerWarehouseAssignments.companyId, companyId)),
+          db.select().from(agentPayments).where(companyScope(agentPayments.companyId, companyId)),
+          db.select({ isDefault: warehouses.isDefault }).from(warehouses).where(and(eq(warehouses.id, input.warehouseId), companyScope(warehouses.companyId, companyId))).limit(1),
+        ]);
+        const isDefaultWarehouse = Boolean(warehouseRow[0]?.isDefault);
+        const linked = (type: string, id: number) => { const links = type === "agent" ? agentLinks.filter(link => link.agentId === id) : sellerLinks.filter(link => link.userId === id); return links.length ? links.some(link => link.warehouseId === input!.warehouseId) : isDefaultWarehouse; };
+        payrollProfiles = profiles.filter(profile => linked(profile.beneficiaryType, profile.beneficiaryId));
+        payrollPayments = allPayments;
+      }
+      const duePayrollCents = payrollProfiles.reduce((sum, profile) => {
         const commissionCents = commissions.filter(item => item.beneficiaryType === profile.beneficiaryType && item.beneficiaryId === profile.beneficiaryId && item.createdAt.toISOString().slice(0, 7) === month).reduce((total, item) => total + item.commissionCents, 0);
         const fixedCents = profile.remunerationMode === "commission" ? 0 : profile.fixedMonthlyCents;
-        const paidCents = payments.filter(item => item.beneficiaryType === profile.beneficiaryType && item.beneficiaryId === profile.beneficiaryId && item.periodLabel === month && item.paymentKind !== "food_allowance").reduce((total, item) => total + item.amountCents, 0);
+        const paidCents = payrollPayments.filter(item => item.beneficiaryType === profile.beneficiaryType && item.beneficiaryId === profile.beneficiaryId && item.periodLabel === month && item.paymentKind !== "food_allowance").reduce((total, item) => total + item.amountCents, 0);
         return sum + Math.max(0, fixedCents + commissionCents - paidCents);
       }, 0);
       const dayKeys = Array.from({ length: 7 }, (_, index) => {
