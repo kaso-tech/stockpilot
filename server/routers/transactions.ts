@@ -1,3 +1,4 @@
+import { moneyLabel } from "../moneyLabel";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -98,7 +99,7 @@ export const transactionsRouter = router({
       if (sale.channel === "quote" || sale.channel === "pos") {
         await tx.delete(saleItems).where(eq(saleItems.saleId, sale.id));
         await tx.delete(sales).where(and(eq(sales.id, sale.id), companyScope(sales.companyId, ctx.user.companyId)));
-        await tx.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Suppression", entityType, entityId: String(sale.id), detail: `${sale.invoiceNumber} supprimé avant encaissement (${sale.totalCents} centimes)` });
+        await tx.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Suppression", entityType, entityId: String(sale.id), detail: `${sale.invoiceNumber} supprimé avant encaissement (${moneyLabel(sale.totalCents)})` });
         return { success: true, outcome: "deleted" as const };
       }
       const voided = await tx.update(sales).set({ status: "void", voidedAt: new Date() }).where(and(eq(sales.id, sale.id), companyScope(sales.companyId, ctx.user.companyId), eq(sales.status, "draft"), eq(sales.amountPaidCents, 0)));
@@ -146,7 +147,7 @@ export const transactionsRouter = router({
       const sequence = await nextCreditNoteSequence(tx, ctx.user.companyId!, new Date().getUTCFullYear());
       creditNoteNumber = formatCreditNoteNumber(new Date().getUTCFullYear(), sequence);
       await tx.update(sales).set({ creditNoteNumber }).where(and(eq(sales.id, sale.id), companyScope(sales.companyId, ctx.user.companyId)));
-      await tx.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Remboursement", entityType: "Facture", entityId: String(sale.id), detail: `Facture ${sale.invoiceNumber} remboursée pour ${sale.amountPaidCents} centimes (avoir ${creditNoteNumber}) ; stock réintégré et commissions contrepassées.` });
+      await tx.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Remboursement", entityType: "Facture", entityId: String(sale.id), detail: `Facture ${sale.invoiceNumber} remboursée pour ${moneyLabel(sale.amountPaidCents)} (avoir ${creditNoteNumber}) ; stock réintégré et commissions contrepassées.` });
     });
     return { success: true, creditNoteNumber };
   }),
@@ -213,7 +214,7 @@ export const transactionsRouter = router({
         const additionalReversal = Math.max(0, targetReversal - reversed);
         if (additionalReversal > 0) await tx.insert(saleCommissions).values({ saleId: sale.id, beneficiaryType: row.beneficiaryType, beneficiaryId: row.beneficiaryId, commissionBasis: row.commissionBasis, rateBasisPoints: row.rateBasisPoints, commissionCents: -additionalReversal });
       }
-      await tx.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Retour", entityType: "Facture", entityId: String(sale.id), detail: `Retour ${creditNoteNumber} sur ${sale.invoiceNumber} : ${calculation.returned.reduce((sum, line) => sum + line.quantity, 0)} article(s), ${refundCents} centimes remboursés.` });
+      await tx.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Retour", entityType: "Facture", entityId: String(sale.id), detail: `Retour ${creditNoteNumber} sur ${sale.invoiceNumber} : ${calculation.returned.reduce((sum, line) => sum + line.quantity, 0)} article(s), ${moneyLabel(refundCents)} remboursés.` });
       return { creditNoteNumber, refundCents, fullyReturned: calculation.fullyReturned, replayed: false };
     });
   }),

@@ -15,8 +15,14 @@ export function formatCurrency(cents: number) {
   return new Intl.NumberFormat(locale, { style: "currency", currency: activeCurrency, maximumFractionDigits: digits, minimumFractionDigits: digits, useGrouping }).format(amount);
 }
 
+const expenseCategoryNames: Record<string, string> = { rent: "Loyer", energy: "Énergie", connection: "Connexion", salary: "Salaire", marketing: "Marketing", supplies: "Fournitures", taxes: "Impôts", other: "Autre", food: "Alimentation" };
+/** Texte affiché : « XOF » devient « FCFA » et les montants anciennement notés en centimes sont convertis. */
 export function displayCurrencyLabel(value: string | null | undefined) {
-  return (value || "").replace(/\bXOF\b/g, "FCFA");
+  return (value || "")
+    .replace(/(-?\d+)\s*centimes?\b/g, (_, cents: string) => formatCurrency(Number(cents)))
+    // Anciens messages : code interne de la catégorie de dépense → libellé.
+    .replace(/\bDépense (rent|energy|connection|salary|marketing|supplies|taxes|other|food) de\b/g, (_, code: string) => `Dépense « ${expenseCategoryNames[code] ?? code} » de`)
+    .replace(/\bXOF\b/g, "FCFA");
 }
 
 export function formatDate(value: Date | string | number | null | undefined, withTime = false) {

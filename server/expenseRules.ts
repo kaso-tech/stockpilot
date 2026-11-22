@@ -1,5 +1,6 @@
 export const expenseCategories = ["rent", "energy", "connection", "salary", "marketing", "supplies", "taxes", "other", "food"] as const;
 export type ExpenseCategory = (typeof expenseCategories)[number];
+export const expenseCategoryLabels: Record<ExpenseCategory, string> = { rent: "Loyer", energy: "Énergie", connection: "Connexion", salary: "Salaire", marketing: "Marketing", supplies: "Fournitures", taxes: "Impôts", other: "Autre", food: "Alimentation" };
 
 export function expenseTotalCents(rows: Array<{ amountCents: number }>) {
   return rows.reduce((sum, row) => sum + row.amountCents, 0);

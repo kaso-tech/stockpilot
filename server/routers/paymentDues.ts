@@ -1,3 +1,4 @@
+import { moneyLabel } from "../moneyLabel";
 import { and, desc, eq, gte, inArray, lt } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { z } from "zod";
@@ -141,7 +142,7 @@ async function settleOccurrenceInTx(tx: any, ctx: { user: { id: number; companyI
   const occurrenceUpdate = await tx.update(paymentDueOccurrences).set({ paidCents, status, resolvedAt: status === "paid" ? input.settledAt : null }).where(and(eq(paymentDueOccurrences.id, row.occurrence.id), eq(paymentDueOccurrences.paidCents, row.occurrence.paidCents), eq(paymentDueOccurrences.status, row.occurrence.status)));
   if (Number((occurrenceUpdate as Array<{ affectedRows?: number }>)[0]?.affectedRows ?? 0) !== 1) throw new TRPCError({ code: "CONFLICT", message: "Cette échéance a été modifiée. Actualisez avant de recommencer." });
   await tx.insert(paymentDueSettlements).values({ occurrenceId: row.occurrence.id, companyId: ctx.user.companyId!, operationId: input.operationId, amountCents: input.amountCents, expenseId, agentPaymentId, receiptUrl, receiptName: input.receiptName ?? null, receiptMimeType: input.receiptMimeType ?? null, settledByUserId: ctx.user.id, settledAt: input.settledAt });
-  await tx.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Échéance réglée", entityType: "Échéance", entityId: String(row.occurrence.id), detail: `Règlement de ${input.amountCents} centimes enregistré sans double comptage.` });
+  await tx.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Échéance réglée", entityType: "Échéance", entityId: String(row.occurrence.id), detail: `Règlement de ${moneyLabel(input.amountCents)} enregistré sans double comptage.` });
   return { success: true, expenseId, agentPaymentId, status, paidCents };
 }
 
@@ -292,7 +293,7 @@ export const paymentDuesRouter = router({
         await settleOccurrenceInTx(tx, ctx, { occurrenceId: row.id, operationId: `${input.operationId}:${row.id}`, amountCents: remaining, settledAt: input.settledAt, note: "Primes d’alimentation du jour" });
         settled += 1; totalCents += remaining;
       }
-      if (settled) await tx.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Primes du jour réglées", entityType: "Échéance", entityId: input.day, detail: `${settled} prime(s) d’alimentation du ${input.day} réglée(s) pour ${totalCents} centimes.` });
+      if (settled) await tx.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Primes du jour réglées", entityType: "Échéance", entityId: input.day, detail: `${settled} prime(s) d’alimentation du ${input.day} réglée(s) pour ${moneyLabel(totalCents)}.` });
       return { settled, totalCents };
     });
   }),

@@ -1,3 +1,4 @@
+import { formatCurrency } from "@/lib/format";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { can } from "@shared/permissions";
@@ -233,7 +234,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const runBackup = trpc.backups.runNow.useMutation({ onSuccess: archive => toast.success(`Sauvegarde ${archive.filename} créée.`), onError: error => toast.error(error.message) });
   const candidateNotifications: RoleNotification[] = [];
   if (isAdmin) {
-    if ((dashboard?.summary?.duePayrollCents ?? 0) > 0) candidateNotifications.push({ id: "payroll", title: "Paie à régler", detail: `${dashboard?.summary?.duePayrollCents ?? 0} centimes restent à payer`, tone: "violet", path: "/agents", audience: "admin" });
+    if ((dashboard?.summary?.duePayrollCents ?? 0) > 0) candidateNotifications.push({ id: "payroll", title: "Paie à régler", detail: `${formatCurrency(dashboard?.summary?.duePayrollCents ?? 0)} restent à payer`, tone: "violet", path: "/agents", audience: "admin" });
     if (dashboard?.summary?.expenseBudget?.exceeded) candidateNotifications.push({ id: "budget-over", title: "Budget dépassé", detail: "Les dépenses ont dépassé le plafond mensuel.", tone: "rose", path: "/depenses", audience: "admin" });
     else if (dashboard?.summary?.expenseBudget?.warningReached) candidateNotifications.push({ id: "budget-warning", title: "Seuil budget atteint", detail: "Le seuil d’alerte des dépenses est atteint.", tone: "amber", path: "/depenses", audience: "admin" });
     if (backups?.settings.lastBackupStatus === "failed") candidateNotifications.push({ id: "backup", title: "Sauvegarde à vérifier", detail: backups.settings.lastBackupError || "La dernière sauvegarde a échoué.", tone: "rose", path: "/sauvegardes", audience: "admin" });

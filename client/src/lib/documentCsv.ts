@@ -15,8 +15,8 @@ const escapeCsvCell = (value: string | number) => {
 };
 
 export function buildCommercialDocumentsCsv(rows: CommercialDocumentCsvRow[]) {
-  const header = ["Référence", "Date", "Client", "Statut", "Agent associé", "Total (centimes)", "Encaissé (centimes)", "Solde (centimes)"];
-  const body = rows.map(row => [row.reference, new Date(row.date).toLocaleString("fr-FR"), row.client, row.statut, row.agent, row.totalCents, row.encaisseCents, Math.max(0, row.totalCents - row.encaisseCents)].map(escapeCsvCell).join(","));
+  const header = ["Référence", "Date", "Client", "Statut", "Agent associé", "Total (FCFA)", "Encaissé (FCFA)", "Solde (FCFA)"];
+  const body = rows.map(row => [row.reference, new Date(row.date).toLocaleString("fr-FR"), row.client, row.statut, row.agent, row.totalCents / 100, row.encaisseCents / 100, Math.max(0, row.totalCents - row.encaisseCents) / 100].map(escapeCsvCell).join(","));
   return `\uFEFF${header.map(escapeCsvCell).join(",")}\n${body.join("\n")}`;
 }
 

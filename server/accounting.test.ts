@@ -29,7 +29,7 @@ describe("journaux comptables", () => {
     const malicious: PaymentRecord = { ...payment, customerName: "=HYPERLINK(\"https://bad.invalid\")" };
     const csv = paymentsJournalCsv([malicious], dayOf);
     expect(csv).toContain("'=HYPERLINK");
-    expect(csv).toContain("Montant (XOF)");
+    expect(csv).toContain("Montant (FCFA)");
     expect(csv.startsWith("\uFEFF")).toBe(true);
   });
   it("conserve la convention interne de montant StockPilot sans modifier les valeurs sources", () => {

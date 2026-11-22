@@ -1,3 +1,4 @@
+import { moneyLabel } from "./moneyLabel";
 import { TRPCError } from "@trpc/server";
 import { and, desc, eq, inArray, isNull, lte, ne, or } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -723,7 +724,7 @@ export const appRouter = router({
         try { assertSellerSensitiveAction(settings, "purchase_price"); } catch (error) { throw new TRPCError({ code: "FORBIDDEN", message: error instanceof Error ? error.message : "Modification du coût d’achat non autorisée." }); }
       }
       await db.update(products).set({ purchasePriceCents: input.purchasePriceCents }).where(and(eq(products.id, product.id), companyScope(products.companyId, ctx.user.companyId)));
-      await createAudit(ctx.user.id, "Coût d’achat modifié", "Produit", product.id, `${product.reference} : ${product.purchasePriceCents} → ${input.purchasePriceCents} centimes`);
+      await createAudit(ctx.user.id, "Coût d’achat modifié", "Produit", product.id, `${product.reference} : ${moneyLabel(product.purchasePriceCents)} → ${moneyLabel(input.purchasePriceCents)}`);
       return { success: true };
     }),
     remove: permissionProcedure("catalog.manage").input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {

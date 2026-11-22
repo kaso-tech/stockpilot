@@ -35,11 +35,11 @@ export function toCsv(header: string[], rows: Array<Array<string | number>>) {
 export function isPostedSale(sale: SaleRecord) { return sale.channel !== "quote" && !(sale.channel === "pos" && sale.status === "draft"); }
 export function salesJournalCsv(sales: SaleRecord[], dayOf: (date: Date) => string) {
   const rows = sales.filter(isPostedSale).map(sale => [dayOf(sale.createdAt), sale.invoiceNumber, sale.channel === "pos" ? "Ticket" : "Facture", sale.customerName ?? "Vente comptoir", amount(sale.totalCents - sale.vatCents - sale.deliveryFeeCents), amount(sale.vatCents), amount(sale.deliveryFeeCents), amount(sale.totalCents), amount(sale.amountPaidCents), amount(sale.returnedCents), STATUS_LABELS[sale.status], sale.creditNoteNumber ?? ""]);
-  return toCsv(["Date", "Numéro", "Type", "Client", "Base HT (XOF)", "TVA (XOF)", "Frais livraison (XOF)", "Total TTC (XOF)", "Encaissé (XOF)", "Retours (XOF)", "Statut", "Avoir"], rows);
+  return toCsv(["Date", "Numéro", "Type", "Client", "Base HT (FCFA)", "TVA (FCFA)", "Frais livraison (FCFA)", "Total TTC (FCFA)", "Encaissé (FCFA)", "Retours (FCFA)", "Statut", "Avoir"], rows);
 }
 export function paymentsJournalCsv(payments: PaymentRecord[], dayOf: (date: Date) => string) {
   const rows = payments.map(payment => [dayOf(payment.createdAt), payment.invoiceNumber, payment.customerName ?? "Vente comptoir", METHOD_LABELS[payment.method] ?? payment.method, payment.amountCents < 0 ? "Remboursement" : "Encaissement", amount(payment.amountCents)]);
-  return toCsv(["Date", "Document", "Client", "Moyen", "Nature", "Montant (XOF)"], rows);
+  return toCsv(["Date", "Document", "Client", "Moyen", "Nature", "Montant (FCFA)"], rows);
 }
 function customerAux(record: { customerId: number | null; customerName: string | null }) {
   return record.customerId ? { number: `C${record.customerId}`, label: record.customerName ?? `Client ${record.customerId}` } : { number: "COMPTOIR", label: "Ventes comptoir" };
