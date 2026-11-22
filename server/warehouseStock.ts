@@ -98,3 +98,25 @@ export async function creditWarehouseStock(tx: DbTransaction, companyId: number 
 export function transferNumber() {
   return `TRF-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 }
+
+/**
+ * Règle unique « sous le seuil » d'un entrepôt (accueil, page Alertes) : produit stocké dans l'entrepôt
+ * dont la quantité locale est inférieure ou égale au seuil de l'entrepôt, ou à défaut au seuil minimum
+ * de la fiche produit.
+ */
+export async function warehouseLowStock(db: DbTransaction, companyId: number | null, warehouseId: number) {
+  const [stocks, overrides, catalog] = await Promise.all([
+    db.select({ productId: warehouseStocks.productId, quantity: warehouseStocks.quantity }).from(warehouseStocks).where(and(companyScope(warehouseStocks.companyId, companyId), eq(warehouseStocks.warehouseId, warehouseId))),
+    db.select({ productId: warehouseReorderThresholds.productId, threshold: warehouseReorderThresholds.threshold }).from(warehouseReorderThresholds).where(and(companyScope(warehouseReorderThresholds.companyId, companyId), eq(warehouseReorderThresholds.warehouseId, warehouseId))),
+    db.select({ id: products.id, minimumQuantity: products.minimumQuantity }).from(products).where(companyScope(products.companyId, companyId)),
+  ]);
+  const thresholds = new Map<number, number>();
+  for (const product of catalog) thresholds.set(product.id, product.minimumQuantity);
+  for (const override of overrides) if (override.threshold > 0) thresholds.set(override.productId, override.threshold);
+  const low = new Map<number, { quantity: number; threshold: number }>();
+  for (const stock of stocks) {
+    const threshold = thresholds.get(stock.productId);
+    if (threshold !== undefined && stock.quantity <= threshold) low.set(stock.productId, { quantity: stock.quantity, threshold });
+  }
+  return { low, thresholds };
+}

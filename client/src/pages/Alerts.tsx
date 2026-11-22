@@ -18,7 +18,8 @@ export default function Alerts() {
   const utils = trpc.useUtils();
   const acknowledge = trpc.warehouses.acknowledgeAlert.useMutation({ onSuccess: () => void utils.warehouses.thresholds.list.invalidate(), onError: () => undefined });
   const [orderOpen, setOrderOpen] = useState(false);
-  const alerts = thresholdRows.filter(product => product.alert).sort((a, b) => (a.quantity - a.threshold) - (b.quantity - b.threshold));
+  // Même règle que l'accueil : sous le seuil de l'entrepôt (ou, à défaut, le seuil minimum du produit).
+  const alerts = thresholdRows.filter(product => product.alert || product.low).map(product => ({ ...product, threshold: product.effectiveThreshold || product.threshold })).sort((a, b) => (a.quantity - a.threshold) - (b.quantity - b.threshold));
   const orderLines = useMemo(() => alerts.map(product => ({
     ...product,
     id: product.productId,

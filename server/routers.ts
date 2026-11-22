@@ -55,7 +55,7 @@ import { adminProcedure, permissionProcedure, protectedProcedure, publicProcedur
 import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { commerceRouter } from "./routers/commerce";
 import { inventoryRouter } from "./routers/inventory";
-import { payrollRouter } from "./routers/payroll";
+import { loadPayrollOverview, payrollRouter } from "./routers/payroll";
 import { printingSettingsRouter } from "./routers/printingSettings";
 import { vatRatesRouter } from "./routers/vatRates";
 import { sellerDiscountPermissionsRouter } from "./routers/sellerDiscountPermissions";
@@ -114,7 +114,7 @@ import { resolveCatalogReferences } from "./catalogReferenceRules";
 import { assertSellerSensitiveAction } from "./sellerActionRules";
 import { companyScope } from "./companyScope";
 import { consumeRateLimit } from "./rateLimit";
-import { creditWarehouseStock, debitWarehouseStock, getDefaultWarehouse, getScopedWarehouse } from "./warehouseStock";
+import { creditWarehouseStock, debitWarehouseStock, getDefaultWarehouse, getScopedWarehouse, warehouseLowStock } from "./warehouseStock";
 import { assertSellerWarehouseAccess } from "./sellerWarehouseAccess";
 import { normalizeAuthEmail } from "./authEmail";
 import { consumePasswordResetToken, issuePasswordResetToken, PASSWORD_RESET_TOKEN_PATTERN } from "./authTokens";
@@ -525,8 +525,8 @@ export const appRouter = router({
       const [productRows, movements, saleRows, customerRows, inventories, profiles, commissions, payments, expenseRows, budgetRows] = await Promise.all([listProducts(companyId, input?.warehouseId), listMovements(companyId, 250, input?.warehouseId), db.select().from(sales).where(salesScope), db.select().from(customers).where(companyScope(customers.companyId, companyId)), db.select().from(inventorySessions).where(inventoryScope), db.select().from(remunerationProfiles).where(companyScope(remunerationProfiles.companyId, companyId)), companyId === null ? db.select().from(saleCommissions) : Promise.resolve([]), db.select().from(agentPayments).where(paymentScope), db.select().from(expenses).where(expenseScope), db.select().from(expenseBudgets).where(companyScope(expenseBudgets.companyId, companyId))]);
       // Entrepôt affiché : seuls les produits réellement stockés ici peuvent être « sous le seuil »
       // (un entrepôt neuf ou remis à zéro ne signale pas tout le catalogue).
-      const stockedHere = input?.warehouseId ? new Set((await db.select({ productId: warehouseStocks.productId }).from(warehouseStocks).where(and(companyScope(warehouseStocks.companyId, companyId), eq(warehouseStocks.warehouseId, input.warehouseId)))).map(row => row.productId)) : null;
-      const lowStock = productRows.filter(product => product.quantity <= product.minimumQuantity && (!stockedHere || stockedHere.has(product.id)));
+      const warehouseLow = input?.warehouseId ? (await warehouseLowStock(db, companyId, input.warehouseId)).low : null;
+      const lowStock = productRows.filter(product => warehouseLow ? warehouseLow.has(product.id) : product.quantity <= product.minimumQuantity);
       const totalValueCents = productRows.reduce(
         (sum, product) => sum + product.quantity * product.purchasePriceCents,
         0,
@@ -546,28 +546,9 @@ export const appRouter = router({
       const currentBudget = budgetRows.find(budget => budget.yearMonth === month && (!input?.warehouseId || budget.warehouseId === input.warehouseId));
       const expenseBudget = budgetComparison(currentBudget?.amountCents ?? null, monthlyExpenseCents, currentBudget?.warningPercent ?? 80);
       const canSeeFinance = ["admin", "manager", "accountant"].includes(ctx.user.role);
-      // Paie à régler de l'entrepôt affiché : agents et vendeurs qui y sont rattachés (les personnes sans
-      // rattachement comptent pour l'entrepôt principal) ; leurs paiements comptent quel que soit l'entrepôt.
-      let payrollProfiles = profiles;
-      let payrollPayments = payments;
-      if (input?.warehouseId) {
-        const [agentLinks, sellerLinks, allPayments, warehouseRow] = await Promise.all([
-          db.select({ agentId: salesAgentWarehouseAssignments.agentId, warehouseId: salesAgentWarehouseAssignments.warehouseId }).from(salesAgentWarehouseAssignments).where(companyScope(salesAgentWarehouseAssignments.companyId, companyId)),
-          db.select({ userId: sellerWarehouseAssignments.sellerUserId, warehouseId: sellerWarehouseAssignments.warehouseId }).from(sellerWarehouseAssignments).where(companyScope(sellerWarehouseAssignments.companyId, companyId)),
-          db.select().from(agentPayments).where(companyScope(agentPayments.companyId, companyId)),
-          db.select({ isDefault: warehouses.isDefault }).from(warehouses).where(and(eq(warehouses.id, input.warehouseId), companyScope(warehouses.companyId, companyId))).limit(1),
-        ]);
-        const isDefaultWarehouse = Boolean(warehouseRow[0]?.isDefault);
-        const linked = (type: string, id: number) => { const links = type === "agent" ? agentLinks.filter(link => link.agentId === id) : sellerLinks.filter(link => link.userId === id); return links.length ? links.some(link => link.warehouseId === input!.warehouseId) : isDefaultWarehouse; };
-        payrollProfiles = profiles.filter(profile => linked(profile.beneficiaryType, profile.beneficiaryId));
-        payrollPayments = allPayments;
-      }
-      const duePayrollCents = payrollProfiles.reduce((sum, profile) => {
-        const commissionCents = commissions.filter(item => item.beneficiaryType === profile.beneficiaryType && item.beneficiaryId === profile.beneficiaryId && item.createdAt.toISOString().slice(0, 7) === month).reduce((total, item) => total + item.commissionCents, 0);
-        const fixedCents = profile.remunerationMode === "commission" ? 0 : profile.fixedMonthlyCents;
-        const paidCents = payrollPayments.filter(item => item.beneficiaryType === profile.beneficiaryType && item.beneficiaryId === profile.beneficiaryId && item.periodLabel === month && item.paymentKind !== "food_allowance").reduce((total, item) => total + item.amountCents, 0);
-        return sum + Math.max(0, fixedCents + commissionCents - paidCents);
-      }, 0);
+      // Paie à régler : même calcul que la page Agents (agents et vendeurs existants uniquement).
+      const payroll = await loadPayrollOverview(db, companyId, month, input?.warehouseId);
+      const duePayrollCents = payroll.balances.reduce((sum, balance) => sum + Math.max(0, balance.dueCents), 0);
       const dayKeys = Array.from({ length: 7 }, (_, index) => {
         const date = new Date();
         date.setDate(date.getDate() - (6 - index));

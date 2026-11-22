@@ -5,7 +5,7 @@ import { auditLogs, products, sellerCredentials, sellerWarehouseAssignments, sto
 import { getDb } from "../db";
 import { adminProcedure, permissionProcedure, protectedProcedure, router } from "../_core/trpc";
 import { companyScope } from "../companyScope";
-import { getScopedWarehouse } from "../warehouseStock";
+import { getScopedWarehouse, warehouseLowStock } from "../warehouseStock";
 import { resolveActiveWarehouse } from "../activeWarehouseRules";
 import { assignedWarehouseIds, assertSellerWarehouseAccess } from "../sellerWarehouseAccess";
 import { warehouseAlertNotificationId, warehouseAlertNotificationTitle } from "../warehouseNotificationRules";
@@ -183,7 +183,9 @@ export const warehousesRouter = router({
       ]);
       const productsWithStock = await db.select({ productId: products.id, name: products.name, reference: products.reference, category: products.category, unit: products.unit, supplierId: products.supplierId, purchasePriceCents: products.purchasePriceCents, quantity: sql<number>`coalesce(${warehouseStocks.quantity}, 0)` }).from(products).leftJoin(warehouseStocks, and(eq(warehouseStocks.productId, products.id), eq(warehouseStocks.warehouseId, warehouse.id), companyScope(warehouseStocks.companyId, ctx.user.companyId))).where(companyScope(products.companyId, ctx.user.companyId)).orderBy(asc(products.name));
       const canAcknowledge = ctx.user.role === "admin" || Boolean((await db.select({ id: sellerWarehouseAssignments.id }).from(sellerWarehouseAssignments).where(and(companyScope(sellerWarehouseAssignments.companyId, ctx.user.companyId), eq(sellerWarehouseAssignments.sellerUserId, ctx.user.id), eq(sellerWarehouseAssignments.warehouseId, warehouse.id), eq(sellerWarehouseAssignments.warehouseRole, "manager"))).limit(1))[0]);
-      return productsWithStock.map(product => ({ ...product, threshold: thresholds.find(item => item.productId === product.productId)?.threshold ?? 0, alert: alerts.find(item => item.productId === product.productId) ?? null, canAcknowledge }));
+      const { low, thresholds: effective } = await warehouseLowStock(db, ctx.user.companyId, warehouse.id);
+      // threshold : seuil propre à l'entrepôt (éditable) ; effectiveThreshold : celui réellement appliqué ; low : même règle que l'accueil.
+      return productsWithStock.map(product => ({ ...product, threshold: thresholds.find(item => item.productId === product.productId)?.threshold ?? 0, effectiveThreshold: effective.get(product.productId) ?? 0, low: low.has(product.productId), alert: alerts.find(item => item.productId === product.productId) ?? null, canAcknowledge }));
     }),
     set: permissionProcedure("stock.adjust").input(z.object({ warehouseId: z.number().int().positive(), productId: z.number().int().positive(), threshold: z.number().int().min(0).max(1_000_000) })).mutation(async ({ ctx, input }) => {
       const db = await dbOrThrow();
