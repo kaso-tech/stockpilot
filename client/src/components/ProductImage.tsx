@@ -35,12 +35,13 @@ export function ProductImageField({ product, canEdit, onChanged }: { product: Im
     finally { setPreparing(false); }
   };
   const hasImage = Boolean(product.imageUrl || product.imageThumbUrl);
+  const touchDevice = useTouchDevice();
   return <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
     <div className="relative"><ProductImage product={product} full className="h-28 w-28 text-3xl" rounded="rounded-xl" />{pending && <span className="absolute inset-0 grid place-items-center rounded-xl bg-card/70" aria-label="Traitement de la photo"><Loader2 className="h-6 w-6 animate-spin text-primary" /></span>}</div>
     {canEdit && <div className="flex flex-col gap-2">
       {!isOnline && <p role="status" className="text-xs text-warning ">Envoi de photos indisponible hors connexion.</p>}
       <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="outline" disabled={pending || !isOnline} onClick={() => cameraInput.current?.click()} className="sm:hidden">{action === "camera" && pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}Prendre une photo</Button>
+        {touchDevice && <Button type="button" variant="outline" disabled={pending || !isOnline} onClick={() => cameraInput.current?.click()}>{action === "camera" && pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}Prendre une photo</Button>}
         <Button type="button" variant="outline" disabled={pending || !isOnline} onClick={() => fileInput.current?.click()}>{action === "file" && pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}{hasImage ? "Remplacer la photo" : "Ajouter une photo"}</Button>
         {hasImage && <Button type="button" variant="ghost" disabled={pending || !isOnline} onClick={() => { setAction("remove"); remove.mutate({ productId: product.id }); }} className="text-destructive hover:bg-destructive-soft hover:text-destructive">{action === "remove" && remove.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}Retirer</Button>}
       </div>
@@ -51,9 +52,17 @@ export function ProductImageField({ product, canEdit, onChanged }: { product: Im
   </div>;
 }
 
+/** Appareil tactile (téléphone, tablette) : l’appareil photo s’ouvre directement via l’attribut capture. */
+function useTouchDevice() {
+  const [touch] = useState(() => typeof window !== "undefined" && (window.matchMedia?.("(pointer: coarse)").matches || navigator.maxTouchPoints > 0));
+  return touch;
+}
+
 export function NewProductPhotoPicker({ name, value, onChange, onBusyChange }: { name: string; value: CompressedProductImage | null; onChange: (value: CompressedProductImage | null) => void; onBusyChange?: (busy: boolean) => void }) {
   const { isOnline } = useOffline();
   const fileInput = useRef<HTMLInputElement>(null);
+  const cameraInput = useRef<HTMLInputElement>(null);
+  const touchDevice = useTouchDevice();
   const [preparing, setPreparing] = useState(false);
   const handleFile = async (file: File | undefined) => {
     if (!file) return;
@@ -63,5 +72,5 @@ export function NewProductPhotoPicker({ name, value, onChange, onBusyChange }: {
     catch (error) { toast.error(error instanceof Error ? error.message : "Photo illisible."); }
     finally { setPreparing(false); onBusyChange?.(false); }
   };
-  return <div className="flex items-center gap-3"><ProductImage product={{ name: name || "?", imageUrl: value?.image ?? null }} full className="h-16 w-16 text-xl" rounded="rounded-xl" /><div className="flex flex-wrap gap-2"><Button type="button" variant="outline" size="sm" disabled={preparing || !isOnline} onClick={() => fileInput.current?.click()}>{preparing ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}{value ? "Changer la photo" : "Ajouter une photo"}</Button>{value && <Button type="button" variant="ghost" size="sm" disabled={!isOnline} onClick={() => onChange(null)} className="text-destructive hover:bg-destructive-soft hover:text-destructive"><Trash2 className="h-4 w-4" />Retirer</Button>}</div><input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={event => { void handleFile(event.target.files?.[0]); event.target.value = ""; }} /></div>;
+  return <div className="flex items-center gap-3"><ProductImage product={{ name: name || "?", imageUrl: value?.image ?? null }} full className="h-16 w-16 text-xl" rounded="rounded-xl" /><div className="flex flex-wrap gap-2">{touchDevice && <Button type="button" variant="outline" size="sm" disabled={preparing || !isOnline} onClick={() => cameraInput.current?.click()}><Camera className="h-4 w-4" />Prendre une photo</Button>}<Button type="button" variant="outline" size="sm" disabled={preparing || !isOnline} onClick={() => fileInput.current?.click()}>{preparing ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}{value ? "Changer la photo" : touchDevice ? "Choisir dans la galerie" : "Ajouter une photo"}</Button>{value && <Button type="button" variant="ghost" size="sm" disabled={!isOnline} onClick={() => onChange(null)} className="text-destructive hover:bg-destructive-soft hover:text-destructive"><Trash2 className="h-4 w-4" />Retirer</Button>}</div><input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={event => { void handleFile(event.target.files?.[0]); event.target.value = ""; }} /><input ref={cameraInput} type="file" accept="image/jpeg,image/png,image/webp" capture="environment" className="hidden" onChange={event => { void handleFile(event.target.files?.[0]); event.target.value = ""; }} /></div>;
 }
