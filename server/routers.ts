@@ -888,7 +888,7 @@ export const appRouter = router({
       warehouseId: z.number().int().positive().optional(),
       notes: z.string().trim().max(2000).nullable().optional(),
       expectedDeliveryDate: z.coerce.date().nullable().optional(),
-      items: z.array(z.object({ productId: z.number().int().positive(), quantity: z.number().int().positive().max(MAX_QUANTITY) })).min(1).max(100),
+      items: z.array(z.object({ productId: z.number().int().positive(), quantity: z.number().int().positive().max(MAX_QUANTITY), unitPriceCents: z.number().int().min(0).max(MAX_CENTS).optional() })).min(1).max(100),
       deliveryFeeCents: z.number().int().min(0).max(MAX_CENTS).default(0),
     })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
@@ -899,8 +899,9 @@ export const appRouter = router({
       const catalog = await db.select().from(products).where(companyScope(products.companyId, ctx.user.companyId));
       const selected = input.items.map(item => {
         const product = catalog.find(value => value.id === item.productId);
-        if (!product || (product.supplierId != null && product.supplierId !== input.supplierId)) throw new TRPCError({ code: "BAD_REQUEST", message: "Chaque produit doit être rattaché à ce fournisseur." });
-        return { product, quantity: item.quantity, lineTotalCents: item.quantity * product.purchasePriceCents };
+        if (!product) throw new TRPCError({ code: "BAD_REQUEST", message: "Produit introuvable." });
+        const unitPriceCents = item.unitPriceCents ?? product.purchasePriceCents;
+        return { product, quantity: item.quantity, unitPriceCents, lineTotalCents: item.quantity * unitPriceCents };
       });
       const subtotalCents = selected.reduce((sum, item) => sum + item.lineTotalCents, 0);
       const totals = calculateCommercialTotals({ subtotalCents, vatRateBasisPoints: settings?.vatEnabled ? settings.vatRateBasisPoints : 0, deliveryFeeCents: input.deliveryFeeCents });
@@ -908,7 +909,7 @@ export const appRouter = router({
       const orderId = await db.transaction(async tx => {
         const result = await tx.insert(purchaseOrders).values({ companyId: ctx.user.companyId, orderNumber, supplierId: input.supplierId, warehouseId: receivingWarehouse.id, subtotalCents: totals.subtotalCents, vatRateBasisPoints: totals.vatRateBasisPoints, vatCents: totals.vatCents, deliveryFeeCents: totals.deliveryFeeCents, totalCents: totals.totalCents, notes: input.notes ?? null, expectedDeliveryDate: input.expectedDeliveryDate ?? null, createdByUserId: ctx.user.id });
         const id = Number(result[0].insertId);
-        await tx.insert(purchaseOrderItems).values(selected.map(item => ({ purchaseOrderId: id, productId: item.product.id, productName: item.product.name, productReference: item.product.reference, unit: item.product.unit, quantity: item.quantity, purchasePriceCents: item.product.purchasePriceCents, lineTotalCents: item.lineTotalCents })));
+        await tx.insert(purchaseOrderItems).values(selected.map(item => ({ purchaseOrderId: id, productId: item.product.id, productName: item.product.name, productReference: item.product.reference, unit: item.product.unit, quantity: item.quantity, purchasePriceCents: item.unitPriceCents, lineTotalCents: item.lineTotalCents })));
         return id;
       });
       await createAudit(ctx.user.id, "Création", "Bon de commande", orderId, `Bon ${orderNumber} créé pour ${supplier.name}`);
