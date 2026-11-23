@@ -20,7 +20,7 @@ import { useLocation } from "wouter";
 type Status = "draft" | "sent" | "received" | "cancelled";
 type OrderItem = { id: number; productId: number; productName: string; productReference: string; unit: string; quantity: number; receivedQuantity: number; lineTotalCents: number };
 type Order = { id: number; orderNumber: string; supplierId: number; status: Status; subtotalCents: number; vatRateBasisPoints: number; vatCents: number; deliveryFeeCents: number; totalCents: number; expectedDeliveryDate: Date | null; receivedAt: Date | null; createdAt: Date; supplier: { id: number; name: string } | null; items: OrderItem[] };
-type Product = { id: number; name: string; reference: string; supplierId: number | null; purchasePriceCents: number; quantity: number; unit: string };
+type Product = { id: number; name: string; reference: string; category?: string | null; description?: string | null; supplierId: number | null; purchasePriceCents: number; quantity: number; unit: string };
 
 const statusMeta: Record<Status, { label: string; className: string }> = {
   draft: { label: "En attente", className: "border-warning/25 bg-warning-soft text-warning" },
@@ -61,7 +61,7 @@ export default function PurchaseOrders() {
   const orderProducts = useMemo(() => {
     const supplier = Number(supplierId);
     const rank = (product: Product) => lines[product.id] ? 0 : product.supplierId === supplier ? 1 : 2;
-    return (products as Product[]).filter(product => lines[product.id] || matchesSearch(productSearch, product.name, product.reference)).sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, "fr"));
+    return (products as Product[]).filter(product => lines[product.id] || matchesSearch(productSearch, product.name, product.reference, product.category, product.description)).sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, "fr"));
   }, [products, supplierId, lines, productSearch]);
   const visibleProducts = orderProducts.slice(0, 60);
   const selectedLines = Object.entries(lines).map(([productId, line]) => ({ productId: Number(productId), quantity: Math.round(Number(line.quantity)), unitPriceCents: Math.round((Number(line.price) || 0) * 100) }));

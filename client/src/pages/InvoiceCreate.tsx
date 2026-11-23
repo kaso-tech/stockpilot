@@ -285,7 +285,7 @@ export default function InvoiceCreate({
       products.filter(
         product =>
           product.quantity > 0 &&
-          matchesSearch(query, product.name, product.reference)
+          matchesSearch(query, product.name, product.reference, product.category, product.description)
       ),
     [products, query]
   );

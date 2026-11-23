@@ -131,7 +131,7 @@ export default function PointOfSale() {
   const available = useMemo(
     () =>
       products.filter(product => {
-        const matchesQuery = matchesSearch(query, product.name, product.reference);
+        const matchesQuery = matchesSearch(query, product.name, product.reference, product.category, product.description);
         return (
           product.quantity - (pendingProductQuantities[product.id] ?? 0) > 0 &&
           matchesQuery &&
