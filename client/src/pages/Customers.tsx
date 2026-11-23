@@ -1,4 +1,5 @@
 import { PhoneInput } from "@/components/PhoneInput";
+import { matchesSearch } from "@/lib/search";
 import { EmptyState, PageHeader, Panel } from "@/components/page";
 import { StatusPill } from "@/components/StatusPill";
 import { can } from "@shared/permissions";
@@ -55,7 +56,7 @@ export default function Customers() {
       return;
     }
     if (editingId) update.mutate({ id: editingId, ...data }); else create.mutate(data); };
-  const visible = useMemo(() => customers.filter(customer => { const needle = search.toLowerCase().trim(); const searchable = [customer.name, customer.email, customer.phone, customer.taxNumber, customer.address].filter(Boolean).join(" ").toLowerCase(); return (!needle || searchable.includes(needle)) && (typeFilter === "all" || customer.type === typeFilter); }).sort((a, b) => a.name.localeCompare(b.name)), [customers, search, typeFilter]);
+  const visible = useMemo(() => customers.filter(customer => { return matchesSearch(search, customer.name, customer.email, customer.phone, customer.taxNumber, customer.address) && (typeFilter === "all" || customer.type === typeFilter); }).sort((a, b) => a.name.localeCompare(b.name)), [customers, search, typeFilter]);
 
   return <div className="mx-auto max-w-[1440px] space-y-6">
     <PageHeader title="Clients" description={`${visible.length} client${visible.length > 1 ? "s" : ""}${typeFilter !== "all" || search ? " correspondant aux critères" : ""}`} actions={canManage ? <Button onClick={() => { reset(); setOpen(true); }}><Plus className="h-4 w-4" />Nouveau client</Button> : undefined} />

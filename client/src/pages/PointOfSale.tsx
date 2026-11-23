@@ -1,4 +1,5 @@
 import { ProductImage } from "@/components/ProductImage";
+import { matchesSearch } from "@/lib/search";
 import { BarcodeCameraDialog } from "@/components/BarcodeCameraDialog";
 import { computeVatBreakdown, vatRatesLabel } from "@shared/pricing";
 import {
@@ -130,12 +131,10 @@ export default function PointOfSale() {
   const available = useMemo(
     () =>
       products.filter(product => {
-        const matchesSearch = [product.name, product.reference].some(value =>
-          value.toLowerCase().includes(query.toLowerCase())
-        );
+        const matchesQuery = matchesSearch(query, product.name, product.reference);
         return (
           product.quantity - (pendingProductQuantities[product.id] ?? 0) > 0 &&
-          matchesSearch &&
+          matchesQuery &&
           (!lowStockOnly || isLowStock(product))
         );
       }),

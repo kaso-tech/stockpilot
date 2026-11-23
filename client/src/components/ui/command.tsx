@@ -5,6 +5,10 @@ import { Command as CommandPrimitive } from "cmdk";
 import { SearchIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { matchesSearch } from "@/lib/search";
+
+/** Filtre par défaut : sans accents ni casse (« television » trouve « Télévision »). */
+const accentInsensitiveFilter = (value: string, search: string, keywords?: string[]) => (matchesSearch(search, value, ...(keywords ?? [])) ? 1 : 0);
 import {
   Dialog,
   DialogContent,
@@ -20,6 +24,7 @@ function Command({
   return (
     <CommandPrimitive
       data-slot="command"
+      filter={accentInsensitiveFilter}
       className={cn(
         "bg-popover text-popover-foreground flex h-full w-full flex-col overflow-hidden rounded-md",
         className

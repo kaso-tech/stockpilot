@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { matchesSearch } from "@/lib/search";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -43,13 +44,12 @@ export default function Tickets() {
   const { data: ticketDetail, isLoading: isDetailLoading } = trpc.commerce.sales.detail.useQuery({ id: selectedTicketId ?? 0 }, { enabled: selectedTicketId !== null });
   const tickets = useMemo(() => (transactions as Ticket[]).filter(ticket => {
     if ((ticket as any).channel !== "pos") return false;
-    const term = search.trim().toLowerCase();
-    const matchesSearch = !term || ticket.invoiceNumber.toLowerCase().includes(term);
+    const matchesQuery = matchesSearch(search, ticket.invoiceNumber, (ticket as any).customerName);
     const matchesStatus = status === "all" || (status === "unpaid" ? ticket.status === "draft" || ticket.status === "partial" : ticket.status === status);
     const matchesAgent = matchesDocumentParticipant(ticket, agentId);
     const created = new Date(ticket.createdAt).getTime(); const now = Date.now();
     const matchesPeriod = period === "all" || (period === "today" ? created >= new Date().setHours(0, 0, 0, 0) : period === "week" ? created >= now - 7 * 86_400_000 : created >= now - 31 * 86_400_000);
-    return matchesSearch && matchesStatus && matchesAgent && matchesPeriod;
+    return matchesQuery && matchesStatus && matchesAgent && matchesPeriod;
   }), [agentId, period, search, status, transactions]);
   const openTickets = tickets.filter(ticket => ticket.status === "draft" || ticket.status === "partial").length;
   const exportFilteredTickets = () => downloadCommercialDocumentsCsv("tickets-filtres.csv", tickets.map(ticket => ({ reference: ticket.invoiceNumber, date: ticket.createdAt, client: "Client comptoir", statut: ticketStatus(ticket)[0], agent: documentParticipantNames(ticket, documentParticipants), totalCents: ticket.totalCents, encaisseCents: ticket.amountPaidCents })));

@@ -1,4 +1,5 @@
 import { BarcodeCameraDialog } from "@/components/BarcodeCameraDialog";
+import { matchesSearch } from "@/lib/search";
 import { computeVatBreakdown, vatRatesLabel } from "@shared/pricing";
 import { DocumentVatRateSelector } from "@/components/DocumentVatRateSelector";
 import {
@@ -284,9 +285,7 @@ export default function InvoiceCreate({
       products.filter(
         product =>
           product.quantity > 0 &&
-          [product.name, product.reference].some(value =>
-            value.toLowerCase().includes(query.toLowerCase())
-          )
+          matchesSearch(query, product.name, product.reference)
       ),
     [products, query]
   );

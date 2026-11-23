@@ -1,4 +1,5 @@
 import { StatCard } from "@/components/page";
+import { matchesSearch } from "@/lib/search";
 import { StatusPill } from "@/components/StatusPill";
 import { ProductImage, ProductImageField, NewProductPhotoPicker } from "@/components/ProductImage";
 import type { CompressedProductImage } from "@/lib/productImage";
@@ -55,11 +56,11 @@ export default function Products() {
   const canEditPurchasePrice = canManage || (user?.role === "seller" && Boolean(settings?.sellerCanEditPurchasePrice));
   const catalogCategories = useMemo(() => Array.from(new Set(products.map(product => product.category))).sort(), [products]);
   const filtered = useMemo(() => products.filter(product => {
-    const matchesSearch = [product.name, product.reference, product.category].some(value => value.toLowerCase().includes(query.toLowerCase()));
+    const matchesQuery = matchesSearch(query, product.name, product.reference, product.category, product.description);
     const matchesCategory = filterCategory === "all" || product.category === filterCategory;
     const matchesSupplier = filterSupplier === "all" || (filterSupplier === "none" ? product.supplierId === null : product.supplierId === Number(filterSupplier));
     const matchesStock = filterStatus === "all" || (filterStatus === "alert" ? product.quantity <= product.minimumQuantity : product.quantity > product.minimumQuantity);
-    return matchesSearch && matchesCategory && matchesSupplier && matchesStock;
+    return matchesQuery && matchesCategory && matchesSupplier && matchesStock;
   }), [products, query, filterCategory, filterSupplier, filterStatus]);
   const detailProduct = products.find(product => product.id === detailId) ?? null;
   const refresh = () => { utils.products.list.invalidate(); utils.movements.list.invalidate(); utils.dashboard.get.invalidate(); };

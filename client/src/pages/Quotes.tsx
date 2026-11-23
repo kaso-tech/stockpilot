@@ -1,4 +1,5 @@
 import { can } from "@shared/permissions";
+import { matchesSearch } from "@/lib/search";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,13 +26,12 @@ export default function Quotes() {
   const [period, setPeriod] = useState<"all" | "today" | "week" | "month">("all");
   const quotes = transactions.filter(item => item.channel === "quote");
   const filteredQuotes = useMemo(() => quotes.filter(quote => {
-    const term = search.trim().toLowerCase();
-    const matchesSearch = !term || quote.invoiceNumber.toLowerCase().includes(term) || (quote.customerName || "").toLowerCase().includes(term);
+    const matchesQuery = matchesSearch(search, quote.invoiceNumber, quote.customerName);
     const matchesStatus = status === "all" || quote.status === status;
     const matchesAgent = matchesDocumentParticipant(quote, agentId);
     const created = new Date(quote.createdAt).getTime(); const now = Date.now();
     const matchesPeriod = period === "all" || (period === "today" ? created >= new Date().setHours(0, 0, 0, 0) : period === "week" ? created >= now - 7 * 86_400_000 : created >= now - 31 * 86_400_000);
-    return matchesSearch && matchesStatus && matchesAgent && matchesPeriod;
+    return matchesQuery && matchesStatus && matchesAgent && matchesPeriod;
   }), [agentId, period, quotes, search, status]);
   const exportFilteredQuotes = () => downloadCommercialDocumentsCsv("devis-filtres.csv", filteredQuotes.map(quote => ({ reference: quote.invoiceNumber, date: quote.createdAt, client: quote.customerName || "Client", statut: quote.status === "paid" ? "Accepté" : quote.status === "void" ? "Retourné / annulé" : "En attente", agent: documentParticipantNames(quote, documentParticipants), totalCents: quote.totalCents, encaisseCents: quote.amountPaidCents })));
   if (!can(user?.role, "sales.view"))

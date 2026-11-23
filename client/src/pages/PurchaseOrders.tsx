@@ -1,4 +1,5 @@
 import { StatCard } from "@/components/page";
+import { matchesSearch } from "@/lib/search";
 import { can } from "@shared/permissions";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -51,19 +52,17 @@ export default function PurchaseOrders() {
     onError: error => toast.error(error.message),
   });
   const typedOrders = orders as Order[];
-  const query = search.trim().toLowerCase();
   const filtered = useMemo(() => typedOrders.filter(order => {
-    const matchesSearch = !query || [order.orderNumber, order.supplier?.name ?? ""].some(value => value.toLowerCase().includes(query));
-    return matchesSearch && (supplierFilter === "all" || order.supplierId === Number(supplierFilter)) && (statusFilter === "all" || order.status === statusFilter);
-  }), [typedOrders, query, supplierFilter, statusFilter]);
+    const matchesQuery = matchesSearch(search, order.orderNumber, order.supplier?.name);
+    return matchesQuery && (supplierFilter === "all" || order.supplierId === Number(supplierFilter)) && (statusFilter === "all" || order.status === statusFilter);
+  }), [typedOrders, search, supplierFilter, statusFilter]);
   const statusCounts = useMemo(() => ({ active: typedOrders.filter(order => order.status === "draft" || order.status === "sent").length, received: typedOrders.filter(order => order.status === "received").length, late: typedOrders.filter(isOverdue).length }), [typedOrders]);
   const currencyLabel = !settings?.currency || settings.currency === "XOF" ? "FCFA" : settings.currency;
-  const productQuery = productSearch.trim().toLowerCase();
   const orderProducts = useMemo(() => {
     const supplier = Number(supplierId);
     const rank = (product: Product) => lines[product.id] ? 0 : product.supplierId === supplier ? 1 : 2;
-    return (products as Product[]).filter(product => lines[product.id] || !productQuery || `${product.name} ${product.reference}`.toLowerCase().includes(productQuery)).sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, "fr"));
-  }, [products, supplierId, lines, productQuery]);
+    return (products as Product[]).filter(product => lines[product.id] || matchesSearch(productSearch, product.name, product.reference)).sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, "fr"));
+  }, [products, supplierId, lines, productSearch]);
   const visibleProducts = orderProducts.slice(0, 60);
   const selectedLines = Object.entries(lines).map(([productId, line]) => ({ productId: Number(productId), quantity: Math.round(Number(line.quantity)), unitPriceCents: Math.round((Number(line.price) || 0) * 100) }));
   const draftSubtotalCents = selectedLines.reduce((sum, line) => sum + (line.quantity > 0 ? line.quantity : 0) * Math.max(0, line.unitPriceCents), 0);

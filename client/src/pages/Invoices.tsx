@@ -1,4 +1,5 @@
 import { EmptyState, ListSkeleton, Panel, table } from "@/components/page";
+import { matchesSearch } from "@/lib/search";
 import { can } from "@shared/permissions";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { vatRatesLabel } from "@shared/pricing";
@@ -111,13 +112,12 @@ export default function Invoices() {
     item => item.channel === "invoice"
   ) as Invoice[];
   const filteredInvoices = useMemo(() => invoices.filter(invoice => {
-    const term = search.trim().toLowerCase();
-    const matchesSearch = !term || invoice.invoiceNumber.toLowerCase().includes(term) || (invoice.customerName || "").toLowerCase().includes(term);
+    const matchesQuery = matchesSearch(search, invoice.invoiceNumber, invoice.customerName);
     const matchesStatus = statusFilter === "all" || (statusFilter === "unpaid" ? invoice.status === "draft" || invoice.status === "partial" : invoice.status === statusFilter);
     const matchesAgent = matchesDocumentParticipant(invoice, agentFilter);
     const created = new Date(invoice.createdAt).getTime(); const now = Date.now();
     const matchesPeriod = periodFilter === "all" || (periodFilter === "today" ? created >= new Date().setHours(0, 0, 0, 0) : periodFilter === "week" ? created >= now - 7 * 86_400_000 : created >= now - 31 * 86_400_000);
-    return matchesSearch && matchesStatus && matchesAgent && matchesPeriod;
+    return matchesQuery && matchesStatus && matchesAgent && matchesPeriod;
   }), [agentFilter, invoices, periodFilter, search, statusFilter]);
   const canRefund =
     can(user?.role, "sales.refund") && (user?.role !== "seller" || Boolean(identity?.sellerCanRefund));

@@ -1,4 +1,5 @@
 import { TRPCError } from "@trpc/server";
+import { matchesSearch } from "@shared/search";
 import { and, desc, eq, gte, inArray, isNotNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import { automationJobRuns, backupSettings, companies, companyLifecycleEvents, companySubscriptions, companySyncHealth, platformAdminUsers, platformAuditLogs, platformNotificationReads, subscriptionPlans, supportAssignments, supportPlatformEvents, supportRequests, users } from "../../drizzle/schema";
@@ -80,8 +81,7 @@ export const platformRouter = router({
     list: authenticatedProcedure.input(z.object({ search: z.string().trim().max(120).optional() }).optional()).query(async ({ ctx, input }) => {
       const { db } = await requirePlatformAccess(ctx);
       const rows = await db.select({ id: companies.id, name: companies.name, platformStatus: companies.platformStatus, suspendedAt: companies.suspendedAt, suspensionReason: companies.suspensionReason, onboardingCompletedAt: companies.onboardingCompletedAt, createdAt: companies.createdAt, ownerName: users.name, ownerEmail: users.email, lastSignedIn: users.lastSignedIn }).from(companies).leftJoin(users, eq(companies.ownerUserId, users.id)).orderBy(desc(companies.createdAt));
-      const term = input?.search?.toLocaleLowerCase("fr") ?? "";
-      return rows.filter(row => !term || row.name.toLocaleLowerCase("fr").includes(term) || row.ownerName?.toLocaleLowerCase("fr").includes(term) || row.ownerEmail?.toLocaleLowerCase("fr").includes(term));
+      return rows.filter(row => matchesSearch(input?.search, row.name, row.ownerName, row.ownerEmail));
     }),
     health: authenticatedProcedure.query(async ({ ctx }) => {
       const { db } = await requirePlatformAccess(ctx);

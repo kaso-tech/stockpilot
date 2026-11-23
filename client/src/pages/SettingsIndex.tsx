@@ -1,4 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { matchesSearch } from "@/lib/search";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Building2, ChevronRight, CircleDollarSign, DatabaseBackup, History, KeyRound, LayoutDashboard, Palette, Printer, Search, Settings2, ShieldCheck, Tags, UsersRound } from "lucide-react";
@@ -33,9 +34,8 @@ export const settingsSections: SettingsSection[] = [
 ];
 
 export function filterSettingsSections(query: string, sections = settingsSections) {
-  const normalized = query.trim().toLocaleLowerCase();
-  if (!normalized) return sections;
-  return sections.map(section => ({ ...section, links: section.links.filter(link => `${section.label} ${link.label} ${link.keywords}`.toLocaleLowerCase().includes(normalized)) })).filter(section => section.links.length > 0);
+  if (!query.trim()) return sections;
+  return sections.map(section => ({ ...section, links: section.links.filter(link => matchesSearch(query, section.label, link.label, link.keywords)) })).filter(section => section.links.length > 0);
 }
 
 export default function SettingsIndex() {
