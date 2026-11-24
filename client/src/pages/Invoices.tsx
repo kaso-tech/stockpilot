@@ -100,7 +100,7 @@ export default function Invoices() {
     onSuccess: () => {
       utils.transactions.list.invalidate();
       utils.movements.list.invalidate();
-      utils.products.list.invalidate();
+      utils.products.invalidate();
       utils.dashboard.get.invalidate();
       setRefundTarget(null);
       setPreviewOpen(false);

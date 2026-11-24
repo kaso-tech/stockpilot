@@ -627,7 +627,7 @@ export default function PointOfSale() {
           freshDraftId.current = null;
           clearCart();
           setCheckoutSale(null);
-          utils.products.list.invalidate();
+          utils.products.invalidate();
         }}
       />
       <Dialog open={purchaseListOpen} onOpenChange={setPurchaseListOpen}>

@@ -90,7 +90,7 @@ export function ProductImageField({ product, canEdit, onChanged }: { product: Im
   const cameraInput = useRef<HTMLInputElement>(null);
   const [preparing, setPreparing] = useState(false);
   const [action, setAction] = useState<"file" | "camera" | "remove" | null>(null);
-  const refresh = () => { void utils.products.list.invalidate(); void utils.products.detail.invalidate({ id: product.id }); void utils.dashboard.get.invalidate(); onChanged?.(); };
+  const refresh = () => { void utils.products.invalidate(); void utils.products.detail.invalidate({ id: product.id }); void utils.dashboard.get.invalidate(); onChanged?.(); };
   const upload = trpc.products.uploadImage.useMutation({ onSuccess: () => { toast.success("Photo enregistrée."); refresh(); }, onError: error => toast.error(error.message), onSettled: () => setAction(null) });
   const remove = trpc.products.removeImage.useMutation({ onSuccess: () => { toast.success("Photo retirée."); refresh(); }, onError: error => toast.error(error.message), onSettled: () => setAction(null) });
   const pending = preparing || upload.isPending || remove.isPending;

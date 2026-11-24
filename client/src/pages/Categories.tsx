@@ -21,7 +21,7 @@ export default function Categories() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
   const [name, setName] = useState("");
-  const refresh = () => { utils.categories.list.invalidate(); utils.products.list.invalidate(); };
+  const refresh = () => { utils.categories.list.invalidate(); utils.products.invalidate(); };
   const close = () => { setOpen(false); setEditing(null); setName(""); };
   const create = trpc.categories.create.useMutation({ onSuccess: () => { refresh(); close(); toast.success("Catégorie créée."); }, onError: error => toast.error(error.message) });
   const update = trpc.categories.update.useMutation({ onSuccess: () => { refresh(); close(); toast.success("Catégorie renommée et produits mis à jour."); }, onError: error => toast.error(error.message) });

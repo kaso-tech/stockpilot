@@ -114,7 +114,7 @@ import { resolveCatalogReferences } from "./catalogReferenceRules";
 import { assertSellerSensitiveAction } from "./sellerActionRules";
 import { companyScope } from "./companyScope";
 import { consumeRateLimit } from "./rateLimit";
-import { creditWarehouseStock, debitWarehouseStock, getDefaultWarehouse, getScopedWarehouse, warehouseLowStock } from "./warehouseStock";
+import { creditWarehouseStock, debitWarehouseStock, getDefaultWarehouse, getScopedWarehouse, warehouseLowStock, warehouseStockQuantity } from "./warehouseStock";
 import { assertSellerWarehouseAccess } from "./sellerWarehouseAccess";
 import { normalizeAuthEmail } from "./authEmail";
 import { consumePasswordResetToken, issuePasswordResetToken, PASSWORD_RESET_TOKEN_PATTERN } from "./authTokens";
@@ -708,11 +708,24 @@ export const appRouter = router({
     }),
     update: permissionProcedure("catalog.manage").input(productInput.safeExtend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
-      const { id, priceTiers, retailPriceTiers, wholesalePriceTiers, warehouseId: _warehouseId, categoryId, unitId, ...values } = input;
+      const { id, priceTiers, retailPriceTiers, wholesalePriceTiers, warehouseId, categoryId, unitId, quantity: requestedQuantity, ...values } = input;
       const retailTiers = retailPriceTiers.length ? retailPriceTiers : priceTiers;
       const current = (await db.select({ id: products.id }).from(products).where(and(eq(products.id, id), companyScope(products.companyId, ctx.user.companyId))).limit(1))[0];
       if (!current) throw new TRPCError({ code: "NOT_FOUND", message: "Produit introuvable." });
-      await db.transaction(async tx => { const refs = await resolveCatalogRefs(tx, ctx.user.companyId, values, { categoryId, unitId }); await tx.update(products).set({ ...values, category: refs.category, unit: refs.unit, categoryId: refs.categoryId, unitId: refs.unitId }).where(and(eq(products.id, id), companyScope(products.companyId, ctx.user.companyId))); await tx.delete(productPriceTiers).where(eq(productPriceTiers.productId, id)); const tiers = [...retailTiers.map(tier => ({ ...tier, productId: id, customerType: "retail" as const })), ...wholesalePriceTiers.map(tier => ({ ...tier, productId: id, customerType: "wholesale" as const }))]; if (tiers.length) await tx.insert(productPriceTiers).values(tiers); });
+      await db.transaction(async tx => { const refs = await resolveCatalogRefs(tx, ctx.user.companyId, values, { categoryId, unitId }); await tx.update(products).set({ ...values, category: refs.category, unit: refs.unit, categoryId: refs.categoryId, unitId: refs.unitId }).where(and(eq(products.id, id), companyScope(products.companyId, ctx.user.companyId))); await tx.delete(productPriceTiers).where(eq(productPriceTiers.productId, id)); const tiers = [...retailTiers.map(tier => ({ ...tier, productId: id, customerType: "retail" as const })), ...wholesalePriceTiers.map(tier => ({ ...tier, productId: id, customerType: "wholesale" as const }))]; if (tiers.length) await tx.insert(productPriceTiers).values(tiers);  
+        // Le stock saisi sur la fiche est celui de l'entrepôt actif : l'écart devient un ajustement tracé
+        // (stock de l'entrepôt, total du produit et mouvement), comme une correction manuelle.
+        const warehouse = warehouseId ? await getScopedWarehouse(tx, ctx.user.companyId, warehouseId, { requireActive: true }) : await getDefaultWarehouse(tx, ctx.user.companyId);
+        const localQuantity = await warehouseStockQuantity(tx, ctx.user.companyId, warehouse.id, id);
+        const delta = requestedQuantity - localQuantity;
+        if (delta !== 0) {
+          const localStock = delta > 0 ? await creditWarehouseStock(tx, ctx.user.companyId, warehouse.id, id, delta) : await debitWarehouseStock(tx, ctx.user.companyId, warehouse.id, id, -delta);
+          // Total du produit = somme des stocks d'entrepôt (corrige aussi les totaux faussés par d'anciennes modifications).
+          const [total] = await tx.select({ quantity: sql<number>`coalesce(sum(${warehouseStocks.quantity}), 0)` }).from(warehouseStocks).where(and(companyScope(warehouseStocks.companyId, ctx.user.companyId), eq(warehouseStocks.productId, id)));
+          await tx.update(products).set({ quantity: Number(total?.quantity ?? 0) }).where(and(eq(products.id, id), companyScope(products.companyId, ctx.user.companyId)));
+          await tx.insert(stockMovements).values({ companyId: ctx.user.companyId, productId: id, warehouseId: warehouse.id, supplierId: null, type: "adjustment", quantity: delta, previousQuantity: localStock.previousQuantity, resultingQuantity: localStock.resultingQuantity, reason: "Correction du stock depuis la fiche produit", createdByUserId: ctx.user.id });
+        }
+      });
       await syncStockAlert(id, ctx.user.companyId);
       await createAudit(ctx.user.id, "Modification", "Produit", id, `Produit ${values.reference} modifié`);
       return { success: true };

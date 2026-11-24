@@ -62,7 +62,7 @@ export function BulkPhotoImport({ products }: { products: Product[] }) {
       }
       setProgress({ done: index + 1, total: ready.length });
     }
-    await utils.products.list.invalidate();
+    await utils.products.invalidate();
     setProgress(null);
     setErrors(failures);
     setMatches([]);

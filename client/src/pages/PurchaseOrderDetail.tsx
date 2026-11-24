@@ -49,7 +49,7 @@ export default function PurchaseOrderDetail() {
   const [editOpen, setEditOpen] = useState(false);
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
-  const refresh = async () => { if (order) await Promise.all([utils.purchaseOrders.get.invalidate({ id: order.id }), utils.purchaseOrders.listBySupplier.invalidate({ supplierId: order.supplierId }), utils.products.list.invalidate(), utils.movements.list.invalidate()]); };
+  const refresh = async () => { if (order) await Promise.all([utils.purchaseOrders.get.invalidate({ id: order.id }), utils.purchaseOrders.listBySupplier.invalidate({ supplierId: order.supplierId }), utils.products.invalidate(), utils.movements.list.invalidate()]); };
   const update = trpc.purchaseOrders.updateDetails.useMutation({ onSuccess: async () => { await refresh(); setEditOpen(false); toast.success("Bon de commande mis à jour."); }, onError: error => toast.error(error.message) });
   const receive = trpc.purchaseOrders.receive.useMutation({ onSuccess: async result => { await refresh(); setReceiveOpen(false); toast.success(result.alreadyReceived ? "Ce bon est déjà entièrement reçu." : ("complete" in result && result.complete ? "Réception complète validée." : "Réception partielle enregistrée.")); }, onError: error => toast.error(error.message) });
   const cancel = trpc.purchaseOrders.cancel.useMutation({ onSuccess: async () => { await refresh(); setCancelOpen(false); toast.success("Bon de commande annulé."); }, onError: error => toast.error(error.message) });

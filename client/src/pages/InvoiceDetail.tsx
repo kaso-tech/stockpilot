@@ -33,7 +33,7 @@ export default function InvoiceDetail({ documentType = "invoice" }: { documentTy
   const documentLabel = documentType === "quote" ? "Devis" : documentType === "ticket" ? "Ticket de caisse" : "Facture";
   const collectionPath = documentType === "quote" ? "/devis" : documentType === "ticket" ? "/tickets" : "/factures";
   const removeDraft = trpc.transactions.removeDraft.useMutation({ onSuccess: () => { utils.transactions.list.invalidate(); toast.success(documentType === "quote" ? "Devis supprimé." : documentType === "ticket" ? "Ticket annulé et supprimé." : "Facture annulée."); setLocation(collectionPath); }, onError: error => toast.error(error.message) });
-  const refreshAfterReturn = () => { void utils.commerce.sales.detail.invalidate({ id }); void utils.transactions.list.invalidate(); void utils.movements.list.invalidate(); void utils.products.list.invalidate(); void utils.dashboard.get.invalidate(); };
+  const refreshAfterReturn = () => { void utils.commerce.sales.detail.invalidate({ id }); void utils.transactions.list.invalidate(); void utils.movements.list.invalidate(); void utils.products.invalidate(); void utils.dashboard.get.invalidate(); };
   const refund = trpc.transactions.refund.useMutation({ onSuccess: result => { refreshAfterReturn(); setConfirmRefund(false); toast.success(`Remboursement enregistré (avoir ${result.creditNoteNumber}). Le stock a été réintégré.`); }, onError: error => toast.error(error.message) });
   if (isLoading || !detail) return <div className="mx-auto max-w-6xl py-16 text-center text-sm text-muted-foreground">Chargement de la facture…</div>;
   const sale = detail.sale;

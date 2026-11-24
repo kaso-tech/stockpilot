@@ -25,7 +25,7 @@ export default function ProductDetail() {
   const productId = Number(params?.id);
   const utils = trpc.useUtils();
   const { data, isLoading, error } = trpc.products.detail.useQuery({ id: productId }, { enabled: Number.isInteger(productId) && productId > 0 });
-  const remove = trpc.products.remove.useMutation({ onSuccess: () => { utils.products.list.invalidate(); toast.success("Produit supprimé."); setLocation("/produits"); }, onError: issue => toast.error(issue.message) });
+  const remove = trpc.products.remove.useMutation({ onSuccess: () => { utils.products.invalidate(); toast.success("Produit supprimé."); setLocation("/produits"); }, onError: issue => toast.error(issue.message) });
   const [orderOpen, setOrderOpen] = useState(false);
   const [quantity, setQuantity] = useState("1");
   const isAdmin = can(user?.role, "catalog.manage");

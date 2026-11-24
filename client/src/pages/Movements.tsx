@@ -41,7 +41,7 @@ export default function Movements() {
   const createMovement = trpc.movements.create.useMutation({
     onSuccess: () => {
       utils.movements.list.invalidate();
-      utils.products.list.invalidate();
+      utils.products.invalidate();
       utils.dashboard.get.invalidate();
       setQuantity("");
       setReason("");
