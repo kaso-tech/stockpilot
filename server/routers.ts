@@ -369,7 +369,12 @@ export const appRouter = router({
       const db = await requireDb();
       const email = normalizeAuthEmail(input.email);
       if (!email) throw new TRPCError({ code: "UNAUTHORIZED", message: "E-mail ou mot de passe incorrect." });
-      const account = (await db.select().from(users).where(and(eq(users.emailNormalized, email), eq(users.active, true), inArray(users.role, ROLES))).limit(1))[0];
+      let account = (await db.select().from(users).where(and(eq(users.emailNormalized, email), eq(users.active, true), inArray(users.role, ROLES))).limit(1))[0];
+      if (!account) {
+        // Comptes vendeurs créés sans e-mail normalisé (ancienne version) : on les retrouve par l'e-mail saisi et on complète le champ.
+        account = (await db.select().from(users).where(and(isNull(users.emailNormalized), sql`lower(trim(${users.email})) = ${email}`, eq(users.active, true), inArray(users.role, ROLES))).limit(1))[0];
+        if (account) await db.update(users).set({ emailNormalized: email }).where(eq(users.id, account.id)).catch(() => undefined);
+      }
       if (!account) throw new TRPCError({ code: "UNAUTHORIZED", message: "E-mail ou mot de passe incorrect." });
 
       const credential = await findPasswordHash(db, account);
