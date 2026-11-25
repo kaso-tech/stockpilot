@@ -356,7 +356,7 @@ export const appRouter = router({
       assertLoginRateLimit(ctx.req, input.username);
       const db = await requireDb();
       const row = (await db.select({ id: users.id, openId: users.openId, name: users.name, active: users.active, passwordHash: sellerCredentials.passwordHash }).from(sellerCredentials).innerJoin(users, eq(sellerCredentials.userId, users.id)).where(eq(sellerCredentials.username, input.username)).limit(1))[0];
-      if (!row || !row.active || !(await verifyPassword(input.password, row.passwordHash))) throw new TRPCError({ code: "UNAUTHORIZED", message: "E-mail ou mot de passe incorrect." });
+      if (!row || !row.active || !(await verifyPassword(input.password, row.passwordHash))) throw new TRPCError({ code: "UNAUTHORIZED", message: "E-mail, identifiant ou mot de passe incorrect." });
       const sessionId = randomUUID();
       const userAgent = typeof ctx.req.headers["user-agent"] === "string" ? ctx.req.headers["user-agent"].slice(0, 512) : undefined;
       await db.insert(userSessions).values({ id: sessionId, userId: row.id, deviceLabel: sessionDeviceLabel(userAgent), userAgent: userAgent ?? null, expiresAt: new Date(Date.now() + ONE_YEAR_MS) });
@@ -364,23 +364,25 @@ export const appRouter = router({
       ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: ONE_YEAR_MS });
       return { success: true } as const;
     }),
-    passwordLogin: publicProcedure.input(z.object({ email: z.string().trim().email().max(320), password: z.string().min(1).max(256), rememberMe: z.boolean().optional().default(false) })).mutation(async ({ ctx, input }) => {
+    passwordLogin: publicProcedure.input(z.object({ email: z.string().trim().min(3).max(320), password: z.string().min(1).max(256), rememberMe: z.boolean().optional().default(false) })).mutation(async ({ ctx, input }) => {
       assertLoginRateLimit(ctx.req, input.email);
       const db = await requireDb();
       const email = normalizeAuthEmail(input.email);
-      if (!email) throw new TRPCError({ code: "UNAUTHORIZED", message: "E-mail ou mot de passe incorrect." });
-      let account = (await db.select().from(users).where(and(eq(users.emailNormalized, email), eq(users.active, true), inArray(users.role, ROLES))).limit(1))[0];
-      if (!account) {
+      if (!email) throw new TRPCError({ code: "UNAUTHORIZED", message: "E-mail, identifiant ou mot de passe incorrect." });
+      // Sans « @ » : identifiant de vendeur (insensible à la casse).
+      const byUsername = !email.includes("@") ? (await db.select({ userId: sellerCredentials.userId }).from(sellerCredentials).where(sql`lower(${sellerCredentials.username}) = ${email}`).limit(1))[0] : undefined;
+      let account = byUsername ? (await db.select().from(users).where(and(eq(users.id, byUsername.userId), eq(users.active, true), inArray(users.role, ROLES))).limit(1))[0] : (await db.select().from(users).where(and(eq(users.emailNormalized, email), eq(users.active, true), inArray(users.role, ROLES))).limit(1))[0];
+      if (!account && email.includes("@")) {
         // Comptes vendeurs créés sans e-mail normalisé (ancienne version) : on les retrouve par l'e-mail saisi et on complète le champ.
         account = (await db.select().from(users).where(and(isNull(users.emailNormalized), sql`lower(trim(${users.email})) = ${email}`, eq(users.active, true), inArray(users.role, ROLES))).limit(1))[0];
         if (account) await db.update(users).set({ emailNormalized: email }).where(eq(users.id, account.id)).catch(() => undefined);
       }
-      if (!account) throw new TRPCError({ code: "UNAUTHORIZED", message: "E-mail ou mot de passe incorrect." });
+      if (!account) throw new TRPCError({ code: "UNAUTHORIZED", message: "E-mail, identifiant ou mot de passe incorrect." });
 
       const credential = await findPasswordHash(db, account);
       const passwordValid = Boolean(credential) && await verifyPassword(input.password, credential!.passwordHash);
 
-      if (!passwordValid) throw new TRPCError({ code: "UNAUTHORIZED", message: "E-mail ou mot de passe incorrect." });
+      if (!passwordValid) throw new TRPCError({ code: "UNAUTHORIZED", message: "E-mail, identifiant ou mot de passe incorrect." });
       const sessionDurationMs = input.rememberMe ? REMEMBERED_AUTH_SESSION_MS : STANDARD_AUTH_SESSION_MS;
       const sessionId = randomUUID();
       const userAgent = typeof ctx.req.headers["user-agent"] === "string" ? ctx.req.headers["user-agent"].slice(0, 512) : undefined;
@@ -394,7 +396,7 @@ export const appRouter = router({
       assertLoginRateLimit(ctx.req, input.email);
       const db = await requireDb();
       const normalizedEmail = normalizeAuthEmail(input.email);
-      const account = normalizedEmail ? (await db.select({ id: users.id }).from(users).where(eq(users.emailNormalized, normalizedEmail)).limit(1))[0] : undefined;
+      const account = normalizedEmail ? (await db.select({ id: users.id }).from(users).where(or(eq(users.emailNormalized, normalizedEmail), and(isNull(users.emailNormalized), sql`lower(trim(${users.email})) = ${normalizedEmail}`))).limit(1))[0] : undefined;
       return { available: !account } as const;
     }),
     registerCompany: publicProcedure.input(z.object({ companyName: z.string().trim().min(2).max(200), administratorName: z.string().trim().min(2).max(160), email: z.string().trim().email().max(320), password: z.string().min(10).max(256), rememberMe: z.boolean().optional().default(true) })).mutation(async ({ ctx, input }) => {
@@ -402,8 +404,8 @@ export const appRouter = router({
       const db = await requireDb();
       const email = normalizeAuthEmail(input.email);
       if (!email) throw new TRPCError({ code: "BAD_REQUEST", message: "Adresse e-mail invalide." });
-      const existingAccount = (await db.select({ id: users.id }).from(users).where(eq(users.emailNormalized, email)).limit(1))[0];
-      if (existingAccount) throw new TRPCError({ code: "CONFLICT", message: "Cette adresse e-mail est déjà utilisée." });
+      const existingAccount = (await db.select({ id: users.id }).from(users).where(or(eq(users.emailNormalized, email), and(isNull(users.emailNormalized), sql`lower(trim(${users.email})) = ${email}`))).limit(1))[0];
+      if (existingAccount) throw new TRPCError({ code: "CONFLICT", message: "Cette adresse e-mail est déjà utilisée par un compte StockPilot (peut-être dans une autre entreprise). Connectez-vous avec ce compte ou utilisez une autre adresse." });
       const sessionDurationMs = input.rememberMe ? REMEMBERED_AUTH_SESSION_MS : STANDARD_AUTH_SESSION_MS;
       const openId = `local_admin_${randomUUID()}`;
       const passwordHash = await hashPassword(input.password);

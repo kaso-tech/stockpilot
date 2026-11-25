@@ -46,10 +46,11 @@ describe("commerce agents et vendeurs", () => {
 
   it("crée, modifie et désactive un vendeur avec des identifiants locaux", async () => {
     const caller = commerceRouter.createCaller(adminContext());
-    await caller.sellers.create({ name: "Vendeur Test", email: "nouveau.vendeur@example.test", username: "vendeur.test", password: "Vendeur!2026", remuneration });
+    await expect(caller.sellers.create({ name: "Doublon", email: null, username: "VENDEUR.TEST", password: "Vendeur!2026", remuneration })).rejects.toThrow("Cet identifiant est déjà utilisé");
+    await caller.sellers.create({ name: "Vendeur Test", email: "nouveau.vendeur@example.test", username: "nouveau.vendeur", password: "Vendeur!2026", remuneration });
     await caller.sellers.update({ id: 30, name: "Vendeur Modifié", email: "vendeur@example.test", username: "vendeur.modifie", remuneration, password: "Nouveau!2026" });
     await caller.sellers.remove({ id: 30 });
-    expect(inserts.find(item => item.table === sellerCredentials)?.values).toMatchObject({ userId: 30, username: "vendeur.test" });
+    expect(inserts.find(item => item.table === sellerCredentials)?.values).toMatchObject({ userId: 30, username: "nouveau.vendeur" });
     expect(updates.find(item => item.table === sellerCredentials)?.values).toMatchObject({ username: "vendeur.modifie" });
     expect(updates.find(item => item.table === users && (item.values as any).active === false)?.values).toEqual({ active: false });
     expect(inserts.filter(item => item.table === auditLogs)).toHaveLength(3);
