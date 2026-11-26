@@ -40,7 +40,7 @@ async function loadPeriod(db: any, companyId: number | null, warehouseId: number
   const payments: PaymentRecord[] = paymentRows.map((row: any) => ({ ...row, customerName: row.customerId ? customerNames.get(row.customerId) ?? null : null }));
   return { sales: salesData, returns: returnRows, payments, inPeriod };
 }
-async function daySummary(db: any, companyId: number | null, warehouseId: number, businessDay: string, timezone: string) {
+export async function daySummary(db: any, companyId: number | null, warehouseId: number, businessDay: string, timezone: string) {
   const period = await loadPeriod(db, companyId, warehouseId, businessDay, businessDay, timezone);
   const dayPayments = period.payments.filter(payment => period.inPeriod(payment.createdAt));
   const totals: Record<string, number> = { cash: 0, card: 0, mobile_money: 0, bank_transfer: 0, credit: 0 };

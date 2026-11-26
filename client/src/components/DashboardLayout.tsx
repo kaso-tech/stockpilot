@@ -215,8 +215,12 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const { data: vatRatePresets = [] } = trpc.vatRates.list.useQuery(undefined, { enabled: Boolean(user) && isDocumentCreation });
   const sellerAllowedPaths = new Set(["/", "/pos", "/tickets", "/factures", "/devis", "/clients", "/mouvements", "/synchronisation"]);
   if (sellerPermissions?.sellerCanEditPurchasePrice) sellerAllowedPaths.add("/produits");
+  // Vendeur gérant d’au moins un dépôt : accueil « Mon dépôt », alertes et transferts.
+  const { data: managedDepots = [] } = trpc.depotSpace.managedWarehouses.useQuery(undefined, { enabled: user?.role === "seller" });
+  const isDepotManager = user?.role === "seller" && managedDepots.length > 0;
+  if (isDepotManager) { sellerAllowedPaths.add("/alertes"); sellerAllowedPaths.add("/transferts-stock"); }
   const sellerMenuSections: MenuSection[] = [
-    ...menuSections.map(section => ({ ...section, items: section.items.filter(item => sellerAllowedPaths.has(item.path)) })).filter(section => section.items.length > 0),
+    ...menuSections.map(section => ({ ...section, items: section.items.filter(item => sellerAllowedPaths.has(item.path)).map(item => isDepotManager && item.path === "/" ? { ...item, label: "Mon dépôt" } : item) })).filter(section => section.items.length > 0),
     { label: "Mon compte", items: [{ icon: Settings2, label: "Apparence", path: "/parametres/apparence" }, { icon: LayoutDashboard, label: "Mon tableau de bord", path: "/parametres/tableau-de-bord" }, { icon: ShieldCheck, label: "Sécurité", path: "/parametres/securite" }] },
   ];
   const roleMenuSections = menuSections.map(section => ({ ...section, items: section.items.filter(item => canOpenRoute(user?.role, item.path)) })).filter(section => section.items.length);

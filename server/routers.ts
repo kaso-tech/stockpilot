@@ -101,6 +101,7 @@ function legacyAdminFallbackEnabled() {
 }
 
 import { backupRouter } from "./routers/backups";
+import { depotSpaceRouter } from "./routers/depotSpace";
 import { cashierSpaceRouter } from "./routers/cashierSpace";
 import { agentSpaceRouter } from "./routers/agentSpace";
 import { transactionsRouter } from "./routers/transactions";
@@ -310,6 +311,7 @@ export const appRouter = router({
   emailVerification: emailVerificationRouter,
   agentSpace: agentSpaceRouter,
   cashierSpace: cashierSpaceRouter,
+  depotSpace: depotSpaceRouter,
   companyLogin: router({
     /** Code entreprise à saisir à la connexion (attribué s'il manque). */
     get: protectedProcedure.query(async ({ ctx }) => {

@@ -4,6 +4,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import DashboardLayout from "@/components/DashboardLayout";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useActiveWarehouse } from "@/contexts/ActiveWarehouseContext";
+import { trpc } from "@/lib/trpc";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -27,6 +29,7 @@ const Home = lazy(() => import("./pages/Home"));
 const AgentSpace = lazy(() => import("./pages/AgentSpace"));
 const AgentQuoteCreate = lazy(() => import("./pages/AgentQuoteCreate"));
 const CashierSpace = lazy(() => import("./pages/CashierSpace"));
+const DepotSpace = lazy(() => import("./pages/DepotSpace"));
 const Invoices = lazy(() => import("./pages/Invoices"));
 const InvoiceDetail = lazy(() => import("./pages/InvoiceDetail"));
 const InvoiceCreate = lazy(() => import("./pages/InvoiceCreate"));
@@ -85,7 +88,16 @@ function PageFallback() {
 /** Accueil selon le rôle : l’agent commercial arrive sur son espace. */
 function HomeForRole() {
   const { user } = useAuth();
-  return user?.role === "agent" ? <AgentSpace /> : user?.role === "cashier" ? <CashierSpace /> : <Home />;
+  const { activeWarehouseId } = useActiveWarehouse();
+  // Vendeur gérant de l’entrepôt actif : son tableau de bord de dépôt.
+  const managed = trpc.depotSpace.managedWarehouses.useQuery(undefined, { enabled: user?.role === "seller" });
+  if (user?.role === "agent") return <AgentSpace />;
+  if (user?.role === "cashier") return <CashierSpace />;
+  if (user?.role === "seller") {
+    if (managed.isLoading) return <PageFallback />;
+    if (managed.data?.some(item => item.id === activeWarehouseId)) return <DepotSpace />;
+  }
+  return <Home />;
 }
 
 function DashboardRouter() {
@@ -96,6 +108,7 @@ function DashboardRouter() {
         <Route path={"/mon-espace/devis/nouveau"} component={AgentQuoteCreate} />
         <Route path={"/mon-espace"} component={AgentSpace} />
         <Route path={"/caisse"} component={CashierSpace} />
+        <Route path={"/depot"} component={DepotSpace} />
         <Route path={"/pilotage-entrepots"} component={WarehouseComparison} />
         <Route path={"/pos"} component={PointOfSale} />
         <Route path={"/tickets"} component={Tickets} />
