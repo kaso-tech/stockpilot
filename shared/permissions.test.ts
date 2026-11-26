@@ -23,8 +23,13 @@ describe("rôles tenant et navigation", () => {
     expect(canOpenRoute("accountant", "/comptabilite")).toBe(true);
   });
   it("n’accorde aucun privilège plateforme par déduction", () => {
-    expect(ROLES).toEqual(["admin", "manager", "seller", "accountant", "viewer"]);
+    expect(ROLES).toEqual(["admin", "manager", "seller", "accountant", "viewer", "agent"]);
     expect(can("platform_admin", "users.manage")).toBe(false);
     expect(can(null, "sales.create")).toBe(false);
+  });
+  it("limite l’agent commercial à ses clients, au catalogue et à son espace", () => {
+    expect(permissionsOf("agent")).toEqual(["customers.view", "customers.manage", "catalog.view", "stock.view"]);
+    for (const path of ["/", "/mon-espace", "/clients", "/clients/4", "/produits", "/produits/2", "/parametres/securite"]) expect(canOpenRoute("agent", path)).toBe(true);
+    for (const path of ["/pos", "/factures", "/devis/nouveau", "/agents", "/mouvements", "/entrepots", "/parametres/identite", "/comptabilite"]) expect(canOpenRoute("agent", path)).toBe(false);
   });
 });

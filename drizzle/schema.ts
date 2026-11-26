@@ -25,7 +25,7 @@ export const users = mysqlTable("users", {
   emailVerifiedAt: timestamp("emailVerifiedAt"),
   phone: varchar("phone", { length: 50 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["admin", "manager", "seller", "accountant", "viewer"]).default("seller").notNull(),
+  role: mysqlEnum("role", ["admin", "manager", "seller", "accountant", "viewer", "agent"]).default("seller").notNull(),
   active: boolean("active").notNull().default(true),
   companyId: int("companyId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -554,6 +554,8 @@ export const agents = mysqlTable("agents", {
   name: varchar("name", { length: 160 }).notNull(),
   type: mysqlEnum("type", ["sales_agent", "cashier"]).notNull(),
   warehouseScope: mysqlEnum("warehouseScope", ["all", "selected", "attribution_only"]).notNull().default("all"),
+  /** Compte de connexion de l’agent (espace agent) : l’historique de ventes et de commissions reste sur la fiche. */
+  userId: int("userId").unique(),
   email: varchar("email", { length: 320 }),
   phone: varchar("phone", { length: 50 }),
   active: boolean("active").notNull().default(true),

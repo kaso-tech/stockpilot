@@ -589,6 +589,13 @@
       "when": 1795650690972,
       "tag": "0083_company_login_code",
       "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "5",
+      "when": 1795674058498,
+      "tag": "0084_agent_accounts",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,5 @@
 /** Matrice tenant StockPilot : les droits plateforme restent séparés (platformAdminUsers). */
-export const ROLES = ["admin", "manager", "seller", "accountant", "viewer"] as const;
+export const ROLES = ["admin", "manager", "seller", "accountant", "viewer", "agent"] as const;
 export type Role = (typeof ROLES)[number];
 export type Permission =
   | "sales.view" | "sales.create" | "sales.refund" | "customers.view" | "customers.manage"
@@ -8,7 +8,7 @@ export type Permission =
   | "team.view" | "team.manage" | "users.manage" | "audit.view" | "accounting.export" | "cash.close"
   | "finance.notifications" | "settings.manage" | "backups.manage";
 export const ROLE_LABELS: Record<Role, string> = {
-  admin: "Administrateur", manager: "Gérant", seller: "Vendeur", accountant: "Comptable", viewer: "Lecture seule",
+  admin: "Administrateur", manager: "Gérant", seller: "Vendeur", accountant: "Comptable", viewer: "Lecture seule", agent: "Agent commercial",
 };
 export const ROLE_DESCRIPTIONS: Record<Role, string> = {
   admin: "Tous les droits de l’entreprise, sans privilèges implicites sur la plateforme SaaS.",
@@ -16,17 +16,18 @@ export const ROLE_DESCRIPTIONS: Record<Role, string> = {
   seller: "Vend et gère les clients selon les restrictions de point de vente et d’entrepôt.",
   accountant: "Consulte les données, gère dépenses et paie, et exporte la comptabilité.",
   viewer: "Consulte les données sans pouvoir les modifier.",
+  agent: "Suit ses ventes et commissions, gère ses clients et consulte le catalogue (sans prix d’achat).",
 };
 const MATRIX: Record<Permission, readonly Role[]> = {
   "sales.view": ["admin", "manager", "seller", "accountant", "viewer"],
   "sales.create": ["admin", "manager", "seller"],
   "sales.refund": ["admin", "manager", "seller"],
-  "customers.view": ["admin", "manager", "seller", "accountant", "viewer"],
-  "customers.manage": ["admin", "manager", "seller"],
-  "catalog.view": ["admin", "manager", "seller", "accountant", "viewer"],
+  "customers.view": ["admin", "manager", "seller", "accountant", "viewer", "agent"],
+  "customers.manage": ["admin", "manager", "seller", "agent"],
+  "catalog.view": ["admin", "manager", "seller", "accountant", "viewer", "agent"],
   "catalog.manage": ["admin", "manager"],
   "catalog.price": ["admin", "manager", "seller"],
-  "stock.view": ["admin", "manager", "seller", "accountant", "viewer"],
+  "stock.view": ["admin", "manager", "seller", "accountant", "viewer", "agent"],
   "purchasing.manage": ["admin", "manager"],
   "stock.adjust": ["admin", "manager", "seller"],
   "inventory.manage": ["admin", "manager"],

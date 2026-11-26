@@ -3,6 +3,7 @@ import { PageSkeleton } from "@/components/page";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import DashboardLayout from "@/components/DashboardLayout";
+import { useAuth } from "@/_core/hooks/useAuth";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -23,6 +24,7 @@ const AgentDetail = lazy(() => import("./pages/AgentDetail"));
 const Customers = lazy(() => import("./pages/Customers"));
 const CustomerDetail = lazy(() => import("./pages/CustomerDetail"));
 const Home = lazy(() => import("./pages/Home"));
+const AgentSpace = lazy(() => import("./pages/AgentSpace"));
 const Invoices = lazy(() => import("./pages/Invoices"));
 const InvoiceDetail = lazy(() => import("./pages/InvoiceDetail"));
 const InvoiceCreate = lazy(() => import("./pages/InvoiceCreate"));
@@ -78,11 +80,18 @@ function PageFallback() {
   return <PageSkeleton />;
 }
 
+/** Accueil selon le rôle : l’agent commercial arrive sur son espace. */
+function HomeForRole() {
+  const { user } = useAuth();
+  return user?.role === "agent" ? <AgentSpace /> : <Home />;
+}
+
 function DashboardRouter() {
   return (
     <DashboardLayout>
       <RoleRouteBoundary><Suspense fallback={<PageFallback />}><Switch>
-        <Route path={"/"} component={Home} />
+        <Route path={"/"} component={HomeForRole} />
+        <Route path={"/mon-espace"} component={AgentSpace} />
         <Route path={"/pilotage-entrepots"} component={WarehouseComparison} />
         <Route path={"/pos"} component={PointOfSale} />
         <Route path={"/tickets"} component={Tickets} />

@@ -220,7 +220,12 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     { label: "Mon compte", items: [{ icon: Settings2, label: "Apparence", path: "/parametres/apparence" }, { icon: LayoutDashboard, label: "Mon tableau de bord", path: "/parametres/tableau-de-bord" }, { icon: ShieldCheck, label: "Sécurité", path: "/parametres/securite" }] },
   ];
   const roleMenuSections = menuSections.map(section => ({ ...section, items: section.items.filter(item => canOpenRoute(user?.role, item.path)) })).filter(section => section.items.length);
-  const visibleMenuSections = user?.role === "seller" ? sellerMenuSections : roleMenuSections;
+  // Agent commercial : son espace, ses clients, le catalogue et son compte.
+  const agentMenuSections: MenuSection[] = [
+    { label: "Mon activité", items: [{ icon: LayoutDashboard, label: "Mon espace", path: "/" }, { icon: UserRound, label: "Clients", path: "/clients" }, { icon: PackageSearch, label: "Catalogue", path: "/produits" }] },
+    { label: "Mon compte", items: [{ icon: Settings2, label: "Apparence", path: "/parametres/apparence" }, { icon: ShieldCheck, label: "Sécurité", path: "/parametres/securite" }] },
+  ];
+  const visibleMenuSections = user?.role === "agent" ? agentMenuSections : user?.role === "seller" ? sellerMenuSections : roleMenuSections;
   const visibleMenuItems = visibleMenuSections.flatMap(section => section.items);
   const navigateFromPalette = (path: string) => {
     setNavigationOpen(false);

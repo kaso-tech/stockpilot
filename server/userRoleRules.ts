@@ -1,4 +1,4 @@
-export type ManagedRole = "admin" | "manager" | "seller" | "accountant" | "viewer";
+export type ManagedRole = import("@shared/permissions").Role;
 export type RoleChangeContext = {
   actorUserId: number;
   targetUserId: number;

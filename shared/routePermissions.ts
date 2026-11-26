@@ -20,8 +20,11 @@ export function routePermission(path: string): Permission | null {
   if (/^\/parametres(\/|$)/.test(pathname)) return "settings.manage";
   return null;
 }
+/** Pages ouvertes à l’agent commercial : son espace, les clients, le catalogue et son compte. */
+const AGENT_ROUTES = /^\/($|mon-espace(\/|$)|clients(\/|$)|produits(\/|$)|synchronisation$|parametres\/(apparence|securite)$)/;
 export function canOpenRoute(role: string | null | undefined, path: string): boolean {
   if (!role) return false;
+  if (role === "agent") return AGENT_ROUTES.test(path.split("?")[0]!.replace(/(.)\/$/, "$1"));
   if (path === "/comptabilite") return can(role, "cash.close") || can(role, "accounting.export");
   const required = routePermission(path);
   return required === null || can(role, required);
