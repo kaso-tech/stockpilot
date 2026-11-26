@@ -25,6 +25,7 @@ const Customers = lazy(() => import("./pages/Customers"));
 const CustomerDetail = lazy(() => import("./pages/CustomerDetail"));
 const Home = lazy(() => import("./pages/Home"));
 const AgentSpace = lazy(() => import("./pages/AgentSpace"));
+const AgentQuoteCreate = lazy(() => import("./pages/AgentQuoteCreate"));
 const Invoices = lazy(() => import("./pages/Invoices"));
 const InvoiceDetail = lazy(() => import("./pages/InvoiceDetail"));
 const InvoiceCreate = lazy(() => import("./pages/InvoiceCreate"));
@@ -91,6 +92,7 @@ function DashboardRouter() {
     <DashboardLayout>
       <RoleRouteBoundary><Suspense fallback={<PageFallback />}><Switch>
         <Route path={"/"} component={HomeForRole} />
+        <Route path={"/mon-espace/devis/nouveau"} component={AgentQuoteCreate} />
         <Route path={"/mon-espace"} component={AgentSpace} />
         <Route path={"/pilotage-entrepots"} component={WarehouseComparison} />
         <Route path={"/pos"} component={PointOfSale} />

@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
-import { agentPayments, agents, customers, remunerationProfiles, saleCommissions, sales } from "../../drizzle/schema";
+import { agentPayments, agents, customers, remunerationProfiles, saleCommissions, saleItems, sales } from "../../drizzle/schema";
 import { protectedProcedure, router } from "../_core/trpc";
 import { companyScope } from "../companyScope";
 import { fixedRemunerationCents } from "../commerceRules";
@@ -24,6 +24,18 @@ const periodInput = z.object({ periodLabel: z.string().regex(/^\d{4}-\d{2}$/).op
  * Aucun prix d'achat ni marge n'est renvoyé.
  */
 export const agentSpaceRouter = router({
+  /** Devis préparés par l'agent (ou qui lui sont attribués), avec leurs lignes pour le partage au client. */
+  quotes: protectedProcedure.query(async ({ ctx }) => {
+    const db = await dbOrThrow();
+    const agent = await linkedAgent(db, ctx.user);
+    const rows = await db.select({ id: sales.id, invoiceNumber: sales.invoiceNumber, status: sales.status, totalCents: sales.totalCents, createdAt: sales.createdAt, customerId: sales.customerId, note: sales.note }).from(sales).where(and(companyScope(sales.companyId, ctx.user.companyId), eq(sales.channel, "quote"), eq(sales.salesAgentId, agent.id))).orderBy(desc(sales.createdAt)).limit(50);
+    const ids = rows.map(row => row.id);
+    const [items, customerRows] = await Promise.all([
+      ids.length ? db.select({ saleId: saleItems.saleId, productName: saleItems.productName, quantity: saleItems.quantity, unitPriceCents: saleItems.unitPriceCents, lineTotalCents: saleItems.lineTotalCents }).from(saleItems).where(inArray(saleItems.saleId, ids)) : Promise.resolve([]),
+      (() => { const customerIds = Array.from(new Set(rows.map(row => row.customerId).filter((id): id is number => typeof id === "number"))); return customerIds.length ? db.select({ id: customers.id, name: customers.name, phone: customers.phone }).from(customers).where(and(companyScope(customers.companyId, ctx.user.companyId), inArray(customers.id, customerIds))) : Promise.resolve([]); })(),
+    ]);
+    return rows.map(row => { const customer = customerRows.find(item => item.id === row.customerId); return { ...row, customerName: customer?.name ?? null, customerPhone: customer?.phone ?? null, items: items.filter(item => item.saleId === row.id) }; });
+  }),
   overview: protectedProcedure.input(periodInput).query(async ({ ctx, input }) => {
     const db = await dbOrThrow();
     const agent = await linkedAgent(db, ctx.user);
