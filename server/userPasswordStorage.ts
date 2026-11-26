@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
-import { adminFallbackPasswords, sellerCredentials } from "../drizzle/schema";
+import { adminFallbackPasswords, sellerCredentials, users } from "../drizzle/schema";
 
 export type PasswordHashRecord = { passwordHash: string };
 /** Retourne le hash du credential historique, sans déplacer ni réinitialiser les identifiants. */
@@ -19,6 +19,7 @@ export async function storePasswordHash(tx: any, account: { id: number; openId: 
   if (seller) await tx.update(sellerCredentials).set({ passwordHash }).where(eq(sellerCredentials.id, seller.id));
   else if (role !== "admin") {
     // Seller credentials require a globally unique username; it is not used by email login.
-    await tx.insert(sellerCredentials).values({ userId: account.id, username: `rolelogin-${account.id}-${randomUUID().slice(0, 12)}`, passwordHash });
+    const owner = (await tx.select({ companyId: users.companyId }).from(users).where(eq(users.id, account.id)).limit(1))[0];
+    await tx.insert(sellerCredentials).values({ userId: account.id, companyId: owner?.companyId ?? null, username: `rolelogin-${account.id}-${randomUUID().slice(0, 12)}`, passwordHash });
   }
 }

@@ -5,6 +5,7 @@ vi.mock("./db", () => ({ getDb: vi.fn(), listAuditLogs: vi.fn(), listMovements: 
 import { getDb } from "./db";
 import { appRouter } from "./routers";
 import { hashPassword } from "./passwords";
+import { sellerCredentials, users } from "../drizzle/schema";
 
 const mockedGetDb = vi.mocked(getDb);
 
@@ -18,8 +19,10 @@ describe("auth.localLogin", () => {
   const insertedSessions: Array<Record<string, unknown>> = [];
   async function setSeller(active: boolean, password = "Vendeur!2026") {
     const passwordHash = await hashPassword(password);
-    const row = { id: 7, openId: "local_seller_1", name: "Vendeur", active, passwordHash };
-    mockedGetDb.mockResolvedValue({ select: () => ({ from: () => ({ innerJoin: () => ({ where: () => ({ limit: async () => [row] }) }) }) }), insert: () => ({ values: async (values: Record<string, unknown>) => { insertedSessions.push(values); return []; } }) } as any);
+    const account = { id: 7, openId: "local_seller_1", name: "Vendeur", active, role: "seller", companyId: null, emailNormalized: null };
+    // La base filtre les comptes inactifs : la fausse base renvoie le compte seulement s'il est actif.
+    const fromTable = (table: unknown) => table === users ? { where: async () => (active ? [account] : []) } : table === sellerCredentials ? { where: () => ({ limit: async () => [{ userId: 7, username: "vendeur", passwordHash }] }) } : { where: () => ({ limit: async () => [] }) };
+    mockedGetDb.mockResolvedValue({ select: () => ({ from: fromTable }), insert: () => ({ values: async (values: Record<string, unknown>) => { insertedSessions.push(values); return []; } }) } as any);
   }
   beforeEach(() => { vi.clearAllMocks(); insertedSessions.length = 0; });
   it("ouvre une session pour un vendeur actif avec le bon mot de passe", async () => {

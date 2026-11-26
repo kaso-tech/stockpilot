@@ -3,6 +3,8 @@ import { boolean, decimal, index, int, mysqlEnum, mysqlTable, text, timestamp, u
 export const companies = mysqlTable("companies", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 200 }).notNull(),
+  /** Code entreprise saisi à la connexion (ex. KASOTECH) : unique, en majuscules. */
+  loginCode: varchar("loginCode", { length: 32 }).unique(),
   ownerUserId: int("ownerUserId"),
   platformStatus: mysqlEnum("platformStatus", ["active", "suspended"]).notNull().default("active"),
   suspendedAt: timestamp("suspendedAt"),
@@ -18,7 +20,8 @@ export const users = mysqlTable("users", {
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
-  emailNormalized: varchar("emailNormalized", { length: 320 }).unique(),
+  /** Unique au sein d’une entreprise : une même personne peut avoir un compte dans plusieurs entreprises. */
+  emailNormalized: varchar("emailNormalized", { length: 320 }),
   emailVerifiedAt: timestamp("emailVerifiedAt"),
   phone: varchar("phone", { length: 50 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
@@ -28,7 +31,7 @@ export const users = mysqlTable("users", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
-}, table => [index("users_company_active_idx").on(table.companyId, table.active)]);
+}, table => [index("users_company_active_idx").on(table.companyId, table.active), uniqueIndex("users_company_email_unique").on(table.companyId, table.emailNormalized)]);
 
 /** Opérateurs explicitement autorisés à administrer la plateforme SaaS. */
 export const platformAdminUsers = mysqlTable("platformAdminUsers", {
@@ -278,11 +281,13 @@ export const sellerWarehouseAssignments = mysqlTable("sellerWarehouseAssignments
 export const sellerCredentials = mysqlTable("sellerCredentials", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull().unique(),
-  username: varchar("username", { length: 80 }).notNull().unique(),
+  /** Entreprise du compte : l’identifiant est unique au sein de l’entreprise. */
+  companyId: int("companyId"),
+  username: varchar("username", { length: 80 }).notNull(),
   passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, table => [uniqueIndex("seller_credentials_company_username_unique").on(table.companyId, table.username)]);
 
 export const adminFallbackPasswords = mysqlTable("adminFallbackPasswords", {
   id: int("id").autoincrement().primaryKey(),

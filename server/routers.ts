@@ -108,6 +108,7 @@ import { agentPaymentExpenseRows, budgetComparison, expenseBreakdownByCategory, 
 import { sdk } from "./_core/sdk";
 import { ENV } from "./_core/env";
 import { matchesAdminFallbackCredentials } from "./adminFallbackAuth";
+import { COMPANY_CODE_PATTERN, availableCompanyCode, ensureCompanyLoginCode, normalizeCompanyCode, resolveLoginAccount, suggestCompanyCode } from "./companyLogin";
 import { hashPassword, verifyPassword } from "./passwords";
 import { categoryCanBeRemoved } from "./categoryRules";
 import { resolveCatalogReferences } from "./catalogReferenceRules";
@@ -305,6 +306,24 @@ export const appRouter = router({
   expenses: expensesRouter,
   documents: documentsRouter,
   emailVerification: emailVerificationRouter,
+  companyLogin: router({
+    /** Code entreprise à saisir à la connexion (attribué s'il manque). */
+    get: protectedProcedure.query(async ({ ctx }) => {
+      if (!ctx.user.companyId) return { code: null };
+      return { code: await ensureCompanyLoginCode(await requireDb(), ctx.user.companyId) };
+    }),
+    update: adminProcedure.input(z.object({ code: z.string().trim().min(3).max(40) })).mutation(async ({ ctx, input }) => {
+      if (!ctx.user.companyId) throw new TRPCError({ code: "FORBIDDEN", message: "Aucune entreprise associée." });
+      const code = normalizeCompanyCode(input.code);
+      if (!COMPANY_CODE_PATTERN.test(code)) throw new TRPCError({ code: "BAD_REQUEST", message: "Le code doit contenir 3 à 20 lettres, chiffres ou tirets." });
+      const db = await requireDb();
+      const taken = (await db.select({ id: companies.id }).from(companies).where(eq(companies.loginCode, code)).limit(1))[0];
+      if (taken && taken.id !== ctx.user.companyId) throw new TRPCError({ code: "CONFLICT", message: "Ce code est déjà utilisé par une autre entreprise." });
+      await db.update(companies).set({ loginCode: code }).where(eq(companies.id, ctx.user.companyId));
+      await createAudit(ctx.user.id, "Modification", "Entreprise", ctx.user.companyId, `Code entreprise de connexion : ${code}`);
+      return { code };
+    }),
+  }),
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     requestPasswordReset: publicProcedure.input(z.object({ email: z.string().trim().email().max(320) })).mutation(async ({ ctx, input }) => {
@@ -315,11 +334,14 @@ export const appRouter = router({
       }
       const db = await getDb();
       if (db && normalizedEmail && accountMailerConfigured()) {
-        const account = (await db.select({ id: users.id, email: users.email }).from(users).where(and(eq(users.emailNormalized, normalizedEmail), eq(users.active, true), inArray(users.role, ROLES))).limit(1))[0];
-        if (account?.email) {
+        // Une même adresse peut avoir un compte dans plusieurs entreprises : un lien par entreprise.
+        const accounts = await db.select({ id: users.id, email: users.email, companyName: companies.name, companyCode: companies.loginCode }).from(users).leftJoin(companies, eq(companies.id, users.companyId)).where(and(or(eq(users.emailNormalized, normalizedEmail), and(isNull(users.emailNormalized), sql`lower(trim(${users.email})) = ${normalizedEmail}`)), eq(users.active, true), inArray(users.role, ROLES))).limit(10);
+        for (const account of accounts) {
+          if (!account.email) continue;
           const token = await issuePasswordResetToken(db, account.id);
           const link = `${appUrl(ctx.req)}/reinitialiser-mot-de-passe?token=${encodeURIComponent(token)}`;
-          await sendMail({ to: account.email, subject: "Réinitialisation de votre mot de passe StockPilot", text: `Pour choisir un nouveau mot de passe, ouvrez ce lien valable une heure : ${link}\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez ce message.` });
+          const companyLine = account.companyName ? `Entreprise : ${account.companyName}${account.companyCode ? ` (code ${account.companyCode})` : ""}\n\n` : "";
+          await sendMail({ to: account.email, subject: `Réinitialisation de votre mot de passe StockPilot${account.companyName ? ` — ${account.companyName}` : ""}`, text: `${companyLine}Pour choisir un nouveau mot de passe, ouvrez ce lien valable une heure : ${link}\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez ce message.` });
         }
       }
       return { success: true } as const;
@@ -352,11 +374,11 @@ export const appRouter = router({
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true } as const;
     }),
-    localLogin: publicProcedure.input(z.object({ username: z.string().trim().min(3).max(320), password: z.string().min(1).max(256) })).mutation(async ({ ctx, input }) => {
-      assertLoginRateLimit(ctx.req, input.username);
+    localLogin: publicProcedure.input(z.object({ companyCode: z.string().trim().max(40).optional(), username: z.string().trim().min(3).max(320), password: z.string().min(1).max(256) })).mutation(async ({ ctx, input }) => {
+      assertLoginRateLimit(ctx.req, `${normalizeCompanyCode(input.companyCode)}:${input.username}`);
       const db = await requireDb();
-      const row = (await db.select({ id: users.id, openId: users.openId, name: users.name, active: users.active, passwordHash: sellerCredentials.passwordHash }).from(sellerCredentials).innerJoin(users, eq(sellerCredentials.userId, users.id)).where(eq(sellerCredentials.username, input.username)).limit(1))[0];
-      if (!row || !row.active || !(await verifyPassword(input.password, row.passwordHash))) throw new TRPCError({ code: "UNAUTHORIZED", message: "E-mail, identifiant ou mot de passe incorrect." });
+      const { account } = await resolveLoginAccount(db, { companyCode: input.companyCode, identifier: input.username, password: input.password });
+      const row = { id: account.id, openId: account.openId, name: account.name };
       const sessionId = randomUUID();
       const userAgent = typeof ctx.req.headers["user-agent"] === "string" ? ctx.req.headers["user-agent"].slice(0, 512) : undefined;
       await db.insert(userSessions).values({ id: sessionId, userId: row.id, deviceLabel: sessionDeviceLabel(userAgent), userAgent: userAgent ?? null, expiresAt: new Date(Date.now() + ONE_YEAR_MS) });
@@ -364,25 +386,10 @@ export const appRouter = router({
       ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: ONE_YEAR_MS });
       return { success: true } as const;
     }),
-    passwordLogin: publicProcedure.input(z.object({ email: z.string().trim().min(3).max(320), password: z.string().min(1).max(256), rememberMe: z.boolean().optional().default(false) })).mutation(async ({ ctx, input }) => {
-      assertLoginRateLimit(ctx.req, input.email);
+    passwordLogin: publicProcedure.input(z.object({ companyCode: z.string().trim().max(40).optional(), email: z.string().trim().min(3).max(320), password: z.string().min(1).max(256), rememberMe: z.boolean().optional().default(false) })).mutation(async ({ ctx, input }) => {
+      assertLoginRateLimit(ctx.req, `${normalizeCompanyCode(input.companyCode)}:${input.email}`);
       const db = await requireDb();
-      const email = normalizeAuthEmail(input.email);
-      if (!email) throw new TRPCError({ code: "UNAUTHORIZED", message: "E-mail, identifiant ou mot de passe incorrect." });
-      // Sans « @ » : identifiant de vendeur (insensible à la casse).
-      const byUsername = !email.includes("@") ? (await db.select({ userId: sellerCredentials.userId }).from(sellerCredentials).where(sql`lower(${sellerCredentials.username}) = ${email}`).limit(1))[0] : undefined;
-      let account = byUsername ? (await db.select().from(users).where(and(eq(users.id, byUsername.userId), eq(users.active, true), inArray(users.role, ROLES))).limit(1))[0] : (await db.select().from(users).where(and(eq(users.emailNormalized, email), eq(users.active, true), inArray(users.role, ROLES))).limit(1))[0];
-      if (!account && email.includes("@")) {
-        // Comptes vendeurs créés sans e-mail normalisé (ancienne version) : on les retrouve par l'e-mail saisi et on complète le champ.
-        account = (await db.select().from(users).where(and(isNull(users.emailNormalized), sql`lower(trim(${users.email})) = ${email}`, eq(users.active, true), inArray(users.role, ROLES))).limit(1))[0];
-        if (account) await db.update(users).set({ emailNormalized: email }).where(eq(users.id, account.id)).catch(() => undefined);
-      }
-      if (!account) throw new TRPCError({ code: "UNAUTHORIZED", message: "E-mail, identifiant ou mot de passe incorrect." });
-
-      const credential = await findPasswordHash(db, account);
-      const passwordValid = Boolean(credential) && await verifyPassword(input.password, credential!.passwordHash);
-
-      if (!passwordValid) throw new TRPCError({ code: "UNAUTHORIZED", message: "E-mail, identifiant ou mot de passe incorrect." });
+      const { account, companyCode } = await resolveLoginAccount(db, { companyCode: input.companyCode, identifier: input.email, password: input.password });
       const sessionDurationMs = input.rememberMe ? REMEMBERED_AUTH_SESSION_MS : STANDARD_AUTH_SESSION_MS;
       const sessionId = randomUUID();
       const userAgent = typeof ctx.req.headers["user-agent"] === "string" ? ctx.req.headers["user-agent"].slice(0, 512) : undefined;
@@ -390,27 +397,28 @@ export const appRouter = router({
       const token = await sdk.createSessionToken(account.openId, { name: account.name || account.email || "Utilisateur", expiresInMs: sessionDurationMs, sessionId });
       ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: sessionDurationMs });
       console.info("[Auth password] Session issued", { role: account.role, remembered: input.rememberMe });
-      return { success: true, role: account.role } as const;
+      return { success: true, role: account.role, companyCode } as const;
     }),
     emailAvailability: publicProcedure.input(z.object({ email: z.string().trim().email().max(320) })).query(async ({ ctx, input }) => {
       assertLoginRateLimit(ctx.req, input.email);
       const db = await requireDb();
       const normalizedEmail = normalizeAuthEmail(input.email);
       const account = normalizedEmail ? (await db.select({ id: users.id }).from(users).where(or(eq(users.emailNormalized, normalizedEmail), and(isNull(users.emailNormalized), sql`lower(trim(${users.email})) = ${normalizedEmail}`))).limit(1))[0] : undefined;
-      return { available: !account } as const;
+      // Une nouvelle entreprise peut réutiliser un e-mail déjà présent ailleurs : simple information.
+      return { available: true, usedElsewhere: Boolean(account) } as const;
     }),
     registerCompany: publicProcedure.input(z.object({ companyName: z.string().trim().min(2).max(200), administratorName: z.string().trim().min(2).max(160), email: z.string().trim().email().max(320), password: z.string().min(10).max(256), rememberMe: z.boolean().optional().default(true) })).mutation(async ({ ctx, input }) => {
       assertLoginRateLimit(ctx.req, input.email);
       const db = await requireDb();
       const email = normalizeAuthEmail(input.email);
       if (!email) throw new TRPCError({ code: "BAD_REQUEST", message: "Adresse e-mail invalide." });
-      const existingAccount = (await db.select({ id: users.id }).from(users).where(or(eq(users.emailNormalized, email), and(isNull(users.emailNormalized), sql`lower(trim(${users.email})) = ${email}`))).limit(1))[0];
-      if (existingAccount) throw new TRPCError({ code: "CONFLICT", message: "Cette adresse e-mail est déjà utilisée par un compte StockPilot (peut-être dans une autre entreprise). Connectez-vous avec ce compte ou utilisez une autre adresse." });
+      // Un même e-mail peut administrer plusieurs entreprises : chaque entreprise a son propre compte et son code de connexion.
+      const loginCode = await availableCompanyCode(db, suggestCompanyCode(input.companyName));
       const sessionDurationMs = input.rememberMe ? REMEMBERED_AUTH_SESSION_MS : STANDARD_AUTH_SESSION_MS;
       const openId = `local_admin_${randomUUID()}`;
       const passwordHash = await hashPassword(input.password);
       const { companyId, administratorId } = await db.transaction(async tx => {
-        const companyResult = await tx.insert(companies).values({ name: input.companyName }).$returningId();
+        const companyResult = await tx.insert(companies).values({ name: input.companyName, loginCode }).$returningId();
         const companyId = Number(companyResult[0]?.id);
         const userResult = await tx.insert(users).values({ openId, name: input.administratorName, email, emailNormalized: email, loginMethod: "password", role: "admin", active: true, companyId }).$returningId();
         const administratorId = Number(userResult[0]?.id);
@@ -426,7 +434,7 @@ export const appRouter = router({
       const token = await sdk.createSessionToken(openId, { name: input.administratorName, expiresInMs: sessionDurationMs, sessionId });
       ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: sessionDurationMs });
       console.info("[Auth registration] Company administrator session issued", { companyId });
-      return { success: true, companyId } as const;
+      return { success: true, companyId, companyCode: loginCode } as const;
     }),
     sessions: router({
       list: protectedProcedure.query(async ({ ctx }) => {

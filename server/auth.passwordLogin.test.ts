@@ -18,8 +18,8 @@ function publicContext(cookies: Array<{ name: string; value: string; options: Re
 }
 
 describe("auth.passwordLogin", () => {
-  const admin = { id: 1, openId: "admin-password-test", name: "Administrateur", email: "admin@example.test", role: "admin" as const, active: true };
-  const seller = { id: 2, openId: "seller-password-test", name: "Vendeur", email: "vendeur@example.test", role: "seller" as const, active: true };
+  const admin = { id: 1, openId: "admin-password-test", name: "Administrateur", email: "admin@example.test", emailNormalized: "admin@example.test", role: "admin" as const, active: true, companyId: null };
+  const seller = { id: 2, openId: "seller-password-test", name: "Vendeur", email: "vendeur@example.test", emailNormalized: "vendeur@example.test", role: "seller" as const, active: true, companyId: null };
   const insertedSessions: Array<Record<string, unknown>> = [];
   let selectedAccount = admin;
 
@@ -47,7 +47,7 @@ describe("auth.passwordLogin", () => {
 
   it("ouvre une session administrateur sécurisée avec e-mail et mot de passe", async () => {
     const cookies: Array<{ name: string; value: string; options: Record<string, unknown> }> = [];
-    await expect(appRouter.createCaller(publicContext(cookies)).auth.passwordLogin({ email: "ADMIN@example.test", password: "Admin!2026", rememberMe: false })).resolves.toEqual({ success: true, role: "admin" });
+    await expect(appRouter.createCaller(publicContext(cookies)).auth.passwordLogin({ email: "ADMIN@example.test", password: "Admin!2026", rememberMe: false })).resolves.toEqual({ success: true, role: "admin", companyCode: null });
     expect(cookies[0]).toMatchObject({ name: COOKIE_NAME, options: { secure: true, sameSite: "none", httpOnly: true, maxAge: 86_400_000 } });
     expect(insertedSessions[0]).toMatchObject({ userId: admin.id, deviceLabel: "Appareil inconnu" });
     expect(insertedSessions[0]?.id).toEqual(expect.any(String));
@@ -56,7 +56,7 @@ describe("auth.passwordLogin", () => {
   it("ouvre une session vendeur avec son e-mail et son mot de passe", async () => {
     const cookies: Array<{ name: string; value: string; options: Record<string, unknown> }> = [];
     selectedAccount = seller;
-    await expect(appRouter.createCaller(publicContext(cookies)).auth.passwordLogin({ email: "vendeur@example.test", password: "Vendeur!2026", rememberMe: true })).resolves.toEqual({ success: true, role: "seller" });
+    await expect(appRouter.createCaller(publicContext(cookies)).auth.passwordLogin({ email: "vendeur@example.test", password: "Vendeur!2026", rememberMe: true })).resolves.toEqual({ success: true, role: "seller", companyCode: null });
     expect(cookies).toHaveLength(1);
     expect(cookies[0]?.options).toMatchObject({ maxAge: 2_592_000_000 });
     expect(insertedSessions[0]).toMatchObject({ userId: seller.id });

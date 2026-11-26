@@ -69,6 +69,15 @@ async function startServer() {
     serveStatic(app);
   }
   await ensureAdminFallbackPasswordSeed();
+  // Codes entreprise de connexion : attribués aux entreprises créées avant leur introduction.
+  void (async () => {
+    try {
+      const { getDb } = await import("../db");
+      const { ensureAllCompanyLoginCodes } = await import("../companyLogin");
+      const db = await getDb();
+      if (db) { const assigned = await ensureAllCompanyLoginCodes(db); if (assigned) console.info("[Company login] codes attribués", { assigned }); }
+    } catch (error) { console.error("[Company login] attribution des codes impossible", error); }
+  })();
 
   const preferredPort = parseInt(process.env.PORT || "3000");
   const port = await findAvailablePort(preferredPort);
