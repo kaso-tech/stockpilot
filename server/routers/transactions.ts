@@ -85,7 +85,7 @@ export const transactionsRouter = router({
   // (trace dans le journal d'audit). Aucun stock n'est concerné : il ne sort qu'à l'encaissement.
   removeDraft: permissionProcedure("sales.create").input(z.object({ saleId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
     const db = await dbOrThrow();
-    const settings = ctx.user.role === "seller" ? (await db.select().from(saleSettings).where(companyScope(saleSettings.companyId, ctx.user.companyId)).limit(1))[0] : undefined;
+    const settings = (ctx.user.role === "seller" || ctx.user.role === "cashier") ? (await db.select().from(saleSettings).where(companyScope(saleSettings.companyId, ctx.user.companyId)).limit(1))[0] : undefined;
     return db.transaction(async tx => {
       const sale = (await tx.select().from(sales).where(and(eq(sales.id, input.saleId), companyScope(sales.companyId, ctx.user.companyId))).limit(1).for("update"))[0];
       if (!sale) throw new TRPCError({ code: "NOT_FOUND", message: "Document introuvable." });
@@ -93,7 +93,7 @@ export const transactionsRouter = router({
       // Un vendeur peut toujours abandonner le ticket de caisse qu'il vient d'ouvrir ;
       // annuler le document d'un autre reste soumis au réglage « annulation de facture ».
       const ownPosTicket = sale.channel === "pos" && sale.sellerUserId === ctx.user.id;
-      if (ctx.user.role === "seller" && !ownPosTicket) { try { assertSellerSensitiveAction(settings, "invoice_cancellation"); } catch (error) { throw new TRPCError({ code: "FORBIDDEN", message: error instanceof Error ? error.message : "Annulation non autorisée." }); } }
+      if ((ctx.user.role === "seller" || ctx.user.role === "cashier") && !ownPosTicket) { try { assertSellerSensitiveAction(settings, "invoice_cancellation"); } catch (error) { throw new TRPCError({ code: "FORBIDDEN", message: error instanceof Error ? error.message : "Annulation non autorisée." }); } }
       const entityType = sale.channel === "pos" ? "Ticket POS" : sale.channel === "quote" ? "Devis" : "Facture";
       // Ticket de caisse ou devis non encaissé : ni paiement, ni stock, ni écriture comptable.
       // Il est supprimé pour ne pas encombrer les listes ; le journal d'audit en garde la trace.
@@ -224,7 +224,10 @@ export const transactionsRouter = router({
     const agentQuote = ctx.user.role === "agent";
     if (!can(ctx.user.role, "sales.create") && !(agentQuote && input.channel === "quote")) throw new TRPCError({ code: "FORBIDDEN", message: "Cette action n’est pas autorisée pour votre rôle." });
     if (agentQuote && (input.replacesSaleId || input.offlineOperationId)) throw new TRPCError({ code: "FORBIDDEN", message: "Cette action n’est pas autorisée pour votre rôle." });
-    const restricted = ctx.user.role === "seller" || agentQuote;
+    // Caissier : tickets de caisse uniquement, encaissés à son nom.
+    const cashierSale = ctx.user.role === "cashier";
+    if (cashierSale && input.channel !== "pos") throw new TRPCError({ code: "FORBIDDEN", message: "Le caissier ne crée que des tickets de caisse." });
+    const restricted = ctx.user.role === "seller" || agentQuote || cashierSale;
     if ((input.channel === "invoice" || input.channel === "quote") && !input.customerId) throw new TRPCError({ code: "BAD_REQUEST", message: "Un client est obligatoire pour créer ce document." });
     const db = await dbOrThrow();
     let created: { id: number; invoiceNumber: string; totalCents: number; salesAgentId: number | null; cashierId: number | null } | null = null;
@@ -239,7 +242,7 @@ export const transactionsRouter = router({
       const customer = input.customerId ? (await tx.select().from(customers).where(and(eq(customers.id, input.customerId), companyScope(customers.companyId, ctx.user.companyId))).limit(1))[0] : null;
       if (input.customerId && !customer) throw new TRPCError({ code: "NOT_FOUND", message: "Client introuvable." });
       const defaultWarehouse = input.warehouseId ? null : await getDefaultWarehouse(tx, ctx.user.companyId);
-      const warehouse = agentQuote ? await assertSellerWarehouseAccess(tx, ctx.user, input.warehouseId ?? defaultWarehouse!.id, { requireActive: true, permission: "view_stock" }) : input.warehouseId ? await assertSellerWarehouseAccess(tx, ctx.user, input.warehouseId, { requireActive: true, permission: "sell" }) : ctx.user.role === "seller" ? await assertSellerWarehouseAccess(tx, ctx.user, defaultWarehouse!.id, { requireActive: true, permission: "sell" }) : defaultWarehouse!;
+      const warehouse = agentQuote ? await assertSellerWarehouseAccess(tx, ctx.user, input.warehouseId ?? defaultWarehouse!.id, { requireActive: true, permission: "view_stock" }) : input.warehouseId ? await assertSellerWarehouseAccess(tx, ctx.user, input.warehouseId, { requireActive: true, permission: "sell" }) : ctx.user.role === "seller" || cashierSale ? await assertSellerWarehouseAccess(tx, ctx.user, defaultWarehouse!.id, { requireActive: true, permission: "sell" }) : defaultWarehouse!;
       const productIds = input.items.map(item => item.productId);
       const productRows = await tx.select().from(products).where(and(inArray(products.id, productIds), companyScope(products.companyId, ctx.user.companyId)));
       if (productRows.length !== productIds.length) throw new TRPCError({ code: "NOT_FOUND", message: "Un produit est introuvable." });
@@ -278,6 +281,11 @@ export const transactionsRouter = router({
       if (totalCents > MAX_CENTS) throw new TRPCError({ code: "BAD_REQUEST", message: "Le total commercial dépasse la limite autorisée." });
       const totalCostCents = assertSafeDatabaseInt(lines.reduce((sum, line) => sum + line.lineCostCents, 0), "Coût total");
       let agentSelection = input;
+      if (cashierSale) {
+        const ownCashier = (await tx.select({ id: agents.id, active: agents.active }).from(agents).where(and(eq(agents.userId, ctx.user.id), companyScope(agents.companyId, ctx.user.companyId))).limit(1))[0];
+        if (!ownCashier?.active) throw new TRPCError({ code: "FORBIDDEN", message: "Votre fiche de caissier n’est plus active." });
+        agentSelection = { ...input, cashierId: ownCashier.id, cashierSelectionMade: true };
+      }
       if (agentQuote) {
         const ownAgent = (await tx.select({ id: agents.id, active: agents.active }).from(agents).where(and(eq(agents.userId, ctx.user.id), companyScope(agents.companyId, ctx.user.companyId))).limit(1))[0];
         if (!ownAgent?.active) throw new TRPCError({ code: "FORBIDDEN", message: "Votre fiche d’agent n’est plus active." });
@@ -323,8 +331,15 @@ export const transactionsRouter = router({
       try { assertPaymentMethodsEnabled(input.payments.map(payment => payment.method), settings); } catch (error) { throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "Moyen de paiement invalide." }); }
       let settlement: ReturnType<typeof settlementResult>;
       try { settlement = settlementResult(remainingBefore, input.settlementMode, input.payments.map(payment => payment.amountCents)); } catch (error) { throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "Règlement invalide." }); }
-      const saleWarehouse = sale.warehouseId ? await assertSellerWarehouseAccess(tx, ctx.user, sale.warehouseId, { permission: "checkout" }) : ctx.user.role === "seller" ? await assertSellerWarehouseAccess(tx, ctx.user, (await getDefaultWarehouse(tx, ctx.user.companyId)).id, { permission: "checkout" }) : await getDefaultWarehouse(tx, ctx.user.companyId);
-      const assigned = await validateAgents(tx, ctx.user.companyId, saleWarehouse.id, input);
+      const saleWarehouse = sale.warehouseId ? await assertSellerWarehouseAccess(tx, ctx.user, sale.warehouseId, { permission: "checkout" }) : ctx.user.role === "seller" || ctx.user.role === "cashier" ? await assertSellerWarehouseAccess(tx, ctx.user, (await getDefaultWarehouse(tx, ctx.user.companyId)).id, { permission: "checkout" }) : await getDefaultWarehouse(tx, ctx.user.companyId);
+      // Caissier connecté : l’encaissement est enregistré à son nom.
+      let checkoutSelection = input;
+      if (ctx.user.role === "cashier") {
+        const ownCashier = (await tx.select({ id: agents.id, active: agents.active }).from(agents).where(and(eq(agents.userId, ctx.user.id), companyScope(agents.companyId, ctx.user.companyId))).limit(1))[0];
+        if (!ownCashier?.active) throw new TRPCError({ code: "FORBIDDEN", message: "Votre fiche de caissier n’est plus active." });
+        checkoutSelection = { ...input, cashierId: ownCashier.id, cashierSelectionMade: true };
+      }
+      const assigned = await validateAgents(tx, ctx.user.companyId, saleWarehouse.id, checkoutSelection);
       const isFirstCollection = sale.status === "draft";
       const checkoutLock = await tx.update(sales).set({ ...assigned, status: settlement.status, amountPaidCents: sale.amountPaidCents + settlement.paidCents, paymentMethod: input.payments[0].method, note: input.note ?? sale.note }).where(and(eq(sales.id, sale.id), companyScope(sales.companyId, ctx.user.companyId), eq(sales.status, sale.status), eq(sales.amountPaidCents, sale.amountPaidCents)));
       if (!didApplyExactlyOneStateTransition(checkoutLock)) throw new TRPCError({ code: "CONFLICT", message: "Cette vente a été modifiée. Actualisez avant de recommencer." });

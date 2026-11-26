@@ -25,7 +25,7 @@ export const users = mysqlTable("users", {
   emailVerifiedAt: timestamp("emailVerifiedAt"),
   phone: varchar("phone", { length: 50 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["admin", "manager", "seller", "accountant", "viewer", "agent"]).default("seller").notNull(),
+  role: mysqlEnum("role", ["admin", "manager", "seller", "accountant", "viewer", "agent", "cashier"]).default("seller").notNull(),
   active: boolean("active").notNull().default(true),
   companyId: int("companyId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

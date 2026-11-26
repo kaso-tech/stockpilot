@@ -225,7 +225,12 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     { label: "Mon activité", items: [{ icon: LayoutDashboard, label: "Mon espace", path: "/" }, { icon: UserRound, label: "Clients", path: "/clients" }, { icon: PackageSearch, label: "Catalogue", path: "/produits" }] },
     { label: "Mon compte", items: [{ icon: Settings2, label: "Apparence", path: "/parametres/apparence" }, { icon: ShieldCheck, label: "Sécurité", path: "/parametres/securite" }] },
   ];
-  const visibleMenuSections = user?.role === "agent" ? agentMenuSections : user?.role === "seller" ? sellerMenuSections : roleMenuSections;
+  // Caissier : sa caisse, la vente rapide, les clients et son compte.
+  const cashierMenuSections: MenuSection[] = [
+    { label: "Ma caisse", items: [{ icon: LayoutDashboard, label: "Encaissements", path: "/" }, { icon: ShoppingCart, label: "Vente rapide", path: "/pos" }, { icon: UserRound, label: "Clients", path: "/clients" }] },
+    { label: "Mon compte", items: [{ icon: Settings2, label: "Apparence", path: "/parametres/apparence" }, { icon: ShieldCheck, label: "Sécurité", path: "/parametres/securite" }] },
+  ];
+  const visibleMenuSections = user?.role === "cashier" ? cashierMenuSections : user?.role === "agent" ? agentMenuSections : user?.role === "seller" ? sellerMenuSections : roleMenuSections;
   const visibleMenuItems = visibleMenuSections.flatMap(section => section.items);
   const navigateFromPalette = (path: string) => {
     setNavigationOpen(false);

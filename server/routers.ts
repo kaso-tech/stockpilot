@@ -101,6 +101,7 @@ function legacyAdminFallbackEnabled() {
 }
 
 import { backupRouter } from "./routers/backups";
+import { cashierSpaceRouter } from "./routers/cashierSpace";
 import { agentSpaceRouter } from "./routers/agentSpace";
 import { transactionsRouter } from "./routers/transactions";
 import { expensesRouter } from "./routers/expenses";
@@ -308,6 +309,7 @@ export const appRouter = router({
   documents: documentsRouter,
   emailVerification: emailVerificationRouter,
   agentSpace: agentSpaceRouter,
+  cashierSpace: cashierSpaceRouter,
   companyLogin: router({
     /** Code entreprise à saisir à la connexion (attribué s'il manque). */
     get: protectedProcedure.query(async ({ ctx }) => {
@@ -526,7 +528,7 @@ export const appRouter = router({
 
   dashboard: router({
     get: protectedProcedure.input(z.object({ warehouseId: z.number().int().positive().optional() }).optional()).query(async ({ ctx, input }) => {
-      if (ctx.user.role === "agent") throw new TRPCError({ code: "FORBIDDEN", message: "Le tableau de bord général n’est pas disponible pour les agents commerciaux." });
+      if (ctx.user.role === "agent" || ctx.user.role === "cashier") throw new TRPCError({ code: "FORBIDDEN", message: "Le tableau de bord général n’est pas disponible pour votre rôle." });
       const db = await requireDb();
       const companyId = ctx.user.companyId;
       if (ctx.user.role !== "admin") {
@@ -694,7 +696,7 @@ export const appRouter = router({
       }
       const rows = await listProducts(ctx.user.companyId, input?.warehouseId);
       // Agent commercial : pas de prix d'achat.
-      return ctx.user.role === "agent" ? rows.map(row => ({ ...row, purchasePriceCents: 0 })) : rows;
+      return ctx.user.role === "agent" || ctx.user.role === "cashier" ? rows.map(row => ({ ...row, purchasePriceCents: 0 })) : rows;
     }),
     detail: permissionProcedure("catalog.view").input(z.object({ id: z.number().int().positive() })).query(async ({ ctx, input }) => {
       const db = await requireDb();
@@ -711,8 +713,8 @@ export const appRouter = router({
       const revenueCents = lines.reduce((sum, line) => sum + line.lineTotalCents, 0);
       const costCents = lines.reduce((sum, line) => sum + line.lineCostCents, 0);
       const unitsSold = lines.reduce((sum, line) => sum + line.quantity, 0);
-      const forAgent = ctx.user.role === "agent";
-      return { product: forAgent ? { ...product, purchasePriceCents: 0 } : product, supplier, tiers: { retail: tiers.filter(tier => tier.customerType === "retail"), wholesale: tiers.filter(tier => tier.customerType === "wholesale") }, movements: movements.slice(0, 12), sales: saleRows.slice(0, 8).map(sale => forAgent ? { ...sale, netProfitCents: 0, costCents: 0 } : sale), statistics: ctx.user.role === "agent" ? { revenueCents, costCents: 0, grossMarginCents: 0, marginRate: 0, unitsSold, saleCount: uniqueSaleIds.length, lastSaleAt: saleRows[0]?.createdAt ?? null } : { revenueCents, costCents, grossMarginCents: revenueCents - costCents, marginRate: revenueCents > 0 ? Math.round(((revenueCents - costCents) / revenueCents) * 1000) / 10 : 0, unitsSold, saleCount: uniqueSaleIds.length, lastSaleAt: saleRows[0]?.createdAt ?? null } };
+      const forAgent = ctx.user.role === "agent" || ctx.user.role === "cashier";
+      return { product: forAgent ? { ...product, purchasePriceCents: 0 } : product, supplier, tiers: { retail: tiers.filter(tier => tier.customerType === "retail"), wholesale: tiers.filter(tier => tier.customerType === "wholesale") }, movements: movements.slice(0, 12), sales: saleRows.slice(0, 8).map(sale => forAgent ? { ...sale, netProfitCents: 0, costCents: 0 } : sale), statistics: ctx.user.role === "agent" || ctx.user.role === "cashier" ? { revenueCents, costCents: 0, grossMarginCents: 0, marginRate: 0, unitsSold, saleCount: uniqueSaleIds.length, lastSaleAt: saleRows[0]?.createdAt ?? null } : { revenueCents, costCents, grossMarginCents: revenueCents - costCents, marginRate: revenueCents > 0 ? Math.round(((revenueCents - costCents) / revenueCents) * 1000) / 10 : 0, unitsSold, saleCount: uniqueSaleIds.length, lastSaleAt: saleRows[0]?.createdAt ?? null } };
     }),
     create: permissionProcedure("catalog.manage").input(productInput).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
@@ -1120,7 +1122,7 @@ export const appRouter = router({
   users: router({
     list: permissionProcedure("users.manage").query(({ ctx }) => listUsers(ctx.user.companyId)),
     updateRole: adminProcedure.input(z.object({ id: z.number().int().positive(), role: z.enum(ROLES) })).mutation(async ({ ctx, input }) => {
-      if (input.role === "agent") throw new TRPCError({ code: "BAD_REQUEST", message: "Le rôle Agent commercial se donne depuis la page Agents (bouton « Donner l’accès »)." });
+      if (input.role === "agent" || input.role === "cashier") throw new TRPCError({ code: "BAD_REQUEST", message: "Les rôles Agent commercial et Caissier se donnent depuis la page Agents (bouton « Donner l’accès »)." });
       const db = await requireDb();
       const target = (await db.select({ id: users.id, openId: users.openId, role: users.role, active: users.active }).from(users).where(and(eq(users.id, input.id), companyScope(users.companyId, ctx.user.companyId))).limit(1))[0];
       if (!target) throw new TRPCError({ code: "NOT_FOUND", message: "Utilisateur introuvable dans cette entreprise." });

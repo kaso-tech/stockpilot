@@ -18,7 +18,7 @@ async function agentWarehouseIds(tx: any, user: ScopedUser): Promise<number[] | 
 
 export async function assignedWarehouseIds(tx: any, user: ScopedUser) {
   if (user.role === "admin") return null;
-  if (user.role === "agent") return agentWarehouseIds(tx, user);
+  if (user.role === "agent" || user.role === "cashier") return agentWarehouseIds(tx, user);
   const rows = await tx.select({ warehouseId: sellerWarehouseAssignments.warehouseId })
     .from(sellerWarehouseAssignments)
     .where(and(companyScope(sellerWarehouseAssignments.companyId, user.companyId), eq(sellerWarehouseAssignments.sellerUserId, user.id)));
@@ -27,7 +27,7 @@ export async function assignedWarehouseIds(tx: any, user: ScopedUser) {
 
 export async function warehouseRoleForUser(tx: any, user: ScopedUser, warehouseId: number): Promise<WarehouseRole | null> {
   if (user.role === "admin") return "manager";
-  if (user.role === "agent") { const ids = await agentWarehouseIds(tx, user); return ids === null || ids.includes(warehouseId) ? "seller" : null; }
+  if (user.role === "agent" || user.role === "cashier") { const ids = await agentWarehouseIds(tx, user); return ids === null || ids.includes(warehouseId) ? (user.role === "cashier" ? "cashier" : "seller") : null; }
   const assignment = (await tx.select({ warehouseRole: sellerWarehouseAssignments.warehouseRole }).from(sellerWarehouseAssignments)
     .where(and(companyScope(sellerWarehouseAssignments.companyId, user.companyId), eq(sellerWarehouseAssignments.sellerUserId, user.id), eq(sellerWarehouseAssignments.warehouseId, warehouseId)))
     .limit(1))[0];
@@ -41,6 +41,6 @@ export async function assertSellerWarehouseAccess(tx: any, user: ScopedUser, war
   if (!role) throw new TRPCError({ code: "FORBIDDEN", message: "Cet entrepôt ne vous est pas attribué." });
   // L’agent commercial consulte seulement le stock de ses entrepôts.
   if (user.role === "agent" && options?.permission && options.permission !== "view_stock") throw new TRPCError({ code: "FORBIDDEN", message: "Votre rôle ne permet pas cette action." });
-  if (options?.permission && user.role === "seller" && !warehouseRoleCan(role, options.permission)) throw new TRPCError({ code: "FORBIDDEN", message: "Votre rôle dans cet entrepôt ne permet pas cette action." });
+  if (options?.permission && (user.role === "seller" || user.role === "cashier") && !warehouseRoleCan(role, options.permission)) throw new TRPCError({ code: "FORBIDDEN", message: "Votre rôle dans cet entrepôt ne permet pas cette action." });
   return warehouse;
 }

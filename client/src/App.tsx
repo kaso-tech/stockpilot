@@ -26,6 +26,7 @@ const CustomerDetail = lazy(() => import("./pages/CustomerDetail"));
 const Home = lazy(() => import("./pages/Home"));
 const AgentSpace = lazy(() => import("./pages/AgentSpace"));
 const AgentQuoteCreate = lazy(() => import("./pages/AgentQuoteCreate"));
+const CashierSpace = lazy(() => import("./pages/CashierSpace"));
 const Invoices = lazy(() => import("./pages/Invoices"));
 const InvoiceDetail = lazy(() => import("./pages/InvoiceDetail"));
 const InvoiceCreate = lazy(() => import("./pages/InvoiceCreate"));
@@ -84,7 +85,7 @@ function PageFallback() {
 /** Accueil selon le rôle : l’agent commercial arrive sur son espace. */
 function HomeForRole() {
   const { user } = useAuth();
-  return user?.role === "agent" ? <AgentSpace /> : <Home />;
+  return user?.role === "agent" ? <AgentSpace /> : user?.role === "cashier" ? <CashierSpace /> : <Home />;
 }
 
 function DashboardRouter() {
@@ -94,6 +95,7 @@ function DashboardRouter() {
         <Route path={"/"} component={HomeForRole} />
         <Route path={"/mon-espace/devis/nouveau"} component={AgentQuoteCreate} />
         <Route path={"/mon-espace"} component={AgentSpace} />
+        <Route path={"/caisse"} component={CashierSpace} />
         <Route path={"/pilotage-entrepots"} component={WarehouseComparison} />
         <Route path={"/pos"} component={PointOfSale} />
         <Route path={"/tickets"} component={Tickets} />
