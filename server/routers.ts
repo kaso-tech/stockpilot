@@ -920,7 +920,7 @@ export const appRouter = router({
       const db = await requireDb();
       const supplier = (await db.select().from(suppliers).where(and(eq(suppliers.id, input.supplierId), companyScope(suppliers.companyId, ctx.user.companyId))).limit(1))[0];
       if (!supplier) throw new TRPCError({ code: "NOT_FOUND", message: "Fournisseur introuvable." });
-      const receivingWarehouse = input.warehouseId ? await getScopedWarehouse(db, ctx.user.companyId, input.warehouseId, { requireActive: true }) : await getDefaultWarehouse(db, ctx.user.companyId);
+      const receivingWarehouse = await assertSellerWarehouseAccess(db, ctx.user, input.warehouseId ?? (await getDefaultWarehouse(db, ctx.user.companyId)).id, { requireActive: true });
       const settings = (await db.select().from(saleSettings).where(companyScope(saleSettings.companyId, ctx.user.companyId)).limit(1))[0];
       const catalog = await db.select().from(products).where(companyScope(products.companyId, ctx.user.companyId));
       const selected = input.items.map(item => {
@@ -1001,7 +1001,7 @@ export const appRouter = router({
           if (line.expiryDate && !line.lotNumber) throw new TRPCError({ code: "BAD_REQUEST", message: "Un numéro de lot est requis lorsqu’une date de péremption est renseignée." });
       }
       const result = await db.transaction(async tx => {
-        const receivingWarehouse = order.warehouseId ? await getScopedWarehouse(tx, ctx.user.companyId, order.warehouseId, { requireActive: true }) : await getDefaultWarehouse(tx, ctx.user.companyId);
+        const receivingWarehouse = await assertSellerWarehouseAccess(tx, ctx.user, order.warehouseId ?? (await getDefaultWarehouse(tx, ctx.user.companyId)).id, { requireActive: true });
         for (const item of items.filter(value => requestedByItemId.has(value.id))) {
           const receivedNow = requestedByItemId.get(item.id) ?? 0;
           const product = (await tx.select().from(products).where(and(eq(products.id, item.productId), companyScope(products.companyId, ctx.user.companyId))).limit(1))[0];
@@ -1031,7 +1031,7 @@ export const appRouter = router({
   movements: router({
     list: protectedProcedure.input(z.object({ warehouseId: z.number().int().positive().optional() }).optional()).query(async ({ ctx, input }) => {
       const db = await requireDb();
-      if (input?.warehouseId) await getScopedWarehouse(db, ctx.user.companyId, input.warehouseId, { requireActive: true });
+      if (input?.warehouseId) await assertSellerWarehouseAccess(db, ctx.user, input.warehouseId, { requireActive: true });
       return listMovements(ctx.user.companyId, 100, input?.warehouseId);
     }),
     create: permissionProcedure("stock.adjust").input(z.object({
@@ -1053,7 +1053,7 @@ export const appRouter = router({
         try { assertSellerSensitiveAction(settings, "stock_correction"); } catch (error) { throw new TRPCError({ code: "FORBIDDEN", message: error instanceof Error ? error.message : "Correction de stock non autorisée." }); }
       }
       await db.transaction(async tx => {
-        const warehouse = input.warehouseId ? await getScopedWarehouse(tx, ctx.user.companyId, input.warehouseId, { requireActive: true }) : await getDefaultWarehouse(tx, ctx.user.companyId);
+        const warehouse = await assertSellerWarehouseAccess(tx, ctx.user, input.warehouseId ?? (await getDefaultWarehouse(tx, ctx.user.companyId)).id, { requireActive: true });
         const row = await tx.select().from(products).where(and(eq(products.id, input.productId), companyScope(products.companyId, ctx.user.companyId))).limit(1);
         const product = row[0];
         if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Produit introuvable." });
