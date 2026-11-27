@@ -216,6 +216,37 @@ export const commerceRouter = router({
       const rows = await db.select({ agentId: agents.id, userId: agents.userId, username: sellerCredentials.username, active: users.active, role: users.role, customRoleId: users.customRoleId }).from(agents).innerJoin(users, eq(users.id, agents.userId)).leftJoin(sellerCredentials, eq(sellerCredentials.userId, users.id)).where(companyScope(agents.companyId, ctx.user.companyId));
       return rows.filter(row => row.active);
     }),
+    /** Comptes de connexion actifs sans fiche d’équipe (ex. fiche effacée par une ancienne réinitialisation d’entrepôt) : invisibles sinon. */
+    orphanAccounts: permissionProcedure("team.view").query(async ({ ctx }) => {
+      const db = await dbOrThrow();
+      const [accountRows, linked, roleRows] = await Promise.all([
+        db.select({ id: users.id, name: users.name, email: users.email, role: users.role, customRoleId: users.customRoleId, username: sellerCredentials.username }).from(users).leftJoin(sellerCredentials, eq(sellerCredentials.userId, users.id)).where(and(companyScope(users.companyId, ctx.user.companyId), eq(users.active, true), inArray(users.role, ["agent", "cashier", "accountant", "viewer", "storekeeper", "purchaser", "custom"]))),
+        db.select({ userId: agents.userId }).from(agents).where(companyScope(agents.companyId, ctx.user.companyId)),
+        db.select({ id: customRoles.id, name: customRoles.name }).from(customRoles).where(companyScope(customRoles.companyId, ctx.user.companyId)),
+      ]);
+      const linkedIds = new Set(linked.map(row => row.userId).filter((id): id is number => id !== null));
+      return accountRows.filter(row => !linkedIds.has(row.id)).map(row => ({ ...row, username: row.username?.startsWith("rolelogin-") ? null : row.username, customRoleName: roleRows.find(role => role.id === row.customRoleId)?.name ?? null }));
+    }),
+    /** Recrée la fiche d’équipe d’un compte orphelin, liée au même compte (identifiant et mot de passe inchangés). */
+    restoreOrphan: permissionProcedure("team.manage").input(z.object({ userId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      const db = await dbOrThrow();
+      const account = (await db.select().from(users).where(and(eq(users.id, input.userId), companyScope(users.companyId, ctx.user.companyId))).limit(1))[0];
+      if (!account || ["admin", "manager", "seller"].includes(account.role)) throw new TRPCError({ code: "NOT_FOUND", message: "Compte introuvable." });
+      const already = (await db.select({ id: agents.id }).from(agents).where(eq(agents.userId, account.id)).limit(1))[0];
+      if (already) return { agentId: already.id };
+      const customRole = account.customRoleId ? (await db.select({ name: customRoles.name }).from(customRoles).where(eq(customRoles.id, account.customRoleId)).limit(1))[0] : undefined;
+      const type = account.role === "agent" ? "sales_agent" as const : account.role === "cashier" ? "cashier" as const : "staff" as const;
+      const jobTitles: Record<string, string> = { accountant: "Comptable", viewer: "Lecture seule", storekeeper: "Magasinier", purchaser: "Responsable achats" };
+      const jobTitle = type === "staff" ? (customRole?.name ?? jobTitles[account.role] ?? "Membre") : null;
+      const agentId = await runAtomically(db, async tx => {
+        const result = await tx.insert(agents).values({ companyId: ctx.user.companyId, name: account.name || "Membre", type, jobTitle, email: account.email ?? null, phone: account.phone ?? null, userId: account.id, active: true });
+        const createdId = Number(result[0].insertId);
+        await tx.insert(remunerationProfiles).values({ beneficiaryType: "agent", beneficiaryId: createdId, companyId: ctx.user.companyId, remunerationMode: type === "staff" ? "fixed" : "commission", fixedMonthlyCents: 0, commissionBasis: "revenue", rateBasisPoints: 0, active: true });
+        return createdId;
+      });
+      await audit(ctx.user.id, "Fiche recréée", "Agent", agentId, `Fiche d’équipe recréée pour le compte existant de ${account.name ?? "membre"}.`);
+      return { agentId };
+    }),
     /** Donne à un agent commercial l'accès à son espace : compte lié à sa fiche, historique conservé. */
     grantAccess: permissionProcedure("team.manage").input(z.object({ id: z.number().int().positive(), role: z.enum(STAFF_ACCESS_ROLES).optional(), customRoleId: z.number().int().positive().optional(), email: optionalLoginEmail, username: z.string().trim().min(3).max(80).regex(/^[a-zA-Z0-9._-]+$/, "L’identifiant ne peut contenir que des lettres, chiffres, points, tirets et tirets bas."), password: z.string().min(8).max(128) })).mutation(async ({ ctx, input }) => {
       const db = await dbOrThrow();

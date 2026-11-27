@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { agents, salesAgentWarehouseAssignments, sellerWarehouseAssignments } from "../drizzle/schema";
+import { agents, salesAgentWarehouseAssignments, sellerWarehouseAssignments, users } from "../drizzle/schema";
 import { companyScope } from "./companyScope";
 import { getScopedWarehouse } from "./warehouseStock";
 import { type WarehousePermission, type WarehouseRole, warehouseRoleCan } from "./warehouseRoleRules";
@@ -56,6 +56,22 @@ export async function warehouseRoleForUser(tx: any, user: ScopedUser, warehouseI
   return assignment?.warehouseRole ?? null;
 }
 
+/**
+ * L’entrepôt a-t-il un caissier séparé (compte caissier actif qui y a accès, ou vendeur nommé caissier de ce dépôt) ?
+ * Sans caissier séparé, les vendeurs encaissent eux-mêmes et le bouton « Envoyer en caisse » n’a pas lieu d’être.
+ */
+export async function warehouseHasDedicatedCashier(tx: any, companyId: number | null, warehouseId: number): Promise<boolean> {
+  const sellerCashier = (await tx.select({ id: sellerWarehouseAssignments.id }).from(sellerWarehouseAssignments).innerJoin(users, eq(users.id, sellerWarehouseAssignments.sellerUserId)).where(and(companyScope(sellerWarehouseAssignments.companyId, companyId), eq(sellerWarehouseAssignments.warehouseId, warehouseId), eq(sellerWarehouseAssignments.warehouseRole, "cashier"), eq(users.active, true))).limit(1))[0];
+  if (sellerCashier) return true;
+  const cashiers = await tx.select({ agentId: agents.id, scope: agents.warehouseScope }).from(agents).innerJoin(users, eq(users.id, agents.userId)).where(and(companyScope(agents.companyId, companyId), eq(agents.type, "cashier"), eq(agents.active, true), eq(users.active, true), eq(users.role, "cashier")));
+  for (const cashier of cashiers as Array<{ agentId: number; scope: string }>) {
+    if (cashier.scope !== "selected") return true;
+    const assigned = (await tx.select({ id: salesAgentWarehouseAssignments.id }).from(salesAgentWarehouseAssignments).where(and(eq(salesAgentWarehouseAssignments.agentId, cashier.agentId), eq(salesAgentWarehouseAssignments.warehouseId, warehouseId))).limit(1))[0];
+    if (assigned) return true;
+  }
+  return false;
+}
+
 export async function assertSellerWarehouseAccess(tx: any, user: ScopedUser, warehouseId: number, options?: { requireActive?: boolean; permission?: WarehousePermission }) {
   const warehouse = await getScopedWarehouse(tx, user.companyId, warehouseId, options);
   if (user.role === "admin") return warehouse;
@@ -63,6 +79,8 @@ export async function assertSellerWarehouseAccess(tx: any, user: ScopedUser, war
   if (!role) throw new TRPCError({ code: "FORBIDDEN", message: "Cet entrepôt ne vous est pas attribué." });
   // L’agent commercial consulte seulement le stock de ses entrepôts.
   if (user.role === "agent" && options?.permission && options.permission !== "view_stock") throw new TRPCError({ code: "FORBIDDEN", message: "Votre rôle ne permet pas cette action." });
+  // Vendeur sans caissier séparé dans l’entrepôt : il encaisse lui-même.
+  if (options?.permission === "checkout" && user.role === "seller" && !warehouseRoleCan(role, "checkout") && !(await warehouseHasDedicatedCashier(tx, user.companyId, warehouse.id))) return warehouse;
   if (options?.permission && (user.role === "seller" || user.role === "cashier") && !warehouseRoleCan(role, options.permission)) throw new TRPCError({ code: "FORBIDDEN", message: "Votre rôle dans cet entrepôt ne permet pas cette action." });
   return warehouse;
 }

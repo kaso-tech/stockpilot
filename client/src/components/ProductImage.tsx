@@ -4,17 +4,36 @@ import { compressProductImage, type CompressedProductImage } from "@/lib/product
 import { trpc } from "@/lib/trpc";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Camera, Download, ImagePlus, Loader2, Trash2 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { sessionAuthHeaders } from "@/lib/sessionAuth";
 import { toast } from "sonner";
 
 type ImageSource = { name: string; reference?: string | null; imageUrl?: string | null; imageThumbUrl?: string | null };
 
+/**
+ * Photo privée : si le navigateur n’envoie pas le cookie de session (navigation privée, WebView, aperçu),
+ * la balise image échoue ; on la recharge alors avec le jeton de session en en-tête.
+ */
+function useAuthenticatedFallback(src: string | null | undefined) {
+  const [state, setState] = useState<{ src: string; url: string | null; failed: boolean } | null>(null);
+  const current = state?.src === src ? state : null;
+  useEffect(() => () => { if (state?.url) URL.revokeObjectURL(state.url); }, [state?.url]);
+  const onError = () => {
+    if (!src || current) { if (src) setState({ src, url: null, failed: true }); return; }
+    setState({ src, url: null, failed: false });
+    void fetch(src, { credentials: "include", headers: sessionAuthHeaders() })
+      .then(async response => { if (!response.ok) throw new Error(String(response.status)); const blob = await response.blob(); setState({ src, url: URL.createObjectURL(blob), failed: false }); })
+      .catch(() => setState({ src, url: null, failed: true }));
+  };
+  return { displaySrc: current?.url ?? src, failed: Boolean(current?.failed), onError };
+}
+
 export function ProductImage({ product, full = false, className = "h-10 w-10", rounded = "rounded-lg", zoomable = false }: { product: ImageSource; full?: boolean; className?: string; rounded?: string; zoomable?: boolean }) {
   const src = full ? (product.imageUrl ?? product.imageThumbUrl) : (product.imageThumbUrl ?? product.imageUrl);
-  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const { displaySrc, failed, onError } = useAuthenticatedFallback(src);
   const [viewerOpen, setViewerOpen] = useState(false);
-  if (src && failedSrc !== src) {
-    const image = <img src={src} alt="" loading="lazy" decoding="async" onError={() => setFailedSrc(src)} className={`${className} ${rounded} shrink-0 bg-white object-contain ring-1 ring-inset ring-border/60`} />;
+  if (src && !failed) {
+    const image = <img src={displaySrc ?? undefined} alt="" loading="lazy" decoding="async" onError={onError} className={`${className} ${rounded} shrink-0 bg-white object-contain ring-1 ring-inset ring-border/60`} />;
     if (!zoomable) return image;
     // Clic sur la photo : agrandissement (sans déclencher le clic de la ligne ou de la carte parente).
     return <>
@@ -32,7 +51,7 @@ function photoFileName(product: ImageSource) {
 
 /** Convertit la photo en JPEG (format lu par toutes les galeries). */
 async function photoAsJpeg(url: string): Promise<Blob> {
-  const response = await fetch(url, { credentials: "include" });
+  const response = await fetch(url, { credentials: "include", headers: sessionAuthHeaders() });
   if (!response.ok) throw new Error("Photo indisponible.");
   const source = await response.blob();
   if (source.type === "image/jpeg") return source;
@@ -48,6 +67,7 @@ async function photoAsJpeg(url: string): Promise<Blob> {
 
 export function ProductImageViewer({ product, open, onOpenChange }: { product: ImageSource; open: boolean; onOpenChange: (open: boolean) => void }) {
   const src = product.imageUrl ?? product.imageThumbUrl;
+  const viewerImage = useAuthenticatedFallback(src);
   const [saving, setSaving] = useState(false);
   const save = async () => {
     if (!src) return;
@@ -74,7 +94,7 @@ export function ProductImageViewer({ product, open, onOpenChange }: { product: I
     <DialogContent className="w-[calc(100vw-1rem)] max-w-3xl gap-3 border-border bg-popover p-3 text-foreground sm:p-4" onClick={event => event.stopPropagation()}>
       <DialogTitle className="pr-8 text-base">{product.name}</DialogTitle>
       <DialogDescription className="sr-only">Photo du produit en grand format.</DialogDescription>
-      {src && <img src={src} alt={product.name} className="max-h-[70vh] w-full rounded-lg bg-white object-contain" />}
+      {src && !viewerImage.failed && <img src={viewerImage.displaySrc ?? undefined} onError={viewerImage.onError} alt={product.name} className="max-h-[70vh] w-full rounded-lg bg-white object-contain" />}
       <div className="flex flex-wrap justify-end gap-2">
         <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Fermer</Button>
         <Button type="button" onClick={() => void save()} disabled={saving || !src} className="bg-primary text-primary-foreground hover:bg-primary/90">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}Enregistrer la photo</Button>

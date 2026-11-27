@@ -100,6 +100,8 @@ export default function PointOfSale() {
   // Circuit vendeur → caisse : ce que l’utilisateur peut faire ici, et ses tickets (paniers de côté, envoyés en caisse).
   const capabilities = trpc.posTickets.capabilities.useQuery({ warehouseId: selectedWarehouseId ?? 0 }, { enabled: Boolean(selectedWarehouseId) });
   const canCheckoutHere = capabilities.data?.canCheckout ?? true;
+  // Sans caissier séparé dans l’entrepôt, on encaisse directement : pas de bouton « Envoyer en caisse ».
+  const hasSeparateCashier = capabilities.data?.hasCashier ?? false;
   const myTickets = trpc.posTickets.mine.useQuery({ warehouseId: selectedWarehouseId ?? 0 }, { enabled: Boolean(selectedWarehouseId), refetchInterval: 5_000 });
   const [holdLabel, setHoldLabel] = useState("");
   const [sentTicket, setSentTicket] = useState<{ queueNumber: number | null; invoiceNumber: string; label: string; totalCents: number } | null>(null);
@@ -589,7 +591,7 @@ export default function PointOfSale() {
       <Input aria-label="Repère du client" value={holdLabel} onChange={event => setHoldLabel(event.target.value)} maxLength={80} placeholder="Repère du client (facultatif) : Awa, monsieur en bleu…" className="h-9 bg-card text-sm" />
       {canCheckoutHere ? <>
         <Button onClick={openCheckout} disabled={!cart.length || draft.isPending} className="h-12 w-full text-base">{draft.isPending ? "Préparation…" : <><Keyboard className="h-4 w-4" />{isOnline ? "Encaisser" : "Encaisser hors connexion"}<span className="ml-1 rounded bg-primary-foreground/15 px-1.5 py-0.5 text-xs">F9</span></>}</Button>
-        <Button variant="outline" onClick={sendToCashier} disabled={!cart.length || sendToCashierMutation.isPending || !isOnline} className="h-10 w-full"><Send className="h-4 w-4" />{sendToCashierMutation.isPending ? "Envoi…" : "Envoyer en caisse"}</Button>
+        {hasSeparateCashier && <Button variant="outline" onClick={sendToCashier} disabled={!cart.length || sendToCashierMutation.isPending || !isOnline} className="h-10 w-full"><Send className="h-4 w-4" />{sendToCashierMutation.isPending ? "Envoi…" : "Envoyer en caisse"}</Button>}
       </> : <Button onClick={sendToCashier} disabled={!cart.length || sendToCashierMutation.isPending || !isOnline} className="h-12 w-full text-base">{sendToCashierMutation.isPending ? "Envoi…" : <><Send className="h-4 w-4" />Envoyer en caisse<span className="ml-1 rounded bg-primary-foreground/15 px-1.5 py-0.5 text-xs">F9</span></>}</Button>}
       <Button variant="outline" onClick={holdTicket} disabled={!cart.length || savePendingTicket.isPending || !isOnline} className="h-10 w-full"><PauseCircle className="h-4 w-4" />{savePendingTicket.isPending ? "Enregistrement…" : "Mettre de côté · client suivant"}</Button>
       {recalled && <Button variant="ghost" onClick={confirmCancelTicket} disabled={cancelTicket.isPending || !isOnline} className="h-10 w-full text-destructive hover:bg-destructive-soft hover:text-destructive"><XCircle className="h-4 w-4" />{cancelTicket.isPending ? "Annulation…" : "Annuler le ticket"}</Button>}
@@ -681,7 +683,7 @@ export default function PointOfSale() {
               <span className="relative grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary-soft text-primary"><ShoppingCart className="h-5 w-5" /><span key={cartUnits} className="animate-pop absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[11px] font-bold text-primary-foreground">{cartUnits}</span></span>
               <span className="min-w-0"><span className="block text-xs text-muted-foreground">{recalled ? `Ticket ${recalled.invoiceNumber}` : "Voir le panier"} <ChevronUp className="inline h-3 w-3" /></span><span className="block truncate text-lg font-bold text-foreground">{formatCurrency(totalCents)}</span></span>
             </button>
-            <Button onClick={openCheckout} disabled={draft.isPending} className="h-11 px-5">{draft.isPending ? "Préparation…" : "Encaisser"}</Button>
+            {canCheckoutHere ? <Button onClick={openCheckout} disabled={draft.isPending} className="h-11 px-5">{draft.isPending ? "Préparation…" : "Encaisser"}</Button> : <Button onClick={sendToCashier} disabled={sendToCashierMutation.isPending || !isOnline} className="h-11 px-4"><Send className="h-4 w-4" />{sendToCashierMutation.isPending ? "Envoi…" : "En caisse"}</Button>}
           </div>
         </div>
       )}

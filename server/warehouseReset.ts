@@ -8,7 +8,7 @@
 // utilisateurs et leur accès à l'entrepôt, et le journal d'activité (trace de l'opération).
 // Le stock total des produits est diminué du stock effacé, avec un ajustement tracé hors entrepôt.
 import { TRPCError } from "@trpc/server";
-import { and, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
 import {
   agentPayments, agents, auditLogs, cashClosures, expenseBudgets, expenses, inventoryItems, inventorySessions,
   paymentDueBeneficiaryGroupMembers, paymentDueBeneficiaryGroups, paymentDueOccurrences, paymentDueReminderEvents, paymentDueSchedules, paymentDueSettlements, paymentDueTemplates,
@@ -46,10 +46,14 @@ const count = async (db: Tx, table: any, where: any) => Number((await db.select(
 const involves = (warehouseId: number) => or(eq(stockTransfers.sourceWarehouseId, warehouseId), eq(stockTransfers.destinationWarehouseId, warehouseId));
 const ids = (rows: Array<{ id: number }>) => rows.map(row => row.id);
 
-/** Agents rattachés à cet entrepôt et à aucun autre, et qui n'apparaissent dans aucune vente d'un autre entrepôt. */
+/** Agents rattachés à cet entrepôt et à aucun autre, sans compte de connexion, et qui n'apparaissent dans aucune vente d'un autre entrepôt.
+ * Un agent qui a un compte (identifiant) est toujours conservé : supprimer sa fiche laisserait un compte orphelin, invisible dans l'Équipe. */
 async function exclusiveAgentIds(db: Tx, companyId: number | null, warehouseId: number): Promise<number[]> {
   const here: Array<{ agentId: number }> = await db.select({ agentId: salesAgentWarehouseAssignments.agentId }).from(salesAgentWarehouseAssignments).where(and(companyScope(salesAgentWarehouseAssignments.companyId, companyId), eq(salesAgentWarehouseAssignments.warehouseId, warehouseId)));
-  const candidates = here.map(row => row.agentId);
+  const hereIds = here.map(row => row.agentId);
+  if (!hereIds.length) return [];
+  const withAccount: Array<{ id: number }> = await db.select({ id: agents.id }).from(agents).where(and(companyScope(agents.companyId, companyId), inArray(agents.id, hereIds), isNotNull(agents.userId)));
+  const candidates = hereIds.filter(id => !withAccount.some(row => row.id === id));
   if (!candidates.length) return [];
   const elsewhere: Array<{ agentId: number }> = await db.select({ agentId: salesAgentWarehouseAssignments.agentId }).from(salesAgentWarehouseAssignments).where(and(companyScope(salesAgentWarehouseAssignments.companyId, companyId), inArray(salesAgentWarehouseAssignments.agentId, candidates), ne(salesAgentWarehouseAssignments.warehouseId, warehouseId)));
   const used: Array<{ salesAgentId: number | null; cashierId: number | null }> = await db.select({ salesAgentId: sales.salesAgentId, cashierId: sales.cashierId }).from(sales).where(and(companyScope(sales.companyId, companyId), or(ne(sales.warehouseId, warehouseId), sql`${sales.warehouseId} IS NULL`), or(inArray(sales.salesAgentId, candidates), inArray(sales.cashierId, candidates))));
@@ -144,8 +148,9 @@ export async function resetWarehouseData(tx: Tx, companyId: number | null, wareh
 
   // 4. Agents rattachés uniquement à cet entrepôt (avec leur rémunération et leurs paiements restants).
   const agentIds = await exclusiveAgentIds(tx, companyId, id);
-  await tx.delete(salesAgentWarehouseAssignments).where(and(companyScope(salesAgentWarehouseAssignments.companyId, companyId), eq(salesAgentWarehouseAssignments.warehouseId, id)));
+  // Les agents conservés gardent leur affectation : l'entrepôt reste disponible et l'équipe ne change pas.
   if (agentIds.length) {
+    await tx.delete(salesAgentWarehouseAssignments).where(and(companyScope(salesAgentWarehouseAssignments.companyId, companyId), inArray(salesAgentWarehouseAssignments.agentId, agentIds)));
     await tx.delete(saleCommissions).where(and(eq(saleCommissions.beneficiaryType, "agent"), inArray(saleCommissions.beneficiaryId, agentIds)));
     await tx.delete(agentPayments).where(and(companyScope(agentPayments.companyId, companyId), eq(agentPayments.beneficiaryType, "agent"), inArray(agentPayments.beneficiaryId, agentIds)));
     await tx.delete(remunerationProfiles).where(and(companyScope(remunerationProfiles.companyId, companyId), eq(remunerationProfiles.beneficiaryType, "agent"), inArray(remunerationProfiles.beneficiaryId, agentIds)));
@@ -163,6 +168,7 @@ export async function removeWarehouse(tx: Tx, companyId: number | null, warehous
   const impact = await resetWarehouseData(tx, companyId, warehouse, actorUserId, { audit: false });
   const id = warehouse.id;
   await tx.delete(sellerWarehouseAssignments).where(and(companyScope(sellerWarehouseAssignments.companyId, companyId), eq(sellerWarehouseAssignments.warehouseId, id)));
+  await tx.delete(salesAgentWarehouseAssignments).where(and(companyScope(salesAgentWarehouseAssignments.companyId, companyId), eq(salesAgentWarehouseAssignments.warehouseId, id)));
   await tx.delete(userWarehousePreferences).where(and(companyScope(userWarehousePreferences.companyId, companyId), eq(userWarehousePreferences.warehouseId, id)));
   await tx.update(supportRequests).set({ warehouseId: null }).where(and(companyScope(supportRequests.companyId, companyId), eq(supportRequests.warehouseId, id)));
   await tx.delete(warehouses).where(and(eq(warehouses.id, id), companyScope(warehouses.companyId, companyId)));

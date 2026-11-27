@@ -7,7 +7,7 @@ import { companyScope } from "../companyScope";
 import { companyTimezone, dayKey } from "../companyTime";
 import { getDb } from "../db";
 import { lockedByOther } from "../posQueueRules";
-import { assertSellerWarehouseAccess } from "../sellerWarehouseAccess";
+import { assertSellerWarehouseAccess, warehouseHasDedicatedCashier } from "../sellerWarehouseAccess";
 
 async function dbOrThrow() { const db = await getDb(); if (!db) throw new Error("Base de données indisponible."); return db; }
 type Db = Awaited<ReturnType<typeof dbOrThrow>>;
@@ -28,7 +28,9 @@ export const posTicketsRouter = router({
   /** Ce que l’utilisateur peut faire dans l’entrepôt : encaisser lui-même ou seulement envoyer en caisse. */
   capabilities: permissionProcedure("sales.create").input(z.object({ warehouseId: z.number().int().positive() })).query(async ({ ctx, input }) => {
     const db = await dbOrThrow();
-    return { canCheckout: await canCheckoutIn(db, ctx.user, input.warehouseId) };
+    const [canCheckout, hasCashier] = await Promise.all([canCheckoutIn(db, ctx.user, input.warehouseId), warehouseHasDedicatedCashier(db, ctx.user.companyId, input.warehouseId)]);
+    // « Envoyer en caisse » n’a de sens que s’il existe un caissier séparé dans l’entrepôt.
+    return { canCheckout, hasCashier };
   }),
 
   /** Tickets du vendeur connecté : paniers de côté (y compris renvoyés), envoyés en caisse, et ceux du jour payés ou annulés. */
