@@ -1,5 +1,6 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
+import { lockedByOther } from "../posQueueRules";
 import { z } from "zod";
 import { agents, customers, saleItems, sales, users } from "../../drizzle/schema";
 import { protectedProcedure, router } from "../_core/trpc";
@@ -36,7 +37,7 @@ export const cashierSpaceRouter = router({
     const db = await dbOrThrow();
     await linkedCashier(db, ctx.user);
     await assertSellerWarehouseAccess(db, ctx.user, input.warehouseId, { permission: "checkout" });
-    const rows = await db.select({ id: sales.id, invoiceNumber: sales.invoiceNumber, status: sales.status, totalCents: sales.totalCents, amountPaidCents: sales.amountPaidCents, createdAt: sales.createdAt, customerId: sales.customerId, sellerUserId: sales.sellerUserId, salesAgentId: sales.salesAgentId, cashierId: sales.cashierId }).from(sales).where(and(companyScope(sales.companyId, ctx.user.companyId), eq(sales.channel, "pos"), eq(sales.warehouseId, input.warehouseId), inArray(sales.status, ["draft", "partial"]))).orderBy(desc(sales.createdAt)).limit(100);
+    const rows = await db.select({ id: sales.id, invoiceNumber: sales.invoiceNumber, queueNumber: sales.queueNumber, holdLabel: sales.holdLabel, queuedAt: sales.queuedAt, checkoutLockedBy: sales.checkoutLockedBy, checkoutLockedAt: sales.checkoutLockedAt, status: sales.status, totalCents: sales.totalCents, amountPaidCents: sales.amountPaidCents, createdAt: sales.createdAt, customerId: sales.customerId, sellerUserId: sales.sellerUserId, salesAgentId: sales.salesAgentId, cashierId: sales.cashierId }).from(sales).where(and(companyScope(sales.companyId, ctx.user.companyId), eq(sales.channel, "pos"), eq(sales.warehouseId, input.warehouseId), inArray(sales.status, ["draft", "partial"]), eq(sales.posStage, "queued"))).orderBy(asc(sales.queuedAt), asc(sales.id)).limit(100);
     const ids = rows.map(row => row.id);
     const customerIds = Array.from(new Set(rows.map(row => row.customerId).filter((id): id is number => typeof id === "number")));
     const sellerIds = Array.from(new Set(rows.map(row => row.sellerUserId)));
@@ -45,6 +46,6 @@ export const cashierSpaceRouter = router({
       customerIds.length ? db.select({ id: customers.id, name: customers.name }).from(customers).where(and(companyScope(customers.companyId, ctx.user.companyId), inArray(customers.id, customerIds))) : Promise.resolve([]),
       sellerIds.length ? db.select({ id: users.id, name: users.name }).from(users).where(and(companyScope(users.companyId, ctx.user.companyId), inArray(users.id, sellerIds))) : Promise.resolve([]),
     ]);
-    return rows.map(row => ({ ...row, balanceCents: Math.max(0, row.totalCents - row.amountPaidCents), customerName: customerRows.find(item => item.id === row.customerId)?.name ?? null, sellerName: sellerRows.find(item => item.id === row.sellerUserId)?.name ?? null, items: items.filter(item => item.saleId === row.id) }));
+    return rows.map(row => ({ ...row, beingCollectedElsewhere: lockedByOther(row.checkoutLockedBy, row.checkoutLockedAt, ctx.user.id), balanceCents: Math.max(0, row.totalCents - row.amountPaidCents), customerName: customerRows.find(item => item.id === row.customerId)?.name ?? null, sellerName: sellerRows.find(item => item.id === row.sellerUserId)?.name ?? null, items: items.filter(item => item.saleId === row.id) }));
   }),
 });

@@ -711,6 +711,24 @@ export const sales = mysqlTable("sales", {
   deliveryAddress: text("deliveryAddress"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   voidedAt: timestamp("voidedAt"),
+  /** Motif d’annulation (ex. ticket annulé en caisse : « client parti »). */
+  voidReason: varchar("voidReason", { length: 300 }),
+  /**
+   * Ticket de caisse non soldé : « parked » = panier mis de côté par le vendeur (invisible en caisse),
+   * « queued » = envoyé en caisse (file du caissier).
+   */
+  posStage: mysqlEnum("posStage", ["parked", "queued"]),
+  /** Numéro court du jour à présenter en caisse (par entrepôt et par jour). */
+  queueNumber: int("queueNumber"),
+  queueDay: varchar("queueDay", { length: 10 }),
+  queuedAt: timestamp("queuedAt"),
+  /** Repère du client donné par le vendeur (« Awa », « Monsieur en bleu »). */
+  holdLabel: varchar("holdLabel", { length: 80 }),
+  /** Motif quand le caissier renvoie le ticket au vendeur. */
+  returnedReason: varchar("returnedReason", { length: 300 }),
+  /** Verrou pendant l’encaissement : personne d’autre ne peut modifier ou encaisser le ticket. */
+  checkoutLockedBy: int("checkoutLockedBy"),
+  checkoutLockedAt: timestamp("checkoutLockedAt"),
 }, table => [index("sales_company_created_idx").on(table.companyId, table.createdAt), index("sales_company_status_idx").on(table.companyId, table.status), index("sales_offline_user_idx").on(table.offlineOperationId, table.sellerUserId)]);
 
 export const expenses = mysqlTable("expenses", {

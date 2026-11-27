@@ -102,6 +102,7 @@ function legacyAdminFallbackEnabled() {
 }
 
 import { backupRouter } from "./routers/backups";
+import { posTicketsRouter } from "./routers/posTickets";
 import { customRolesRouter } from "./routers/customRoles";
 import { depotSpaceRouter } from "./routers/depotSpace";
 import { cashierSpaceRouter } from "./routers/cashierSpace";
@@ -321,6 +322,7 @@ export const appRouter = router({
   cashierSpace: cashierSpaceRouter,
   depotSpace: depotSpaceRouter,
   customRoles: customRolesRouter,
+  posTickets: posTicketsRouter,
   companyLogin: router({
     /** Code entreprise à saisir à la connexion (attribué s'il manque). */
     get: protectedProcedure.query(async ({ ctx }) => {

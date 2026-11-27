@@ -44,7 +44,7 @@ export const depotSpaceRouter = router({
       daySummary(db, companyId, warehouse.id, today, timezone),
       db.select({ expectedCashCents: cashClosures.expectedCashCents, countedCashCents: cashClosures.countedCashCents, differenceCents: cashClosures.differenceCents }).from(cashClosures).where(and(companyScope(cashClosures.companyId, companyId), eq(cashClosures.warehouseId, warehouse.id), eq(cashClosures.businessDay, today))).limit(1),
       db.select({ id: sales.id, channel: sales.channel, status: sales.status, totalCents: sales.totalCents, createdAt: sales.createdAt, sellerUserId: sales.sellerUserId }).from(sales).where(and(companyScope(sales.companyId, companyId), eq(sales.warehouseId, warehouse.id), gte(sales.createdAt, since))),
-      db.select({ channel: sales.channel, status: sales.status, totalCents: sales.totalCents, amountPaidCents: sales.amountPaidCents }).from(sales).where(and(companyScope(sales.companyId, companyId), eq(sales.warehouseId, warehouse.id), inArray(sales.status, ["draft", "partial"]))),
+      db.select({ channel: sales.channel, status: sales.status, posStage: sales.posStage, totalCents: sales.totalCents, amountPaidCents: sales.amountPaidCents }).from(sales).where(and(companyScope(sales.companyId, companyId), eq(sales.warehouseId, warehouse.id), inArray(sales.status, ["draft", "partial"]))),
       warehouseLowStock(db, companyId, warehouse.id),
       db.select({ productId: warehouseStocks.productId, quantity: warehouseStocks.quantity }).from(warehouseStocks).where(and(companyScope(warehouseStocks.companyId, companyId), eq(warehouseStocks.warehouseId, warehouse.id))),
       db.select({ id: stockTransfers.id, status: stockTransfers.status, sourceWarehouseId: stockTransfers.sourceWarehouseId, destinationWarehouseId: stockTransfers.destinationWarehouseId }).from(stockTransfers).where(and(companyScope(stockTransfers.companyId, companyId), inArray(stockTransfers.status, ["draft", "in_transit"]), or(eq(stockTransfers.sourceWarehouseId, warehouse.id), eq(stockTransfers.destinationWarehouseId, warehouse.id)))),
@@ -62,7 +62,7 @@ export const depotSpaceRouter = router({
     const lowIds = Array.from(low.low.keys());
     const lowNames = lowIds.length ? await db.select({ id: products.id, name: products.name, unit: products.unit }).from(products).where(and(companyScope(products.companyId, companyId), inArray(products.id, lowIds))) : [];
     const lowItems = lowIds.map(id => { const product = lowNames.find(row => row.id === id); const entry = low.low.get(id)!; return { productId: id, name: product?.name ?? "Produit", unit: product?.unit ?? "", quantity: entry.quantity, threshold: entry.threshold }; }).sort((a, b) => (a.quantity - a.threshold) - (b.quantity - b.threshold));
-    const pendingTickets = pendingRows.filter(row => row.channel === "pos");
+    const pendingTickets = pendingRows.filter(row => row.channel === "pos" && row.posStage === "queued");
     const unpaidInvoices = pendingRows.filter(row => row.channel === "invoice");
     const openQuotes = pendingRows.filter(row => row.channel === "quote" && row.status === "draft");
     const balance = (rows: typeof pendingRows) => rows.reduce((sum, row) => sum + Math.max(0, row.totalCents - row.amountPaidCents), 0);

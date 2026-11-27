@@ -46,10 +46,13 @@ import {
   Plus,
   Search,
   ShoppingCart,
+  PauseCircle,
+  Send,
   TicketCheck,
   Trash2,
   XCircle,
 } from "lucide-react";
+import { formatQueueNumber, playAlert } from "@/lib/notifySound";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -94,6 +97,12 @@ export default function PointOfSale() {
   const { data: agents = [] } = trpc.commerce.agents.list.useQuery(selectedWarehouseId ? { warehouseId: selectedWarehouseId } : undefined);
   const { data: settings } = trpc.commerce.settings.get.useQuery();
   const { data: transactions = [] } = trpc.transactions.list.useQuery(selectedWarehouseId ? { warehouseId: selectedWarehouseId } : undefined);
+  // Circuit vendeur → caisse : ce que l’utilisateur peut faire ici, et ses tickets (paniers de côté, envoyés en caisse).
+  const capabilities = trpc.posTickets.capabilities.useQuery({ warehouseId: selectedWarehouseId ?? 0 }, { enabled: Boolean(selectedWarehouseId) });
+  const canCheckoutHere = capabilities.data?.canCheckout ?? true;
+  const myTickets = trpc.posTickets.mine.useQuery({ warehouseId: selectedWarehouseId ?? 0 }, { enabled: Boolean(selectedWarehouseId), refetchInterval: 5_000 });
+  const [holdLabel, setHoldLabel] = useState("");
+  const [sentTicket, setSentTicket] = useState<{ queueNumber: number | null; invoiceNumber: string; label: string; totalCents: number } | null>(null);
   const { data: sellerDiscountPermissions } =
     trpc.sellerDiscountPermissions.get.useQuery(undefined, {
       enabled: user?.role === "seller",
@@ -120,7 +129,26 @@ export default function PointOfSale() {
   const [recalled, setRecalled] = useState<{ id: number; invoiceNumber: string } | null>(null);
   // Quand le panneau du panier apparaît, la grille se réorganise : on ignore brièvement les touches suivantes.
   const tapGuardUntil = useRef(0);
-  const pendingTickets = useMemo(() => transactions.filter(ticket => ticket.channel === "pos" && (ticket.status === "draft" || ticket.status === "partial") && (!selectedWarehouseId || ticket.warehouseId === selectedWarehouseId)).slice(0, 4), [selectedWarehouseId, transactions]);
+  const myOpenTickets = useMemo(() => (myTickets.data ?? []).filter(ticket => ticket.id !== recalled?.id && (ticket.state === "parked" || ticket.state === "queued")), [myTickets.data, recalled?.id]);
+  const parkedTickets = myOpenTickets.filter(ticket => ticket.state === "parked");
+  const queuedTickets = myOpenTickets.filter(ticket => ticket.state === "queued");
+  // Notification au vendeur quand la caisse a encaissé, renvoyé ou annulé un de ses tickets.
+  const previousStates = useRef<Map<number, string> | null>(null);
+  useEffect(() => {
+    const rows = myTickets.data;
+    if (!rows) return;
+    const before = previousStates.current;
+    previousStates.current = new Map(rows.map(ticket => [ticket.id, `${ticket.state}|${ticket.returnedReason ?? ""}`]));
+    if (!before) return;
+    for (const ticket of rows) {
+      const old = before.get(ticket.id);
+      if (!old || !old.startsWith("queued")) continue;
+      const name = `Ticket n° ${formatQueueNumber(ticket.queueNumber)}${ticket.holdLabel ? ` (${ticket.holdLabel})` : ""}`;
+      if (ticket.state === "paid") { playAlert("success"); toast.success(`${name} payé en caisse.`, { description: "Vous pouvez remettre les articles au client.", duration: 10_000 }); }
+      else if (ticket.state === "parked" && ticket.returnedReason) { playAlert("warning"); toast.warning(`${name} renvoyé par la caisse.`, { description: ticket.returnedReason, duration: 15_000 }); }
+      else if (ticket.state === "cancelled") { playAlert("warning"); toast.error(`${name} annulé en caisse.`, { description: ticket.voidReason ?? undefined, duration: 15_000 }); }
+    }
+  }, [myTickets.data]);
 
   const isLowStock = useCallback(
     (product: (typeof products)[number]) =>
@@ -305,6 +333,7 @@ export default function PointOfSale() {
     setInvoiceDiscount(noDiscount);
     setCartCollapsed(true);
     setRecalled(null);
+    setHoldLabel("");
   };
   // Vente numérotée créée par « Encaisser » : annulée (et tracée) si l'encaissement est abandonné.
   // Un ticket mis en attente puis repris n'est jamais annulé automatiquement.
@@ -334,8 +363,9 @@ export default function PointOfSale() {
   const savePendingTicket = trpc.transactions.createDraft.useMutation({
     onSuccess: result => {
       utils.transactions.list.invalidate();
+      void utils.posTickets.mine.invalidate();
+      toast.success(`Panier${holdLabel.trim() ? ` « ${holdLabel.trim()} »` : ""} mis de côté.`, { description: "Il n’est pas visible en caisse. Reprenez-le quand le client revient." });
       clearCart();
-      toast.success(recalled ? `${result.invoiceNumber} mis à jour, toujours à encaisser.` : `${result.invoiceNumber} est enregistré à encaisser plus tard.`);
     },
     onError: error => toast.error(error.message),
   });
@@ -380,6 +410,8 @@ export default function PointOfSale() {
     }
     draft.mutate({
       channel: "pos",
+      posStage: "parked",
+      holdLabel: holdLabel.trim() || null,
       replacesSaleId: recalled?.id,
       warehouseId: selectedWarehouseId ?? undefined,
       customerId: null,
@@ -395,7 +427,7 @@ export default function PointOfSale() {
         discount: discountPayload(item.discount),
       })),
     });
-  }, [cart, draft, invoiceDiscount, isOnline, lines, recalled, selectedWarehouseId, totalCents]);
+  }, [cart, draft, holdLabel, invoiceDiscount, isOnline, lines, recalled, selectedWarehouseId, totalCents]);
   const cancelTicket = trpc.transactions.removeDraft.useMutation({
     onSuccess: () => { toast.success(`Ticket ${recalled?.invoiceNumber ?? ""} annulé et supprimé.`); void utils.transactions.list.invalidate(); clearCart(); },
     onError: error => toast.error(error.message),
@@ -405,18 +437,20 @@ export default function PointOfSale() {
     if (window.confirm(`Annuler le ticket ${recalled.invoiceNumber} ? Il n’a pas été encaissé : il sera supprimé (une trace reste dans le journal d’audit).`)) cancelTicket.mutate({ saleId: recalled.id });
   };
   /** Rappelle un ticket en attente dans le panier ; un ticket déjà partiellement réglé s'encaisse directement. */
-  const recallTicket = async (ticket: (typeof pendingTickets)[number]) => {
-    if (ticket.amountPaidCents > 0 || ticket.status !== "draft") { freshDraftId.current = null; setCheckoutSale({ id: ticket.id, totalCents: ticket.totalCents, invoiceNumber: ticket.invoiceNumber, channel: "pos" }); return; }
-    if (cart.length && !window.confirm(recalled ? `Laisser ${recalled.invoiceNumber} en attente sans enregistrer vos changements et ouvrir ${ticket.invoiceNumber} ?` : "Le panier en cours sera remplacé par ce ticket. Continuer ?")) return;
+  const recallTicket = async (ticket: { id: number; invoiceNumber: string }) => {
+    if (cart.length && !window.confirm(recalled ? `Laisser ${recalled.invoiceNumber} de côté sans enregistrer vos changements et ouvrir ce ticket ?` : "Le panier en cours sera remplacé par ce ticket. Mettez-le d’abord de côté si vous voulez le garder. Continuer ?")) return;
     try {
-      const detail = await utils.commerce.sales.detail.fetch({ id: ticket.id });
+      const detail = await utils.posTickets.detail.fetch({ saleId: ticket.id });
+      // Un ticket déjà partiellement réglé s’encaisse directement.
+      if (detail.amountPaidCents > 0 || detail.status !== "draft") { freshDraftId.current = null; setCheckoutSale({ id: detail.id, totalCents: detail.totalCents, invoiceNumber: detail.invoiceNumber, channel: "pos" }); return; }
       const toForm = (type: string | null | undefined, value: number | null | undefined): DiscountForm => type === "percent" || type === "fixed" ? { type, value: String((value ?? 0) / 100) } : noDiscount;
-      const items = detail.items.filter((item: any) => products.some(product => product.id === item.productId));
+      const items = detail.items.filter(item => products.some(product => product.id === item.productId));
       if (items.length < detail.items.length) toast.warning("Certains produits du ticket ne sont plus disponibles dans cet entrepôt.");
-      setCart(items.map((item: any) => ({ productId: item.productId, quantity: item.quantity, discount: toForm(item.discountType, item.discountValue) })));
-      setInvoiceDiscount(toForm(detail.sale.invoiceDiscountType, detail.sale.invoiceDiscountValue));
-      if (settings?.vatEnabled) setPosApplyVat(detail.sale.vatCents > 0);
-      setRecalled({ id: ticket.id, invoiceNumber: ticket.invoiceNumber });
+      setCart(items.map(item => ({ productId: item.productId, quantity: item.quantity, discount: toForm(item.discountType, item.discountValue) })));
+      setInvoiceDiscount(toForm(detail.invoiceDiscountType, detail.invoiceDiscountValue));
+      if (settings?.vatEnabled) setPosApplyVat(detail.vatCents > 0);
+      setRecalled({ id: detail.id, invoiceNumber: detail.invoiceNumber });
+      setHoldLabel(detail.holdLabel ?? "");
       setCartCollapsed(false);
     } catch (error) { toast.error(error instanceof Error ? error.message : "Ticket introuvable."); }
   };
@@ -429,11 +463,48 @@ export default function PointOfSale() {
     setQuery("");
     toast.success(`${product.name} ajouté au panier.`);
   };
+  const sendToCashierMutation = trpc.transactions.createDraft.useMutation({
+    onSuccess: result => {
+      utils.transactions.list.invalidate();
+      void utils.posTickets.mine.invalidate();
+      setSentTicket({ queueNumber: result.queueNumber ?? null, invoiceNumber: result.invoiceNumber, label: holdLabel.trim(), totalCents: result.totalCents });
+      clearCart();
+    },
+    onError: error => toast.error(error.message),
+  });
+  /** Envoie le panier terminé en caisse : il reçoit un numéro du jour et apparaît dans la file du caissier. */
+  const sendToCashier = () => {
+    if (!cart.length) return toast.error("Ajoutez au moins un produit au panier.");
+    if (!isOnline) return toast.error("Connectez-vous pour envoyer un ticket en caisse.");
+    sendToCashierMutation.mutate({
+      channel: "pos",
+      posStage: "queued",
+      holdLabel: holdLabel.trim() || null,
+      replacesSaleId: recalled?.id,
+      warehouseId: selectedWarehouseId ?? undefined,
+      customerId: null,
+      salesAgentId: null,
+      cashierId: null,
+      note: null,
+      invoiceDiscount: discountPayload(invoiceDiscount),
+      applyVat,
+      vatRateBasisPoints: applyVat ? vatRateBasisPoints : undefined,
+      items: cart.map(item => ({ productId: item.productId, quantity: item.quantity, discount: discountPayload(item.discount) })),
+    });
+  };
+  const recallFromCashier = trpc.posTickets.recall.useMutation({ onError: error => toast.error(error.message) });
+  /** Reprend un ticket déjà envoyé en caisse (client revenu avec un autre article). */
+  const recallQueuedTicket = async (ticket: { id: number; invoiceNumber: string }) => {
+    try { await recallFromCashier.mutateAsync({ saleId: ticket.id }); void utils.posTickets.mine.invalidate(); await recallTicket(ticket); }
+    catch { /* message déjà affiché */ }
+  };
   const holdTicket = () => {
     if (!cart.length) return toast.error("Ajoutez au moins un produit au panier.");
-    if (!isOnline) return toast.error("Connectez-vous pour enregistrer un ticket à encaisser plus tard.");
+    if (!isOnline) return toast.error("Connectez-vous pour mettre un panier de côté.");
     savePendingTicket.mutate({
       channel: "pos",
+      posStage: "parked",
+      holdLabel: holdLabel.trim() || null,
       replacesSaleId: recalled?.id,
       warehouseId: selectedWarehouseId ?? undefined,
       customerId: null,
@@ -462,13 +533,13 @@ export default function PointOfSale() {
         })
       )
         return;
-      if (!cart.length || draft.isPending) return;
+      if (!cart.length || draft.isPending || sendToCashierMutation.isPending) return;
       event.preventDefault();
-      openCheckout();
+      if (canCheckoutHere) openCheckout(); else sendToCashier();
     };
     window.addEventListener("keydown", handleShortcut);
     return () => window.removeEventListener("keydown", handleShortcut);
-  }, [cart.length, draft.isPending, openCheckout]);
+  }, [cart.length, draft.isPending, openCheckout, canCheckoutHere, sendToCashier, sendToCashierMutation.isPending]);
 
   const cartUnits = cart.reduce((sum, item) => sum + item.quantity, 0);
   // Le panneau n’apparaît que s’il contient quelque chose (ou un ticket rappelé, même vidé).
@@ -515,8 +586,12 @@ export default function PointOfSale() {
         {vatCents > 0 && <div className="flex items-center justify-between"><span>TVA ({vatRatesLabel(vatBreakdown.byRate.filter(rate => rate.vatCents > 0).map(rate => rate.vatRateBasisPoints)) || `${(vatRateBasisPoints / 100).toFixed(2)} %`})</span><span>{formatCurrency(vatCents)}</span></div>}
       </div>
       <div className="flex items-baseline justify-between"><span className="text-sm font-medium text-foreground">Total TTC</span><span className="text-2xl font-bold tracking-tight text-foreground">{formatCurrency(totalCents)}</span></div>
-      <Button onClick={openCheckout} disabled={!cart.length || draft.isPending} className="h-12 w-full text-base">{draft.isPending ? "Préparation…" : <><Keyboard className="h-4 w-4" />{isOnline ? "Encaisser" : "Encaisser hors connexion"}<span className="ml-1 rounded bg-primary-foreground/15 px-1.5 py-0.5 text-xs">F9</span></>}</Button>
-      <Button variant="outline" onClick={holdTicket} disabled={!cart.length || savePendingTicket.isPending || !isOnline} className="h-10 w-full"><TicketCheck className="h-4 w-4" />{savePendingTicket.isPending ? "Enregistrement…" : recalled ? "Enregistrer et remettre en attente" : "Mettre en attente"}</Button>
+      <Input aria-label="Repère du client" value={holdLabel} onChange={event => setHoldLabel(event.target.value)} maxLength={80} placeholder="Repère du client (facultatif) : Awa, monsieur en bleu…" className="h-9 bg-card text-sm" />
+      {canCheckoutHere ? <>
+        <Button onClick={openCheckout} disabled={!cart.length || draft.isPending} className="h-12 w-full text-base">{draft.isPending ? "Préparation…" : <><Keyboard className="h-4 w-4" />{isOnline ? "Encaisser" : "Encaisser hors connexion"}<span className="ml-1 rounded bg-primary-foreground/15 px-1.5 py-0.5 text-xs">F9</span></>}</Button>
+        <Button variant="outline" onClick={sendToCashier} disabled={!cart.length || sendToCashierMutation.isPending || !isOnline} className="h-10 w-full"><Send className="h-4 w-4" />{sendToCashierMutation.isPending ? "Envoi…" : "Envoyer en caisse"}</Button>
+      </> : <Button onClick={sendToCashier} disabled={!cart.length || sendToCashierMutation.isPending || !isOnline} className="h-12 w-full text-base">{sendToCashierMutation.isPending ? "Envoi…" : <><Send className="h-4 w-4" />Envoyer en caisse<span className="ml-1 rounded bg-primary-foreground/15 px-1.5 py-0.5 text-xs">F9</span></>}</Button>}
+      <Button variant="outline" onClick={holdTicket} disabled={!cart.length || savePendingTicket.isPending || !isOnline} className="h-10 w-full"><PauseCircle className="h-4 w-4" />{savePendingTicket.isPending ? "Enregistrement…" : "Mettre de côté · client suivant"}</Button>
       {recalled && <Button variant="ghost" onClick={confirmCancelTicket} disabled={cancelTicket.isPending || !isOnline} className="h-10 w-full text-destructive hover:bg-destructive-soft hover:text-destructive"><XCircle className="h-4 w-4" />{cancelTicket.isPending ? "Annulation…" : "Annuler le ticket"}</Button>}
     </div>
   );
@@ -524,7 +599,7 @@ export default function PointOfSale() {
     <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
       <div className="flex items-center gap-2.5">
         <span className="relative grid h-9 w-9 place-items-center rounded-lg bg-primary-soft text-primary"><ShoppingCart className="h-[18px] w-[18px]" />{cartUnits > 0 && <span key={cartUnits} className="animate-pop absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[11px] font-bold text-primary-foreground">{cartUnits}</span>}</span>
-        <div className="min-w-0"><h2 className="truncate text-base font-semibold text-foreground">{recalled ? `Ticket ${recalled.invoiceNumber}` : "Panier"}</h2><p className="text-xs text-muted-foreground">{recalled ? "En attente · " : ""}{cart.length ? `${cart.length} article${cart.length > 1 ? "s" : ""}` : "Vide"}</p></div>
+        <div className="min-w-0"><h2 className="truncate text-base font-semibold text-foreground">{recalled ? (holdLabel ? `Panier « ${holdLabel} »` : "Panier repris") : "Panier"}</h2><p className="text-xs text-muted-foreground">{recalled ? "Repris · " : ""}{cart.length ? `${cart.length} article${cart.length > 1 ? "s" : ""}` : "Vide"}</p></div>
       </div>
       <div className="flex items-center gap-1">
         {!recalled && cart.length > 0 && <Button variant="ghost" size="sm" onClick={clearCart} className="text-destructive hover:bg-destructive-soft hover:text-destructive"><Trash2 className="h-4 w-4" />Vider</Button>}
@@ -543,10 +618,12 @@ export default function PointOfSale() {
             </div>
             <label className="flex min-w-0 items-center gap-2 text-[13px] text-muted-foreground">Entrepôt<select value={selectedWarehouseId ? String(selectedWarehouseId) : ""} onChange={event => { const nextId = Number(event.target.value); if (nextId && nextId !== selectedWarehouseId && cart.length && !window.confirm("Changer d’entrepôt videra le panier en cours. Continuer ?")) return; if (nextId !== selectedWarehouseId) clearCart(); if (isAdmin && nextId) setActiveWarehouseId(nextId); setSelectedWarehouseId(nextId || null); }} className="min-w-0 rounded-lg border border-border bg-card px-2.5 py-1.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary" disabled={!warehouses.length}>{warehouses.filter(warehouse => warehouse.active).map(warehouse => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}{warehouse.isDefault ? " · Principal" : ""}</option>)}</select></label>
           </header>
-          {pendingTickets.some(ticket => ticket.id !== recalled?.id) && (
-            <section aria-label="Tickets à encaisser" className="surface rounded-xl border border-border bg-card px-4 py-3">
-              <div className="mb-2 flex items-center justify-between"><span className="flex items-center gap-2 text-sm font-semibold text-foreground"><TicketCheck className="h-4 w-4 text-warning" />En attente d’encaissement</span><button type="button" onClick={() => setLocation("/tickets?statut=unpaid")} className="text-[13px] font-medium text-primary hover:underline">Voir tout</button></div>
-              <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">{pendingTickets.filter(ticket => ticket.id !== recalled?.id).map(ticket => <button key={ticket.id} type="button" onClick={() => void recallTicket(ticket)} className="lift shrink-0 rounded-lg border border-border bg-background px-3 py-2 text-left hover:border-warning/40"><span className="block text-xs font-semibold text-foreground">{ticket.invoiceNumber}</span><span className="mt-0.5 block text-sm font-semibold text-warning">{formatCurrency(ticket.totalCents - ticket.amountPaidCents)}</span></button>)}</div>
+          {(parkedTickets.length > 0 || queuedTickets.length > 0) && (
+            <section aria-label="Mes paniers et tickets" className="surface space-y-3 rounded-xl border border-border bg-card px-4 py-3">
+              {parkedTickets.length > 0 && <div><p className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground"><PauseCircle className="h-4 w-4 text-primary" />Paniers mis de côté <span className="text-xs font-normal text-muted-foreground">· invisibles en caisse</span></p>
+                <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">{parkedTickets.map(ticket => { const ageMinutes = Math.round((Date.now() - new Date(ticket.createdAt).getTime()) / 60_000); const forgotten = ageMinutes >= 120; return <button key={ticket.id} type="button" onClick={() => void recallTicket(ticket)} className={`lift shrink-0 rounded-lg border px-3 py-2 text-left hover:border-primary/40 ${ticket.returnedReason ? "border-warning/50 bg-warning-soft/40" : forgotten ? "border-warning/40 bg-background" : "border-border bg-background"}`}><span className="block text-sm font-semibold text-foreground">{ticket.holdLabel || "Client sans repère"}</span><span className="block text-xs text-muted-foreground">{ticket.itemsCount} article(s) · {formatCurrency(ticket.totalCents)}</span>{ticket.returnedReason ? <span className="mt-0.5 block max-w-52 truncate text-xs font-medium text-warning">Renvoyé : {ticket.returnedReason}</span> : <span className={`mt-0.5 block text-xs ${forgotten ? "font-medium text-warning" : "text-faint"}`}>{forgotten ? `Oublié ? depuis ${Math.floor(ageMinutes / 60)} h` : `depuis ${ageMinutes} min`}</span>}</button>; })}</div></div>}
+              {queuedTickets.length > 0 && <div><p className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground"><Send className="h-4 w-4 text-warning" />Envoyés en caisse</p>
+                <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">{queuedTickets.map(ticket => <div key={ticket.id} className="shrink-0 rounded-lg border border-border bg-background px-3 py-2"><span className="block text-sm font-semibold text-foreground">N° {formatQueueNumber(ticket.queueNumber)}{ticket.holdLabel ? ` · ${ticket.holdLabel}` : ""}</span><span className="block text-xs text-muted-foreground">{formatCurrency(ticket.totalCents)} · {ticket.beingCollected ? "en cours d’encaissement" : "en attente"}</span><button type="button" disabled={ticket.beingCollected || recallFromCashier.isPending} onClick={() => void recallQueuedTicket(ticket)} className="mt-1 text-xs font-medium text-primary hover:underline disabled:text-faint disabled:no-underline">Reprendre pour modifier</button></div>)}</div></div>}
             </section>
           )}
           <section className="surface rounded-xl border border-border bg-card p-4">
@@ -616,6 +693,7 @@ export default function PointOfSale() {
         </div>
       )}
       <BarcodeCameraDialog open={cameraOpen} onOpenChange={setCameraOpen} onDetected={handleCode} />
+      <Dialog open={Boolean(sentTicket)} onOpenChange={open => !open && setSentTicket(null)}><DialogContent className="border-border bg-popover text-center text-foreground sm:max-w-sm"><DialogHeader><DialogTitle className="text-center">Envoyé en caisse</DialogTitle></DialogHeader><p className="text-sm text-muted-foreground">Ticket à présenter à la caisse{sentTicket?.label ? ` · ${sentTicket.label}` : ""}</p><p className="font-mono text-6xl font-bold tracking-wider text-primary">N° {formatQueueNumber(sentTicket?.queueNumber)}</p><p className="text-lg font-semibold">{formatCurrency(sentTicket?.totalCents ?? 0)}</p><p className="text-xs text-faint">Vous serez prévenu quand le client aura payé.</p><DialogFooter className="sm:justify-center"><Button onClick={() => setSentTicket(null)} className="h-11 w-full">Client suivant</Button></DialogFooter></DialogContent></Dialog>
       <CheckoutSheet
         open={Boolean(checkoutSale)}
         onOpenChange={open => !open && closeCheckout(false)}

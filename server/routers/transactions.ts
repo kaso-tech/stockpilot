@@ -21,6 +21,8 @@ import { creditWarehouseStock, debitWarehouseStock, getDefaultWarehouse, getScop
 import { assignedWarehouseIds, assertSellerWarehouseAccess } from "../sellerWarehouseAccess";
 import { canCoordinateSaleFromWarehouse } from "../salesAgentWarehouseScope";
 import { calculatePartialReturn, formatCreditNoteNumber, requestFingerprint } from "../returnRules";
+import { lockedByOther, queueNumberFor } from "../posQueueRules";
+import { companyTimezone, dayKey } from "../companyTime";
 
 const paymentMethod = z.enum(["cash", "card", "mobile_money", "bank_transfer", "credit"]);
 const discountInput = z.object({ type: z.enum(["none", "percent", "fixed"]), value: z.number().int().min(0).max(MAX_CENTS) }).superRefine((value, ctx) => { if (value.type === "percent" && value.value > MAX_DISCOUNT_BASIS_POINTS) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Le pourcentage de remise est invalide." }); });
@@ -219,7 +221,7 @@ export const transactionsRouter = router({
       return { creditNoteNumber, refundCents, fullyReturned: calculation.fullyReturned, replayed: false };
     });
   }),
-  createDraft: protectedProcedure.input(z.object({ channel: z.enum(["pos", "invoice", "quote"]), customerId: z.number().int().positive().nullable(), warehouseId: z.number().int().positive().optional(), note: z.string().trim().max(1000).nullable(), deliveryAddress: z.string().trim().max(1500).nullable().optional(), deliveryFeeCents: z.number().int().min(0).max(MAX_CENTS).default(0), applyVat: z.boolean().optional(), vatRateBasisPoints: z.number().int().min(0).max(MAX_DISCOUNT_BASIS_POINTS).optional(), items: z.array(itemInput).min(1).max(MAX_LINE_ITEMS), invoiceDiscount: discountInput.default({ type: "none", value: 0 }), replacesSaleId: z.number().int().positive().optional(), offlineOperationId: z.string().trim().min(8).max(80).optional() }).merge(agentSelection)).mutation(async ({ ctx, input }) => {
+  createDraft: protectedProcedure.input(z.object({ channel: z.enum(["pos", "invoice", "quote"]), customerId: z.number().int().positive().nullable(), warehouseId: z.number().int().positive().optional(), note: z.string().trim().max(1000).nullable(), deliveryAddress: z.string().trim().max(1500).nullable().optional(), deliveryFeeCents: z.number().int().min(0).max(MAX_CENTS).default(0), applyVat: z.boolean().optional(), vatRateBasisPoints: z.number().int().min(0).max(MAX_DISCOUNT_BASIS_POINTS).optional(), items: z.array(itemInput).min(1).max(MAX_LINE_ITEMS), invoiceDiscount: discountInput.default({ type: "none", value: 0 }), replacesSaleId: z.number().int().positive().optional(), offlineOperationId: z.string().trim().min(8).max(80).optional(), posStage: z.enum(["parked", "queued"]).optional(), holdLabel: z.string().trim().max(80).nullable().optional() }).merge(agentSelection)).mutation(async ({ ctx, input }) => {
     // Agent commercial : uniquement des devis, attribués à sa fiche, avec les limites de prix et de remise des vendeurs.
     const agentQuote = ctx.user.role === "agent";
     if (!can(ctx.user.role, "sales.create", ctx.user.permissions) && !(agentQuote && input.channel === "quote")) throw new TRPCError({ code: "FORBIDDEN", message: "Cette action n’est pas autorisée pour votre rôle." });
@@ -230,7 +232,7 @@ export const transactionsRouter = router({
     const restricted = ctx.user.role === "seller" || ctx.user.role === "custom" || agentQuote || cashierSale;
     if ((input.channel === "invoice" || input.channel === "quote") && !input.customerId) throw new TRPCError({ code: "BAD_REQUEST", message: "Un client est obligatoire pour créer ce document." });
     const db = await dbOrThrow();
-    let created: { id: number; invoiceNumber: string; totalCents: number; salesAgentId: number | null; cashierId: number | null } | null = null;
+    let created: { id: number; invoiceNumber: string; totalCents: number; salesAgentId: number | null; cashierId: number | null; queueNumber?: number | null } | null = null;
     await db.transaction(async tx => {
       if (input.offlineOperationId) {
         const existing = (await tx.select().from(sales).where(and(eq(sales.offlineOperationId, input.offlineOperationId), eq(sales.sellerUserId, ctx.user.id), companyScope(sales.companyId, ctx.user.companyId))).limit(1))[0];
@@ -294,20 +296,32 @@ export const transactionsRouter = router({
       const assigned = await validateAgents(tx, ctx.user.companyId, warehouse.id, agentSelection, input.channel);
       // Ticket en attente rappelé dans le panier puis modifié : il est remplacé en gardant son numéro.
       let number = invoiceNumber(input.channel);
+      let previousTicket: typeof sales.$inferSelect | null = null;
       if (input.replacesSaleId) {
         const previous = (await tx.select().from(sales).where(and(eq(sales.id, input.replacesSaleId), companyScope(sales.companyId, ctx.user.companyId))).limit(1).for("update"))[0];
         if (!previous || previous.channel !== "pos" || input.channel !== "pos") throw new TRPCError({ code: "NOT_FOUND", message: "Ticket en attente introuvable." });
         if (previous.status !== "draft" || previous.amountPaidCents > 0) throw new TRPCError({ code: "CONFLICT", message: "Ce ticket a déjà été encaissé ou modifié. Actualisez avant de recommencer." });
+        if (lockedByOther(previous.checkoutLockedBy, previous.checkoutLockedAt, ctx.user.id)) throw new TRPCError({ code: "CONFLICT", message: "Ce ticket est en cours d’encaissement en caisse : il ne peut pas être modifié." });
+        previousTicket = previous;
         if (previous.warehouseId != null) await assertSellerWarehouseAccess(tx, ctx.user, previous.warehouseId, { permission: "sell" });
         number = previous.invoiceNumber;
         await tx.delete(saleItems).where(eq(saleItems.saleId, previous.id));
         await tx.delete(sales).where(and(eq(sales.id, previous.id), companyScope(sales.companyId, ctx.user.companyId)));
       }
-      const result = await tx.insert(sales).values({ companyId: ctx.user.companyId, invoiceNumber: number, offlineOperationId: input.offlineOperationId, channel: input.channel, customerId: customer?.id ?? null, warehouseId: warehouse.id, sellerUserId: ctx.user.id, ...assigned, paymentMethod: "cash", amountPaidCents: 0, subtotalCents, invoiceDiscountType: input.invoiceDiscount.type, invoiceDiscountValue: input.invoiceDiscount.value, invoiceDiscountCents, vatRateBasisPoints: fallbackVatRate, vatCents, deliveryFeeCents: input.deliveryFeeCents, totalCents, totalCostCents, netProfitCents: assertSafeDatabaseInt(totalCents - totalCostCents, "Bénéfice net"), note: input.note, deliveryAddress: input.deliveryAddress?.trim() || null, status: "draft" });
+      // Ticket de caisse : « mis de côté » (vendeur seul) par défaut, ou « envoyé en caisse » avec un numéro du jour.
+      const stage = input.channel === "pos" ? (input.posStage ?? "parked") : null;
+      let queueFields: { queueNumber: number | null; queueDay: string | null; queuedAt: Date | null } = { queueNumber: null, queueDay: null, queuedAt: null };
+      if (stage === "queued") {
+        const today = dayKey(new Date(), await companyTimezone(tx, ctx.user.companyId));
+        const [max] = await tx.select({ value: sql<number | null>`max(${sales.queueNumber})` }).from(sales).where(and(companyScope(sales.companyId, ctx.user.companyId), eq(sales.warehouseId, warehouse.id), eq(sales.queueDay, today)));
+        queueFields = { queueNumber: queueNumberFor(previousTicket, today, max?.value ?? null), queueDay: today, queuedAt: new Date() };
+      }
+      const posFields = input.channel === "pos" ? { posStage: stage, ...queueFields, holdLabel: input.holdLabel?.trim() || previousTicket?.holdLabel || null, returnedReason: null, checkoutLockedBy: null, checkoutLockedAt: null } : {};
+      const result = await tx.insert(sales).values({ ...posFields, companyId: ctx.user.companyId, invoiceNumber: number, offlineOperationId: input.offlineOperationId, channel: input.channel, customerId: customer?.id ?? null, warehouseId: warehouse.id, sellerUserId: ctx.user.id, ...assigned, paymentMethod: "cash", amountPaidCents: 0, subtotalCents, invoiceDiscountType: input.invoiceDiscount.type, invoiceDiscountValue: input.invoiceDiscount.value, invoiceDiscountCents, vatRateBasisPoints: fallbackVatRate, vatCents, deliveryFeeCents: input.deliveryFeeCents, totalCents, totalCostCents, netProfitCents: assertSafeDatabaseInt(totalCents - totalCostCents, "Bénéfice net"), note: input.note, deliveryAddress: input.deliveryAddress?.trim() || null, status: "draft" });
       const saleId = Number(result[0].insertId);
       for (const [index, line] of lines.entries()) await tx.insert(saleItems).values({ saleId, productId: line.product.id, productName: line.product.name, productReference: line.product.reference, quantity: line.quantity, unitPriceCents: line.unitPriceCents, purchasePriceCents: line.product.purchasePriceCents, discountType: line.discount.type, discountValue: line.discount.value, discountCents: line.lineDiscountCents, lineSubtotalCents: line.lineSubtotalCents, lineTotalCents: line.lineTotalCents, lineCostCents: line.lineCostCents, vatRateBasisPoints: vatBreakdown.perLine[index]!.vatRateBasisPoints, vatCents: vatBreakdown.perLine[index]!.vatCents });
       await tx.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: input.replacesSaleId ? "Modification" : "Document créé", entityType: input.channel === "pos" ? "Ticket POS" : input.channel === "quote" ? "Devis" : "Facture", entityId: String(saleId), detail: input.replacesSaleId ? `${number} modifié avant encaissement` : `${number} enregistré en attente d’encaissement` });
-      created = { id: saleId, invoiceNumber: number, totalCents, salesAgentId: assigned.salesAgentId, cashierId: assigned.cashierId };
+      created = { id: saleId, invoiceNumber: number, totalCents, salesAgentId: assigned.salesAgentId, cashierId: assigned.cashierId, queueNumber: queueFields.queueNumber };
     });
     return created!;
   }),
@@ -325,6 +339,9 @@ export const transactionsRouter = router({
         }
       }
       if (sale.status === "paid") throw new TRPCError({ code: "BAD_REQUEST", message: "Cette vente est déjà intégralement encaissée." });
+      // Circuit vendeur → caisse : un panier mis de côté n’est encaissable que par son vendeur ; un ticket ouvert par un autre caissier est verrouillé.
+      if (sale.channel === "pos" && sale.posStage === "parked" && sale.sellerUserId !== ctx.user.id) throw new TRPCError({ code: "FORBIDDEN", message: "Ce panier n’a pas encore été envoyé en caisse par le vendeur." });
+      if (lockedByOther(sale.checkoutLockedBy, sale.checkoutLockedAt, ctx.user.id)) throw new TRPCError({ code: "CONFLICT", message: "Ce ticket est déjà en cours d’encaissement sur un autre poste." });
       const remainingBefore = Math.max(0, sale.totalCents - (sale.returnedCents ?? 0) - sale.amountPaidCents);
       if (sale.channel === "pos" && input.settlementMode !== "full") throw new TRPCError({ code: "BAD_REQUEST", message: "Le POS requiert un règlement intégral." });
       const settings = (await tx.select().from(saleSettings).where(companyScope(saleSettings.companyId, ctx.user.companyId)).limit(1))[0];
@@ -341,7 +358,7 @@ export const transactionsRouter = router({
       }
       const assigned = await validateAgents(tx, ctx.user.companyId, saleWarehouse.id, checkoutSelection);
       const isFirstCollection = sale.status === "draft";
-      const checkoutLock = await tx.update(sales).set({ ...assigned, status: settlement.status, amountPaidCents: sale.amountPaidCents + settlement.paidCents, paymentMethod: input.payments[0].method, note: input.note ?? sale.note }).where(and(eq(sales.id, sale.id), companyScope(sales.companyId, ctx.user.companyId), eq(sales.status, sale.status), eq(sales.amountPaidCents, sale.amountPaidCents)));
+      const checkoutLock = await tx.update(sales).set({ ...assigned, ...(sale.channel === "pos" ? { posStage: null, checkoutLockedBy: null, checkoutLockedAt: null, returnedReason: null } : {}), status: settlement.status, amountPaidCents: sale.amountPaidCents + settlement.paidCents, paymentMethod: input.payments[0].method, note: input.note ?? sale.note }).where(and(eq(sales.id, sale.id), companyScope(sales.companyId, ctx.user.companyId), eq(sales.status, sale.status), eq(sales.amountPaidCents, sale.amountPaidCents)));
       if (!didApplyExactlyOneStateTransition(checkoutLock)) throw new TRPCError({ code: "CONFLICT", message: "Cette vente a été modifiée. Actualisez avant de recommencer." });
       if (isFirstCollection) {
         const items = await tx.select().from(saleItems).where(eq(saleItems.saleId, sale.id));

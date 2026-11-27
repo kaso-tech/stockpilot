@@ -617,6 +617,13 @@
       "when": 1795760965185,
       "tag": "0087_custom_roles",
       "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "5",
+      "when": 1795762834982,
+      "tag": "0088_pos_cashier_flow",
+      "breakpoints": true
     }
   ]
 }
