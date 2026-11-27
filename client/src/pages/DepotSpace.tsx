@@ -27,7 +27,7 @@ export default function DepotSpace() {
   return <div className="mx-auto max-w-6xl space-y-5">
     <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div><p className="text-xs font-medium text-primary">Gérant de dépôt</p><h1 className="text-[22px] font-bold tracking-tight text-foreground">{data.warehouse.name}</h1></div>
-      <div className="flex flex-wrap gap-2">{managed.length > 1 && <select aria-label="Dépôt" value={warehouseId} onChange={event => setActiveWarehouseId(Number(event.target.value))} className="h-10 rounded-lg border border-input bg-card px-3 text-sm">{managed.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select>}<Button onClick={() => setLocation("/pos")} className="h-10 bg-primary text-primary-foreground hover:bg-primary/90"><ShoppingCart className="h-4 w-4" />Vente rapide</Button></div>
+      <div className="grid w-full gap-2 sm:flex sm:w-auto sm:flex-wrap">{managed.length > 1 && <select aria-label="Dépôt" value={warehouseId} onChange={event => setActiveWarehouseId(Number(event.target.value))} className="h-11 w-full rounded-lg border border-input bg-card px-3 text-sm sm:h-10 sm:w-auto">{managed.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select>}<Button onClick={() => setLocation("/pos")} className="h-11 w-full bg-primary text-primary-foreground hover:bg-primary/90 sm:h-10 sm:w-auto"><ShoppingCart className="h-4 w-4" />Vente rapide</Button></div>
     </header>
 
     <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">

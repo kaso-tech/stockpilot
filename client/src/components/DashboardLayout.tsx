@@ -208,13 +208,12 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     window.addEventListener("keydown", openNavigation);
     return () => window.removeEventListener("keydown", openNavigation);
   }, []);
-  const { data: sellerPermissions } = trpc.commerce.settings.get.useQuery(undefined, { enabled: user?.role === "seller" });
   const platformAccess = trpc.platform.access.useQuery(undefined, { enabled: Boolean(user), retry: false });
   const isDocumentCreation = location === "/factures/nouvelle" || location === "/devis/nouveau";
   const { data: documentVatSettings } = trpc.commerce.settings.get.useQuery(undefined, { enabled: Boolean(user) && isDocumentCreation });
   const { data: vatRatePresets = [] } = trpc.vatRates.list.useQuery(undefined, { enabled: Boolean(user) && isDocumentCreation });
-  const sellerAllowedPaths = new Set(["/", "/pos", "/tickets", "/factures", "/devis", "/clients", "/mouvements", "/synchronisation"]);
-  if (sellerPermissions?.sellerCanEditPurchasePrice) sellerAllowedPaths.add("/produits");
+  // Le vendeur consulte toujours le catalogue (photos, prix, stock) ; les prix d’achat restent masqués sauf autorisation.
+  const sellerAllowedPaths = new Set(["/", "/pos", "/tickets", "/factures", "/devis", "/clients", "/produits", "/mouvements", "/synchronisation"]);
   // Vendeur gérant d’au moins un dépôt : accueil « Mon dépôt », alertes et transferts.
   const { data: managedDepots = [] } = trpc.depotSpace.managedWarehouses.useQuery(undefined, { enabled: user?.role === "seller" });
   const isDepotManager = user?.role === "seller" && managedDepots.length > 0;

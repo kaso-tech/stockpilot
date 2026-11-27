@@ -296,8 +296,13 @@ async function syncStockAlert(productId: number, companyId: number) {
 }
 
 /** Prix d’achat masqués : rôles sans accès aux coûts, et rôles personnalisés sans la permission « prix et coûts ». */
-function hidesPurchaseCosts(user: { role: string; permissions?: string[] }) {
+async function hidesPurchaseCosts(db: any, user: { role: string; permissions?: string[]; companyId: number | null }) {
   if (["agent", "cashier", "storekeeper"].includes(user.role)) return true;
+  // Vendeur (y compris gérant de dépôt) : prix d’achat visibles seulement si l’administrateur l’autorise.
+  if (user.role === "seller") {
+    const row = (await db.select({ allowed: saleSettings.sellerCanEditPurchasePrice }).from(saleSettings).where(companyScope(saleSettings.companyId, user.companyId)).limit(1))[0];
+    return !row?.allowed;
+  }
   return user.role === "custom" && !can(user.role, "catalog.price", user.permissions);
 }
 
@@ -709,7 +714,7 @@ export const appRouter = router({
       }
       const rows = await listProducts(ctx.user.companyId, input?.warehouseId);
       // Agent commercial : pas de prix d'achat.
-      return hidesPurchaseCosts(ctx.user) ? rows.map(row => ({ ...row, purchasePriceCents: 0 })) : rows;
+      return (await hidesPurchaseCosts(db, ctx.user)) ? rows.map(row => ({ ...row, purchasePriceCents: 0 })) : rows;
     }),
     detail: permissionProcedure("catalog.view").input(z.object({ id: z.number().int().positive() })).query(async ({ ctx, input }) => {
       const db = await requireDb();
@@ -726,8 +731,8 @@ export const appRouter = router({
       const revenueCents = lines.reduce((sum, line) => sum + line.lineTotalCents, 0);
       const costCents = lines.reduce((sum, line) => sum + line.lineCostCents, 0);
       const unitsSold = lines.reduce((sum, line) => sum + line.quantity, 0);
-      const forAgent = hidesPurchaseCosts(ctx.user);
-      return { product: forAgent ? { ...product, purchasePriceCents: 0 } : product, supplier, tiers: { retail: tiers.filter(tier => tier.customerType === "retail"), wholesale: tiers.filter(tier => tier.customerType === "wholesale") }, movements: movements.slice(0, 12), sales: saleRows.slice(0, 8).map(sale => forAgent ? { ...sale, netProfitCents: 0, costCents: 0 } : sale), statistics: hidesPurchaseCosts(ctx.user) ? { revenueCents, costCents: 0, grossMarginCents: 0, marginRate: 0, unitsSold, saleCount: uniqueSaleIds.length, lastSaleAt: saleRows[0]?.createdAt ?? null } : { revenueCents, costCents, grossMarginCents: revenueCents - costCents, marginRate: revenueCents > 0 ? Math.round(((revenueCents - costCents) / revenueCents) * 1000) / 10 : 0, unitsSold, saleCount: uniqueSaleIds.length, lastSaleAt: saleRows[0]?.createdAt ?? null } };
+      const forAgent = await hidesPurchaseCosts(db, ctx.user);
+      return { product: forAgent ? { ...product, purchasePriceCents: 0 } : product, supplier, tiers: { retail: tiers.filter(tier => tier.customerType === "retail"), wholesale: tiers.filter(tier => tier.customerType === "wholesale") }, movements: movements.slice(0, 12), sales: saleRows.slice(0, 8).map(sale => forAgent ? { ...sale, netProfitCents: 0, costCents: 0 } : sale), statistics: forAgent ? { revenueCents, costCents: 0, grossMarginCents: 0, marginRate: 0, unitsSold, saleCount: uniqueSaleIds.length, lastSaleAt: saleRows[0]?.createdAt ?? null } : { revenueCents, costCents, grossMarginCents: revenueCents - costCents, marginRate: revenueCents > 0 ? Math.round(((revenueCents - costCents) / revenueCents) * 1000) / 10 : 0, unitsSold, saleCount: uniqueSaleIds.length, lastSaleAt: saleRows[0]?.createdAt ?? null } };
     }),
     create: permissionProcedure("catalog.manage").input(productInput).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
