@@ -23,7 +23,7 @@ describe("rôles tenant et navigation", () => {
     expect(canOpenRoute("accountant", "/comptabilite")).toBe(true);
   });
   it("n’accorde aucun privilège plateforme par déduction", () => {
-    expect(ROLES).toEqual(["admin", "manager", "seller", "accountant", "viewer", "agent", "cashier"]);
+    expect(ROLES).toEqual(["admin", "manager", "seller", "accountant", "viewer", "agent", "cashier", "storekeeper", "purchaser"]);
     expect(can("platform_admin", "users.manage")).toBe(false);
     expect(can(null, "sales.create")).toBe(false);
   });
@@ -31,6 +31,14 @@ describe("rôles tenant et navigation", () => {
     expect(permissionsOf("agent")).toEqual(["customers.view", "customers.manage", "catalog.view", "stock.view"]);
     for (const path of ["/", "/mon-espace", "/clients", "/clients/4", "/produits", "/produits/2", "/parametres/securite"]) expect(canOpenRoute("agent", path)).toBe(true);
     for (const path of ["/pos", "/factures", "/devis/nouveau", "/agents", "/mouvements", "/entrepots", "/parametres/identite", "/comptabilite"]) expect(canOpenRoute("agent", path)).toBe(false);
+  });
+  it("donne au magasinier le stock sans ventes ni caisse, et au responsable achats les achats", () => {
+    expect(permissionsOf("storekeeper")).toEqual(["catalog.view", "stock.view", "stock.adjust", "inventory.manage"]);
+    expect(permissionsOf("purchaser")).toEqual(["catalog.view", "catalog.manage", "catalog.price", "stock.view", "purchasing.manage"]);
+    for (const path of ["/produits", "/mouvements", "/transferts-stock", "/inventaires", "/alertes"]) expect(canOpenRoute("storekeeper", path)).toBe(true);
+    for (const path of ["/pos", "/factures", "/bons-commande", "/agents", "/comptabilite"]) expect(canOpenRoute("storekeeper", path)).toBe(false);
+    for (const path of ["/fournisseurs", "/bons-commande", "/produits"]) expect(canOpenRoute("purchaser", path)).toBe(true);
+    for (const path of ["/pos", "/factures", "/inventaires", "/agents"]) expect(canOpenRoute("purchaser", path)).toBe(false);
   });
   it("limite le caissier à l’encaissement, à la caisse et aux clients", () => {
     expect(permissionsOf("cashier")).toEqual(["sales.create", "customers.view", "catalog.view", "stock.view", "cash.close"]);

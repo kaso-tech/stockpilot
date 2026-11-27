@@ -124,7 +124,7 @@ import { normalizeAuthEmail } from "./authEmail";
 import { consumePasswordResetToken, issuePasswordResetToken, PASSWORD_RESET_TOKEN_PATTERN } from "./authTokens";
 import { emailVerificationRouter } from "./routers/emailVerification";
 import { appUrl, accountMailerConfigured, mailerConfigured, sendMail } from "./mailer";
-import { ROLES, ROLE_LABELS, type Role } from "@shared/permissions";
+import { can, ROLES, ROLE_LABELS, type Role } from "@shared/permissions";
 import { roleChangeRefusal } from "./userRoleRules";
 import { findPasswordHash, storePasswordHash } from "./userPasswordStorage";
 import { assertSubscriptionQuota } from "./subscriptionQuotas";
@@ -615,7 +615,7 @@ export const appRouter = router({
           ...(canSeeFinance ? { todaySaleCount: todaySales.length, previousMonthToDateRevenueCents, receivableOverdueCount, dueSoonCount: dueSoon.length, dueSoonCents: dueSoon.reduce((sum, row) => sum + Math.max(0, row.amountCents - row.paidCents), 0), receivableCount: saleRows.filter(isReceivableInvoice).length, receivableCents: saleRows.filter(isReceivableInvoice).reduce((sum, sale) => sum + Math.max(0, sale.totalCents - sale.amountPaidCents), 0), monthlyInvoiceCount: monthlySales.length, todayRevenueCents: todaySales.reduce((sum, sale) => sum + sale.totalCents, 0), averageBasketCents: monthlySales.length ? Math.round(monthlyRevenueCents / monthlySales.length) : 0 } : {}),
           draftInventories: inventories.filter(inventory => inventory.status === "draft").length,
         },
-        lowStock: lowStock.slice(0, 6),
+        lowStock: lowStock.slice(0, 6).map(product => can(ctx.user.role, "catalog.price") ? product : { ...product, purchasePriceCents: 0 }),
         recentMovements: movements.slice(0, 6),
         trend,
         ...(canSeeFinance ? { salesTrend, salesTrend30, topProducts,
@@ -698,7 +698,7 @@ export const appRouter = router({
       }
       const rows = await listProducts(ctx.user.companyId, input?.warehouseId);
       // Agent commercial : pas de prix d'achat.
-      return ctx.user.role === "agent" || ctx.user.role === "cashier" ? rows.map(row => ({ ...row, purchasePriceCents: 0 })) : rows;
+      return ["agent", "cashier", "storekeeper"].includes(ctx.user.role) ? rows.map(row => ({ ...row, purchasePriceCents: 0 })) : rows;
     }),
     detail: permissionProcedure("catalog.view").input(z.object({ id: z.number().int().positive() })).query(async ({ ctx, input }) => {
       const db = await requireDb();
@@ -715,8 +715,8 @@ export const appRouter = router({
       const revenueCents = lines.reduce((sum, line) => sum + line.lineTotalCents, 0);
       const costCents = lines.reduce((sum, line) => sum + line.lineCostCents, 0);
       const unitsSold = lines.reduce((sum, line) => sum + line.quantity, 0);
-      const forAgent = ctx.user.role === "agent" || ctx.user.role === "cashier";
-      return { product: forAgent ? { ...product, purchasePriceCents: 0 } : product, supplier, tiers: { retail: tiers.filter(tier => tier.customerType === "retail"), wholesale: tiers.filter(tier => tier.customerType === "wholesale") }, movements: movements.slice(0, 12), sales: saleRows.slice(0, 8).map(sale => forAgent ? { ...sale, netProfitCents: 0, costCents: 0 } : sale), statistics: ctx.user.role === "agent" || ctx.user.role === "cashier" ? { revenueCents, costCents: 0, grossMarginCents: 0, marginRate: 0, unitsSold, saleCount: uniqueSaleIds.length, lastSaleAt: saleRows[0]?.createdAt ?? null } : { revenueCents, costCents, grossMarginCents: revenueCents - costCents, marginRate: revenueCents > 0 ? Math.round(((revenueCents - costCents) / revenueCents) * 1000) / 10 : 0, unitsSold, saleCount: uniqueSaleIds.length, lastSaleAt: saleRows[0]?.createdAt ?? null } };
+      const forAgent = ["agent", "cashier", "storekeeper"].includes(ctx.user.role);
+      return { product: forAgent ? { ...product, purchasePriceCents: 0 } : product, supplier, tiers: { retail: tiers.filter(tier => tier.customerType === "retail"), wholesale: tiers.filter(tier => tier.customerType === "wholesale") }, movements: movements.slice(0, 12), sales: saleRows.slice(0, 8).map(sale => forAgent ? { ...sale, netProfitCents: 0, costCents: 0 } : sale), statistics: ["agent", "cashier", "storekeeper"].includes(ctx.user.role) ? { revenueCents, costCents: 0, grossMarginCents: 0, marginRate: 0, unitsSold, saleCount: uniqueSaleIds.length, lastSaleAt: saleRows[0]?.createdAt ?? null } : { revenueCents, costCents, grossMarginCents: revenueCents - costCents, marginRate: revenueCents > 0 ? Math.round(((revenueCents - costCents) / revenueCents) * 1000) / 10 : 0, unitsSold, saleCount: uniqueSaleIds.length, lastSaleAt: saleRows[0]?.createdAt ?? null } };
     }),
     create: permissionProcedure("catalog.manage").input(productInput).mutation(async ({ ctx, input }) => {
       const db = await requireDb();

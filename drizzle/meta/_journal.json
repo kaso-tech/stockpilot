@@ -603,6 +603,13 @@
       "when": 1795675228550,
       "tag": "0085_cashier_role",
       "breakpoints": true
+    },
+    {
+      "idx": 86,
+      "version": "5",
+      "when": 1795759636437,
+      "tag": "0086_team_functions",
+      "breakpoints": true
     }
   ]
 }

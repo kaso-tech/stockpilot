@@ -1,5 +1,5 @@
 /** Matrice tenant StockPilot : les droits plateforme restent séparés (platformAdminUsers). */
-export const ROLES = ["admin", "manager", "seller", "accountant", "viewer", "agent", "cashier"] as const;
+export const ROLES = ["admin", "manager", "seller", "accountant", "viewer", "agent", "cashier", "storekeeper", "purchaser"] as const;
 export type Role = (typeof ROLES)[number];
 export type Permission =
   | "sales.view" | "sales.create" | "sales.refund" | "customers.view" | "customers.manage"
@@ -8,7 +8,7 @@ export type Permission =
   | "team.view" | "team.manage" | "users.manage" | "audit.view" | "accounting.export" | "cash.close"
   | "finance.notifications" | "settings.manage" | "backups.manage";
 export const ROLE_LABELS: Record<Role, string> = {
-  admin: "Administrateur", manager: "Gérant", seller: "Vendeur", accountant: "Comptable", viewer: "Lecture seule", agent: "Agent commercial", cashier: "Caissier",
+  admin: "Administrateur", manager: "Gérant d’entreprise", seller: "Vendeur", accountant: "Comptable", viewer: "Lecture seule", agent: "Agent commercial", cashier: "Caissier", storekeeper: "Magasinier", purchaser: "Responsable achats",
 };
 export const ROLE_DESCRIPTIONS: Record<Role, string> = {
   admin: "Tous les droits de l’entreprise, sans privilèges implicites sur la plateforme SaaS.",
@@ -18,6 +18,8 @@ export const ROLE_DESCRIPTIONS: Record<Role, string> = {
   viewer: "Consulte les données sans pouvoir les modifier.",
   agent: "Suit ses ventes et commissions, gère ses clients et consulte le catalogue (sans prix d’achat).",
   cashier: "Encaisse les tickets, vend en caisse et clôture la caisse de ses entrepôts (sans prix d’achat).",
+  storekeeper: "Gère le stock de ses entrepôts : entrées et corrections, transferts, inventaires et alertes ; ni ventes, ni caisse, ni prix d’achat.",
+  purchaser: "Gère les fournisseurs, le catalogue et les bons de commande (réceptions comprises) ; consulte le stock.",
 };
 const MATRIX: Record<Permission, readonly Role[]> = {
   "sales.view": ["admin", "manager", "seller", "accountant", "viewer"],
@@ -25,13 +27,13 @@ const MATRIX: Record<Permission, readonly Role[]> = {
   "sales.refund": ["admin", "manager", "seller"],
   "customers.view": ["admin", "manager", "seller", "accountant", "viewer", "agent", "cashier"],
   "customers.manage": ["admin", "manager", "seller", "agent"],
-  "catalog.view": ["admin", "manager", "seller", "accountant", "viewer", "agent", "cashier"],
-  "catalog.manage": ["admin", "manager"],
-  "catalog.price": ["admin", "manager", "seller"],
-  "stock.view": ["admin", "manager", "seller", "accountant", "viewer", "agent", "cashier"],
-  "purchasing.manage": ["admin", "manager"],
-  "stock.adjust": ["admin", "manager", "seller"],
-  "inventory.manage": ["admin", "manager"],
+  "catalog.view": ["admin", "manager", "seller", "accountant", "viewer", "agent", "cashier", "storekeeper", "purchaser"],
+  "catalog.manage": ["admin", "manager", "purchaser"],
+  "catalog.price": ["admin", "manager", "seller", "purchaser"],
+  "stock.view": ["admin", "manager", "seller", "accountant", "viewer", "agent", "cashier", "storekeeper", "purchaser"],
+  "purchasing.manage": ["admin", "manager", "purchaser"],
+  "stock.adjust": ["admin", "manager", "seller", "storekeeper"],
+  "inventory.manage": ["admin", "manager", "storekeeper"],
   "expenses.manage": ["admin", "manager", "accountant"],
   "payroll.manage": ["admin", "manager", "accountant"],
   "team.view": ["admin", "manager", "accountant"],

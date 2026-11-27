@@ -14,7 +14,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 type Method = CheckoutPaymentMethod;
-type Agent = { id: number; name: string; type: "sales_agent" | "cashier"; active: boolean };
+type Agent = { id: number; name: string; type: "sales_agent" | "cashier" | "staff"; active: boolean };
 type PaymentSettings = { defaultSalesAgentId?: number | null; defaultCashierId?: number | null; paymentCashEnabled?: boolean; paymentCardEnabled?: boolean; paymentMobileMoneyEnabled?: boolean; paymentBankTransferEnabled?: boolean; paymentCreditEnabled?: boolean; companyName?: string | null; companyLogoUrl?: string | null; companyAddress?: string | null; companyPhone?: string | null; companyEmail?: string | null; companyFooter?: string | null; ticketHeader?: string | null; ticketFooter?: string | null; ticketWidthMm?: "58" | "80" | null };
 const paymentMethods: Array<{ id: Method; label: string; icon: typeof Banknote; setting: keyof PaymentSettings }> = [
   { id: "cash", label: "Espèces", icon: Banknote, setting: "paymentCashEnabled" },

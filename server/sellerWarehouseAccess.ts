@@ -16,9 +16,22 @@ async function agentWarehouseIds(tx: any, user: ScopedUser): Promise<number[] | 
   return rows.map((row: { warehouseId: number }) => row.warehouseId);
 }
 
+/** Rôles d’entreprise : tous les entrepôts. */
+const COMPANY_WIDE_ROLES = new Set(["admin", "manager", "accountant", "viewer"]);
+/** Rôles liés à une fiche de l’équipe : entrepôts selon la portée de la fiche. */
+const MEMBER_ROLES = new Set(["agent", "cashier", "storekeeper", "purchaser"]);
+
+/** Entrepôts d’un membre lié : portée de sa fiche ; sans fiche, ses affectations d’entrepôt. */
+async function memberWarehouseIds(tx: any, user: ScopedUser): Promise<number[] | null> {
+  const linked = (await tx.select({ id: agents.id }).from(agents).where(and(companyScope(agents.companyId, user.companyId), eq(agents.userId, user.id))).limit(1))[0];
+  if (linked || user.role === "agent" || user.role === "cashier") return agentWarehouseIds(tx, user);
+  const rows = await tx.select({ warehouseId: sellerWarehouseAssignments.warehouseId }).from(sellerWarehouseAssignments).where(and(companyScope(sellerWarehouseAssignments.companyId, user.companyId), eq(sellerWarehouseAssignments.sellerUserId, user.id)));
+  return rows.map((row: { warehouseId: number }) => row.warehouseId);
+}
+
 export async function assignedWarehouseIds(tx: any, user: ScopedUser) {
-  if (user.role === "admin") return null;
-  if (user.role === "agent" || user.role === "cashier") return agentWarehouseIds(tx, user);
+  if (COMPANY_WIDE_ROLES.has(user.role)) return null;
+  if (MEMBER_ROLES.has(user.role)) return memberWarehouseIds(tx, user);
   const rows = await tx.select({ warehouseId: sellerWarehouseAssignments.warehouseId })
     .from(sellerWarehouseAssignments)
     .where(and(companyScope(sellerWarehouseAssignments.companyId, user.companyId), eq(sellerWarehouseAssignments.sellerUserId, user.id)));
@@ -26,7 +39,8 @@ export async function assignedWarehouseIds(tx: any, user: ScopedUser) {
 }
 
 export async function warehouseRoleForUser(tx: any, user: ScopedUser, warehouseId: number): Promise<WarehouseRole | null> {
-  if (user.role === "admin") return "manager";
+  if (COMPANY_WIDE_ROLES.has(user.role)) return "manager";
+  if (user.role === "storekeeper" || user.role === "purchaser") { const ids = await memberWarehouseIds(tx, user); return ids === null || ids.includes(warehouseId) ? "manager" : null; }
   if (user.role === "agent" || user.role === "cashier") { const ids = await agentWarehouseIds(tx, user); return ids === null || ids.includes(warehouseId) ? (user.role === "cashier" ? "cashier" : "seller") : null; }
   const assignment = (await tx.select({ warehouseRole: sellerWarehouseAssignments.warehouseRole }).from(sellerWarehouseAssignments)
     .where(and(companyScope(sellerWarehouseAssignments.companyId, user.companyId), eq(sellerWarehouseAssignments.sellerUserId, user.id), eq(sellerWarehouseAssignments.warehouseId, warehouseId)))

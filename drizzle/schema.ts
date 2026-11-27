@@ -25,7 +25,7 @@ export const users = mysqlTable("users", {
   emailVerifiedAt: timestamp("emailVerifiedAt"),
   phone: varchar("phone", { length: 50 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["admin", "manager", "seller", "accountant", "viewer", "agent", "cashier"]).default("seller").notNull(),
+  role: mysqlEnum("role", ["admin", "manager", "seller", "accountant", "viewer", "agent", "cashier", "storekeeper", "purchaser"]).default("seller").notNull(),
   active: boolean("active").notNull().default(true),
   companyId: int("companyId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -552,7 +552,9 @@ export const agents = mysqlTable("agents", {
   id: int("id").autoincrement().primaryKey(),
   companyId: int("companyId").notNull(),
   name: varchar("name", { length: 160 }).notNull(),
-  type: mysqlEnum("type", ["sales_agent", "cashier"]).notNull(),
+  type: mysqlEnum("type", ["sales_agent", "cashier", "staff"]).notNull(),
+  /** Fonction libre pour les autres membres de l’équipe (Magasinier, Livreur, Gardien…). */
+  jobTitle: varchar("jobTitle", { length: 80 }),
   warehouseScope: mysqlEnum("warehouseScope", ["all", "selected", "attribution_only"]).notNull().default("all"),
   /** Compte de connexion de l’agent (espace agent) : l’historique de ventes et de commissions reste sur la fiche. */
   userId: int("userId").unique(),

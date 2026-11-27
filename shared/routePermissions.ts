@@ -15,6 +15,7 @@ export function routePermission(path: string): Permission | null {
   if (/^\/journal(\/|$)/.test(pathname)) return "audit.view";
   if (/^\/pilotage-entrepots(\/|$)/.test(pathname)) return "settings.manage";
   if (/^\/donnees(\/|$)/.test(pathname)) return "settings.manage";
+  if (/^\/sauvegardes(\/|$)/.test(pathname)) return "backups.manage";
   if (/^\/parametres\/utilisateurs(\/|$)/.test(pathname)) return "users.manage";
   if (/^\/parametres\/(apparence|tableau-de-bord|securite)(\/|$)/.test(pathname)) return null;
   if (/^\/parametres(\/|$)/.test(pathname)) return "settings.manage";
