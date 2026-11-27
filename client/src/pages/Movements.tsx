@@ -17,7 +17,7 @@ type MovementType = "entry" | "exit" | "adjustment";
 
 export default function Movements() {
   const { user } = useAuth();
-  const canManage = can(user?.role, "stock.adjust");
+  const canManage = can(user?.role, "stock.adjust", user?.permissions);
   const { activeWarehouseId, activeWarehouse, setActiveWarehouseId } = useActiveWarehouse();
   const { data: settings } = trpc.commerce.settings.get.useQuery();
   const canCorrectStock = !canManage && Boolean(settings?.sellerCanCorrectStock);

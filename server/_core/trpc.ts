@@ -55,7 +55,7 @@ export const protectedProcedure = authenticatedProcedure.use(requireActiveCompan
 /** Applique la matrice d’accès tenant ; les contrôles entrepôt et vendeur restent complémentaires. */
 export const permissionProcedure = (permission: Permission) => protectedProcedure.use(
   t.middleware(async ({ ctx, next }) => {
-    if (!ctx.user || !can(ctx.user.role, permission)) {
+    if (!ctx.user || !can(ctx.user.role, permission, ctx.user.permissions)) {
       throw new TRPCError({ code: "FORBIDDEN", message: "Cette action n’est pas autorisée pour votre rôle." });
     }
     return next();

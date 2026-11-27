@@ -10,6 +10,7 @@ import {
   userSessions,
   users,
   warehouseStocks,
+  customRoles,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { companyScope } from "./companyScope";
@@ -70,6 +71,18 @@ export async function getUserByNormalizedEmail(email: string) {
   const normalizedEmail = normalizeAuthEmail(email);
   if (!normalizedEmail) return undefined;
   return (await db.select().from(users).where(eq(users.emailNormalized, normalizedEmail)).limit(1))[0];
+}
+
+/** Rôle personnalisé d’une entreprise avec ses permissions (liste vide si introuvable). */
+export async function getCustomRole(companyId: number, customRoleId: number | null | undefined) {
+  if (!customRoleId) return null;
+  const db = await getDb();
+  if (!db) return null;
+  const row = (await db.select().from(customRoles).where(and(eq(customRoles.id, customRoleId), eq(customRoles.companyId, companyId))).limit(1))[0];
+  if (!row) return null;
+  let permissions: string[] = [];
+  try { const parsed = JSON.parse(row.permissions); if (Array.isArray(parsed)) permissions = parsed.filter((value): value is string => typeof value === "string"); } catch { permissions = []; }
+  return { id: row.id, name: row.name, permissions };
 }
 
 export async function getUserSessionById(sessionId: string) {
@@ -165,6 +178,7 @@ export async function listUsers(companyId: number | null) {
       name: users.name,
       email: users.email,
       role: users.role,
+      customRoleId: users.customRoleId,
       lastSignedIn: users.lastSignedIn,
       createdAt: users.createdAt,
     })

@@ -19,7 +19,7 @@ const emptySupplier: SupplierForm = { name: "", address: "", email: "", phone: "
 export default function Suppliers() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
-  const canManage = can(user?.role, "catalog.manage");
+  const canManage = can(user?.role, "catalog.manage", user?.permissions);
   const utils = trpc.useUtils();
   const { data: suppliers = [] } = trpc.suppliers.list.useQuery();
   const { data: movements = [] } = trpc.movements.list.useQuery();

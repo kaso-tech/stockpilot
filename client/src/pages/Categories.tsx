@@ -15,7 +15,7 @@ type Category = { id: number; name: string };
 
 export default function Categories() {
   const { user } = useAuth();
-  const isAdmin = can(user?.role, "catalog.manage");
+  const isAdmin = can(user?.role, "catalog.manage", user?.permissions);
   const utils = trpc.useUtils();
   const { data: categories = [], isLoading } = trpc.categories.list.useQuery(undefined, { enabled: isAdmin });
   const [open, setOpen] = useState(false);

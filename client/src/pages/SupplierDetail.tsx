@@ -34,7 +34,7 @@ export default function SupplierDetail() {
   const [, setLocation] = useLocation();
   const supplierId = Number(params?.id);
   const { user } = useAuth();
-  const canManage = can(user?.role, "catalog.manage");
+  const canManage = can(user?.role, "catalog.manage", user?.permissions);
   const utils = trpc.useUtils();
   const { data: suppliers = [], isLoading } = trpc.suppliers.list.useQuery();
   const { data: products = [] } = trpc.products.list.useQuery();

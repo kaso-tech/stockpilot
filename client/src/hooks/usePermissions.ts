@@ -4,5 +4,6 @@ import { can, ROLE_LABELS, type Permission, type Role } from "@shared/permission
 export function usePermissions() {
   const { user } = useAuth();
   const role = (user?.role ?? null) as Role | null;
-  return { role, roleLabel: role ? ROLE_LABELS[role] : "", can: (permission: Permission) => can(role, permission) };
+  const label = role === "custom" ? (user?.customRoleName ?? ROLE_LABELS.custom) : role ? ROLE_LABELS[role] : "";
+  return { role, roleLabel: label, can: (permission: Permission) => can(role, permission, user?.permissions) };
 }

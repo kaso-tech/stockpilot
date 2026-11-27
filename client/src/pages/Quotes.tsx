@@ -34,7 +34,7 @@ export default function Quotes() {
     return matchesQuery && matchesStatus && matchesAgent && matchesPeriod;
   }), [agentId, period, quotes, search, status]);
   const exportFilteredQuotes = () => downloadCommercialDocumentsCsv("devis-filtres.csv", filteredQuotes.map(quote => ({ reference: quote.invoiceNumber, date: quote.createdAt, client: quote.customerName || "Client", statut: quote.status === "paid" ? "Accepté" : quote.status === "void" ? "Retourné / annulé" : "En attente", agent: documentParticipantNames(quote, documentParticipants), totalCents: quote.totalCents, encaisseCents: quote.amountPaidCents })));
-  if (!can(user?.role, "sales.view"))
+  if (!can(user?.role, "sales.view", user?.permissions))
     return (
       <div className="mx-auto max-w-5xl py-16 text-center text-muted-foreground">
         Accès réservé aux utilisateurs autorisés.

@@ -3,7 +3,7 @@ import { normalizeAuthEmail } from "../authEmail";
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { z } from "zod";
-import {
+import { customRoles,
   agentPayments, agents, auditLogs, customers, paymentDueSchedules, paymentDueTemplates, productPriceTiers, products, remunerationProfiles, saleCommissions, saleReturns, sellerCredentials,
   sellerWarehouseAssignments, salesAgentWarehouseAssignments, saleItems, salePayments, sales, saleSettings, stockAlerts, stockMovements, users, warehouses,
 } from "../../drizzle/schema";
@@ -61,7 +61,7 @@ function normalizeJobTitle<T extends { type: string; jobTitle?: string | null }>
 }
 
 /** Rôles qu’on peut donner à un membre « autre fonction » (vendeurs, caissiers et agents ont leur propre accès). */
-export const STAFF_ACCESS_ROLES = ["admin", "manager", "accountant", "viewer", "storekeeper", "purchaser"] as const;
+export const STAFF_ACCESS_ROLES = ["admin", "manager", "accountant", "viewer", "storekeeper", "purchaser", "custom"] as const;
 /** Rôle du compte attendu pour un type de fiche ; pour « autre fonction », le rôle choisi doit faire partie de la liste. */
 function accountRoleFits(type: string, role: string | null | undefined) {
   if (type === "sales_agent") return role === "agent";
@@ -213,16 +213,19 @@ export const commerceRouter = router({
     /** Comptes de connexion liés aux fiches d'agents (identifiant affiché sur la page Agents). */
     accessList: permissionProcedure("team.view").query(async ({ ctx }) => {
       const db = await dbOrThrow();
-      const rows = await db.select({ agentId: agents.id, userId: agents.userId, username: sellerCredentials.username, active: users.active, role: users.role }).from(agents).innerJoin(users, eq(users.id, agents.userId)).leftJoin(sellerCredentials, eq(sellerCredentials.userId, users.id)).where(companyScope(agents.companyId, ctx.user.companyId));
+      const rows = await db.select({ agentId: agents.id, userId: agents.userId, username: sellerCredentials.username, active: users.active, role: users.role, customRoleId: users.customRoleId }).from(agents).innerJoin(users, eq(users.id, agents.userId)).leftJoin(sellerCredentials, eq(sellerCredentials.userId, users.id)).where(companyScope(agents.companyId, ctx.user.companyId));
       return rows.filter(row => row.active);
     }),
     /** Donne à un agent commercial l'accès à son espace : compte lié à sa fiche, historique conservé. */
-    grantAccess: permissionProcedure("team.manage").input(z.object({ id: z.number().int().positive(), role: z.enum(STAFF_ACCESS_ROLES).optional(), email: optionalLoginEmail, username: z.string().trim().min(3).max(80).regex(/^[a-zA-Z0-9._-]+$/, "L’identifiant ne peut contenir que des lettres, chiffres, points, tirets et tirets bas."), password: z.string().min(8).max(128) })).mutation(async ({ ctx, input }) => {
+    grantAccess: permissionProcedure("team.manage").input(z.object({ id: z.number().int().positive(), role: z.enum(STAFF_ACCESS_ROLES).optional(), customRoleId: z.number().int().positive().optional(), email: optionalLoginEmail, username: z.string().trim().min(3).max(80).regex(/^[a-zA-Z0-9._-]+$/, "L’identifiant ne peut contenir que des lettres, chiffres, points, tirets et tirets bas."), password: z.string().min(8).max(128) })).mutation(async ({ ctx, input }) => {
       const db = await dbOrThrow();
       const agent = (await db.select().from(agents).where(and(eq(agents.id, input.id), companyScope(agents.companyId, ctx.user.companyId))).limit(1))[0];
       if (!agent || !agent.active) throw new TRPCError({ code: "NOT_FOUND", message: "Agent actif introuvable." });
       if (agent.type === "staff" && !input.role) throw new TRPCError({ code: "BAD_REQUEST", message: "Choisissez le rôle de ce membre dans l’application." });
       const accountRole = agent.type === "cashier" ? "cashier" : agent.type === "sales_agent" ? "agent" : input.role!;
+      const customRole = accountRole === "custom" ? (input.customRoleId ? (await db.select({ id: customRoles.id }).from(customRoles).where(and(eq(customRoles.id, input.customRoleId), companyScope(customRoles.companyId, ctx.user.companyId))).limit(1))[0] : undefined) : null;
+      if (accountRole === "custom" && !customRole) throw new TRPCError({ code: "BAD_REQUEST", message: "Choisissez un rôle personnalisé existant." });
+      const customRoleId = customRole?.id ?? null;
       if (input.email) await ensureLoginEmailAvailable(db, ctx.user.companyId, input.email);
       await ensureUsernameAvailable(db, ctx.user.companyId, input.username);
       const passwordHash = await hashPassword(input.password);
@@ -231,12 +234,12 @@ export const commerceRouter = router({
       if (existing) {
         // Accès retiré puis redonné : même compte réactivé, nouveaux identifiants.
         userId = existing.id;
-        await db.update(users).set({ active: true, name: agent.name, email: input.email ?? null, emailNormalized: normalizeAuthEmail(input.email), role: accountRole }).where(eq(users.id, userId));
+        await db.update(users).set({ active: true, name: agent.name, email: input.email ?? null, emailNormalized: normalizeAuthEmail(input.email), role: accountRole, customRoleId }).where(eq(users.id, userId));
         const credential = (await db.select().from(sellerCredentials).where(eq(sellerCredentials.userId, userId)).limit(1))[0];
         if (credential) await db.update(sellerCredentials).set({ username: input.username, passwordHash, companyId: ctx.user.companyId }).where(eq(sellerCredentials.id, credential.id));
         else await db.insert(sellerCredentials).values({ userId, companyId: ctx.user.companyId, username: input.username, passwordHash });
       } else {
-        const result = await db.insert(users).values({ openId: `local_${accountRole}_${randomUUID()}`, name: agent.name, email: input.email ?? null, emailNormalized: normalizeAuthEmail(input.email), phone: agent.phone ?? null, loginMethod: "password", role: accountRole, active: true, companyId: ctx.user.companyId });
+        const result = await db.insert(users).values({ openId: `local_${accountRole}_${randomUUID()}`, name: agent.name, email: input.email ?? null, emailNormalized: normalizeAuthEmail(input.email), phone: agent.phone ?? null, loginMethod: "password", role: accountRole, customRoleId, active: true, companyId: ctx.user.companyId });
         userId = Number(result[0].insertId);
         await db.insert(sellerCredentials).values({ userId, companyId: ctx.user.companyId, username: input.username, passwordHash });
         await db.update(agents).set({ userId }).where(and(eq(agents.id, agent.id), companyScope(agents.companyId, ctx.user.companyId)));

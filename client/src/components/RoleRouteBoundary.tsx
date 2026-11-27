@@ -5,7 +5,7 @@ import { Link, useLocation } from "wouter";
 export function RoleRouteBoundary({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const [location] = useLocation();
-  if (user && !canOpenRoute(user.role, location)) {
+  if (user && !canOpenRoute(user.role, location, user.permissions)) {
     return <section className="rounded-xl border border-border bg-card p-6 text-card-foreground" role="alert">
       <h1 className="text-xl font-semibold">Accès limité par votre rôle</h1>
       <p className="mt-0.5 text-[13px] text-muted-foreground">Cette rubrique n’est pas disponible pour votre rôle. Vos autres espaces restent accessibles dans le menu.</p>

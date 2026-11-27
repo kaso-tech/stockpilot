@@ -28,7 +28,7 @@ export default function ProductDetail() {
   const remove = trpc.products.remove.useMutation({ onSuccess: () => { utils.products.invalidate(); toast.success("Produit supprimé."); setLocation("/produits"); }, onError: issue => toast.error(issue.message) });
   const [orderOpen, setOrderOpen] = useState(false);
   const [quantity, setQuantity] = useState("1");
-  const isAdmin = can(user?.role, "catalog.manage");
+  const isAdmin = can(user?.role, "catalog.manage", user?.permissions);
   // Agent commercial : ni coûts ni marges, ni vente ni commande depuis la fiche.
   const isAgent = user?.role === "agent";
   const product = data?.product;

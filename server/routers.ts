@@ -36,6 +36,7 @@ import {
   userDashboardPreferences,
   userSessions,
   users,
+  customRoles,
 } from "../drizzle/schema";
 import {
   getDb,
@@ -101,6 +102,7 @@ function legacyAdminFallbackEnabled() {
 }
 
 import { backupRouter } from "./routers/backups";
+import { customRolesRouter } from "./routers/customRoles";
 import { depotSpaceRouter } from "./routers/depotSpace";
 import { cashierSpaceRouter } from "./routers/cashierSpace";
 import { agentSpaceRouter } from "./routers/agentSpace";
@@ -292,6 +294,12 @@ async function syncStockAlert(productId: number, companyId: number) {
   }
 }
 
+/** Prix d’achat masqués : rôles sans accès aux coûts, et rôles personnalisés sans la permission « prix et coûts ». */
+function hidesPurchaseCosts(user: { role: string; permissions?: string[] }) {
+  if (["agent", "cashier", "storekeeper"].includes(user.role)) return true;
+  return user.role === "custom" && !can(user.role, "catalog.price", user.permissions);
+}
+
 export const appRouter = router({
   platform: platformRouter,
   syncHealth: syncHealthRouter,
@@ -312,6 +320,7 @@ export const appRouter = router({
   agentSpace: agentSpaceRouter,
   cashierSpace: cashierSpaceRouter,
   depotSpace: depotSpaceRouter,
+  customRoles: customRolesRouter,
   companyLogin: router({
     /** Code entreprise à saisir à la connexion (attribué s'il manque). */
     get: protectedProcedure.query(async ({ ctx }) => {
@@ -567,7 +576,7 @@ export const appRouter = router({
       const monthlyOperatingProfitCents = operatingNetProfitCents(monthlyMarginCents, monthlyExpenseCents);
       const currentBudget = budgetRows.find(budget => budget.yearMonth === month && (!input?.warehouseId || budget.warehouseId === input.warehouseId));
       const expenseBudget = budgetComparison(currentBudget?.amountCents ?? null, monthlyExpenseCents, currentBudget?.warningPercent ?? 80);
-      const canSeeFinance = ["admin", "manager", "accountant"].includes(ctx.user.role);
+      const canSeeFinance = ["admin", "manager", "accountant"].includes(ctx.user.role) || (ctx.user.role === "custom" && can(ctx.user.role, "finance.notifications", ctx.user.permissions));
       // Paie à régler : même calcul que la page Agents (agents et vendeurs existants uniquement).
       const payroll = await loadPayrollOverview(db, companyId, month, input?.warehouseId);
       const duePayrollCents = payroll.balances.reduce((sum, balance) => sum + Math.max(0, balance.dueCents), 0);
@@ -615,7 +624,7 @@ export const appRouter = router({
           ...(canSeeFinance ? { todaySaleCount: todaySales.length, previousMonthToDateRevenueCents, receivableOverdueCount, dueSoonCount: dueSoon.length, dueSoonCents: dueSoon.reduce((sum, row) => sum + Math.max(0, row.amountCents - row.paidCents), 0), receivableCount: saleRows.filter(isReceivableInvoice).length, receivableCents: saleRows.filter(isReceivableInvoice).reduce((sum, sale) => sum + Math.max(0, sale.totalCents - sale.amountPaidCents), 0), monthlyInvoiceCount: monthlySales.length, todayRevenueCents: todaySales.reduce((sum, sale) => sum + sale.totalCents, 0), averageBasketCents: monthlySales.length ? Math.round(monthlyRevenueCents / monthlySales.length) : 0 } : {}),
           draftInventories: inventories.filter(inventory => inventory.status === "draft").length,
         },
-        lowStock: lowStock.slice(0, 6).map(product => can(ctx.user.role, "catalog.price") ? product : { ...product, purchasePriceCents: 0 }),
+        lowStock: lowStock.slice(0, 6).map(product => can(ctx.user.role, "catalog.price", ctx.user.permissions) ? product : { ...product, purchasePriceCents: 0 }),
         recentMovements: movements.slice(0, 6),
         trend,
         ...(canSeeFinance ? { salesTrend, salesTrend30, topProducts,
@@ -698,7 +707,7 @@ export const appRouter = router({
       }
       const rows = await listProducts(ctx.user.companyId, input?.warehouseId);
       // Agent commercial : pas de prix d'achat.
-      return ["agent", "cashier", "storekeeper"].includes(ctx.user.role) ? rows.map(row => ({ ...row, purchasePriceCents: 0 })) : rows;
+      return hidesPurchaseCosts(ctx.user) ? rows.map(row => ({ ...row, purchasePriceCents: 0 })) : rows;
     }),
     detail: permissionProcedure("catalog.view").input(z.object({ id: z.number().int().positive() })).query(async ({ ctx, input }) => {
       const db = await requireDb();
@@ -715,8 +724,8 @@ export const appRouter = router({
       const revenueCents = lines.reduce((sum, line) => sum + line.lineTotalCents, 0);
       const costCents = lines.reduce((sum, line) => sum + line.lineCostCents, 0);
       const unitsSold = lines.reduce((sum, line) => sum + line.quantity, 0);
-      const forAgent = ["agent", "cashier", "storekeeper"].includes(ctx.user.role);
-      return { product: forAgent ? { ...product, purchasePriceCents: 0 } : product, supplier, tiers: { retail: tiers.filter(tier => tier.customerType === "retail"), wholesale: tiers.filter(tier => tier.customerType === "wholesale") }, movements: movements.slice(0, 12), sales: saleRows.slice(0, 8).map(sale => forAgent ? { ...sale, netProfitCents: 0, costCents: 0 } : sale), statistics: ["agent", "cashier", "storekeeper"].includes(ctx.user.role) ? { revenueCents, costCents: 0, grossMarginCents: 0, marginRate: 0, unitsSold, saleCount: uniqueSaleIds.length, lastSaleAt: saleRows[0]?.createdAt ?? null } : { revenueCents, costCents, grossMarginCents: revenueCents - costCents, marginRate: revenueCents > 0 ? Math.round(((revenueCents - costCents) / revenueCents) * 1000) / 10 : 0, unitsSold, saleCount: uniqueSaleIds.length, lastSaleAt: saleRows[0]?.createdAt ?? null } };
+      const forAgent = hidesPurchaseCosts(ctx.user);
+      return { product: forAgent ? { ...product, purchasePriceCents: 0 } : product, supplier, tiers: { retail: tiers.filter(tier => tier.customerType === "retail"), wholesale: tiers.filter(tier => tier.customerType === "wholesale") }, movements: movements.slice(0, 12), sales: saleRows.slice(0, 8).map(sale => forAgent ? { ...sale, netProfitCents: 0, costCents: 0 } : sale), statistics: hidesPurchaseCosts(ctx.user) ? { revenueCents, costCents: 0, grossMarginCents: 0, marginRate: 0, unitsSold, saleCount: uniqueSaleIds.length, lastSaleAt: saleRows[0]?.createdAt ?? null } : { revenueCents, costCents, grossMarginCents: revenueCents - costCents, marginRate: revenueCents > 0 ? Math.round(((revenueCents - costCents) / revenueCents) * 1000) / 10 : 0, unitsSold, saleCount: uniqueSaleIds.length, lastSaleAt: saleRows[0]?.createdAt ?? null } };
     }),
     create: permissionProcedure("catalog.manage").input(productInput).mutation(async ({ ctx, input }) => {
       const db = await requireDb();
@@ -1123,10 +1132,13 @@ export const appRouter = router({
 
   users: router({
     list: permissionProcedure("users.manage").query(({ ctx }) => listUsers(ctx.user.companyId)),
-    updateRole: adminProcedure.input(z.object({ id: z.number().int().positive(), role: z.enum(ROLES) })).mutation(async ({ ctx, input }) => {
+    updateRole: adminProcedure.input(z.object({ id: z.number().int().positive(), role: z.enum(ROLES), customRoleId: z.number().int().positive().optional() })).mutation(async ({ ctx, input }) => {
       if (input.role === "agent" || input.role === "cashier") throw new TRPCError({ code: "BAD_REQUEST", message: "Les rôles Agent commercial et Caissier se donnent depuis la page Agents (bouton « Donner l’accès »)." });
       const db = await requireDb();
-      const target = (await db.select({ id: users.id, openId: users.openId, role: users.role, active: users.active }).from(users).where(and(eq(users.id, input.id), companyScope(users.companyId, ctx.user.companyId))).limit(1))[0];
+      // Rôle personnalisé : il doit exister dans l’entreprise.
+      const customRole = input.role === "custom" ? (input.customRoleId ? (await db.select({ id: customRoles.id, name: customRoles.name }).from(customRoles).where(and(eq(customRoles.id, input.customRoleId), companyScope(customRoles.companyId, ctx.user.companyId))).limit(1))[0] : undefined) : null;
+      if (input.role === "custom" && !customRole) throw new TRPCError({ code: "BAD_REQUEST", message: "Choisissez un rôle personnalisé existant." });
+      const target = (await db.select({ id: users.id, openId: users.openId, role: users.role, active: users.active, customRoleId: users.customRoleId }).from(users).where(and(eq(users.id, input.id), companyScope(users.companyId, ctx.user.companyId))).limit(1))[0];
       if (!target) throw new TRPCError({ code: "NOT_FOUND", message: "Utilisateur introuvable dans cette entreprise." });
       const owner = (await db.select({ ownerUserId: companies.ownerUserId }).from(companies).where(eq(companies.id, ctx.user.companyId)).limit(1))[0];
       const fallback = (await db.select({ id: adminFallbackPasswords.id }).from(adminFallbackPasswords).where(eq(adminFallbackPasswords.ownerOpenId, target.openId)).limit(1))[0];
@@ -1136,13 +1148,13 @@ export const appRouter = router({
         const messages = { self: "Vous ne pouvez pas modifier votre propre rôle.", owner: "Le propriétaire de l’entreprise doit rester administrateur.", fallback_admin: "Le compte administrateur de secours doit rester administrateur.", last_admin: "Le dernier administrateur actif ne peut pas être rétrogradé." };
         throw new TRPCError({ code: "BAD_REQUEST", message: messages[refusal] });
       }
-      if (target.role === input.role) return { success: true, changed: false };
+      if (target.role === input.role && (input.role !== "custom" || target.customRoleId === customRole?.id)) return { success: true, changed: false };
       await db.transaction(async tx => {
         const storedPassword = await findPasswordHash(tx, target);
         if (storedPassword) await storePasswordHash(tx, target, storedPassword.passwordHash, input.role, ctx.user.id);
-        await tx.update(users).set({ role: input.role }).where(and(eq(users.id, input.id), companyScope(users.companyId, ctx.user.companyId)));
+        await tx.update(users).set({ role: input.role, customRoleId: customRole?.id ?? null }).where(and(eq(users.id, input.id), companyScope(users.companyId, ctx.user.companyId)));
         await tx.update(userSessions).set({ revokedAt: new Date() }).where(and(eq(userSessions.userId, input.id), isNull(userSessions.revokedAt)));
-        await tx.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Rôle modifié", entityType: "Utilisateur", entityId: String(input.id), detail: `Rôle défini sur ${ROLE_LABELS[input.role]}; sessions révoquées` });
+        await tx.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Rôle modifié", entityType: "Utilisateur", entityId: String(input.id), detail: `Rôle défini sur ${customRole ? `« ${customRole.name} » (personnalisé)` : ROLE_LABELS[input.role]}; sessions révoquées` });
       });
       return { success: true, changed: true };
     }),

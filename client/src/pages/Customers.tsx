@@ -26,7 +26,7 @@ const emptyCustomer: CustomerForm = { name: "", type: "ordinary", email: "", pho
 export default function Customers() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
-  const canManage = can(user?.role, "customers.manage");
+  const canManage = can(user?.role, "customers.manage", user?.permissions);
   const utils = trpc.useUtils();
   const { data: customers = [] } = trpc.commerce.customers.list.useQuery();
   const [open, setOpen] = useState(false);

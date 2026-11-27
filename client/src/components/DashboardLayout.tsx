@@ -223,7 +223,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     ...menuSections.map(section => ({ ...section, items: section.items.filter(item => sellerAllowedPaths.has(item.path)).map(item => isDepotManager && item.path === "/" ? { ...item, label: "Mon dépôt" } : item) })).filter(section => section.items.length > 0),
     { label: "Mon compte", items: [{ icon: Settings2, label: "Apparence", path: "/parametres/apparence" }, { icon: LayoutDashboard, label: "Mon tableau de bord", path: "/parametres/tableau-de-bord" }, { icon: ShieldCheck, label: "Sécurité", path: "/parametres/securite" }] },
   ];
-  const roleMenuSections = menuSections.map(section => ({ ...section, items: section.items.filter(item => canOpenRoute(user?.role, item.path)) })).filter(section => section.items.length);
+  const roleMenuSections = menuSections.map(section => ({ ...section, items: section.items.filter(item => canOpenRoute(user?.role, item.path, user?.permissions)) })).filter(section => section.items.length);
   // Agent commercial : son espace, ses clients, le catalogue et son compte.
   const agentMenuSections: MenuSection[] = [
     { label: "Mon activité", items: [{ icon: LayoutDashboard, label: "Mon espace", path: "/" }, { icon: UserRound, label: "Clients", path: "/clients" }, { icon: PackageSearch, label: "Catalogue", path: "/produits" }] },
@@ -243,7 +243,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   };
   const activeMenuItem = visibleMenuItems.find(item => item.path === location || (item.path === "/produits" && location.startsWith("/produits/")) || (item.path === "/clients" && location.startsWith("/clients/")) || (item.path === "/fournisseurs" && location.startsWith("/fournisseurs/")) || (item.path === "/bons-commande" && location.startsWith("/bons-commande/")) || (item.path === "/devis" && location.startsWith("/devis/")) || (item.path === "/tickets" && location.startsWith("/tickets/"))) ?? visibleMenuItems[0];
   const initials = (user?.name || user?.email || "U").slice(0, 2).toUpperCase();
-  const isAdmin = can(user?.role, "finance.notifications");
+  const isAdmin = can(user?.role, "finance.notifications", user?.permissions);
   const canRunBackup = user?.role === "admin" || user?.role === "seller";
   const { data: dashboard } = trpc.dashboard.get.useQuery(activeWarehouseId ? { warehouseId: activeWarehouseId } : undefined, { enabled: isAdmin, refetchInterval: 60_000 });
   const { data: backups } = trpc.backups.get.useQuery(undefined, { enabled: user?.role === "admin", refetchInterval: 60_000 });
@@ -257,9 +257,9 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     else if (dashboard?.summary?.expenseBudget?.warningReached) candidateNotifications.push({ id: "budget-warning", title: "Seuil budget atteint", detail: "Le seuil d’alerte des dépenses est atteint.", tone: "amber", path: "/depenses", audience: "admin" });
     if (backups?.settings.lastBackupStatus === "failed") candidateNotifications.push({ id: "backup", title: "Sauvegarde à vérifier", detail: backups.settings.lastBackupError || "La dernière sauvegarde a échoué.", tone: "rose", path: "/sauvegardes", audience: "admin" });
   }
-  warehouseAlerts.forEach(alert => candidateNotifications.push({ id: alert.id, title: alert.title, detail: alert.detail, tone: alert.status === "active" ? "rose" : "violet", path: "/alertes", audience: can(user?.role, "finance.notifications") ? "admin" : "seller" }));
-  paymentDueNotifications.forEach(notification => candidateNotifications.push({ ...notification, audience: can(user?.role, "finance.notifications") ? "admin" : "seller" }));
-  const notifications = visibleNotificationsForRole(can(user?.role, "finance.notifications") ? "admin" : "seller", candidateNotifications);
+  warehouseAlerts.forEach(alert => candidateNotifications.push({ id: alert.id, title: alert.title, detail: alert.detail, tone: alert.status === "active" ? "rose" : "violet", path: "/alertes", audience: can(user?.role, "finance.notifications", user?.permissions) ? "admin" : "seller" }));
+  paymentDueNotifications.forEach(notification => candidateNotifications.push({ ...notification, audience: can(user?.role, "finance.notifications", user?.permissions) ? "admin" : "seller" }));
+  const notifications = visibleNotificationsForRole(can(user?.role, "finance.notifications", user?.permissions) ? "admin" : "seller", candidateNotifications);
   const [readNotificationIdsState, setReadNotificationIdsState] = useState<string[]>([]);
   useEffect(() => { setReadNotificationIdsState(readNotificationIds(user?.companyId ?? undefined, user?.id)); }, [user?.companyId, user?.id]);
   const saveReadNotifications = (ids: string[]) => { setReadNotificationIdsState(ids); writeNotificationIds(user?.companyId ?? undefined, user?.id, ids); };

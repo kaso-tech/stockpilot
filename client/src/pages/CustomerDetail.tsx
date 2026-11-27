@@ -28,7 +28,7 @@ export default function CustomerDetail() {
   const { data, isLoading } = trpc.commerce.customers.get.useQuery({ id: customerId }, { enabled: Number.isInteger(customerId) && customerId > 0 });
   const utils = trpc.useUtils();
   const [editOpen, setEditOpen] = useState(false);
-  const canManage = can(user?.role, "customers.manage");
+  const canManage = can(user?.role, "customers.manage", user?.permissions);
   const update = trpc.commerce.customers.update.useMutation({ onSuccess: async () => { await Promise.all([utils.commerce.customers.get.invalidate({ id: customerId }), utils.commerce.customers.list.invalidate()]); setEditOpen(false); toast.success("Client mis à jour."); }, onError: error => toast.error(error.message) });
   const remove = trpc.commerce.customers.remove.useMutation({ onSuccess: async () => { await utils.commerce.customers.list.invalidate(); toast.success("Client supprimé."); setLocation("/clients"); }, onError: error => toast.error(error.message) });
   if (isLoading) return <div className="mx-auto max-w-[1500px] py-24 text-center text-sm text-faint">Chargement de la fiche client…</div>;

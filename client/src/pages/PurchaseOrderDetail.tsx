@@ -35,7 +35,7 @@ export default function PurchaseOrderDetail() {
   // « Enregistrer et imprimer » depuis la fiche produit : impression dès que le bon est affiché.
   const printRequested = useRef(new URLSearchParams(window.location.search).get("imprimer") === "1");
   const { user } = useAuth();
-  const canManage = can(user?.role, "purchasing.manage");
+  const canManage = can(user?.role, "purchasing.manage", user?.permissions);
   const utils = trpc.useUtils();
   const { data, isLoading } = trpc.purchaseOrders.get.useQuery({ id: orderId }, { enabled: Number.isInteger(orderId) && orderId > 0 });
   useEffect(() => {

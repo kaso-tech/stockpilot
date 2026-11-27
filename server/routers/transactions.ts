@@ -222,12 +222,12 @@ export const transactionsRouter = router({
   createDraft: protectedProcedure.input(z.object({ channel: z.enum(["pos", "invoice", "quote"]), customerId: z.number().int().positive().nullable(), warehouseId: z.number().int().positive().optional(), note: z.string().trim().max(1000).nullable(), deliveryAddress: z.string().trim().max(1500).nullable().optional(), deliveryFeeCents: z.number().int().min(0).max(MAX_CENTS).default(0), applyVat: z.boolean().optional(), vatRateBasisPoints: z.number().int().min(0).max(MAX_DISCOUNT_BASIS_POINTS).optional(), items: z.array(itemInput).min(1).max(MAX_LINE_ITEMS), invoiceDiscount: discountInput.default({ type: "none", value: 0 }), replacesSaleId: z.number().int().positive().optional(), offlineOperationId: z.string().trim().min(8).max(80).optional() }).merge(agentSelection)).mutation(async ({ ctx, input }) => {
     // Agent commercial : uniquement des devis, attribués à sa fiche, avec les limites de prix et de remise des vendeurs.
     const agentQuote = ctx.user.role === "agent";
-    if (!can(ctx.user.role, "sales.create") && !(agentQuote && input.channel === "quote")) throw new TRPCError({ code: "FORBIDDEN", message: "Cette action n’est pas autorisée pour votre rôle." });
+    if (!can(ctx.user.role, "sales.create", ctx.user.permissions) && !(agentQuote && input.channel === "quote")) throw new TRPCError({ code: "FORBIDDEN", message: "Cette action n’est pas autorisée pour votre rôle." });
     if (agentQuote && (input.replacesSaleId || input.offlineOperationId)) throw new TRPCError({ code: "FORBIDDEN", message: "Cette action n’est pas autorisée pour votre rôle." });
     // Caissier : tickets de caisse uniquement, encaissés à son nom.
     const cashierSale = ctx.user.role === "cashier";
     if (cashierSale && input.channel !== "pos") throw new TRPCError({ code: "FORBIDDEN", message: "Le caissier ne crée que des tickets de caisse." });
-    const restricted = ctx.user.role === "seller" || agentQuote || cashierSale;
+    const restricted = ctx.user.role === "seller" || ctx.user.role === "custom" || agentQuote || cashierSale;
     if ((input.channel === "invoice" || input.channel === "quote") && !input.customerId) throw new TRPCError({ code: "BAD_REQUEST", message: "Un client est obligatoire pour créer ce document." });
     const db = await dbOrThrow();
     let created: { id: number; invoiceNumber: string; totalCents: number; salesAgentId: number | null; cashierId: number | null } | null = null;

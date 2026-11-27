@@ -610,6 +610,13 @@
       "when": 1795759636437,
       "tag": "0086_team_functions",
       "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "5",
+      "when": 1795760965185,
+      "tag": "0087_custom_roles",
+      "breakpoints": true
     }
   ]
 }

@@ -25,13 +25,28 @@ export const users = mysqlTable("users", {
   emailVerifiedAt: timestamp("emailVerifiedAt"),
   phone: varchar("phone", { length: 50 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["admin", "manager", "seller", "accountant", "viewer", "agent", "cashier", "storekeeper", "purchaser"]).default("seller").notNull(),
+  role: mysqlEnum("role", ["admin", "manager", "seller", "accountant", "viewer", "agent", "cashier", "storekeeper", "purchaser", "custom"]).default("seller").notNull(),
+  /** Rôle personnalisé de l’entreprise (quand role = « custom »). */
+  customRoleId: int("customRoleId"),
   active: boolean("active").notNull().default(true),
   companyId: int("companyId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
 }, table => [index("users_company_active_idx").on(table.companyId, table.active), uniqueIndex("users_company_email_unique").on(table.companyId, table.emailNormalized)]);
+
+/** Rôles créés par l’administrateur d’une entreprise : nom et liste de permissions cochées. */
+export const customRoles = mysqlTable("customRoles", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  name: varchar("name", { length: 80 }).notNull(),
+  description: varchar("description", { length: 300 }),
+  /** Permissions accordées (JSON : liste de clés de la matrice, ex. ["sales.view","cash.close"]). */
+  permissions: text("permissions").notNull(),
+  createdByUserId: int("createdByUserId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [uniqueIndex("custom_roles_company_name_unique").on(table.companyId, table.name)]);
 
 /** Opérateurs explicitement autorisés à administrer la plateforme SaaS. */
 export const platformAdminUsers = mysqlTable("platformAdminUsers", {

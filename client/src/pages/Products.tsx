@@ -31,7 +31,7 @@ const emptyProduct: ProductForm = { reference: "", name: "", description: "", ca
 export default function Products() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
-  const canManage = can(user?.role, "catalog.manage");
+  const canManage = can(user?.role, "catalog.manage", user?.permissions);
   const { activeWarehouseId, activeWarehouse } = useActiveWarehouse();
   const utils = trpc.useUtils();
   const { data: products = [], isLoading } = trpc.products.list.useQuery(activeWarehouseId ? { warehouseId: activeWarehouseId } : undefined);

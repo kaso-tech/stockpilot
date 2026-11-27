@@ -337,7 +337,9 @@ class SDKServer {
       lastSignedIn: signedInAt,
     });
 
-    return { ...user, companyId, ...(session.sessionId ? { sessionId: session.sessionId } : {}) };
+    const customRole = user.role === "custom" ? await db.getCustomRole(companyId, user.customRoleId) : null;
+    const customRoleFields = user.role === "custom" ? { permissions: customRole?.permissions ?? [], customRoleName: customRole?.name ?? null } : {};
+    return { ...user, companyId, ...customRoleFields, ...(session.sessionId ? { sessionId: session.sessionId } : {}) };
   }
 }
 
@@ -346,6 +348,9 @@ const CRON_OPEN_ID_PREFIX = "cron_";
 /** Result of `sdk.authenticateRequest`. Cron callbacks set `isCron=true` and `taskUid`; see `/home/ubuntu/skills/webdev-periodic-updates/SKILL.md`. */
 export type AuthenticatedUser = Omit<User, "companyId"> & {
   companyId: number;
+  /** Rôle personnalisé : permissions cochées par l’administrateur et nom du rôle. */
+  permissions?: string[];
+  customRoleName?: string | null;
   sessionId?: string;
   taskUid?: string;
   isCron?: boolean;

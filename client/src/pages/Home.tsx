@@ -33,8 +33,8 @@ const compact = (cents: number) => { const value = cents / 100; return value >= 
 export default function Home() {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
-  const canSeeFinance = can(user?.role, "expenses.manage");
-  const canSeePayroll = can(user?.role, "payroll.manage");
+  const canSeeFinance = can(user?.role, "expenses.manage", user?.permissions);
+  const canSeePayroll = can(user?.role, "payroll.manage", user?.permissions);
   const { activeWarehouseId, activeWarehouse } = useActiveWarehouse();
   const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
@@ -57,7 +57,7 @@ export default function Home() {
   const todayRaw = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long" }).format(new Date());
   const today = todayRaw.charAt(0).toUpperCase() + todayRaw.slice(1);
   const firstName = user?.name?.trim().split(/\s+/)[0];
-  const canSell = can(user?.role, "sales.create");
+  const canSell = can(user?.role, "sales.create", user?.permissions);
   const showChart = canSeeFinance && preferences.salesTrend;
   const showTodo = preferences.todo;
   const showRecent = canSeeFinance && preferences.recentSales;
@@ -72,7 +72,7 @@ export default function Home() {
       {preferences.hero && <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
         {canSell && <Button onClick={() => setLocation("/pos")} className="col-span-2 h-11 sm:h-10"><ShoppingCart className="h-4 w-4" />Vente rapide</Button>}
         {canSell && <Button onClick={() => setLocation("/factures/nouvelle")} variant="outline" className="h-10"><FilePlus2 className="h-4 w-4" />Nouvelle facture</Button>}
-        {can(user?.role, "customers.manage") && <Button onClick={() => setLocation("/clients?nouveau=1")} variant="outline" className="h-10"><UserPlus className="h-4 w-4" />Nouveau client</Button>}
+        {can(user?.role, "customers.manage", user?.permissions) && <Button onClick={() => setLocation("/clients?nouveau=1")} variant="outline" className="h-10"><UserPlus className="h-4 w-4" />Nouveau client</Button>}
       </div>}
     </header>
 
@@ -86,7 +86,7 @@ export default function Home() {
     {(showChart || showTodo || showRecent || showStock) && <section className="grid items-stretch gap-5 lg:grid-cols-[minmax(0,1.7fr)_minmax(320px,1fr)]">
       {/* Téléphone : À traiter, dernières ventes, graphique, stock. Ordinateur : deux rangées. */}
       {showChart && <div className="order-3 min-w-0 lg:order-1"><SalesChart data={data?.salesTrend30 ?? []} loading={loading} /></div>}
-      {showTodo && <div className="order-1 min-w-0 lg:order-2"><TodoPanel summary={summary} loading={loading} canSeeFinance={canSeeFinance} canSeePayroll={canSeePayroll} canSeeInventory={can(user?.role, "inventory.manage")} onNavigate={setLocation} /></div>}
+      {showTodo && <div className="order-1 min-w-0 lg:order-2"><TodoPanel summary={summary} loading={loading} canSeeFinance={canSeeFinance} canSeePayroll={canSeePayroll} canSeeInventory={can(user?.role, "inventory.manage", user?.permissions)} onNavigate={setLocation} /></div>}
       {showRecent && <div className="order-2 min-w-0 lg:order-3"><RecentSales sales={(data?.recentSales ?? []) as Sale[]} loading={loading} onNavigate={setLocation} /></div>}
       {showStock && <div className="order-4 min-w-0"><StockPanel lowStock={(data?.lowStock ?? []) as Product[]} topProducts={canSeeFinance ? data?.topProducts ?? [] : []} loading={loading} onNavigate={setLocation} /></div>}
     </section>}

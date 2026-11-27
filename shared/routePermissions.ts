@@ -25,11 +25,11 @@ export function routePermission(path: string): Permission | null {
 const AGENT_ROUTES = /^\/($|mon-espace(\/|$)|clients(\/|$)|produits(\/|$)|synchronisation$|parametres\/(apparence|securite)$)/;
 /** Pages ouvertes au caissier : son espace (encaissements, caisse du jour), la vente rapide, les clients et son compte. */
 const CASHIER_ROUTES = /^\/($|caisse(\/|$)|pos(\/|$)|clients(\/|$)|synchronisation$|parametres\/(apparence|securite)$)/;
-export function canOpenRoute(role: string | null | undefined, path: string): boolean {
+export function canOpenRoute(role: string | null | undefined, path: string, customPermissions?: readonly string[] | null): boolean {
   if (!role) return false;
   if (role === "cashier") return CASHIER_ROUTES.test(path.split("?")[0]!.replace(/(.)\/$/, "$1"));
   if (role === "agent") return AGENT_ROUTES.test(path.split("?")[0]!.replace(/(.)\/$/, "$1"));
-  if (path === "/comptabilite") return can(role, "cash.close") || can(role, "accounting.export");
+  if (path === "/comptabilite") return can(role, "cash.close", customPermissions) || can(role, "accounting.export", customPermissions);
   const required = routePermission(path);
-  return required === null || can(role, required);
+  return required === null || can(role, required, customPermissions);
 }

@@ -120,7 +120,7 @@ export default function Invoices() {
     return matchesQuery && matchesStatus && matchesAgent && matchesPeriod;
   }), [agentFilter, invoices, periodFilter, search, statusFilter]);
   const canRefund =
-    can(user?.role, "sales.refund") && (user?.role !== "seller" || Boolean(identity?.sellerCanRefund));
+    can(user?.role, "sales.refund", user?.permissions) && (user?.role !== "seller" || Boolean(identity?.sellerCanRefund));
   const exportFilteredInvoices = () => { downloadCommercialDocumentsCsv("factures-filtrees.csv", filteredInvoices.map(invoice => ({ reference: invoice.invoiceNumber, date: invoice.createdAt, client: invoice.customerName || "Client comptoir", statut: invoiceStatusMeta[invoice.status][0], agent: documentParticipantNames(invoice, documentParticipants), totalCents: invoice.totalCents, encaisseCents: invoice.amountPaidCents }))); toast.success(`${filteredInvoices.length} facture(s) exportée(s) au format CSV.`); };
 
   useEffect(() => {

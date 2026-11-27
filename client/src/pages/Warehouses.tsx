@@ -22,7 +22,7 @@ const emptyForm = { name: "", code: "", address: "", isDefault: false, wholesale
 
 export default function Warehouses() {
   const { user } = useAuth();
-  const isAdmin = can(user?.role, "catalog.manage");
+  const isAdmin = can(user?.role, "catalog.manage", user?.permissions);
   const utils = trpc.useUtils();
   const { data: warehouses = [], isLoading } = trpc.warehouses.list.useQuery(undefined, { enabled: isAdmin });
   const [dialogOpen, setDialogOpen] = useState(false);

@@ -28,7 +28,7 @@ const categoryLabels = { ...Object.fromEntries(categories.map(item => [item.valu
 const categoryLabel = (category: string) => categoryLabels[category] ?? "Autre";
 
 export default function Expenses() {
-  const { user } = useAuth(); const isAdmin = can(user?.role, "expenses.manage"); const { activeWarehouseId, activeWarehouse } = useActiveWarehouse(); const utils = trpc.useUtils(); const monthKey = new Date().toISOString().slice(0, 7);
+  const { user } = useAuth(); const isAdmin = can(user?.role, "expenses.manage", user?.permissions); const { activeWarehouseId, activeWarehouse } = useActiveWarehouse(); const utils = trpc.useUtils(); const monthKey = new Date().toISOString().slice(0, 7);
   const warehouseInput = activeWarehouseId ? { warehouseId: activeWarehouseId } : undefined;
   const { isOnline, queueExpense, queueDueSettlement } = useOffline();
   const { data: expenses, isLoading } = trpc.expenses.list.useQuery(warehouseInput, { enabled: isAdmin }); const { data: budget } = trpc.expenses.budget.get.useQuery({ yearMonth: monthKey, ...warehouseInput }, { enabled: isAdmin });

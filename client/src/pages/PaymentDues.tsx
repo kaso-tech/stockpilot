@@ -65,7 +65,7 @@ function statusMeta(status: Exclude<DueStatus, "all"> | string) {
 
 export default function PaymentDues() {
   const { user } = useAuth();
-  const isAdmin = can(user?.role, "expenses.manage");
+  const isAdmin = can(user?.role, "expenses.manage", user?.permissions);
   const { activeWarehouseId, activeWarehouse } = useActiveWarehouse();
   const utils = trpc.useUtils();
   const warehouseInput = activeWarehouseId ? { warehouseId: activeWarehouseId } : undefined;

@@ -62,7 +62,7 @@ export function OfflineQueryCacheBridge() {
         ...(role === "seller" ? [utils.sellerDiscountPermissions.get.prefetch()] : []),
         ...(finance ? [utils.dashboard.get.prefetch({ warehouseId })] : []),
         // Dépenses et échéances, pour les saisir et les régler sans réseau.
-        ...(can(role as any, "expenses.manage") ? (() => { const yearMonth = new Date().toISOString().slice(0, 7); return [
+        ...(can(role as any, "expenses.manage", user?.permissions) ? (() => { const yearMonth = new Date().toISOString().slice(0, 7); return [
           utils.expenses.list.prefetch({ warehouseId }), utils.expenses.budget.get.prefetch({ yearMonth, warehouseId }), utils.expenses.report.prefetch({ yearMonth, warehouseId }),
           utils.paymentDues.list.prefetch({ warehouseId }), utils.paymentDues.schedules.list.prefetch({ warehouseId }), utils.paymentDues.groups.list.prefetch({ warehouseId }),
           utils.paymentDues.templates.list.prefetch({ warehouseId, includeInactive: true }), utils.paymentDues.templates.list.prefetch({ scheduleType: "expense", warehouseId }),

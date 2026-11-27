@@ -20,6 +20,7 @@ function userFor(companyId: number, id: number, role: "admin" | "seller", slug: 
     phone: null,
     loginMethod: "password",
     role,
+    customRoleId: null,
     active: true,
     companyId,
     createdAt: now,
