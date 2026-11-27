@@ -50,13 +50,15 @@ async function nextCreditNoteSequence(tx: any, companyId: number, year: number) 
 
 async function validateAgents(tx: any, companyId: number | null, warehouseId: number, selected: { salesAgentId: number | null; cashierId: number | null; salesAgentSelectionMade?: boolean; cashierSelectionMade?: boolean }, channel?: "pos" | "invoice" | "quote") {
   const settings = (await tx.select().from(saleSettings).where(companyScope(saleSettings.companyId, companyId)).limit(1))[0];
-  const salesAgentId = selected.salesAgentId ?? settings?.defaultSalesAgentId ?? null;
+  // « Aucun » choisi explicitement l’emporte sur l’agent par défaut ; sinon l’agent par défaut s’applique.
+  const salesAgentId = selected.salesAgentId ?? (selected.salesAgentSelectionMade ? null : settings?.defaultSalesAgentId ?? null);
   const cashierId = selected.cashierId ?? settings?.defaultCashierId ?? null;
   if (channel === "invoice" || channel === "quote") {
-    try { assertExplicitInvoiceAgentChoice({ requiresSalesAgentChoice: !settings?.defaultSalesAgentId, requiresCashierChoice: !settings?.defaultCashierId, salesAgentSelectionMade: selected.salesAgentSelectionMade ?? false, cashierSelectionMade: selected.cashierSelectionMade ?? false }); } catch (error) { throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "Sélectionnez les intervenants." }); }
+    // Choix explicite exigé seulement en mode « choisir l’agent à chaque vente ».
+    try { assertExplicitInvoiceAgentChoice({ requiresSalesAgentChoice: Boolean(settings?.requireSalesAgent), requiresCashierChoice: false, salesAgentSelectionMade: selected.salesAgentSelectionMade ?? false, cashierSelectionMade: selected.cashierSelectionMade ?? false }); } catch (error) { throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "Sélectionnez les intervenants." }); }
   }
-  if (settings?.requireSalesAgent && !salesAgentId) throw new TRPCError({ code: "BAD_REQUEST", message: "Un agent commercial est requis." });
-  if (settings?.requireCashier && !cashierId) throw new TRPCError({ code: "BAD_REQUEST", message: "Un caissier est requis." });
+  // Caisse partagée : à l’encaissement, le caissier doit être identifié (un caissier connecté l’est automatiquement).
+  if (settings?.requireCashier && !cashierId && !channel) throw new TRPCError({ code: "BAD_REQUEST", message: "Caisse partagée : indiquez le caissier qui encaisse." });
   const ids = [salesAgentId, cashierId].filter((id): id is number => id !== null);
   const selectedAgents = ids.length ? await tx.select().from(agents).where(and(inArray(agents.id, ids), companyScope(agents.companyId, companyId))) : [];
   const salesAgent = selectedAgents.find((agent: any) => agent.id === salesAgentId);

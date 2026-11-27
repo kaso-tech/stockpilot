@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { trpc } from "@/lib/trpc";
+import { salesAgentMode as readSalesAgentMode, type SalesAgentMode } from "@/lib/assignmentRules";
 import { ChevronLeft, ReceiptText, Settings2, ShieldCheck, UsersRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -13,7 +14,7 @@ import { Link } from "wouter";
 import { Restricted } from "./AuditLog";
 import { SellerDiscountPermissionsCard } from "@/components/SellerDiscountPermissionsCard";
 
-type AssignmentMode = "default" | "prompt";
+type AssignmentMode = SalesAgentMode;
 export type SettingsPosSectionKind = "all" | "assignment" | "ticket" | "payments" | "seller";
 
 export default function SettingsPosSection({ section = "all" }: { section?: SettingsPosSectionKind }) {
@@ -24,8 +25,8 @@ export default function SettingsPosSection({ section = "all" }: { section?: Sett
   const { data: agents = [] } = trpc.commerce.agents.list.useQuery(undefined, { enabled: isAdmin });
   const [salesAgentId, setSalesAgentId] = useState("none");
   const [cashierId, setCashierId] = useState("none");
-  const [salesAgentMode, setSalesAgentMode] = useState<AssignmentMode>("prompt");
-  const [cashierMode, setCashierMode] = useState<AssignmentMode>("prompt");
+  const [salesAgentMode, setSalesAgentMode] = useState<AssignmentMode>("none");
+  const [sharedRegister, setSharedRegister] = useState(false);
   const [ticketHeader, setTicketHeader] = useState("Merci de votre achat");
   const [ticketFooter, setTicketFooter] = useState("À bientôt");
   const [ticketWidthMm, setTicketWidthMm] = useState<"58" | "80">("80");
@@ -48,8 +49,8 @@ export default function SettingsPosSection({ section = "all" }: { section?: Sett
     if (!settings) return;
     setSalesAgentId(settings.defaultSalesAgentId ? String(settings.defaultSalesAgentId) : "none");
     setCashierId(settings.defaultCashierId ? String(settings.defaultCashierId) : "none");
-    setSalesAgentMode(settings.defaultSalesAgentId ? "default" : "prompt");
-    setCashierMode(settings.defaultCashierId ? "default" : "prompt");
+    setSalesAgentMode(readSalesAgentMode(settings));
+    setSharedRegister(Boolean(settings.requireCashier));
     setTicketHeader(settings.ticketHeader || "Merci de votre achat");
     setTicketFooter(settings.ticketFooter || "À bientôt");
     setTicketWidthMm(settings.ticketWidthMm || "80");
@@ -79,9 +80,9 @@ export default function SettingsPosSection({ section = "all" }: { section?: Sett
   const cashiers = agents.filter(agent => agent.type === "cashier" && agent.active);
   const saveSettings = () => save.mutate({
     defaultSalesAgentId: salesAgentMode === "default" && salesAgentId !== "none" ? Number(salesAgentId) : null,
-    defaultCashierId: cashierMode === "default" && cashierId !== "none" ? Number(cashierId) : null,
-    requireSalesAgent: false,
-    requireCashier: false,
+    defaultCashierId: cashierId !== "none" ? Number(cashierId) : null,
+    requireSalesAgent: salesAgentMode === "prompt",
+    requireCashier: sharedRegister,
     currency: settings?.currency ?? "XOF",
     ticketHeader,
     ticketFooter,
@@ -109,7 +110,7 @@ export default function SettingsPosSection({ section = "all" }: { section?: Sett
   return <div className="mx-auto max-w-4xl space-y-6">
     <Link href="/parametres" className="inline-flex items-center gap-1 text-sm text-primary hover:underline"><ChevronLeft className="h-4 w-4" />Retour aux paramètres</Link>
     <header><h1 className="text-[22px] font-bold tracking-tight text-foreground">{titles[section]}</h1><p className="mt-0.5 text-[13px] text-muted-foreground">{descriptions[section]}</p></header>
-    {show("assignment") && <Card className="border-border bg-card gap-0 py-0"><CardContent className="space-y-6 p-6"><div className="flex items-center gap-3"><UsersRound className="h-5 w-5 text-primary" /><div><h2 className="font-semibold text-foreground">Rattachement des ventes</h2><p className="mt-1 text-sm text-muted-foreground">Le vendeur connecté est toujours rattaché automatiquement à sa vente et à sa rémunération.</p></div></div><div className="grid gap-6 lg:grid-cols-2"><AssignmentCard title="Caissier" description="Rémunéré sur les ventes qu’il encaisse." mode={cashierMode} onModeChange={setCashierMode} value={cashierId} onValueChange={setCashierId} agents={cashiers} agentNoun="caissier" /><AssignmentCard title="Agent commercial" description="Commissionné sur les ventes qu’il apporte." mode={salesAgentMode} onModeChange={setSalesAgentMode} value={salesAgentId} onValueChange={setSalesAgentId} agents={salesAgents} agentNoun="agent commercial" /></div></CardContent></Card>}
+    {show("assignment") && <Card className="border-border bg-card gap-0 py-0"><CardContent className="space-y-6 p-6"><div className="flex items-center gap-3"><UsersRound className="h-5 w-5 text-primary" /><div><h2 className="font-semibold text-foreground">Rattachement des ventes</h2><p className="mt-1 text-sm text-muted-foreground">Le vendeur connecté est toujours rattaché automatiquement à sa vente et à sa rémunération.</p></div></div><div className="grid gap-6 lg:grid-cols-2"><AssignmentCard mode={salesAgentMode} onModeChange={setSalesAgentMode} value={salesAgentId} onValueChange={setSalesAgentId} agents={salesAgents} /><CashierCard shared={sharedRegister} onSharedChange={setSharedRegister} value={cashierId} onValueChange={setCashierId} agents={cashiers} /></div></CardContent></Card>}
     {show("assignment") && <Card className="border-border bg-card gap-0 py-0"><CardContent className="space-y-5 p-6"><div className="flex items-center justify-between gap-4"><div><h2 className="font-semibold text-foreground">Produits habituellement achetés</h2><p className="mt-1 text-sm text-muted-foreground">Proposez les derniers produits du client lors de la création de facture ou de devis.</p></div><Switch checked={customerSuggestionsEnabled} onCheckedChange={setCustomerSuggestionsEnabled} /></div>{customerSuggestionsEnabled && <Field label="Nombre de produits affichés"><Input type="number" min={1} max={12} value={customerSuggestionsLimit} onChange={event => setCustomerSuggestionsLimit(Math.max(1, Math.min(12, Number(event.target.value) || 4)))} /></Field>}</CardContent></Card>}
     {(show("ticket") || show("payments")) && <div className="grid gap-6 lg:grid-cols-2">
       {show("ticket") && <Card className="border-border bg-card gap-0 py-0"><CardContent className="space-y-5 p-6"><div className="flex items-center gap-3"><ReceiptText className="h-5 w-5 text-primary" /><h2 className="font-semibold text-foreground">Tickets de caisse</h2></div><Field label="Largeur"><Select value={ticketWidthMm} onValueChange={value => setTicketWidthMm(value as "58" | "80")}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="58">58 mm</SelectItem><SelectItem value="80">80 mm</SelectItem></SelectContent></Select></Field><Field label="En-tête du ticket"><Input value={ticketHeader} onChange={event => setTicketHeader(event.target.value)} maxLength={160} /></Field><Field label="Pied du ticket"><Input value={ticketFooter} onChange={event => setTicketFooter(event.target.value)} maxLength={240} /></Field></CardContent></Card>}
@@ -121,6 +122,28 @@ export default function SettingsPosSection({ section = "all" }: { section?: Sett
   </div>;
 }
 
-function AssignmentCard({ title, description, mode, onModeChange, value, onValueChange, agents, agentNoun }: { title: string; description: string; mode: AssignmentMode; onModeChange: (mode: AssignmentMode) => void; value: string; onValueChange: (value: string) => void; agents: Array<{ id: number; name: string }>; agentNoun: string }) { return <section className="space-y-4 rounded-xl border border-border bg-muted/30 p-5"><div><h3 className="font-semibold text-foreground">{title}</h3><p className="mt-1 text-sm text-muted-foreground">{description}</p></div><div className="grid grid-cols-1 gap-2 sm:grid-cols-2"><Button type="button" variant="outline" onClick={() => onModeChange("default")} className={mode === "default" ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90" : "border-border text-foreground"}>Compte par défaut</Button><Button type="button" variant="outline" onClick={() => onModeChange("prompt")} className={mode === "prompt" ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90" : "border-border text-foreground"}>Demander au comptoir</Button></div>{mode === "default" ? <div className="space-y-2"><Label className="text-sm text-muted-foreground">Compte appliqué à toutes les ventes</Label><Select value={value} onValueChange={onValueChange}><SelectTrigger><SelectValue placeholder={`Choisir un ${agentNoun}`} /></SelectTrigger><SelectContent><SelectItem value="none">Aucun</SelectItem>{agents.map(agent => <SelectItem key={agent.id} value={String(agent.id)}>{agent.name}</SelectItem>)}</SelectContent></Select><p className="text-xs text-muted-foreground">Le vendeur ne verra pas ce champ lors de la création de la facture.</p></div> : <p className="text-sm text-muted-foreground">Le vendeur choisira cet intervenant à chaque facture, avec le choix « Aucun » disponible.</p>}</section>; }
+const agentModes: Array<{ id: AssignmentMode; label: string; hint: string }> = [
+  { id: "none", label: "Pas d’agent commercial", hint: "Le champ n’apparaît pas à l’encaissement ni sur les factures. L’agent déjà rattaché à un devis ou un ticket est conservé." },
+  { id: "default", label: "Agent par défaut", hint: "L’agent choisi est prérempli sur chaque vente ; le vendeur peut le changer ou choisir « Aucun »." },
+  { id: "prompt", label: "Choisir à chaque vente", hint: "Le vendeur doit indiquer l’agent (ou « Aucun ») avant de valider chaque encaissement ou facture." },
+];
+
+function AssignmentCard({ mode, onModeChange, value, onValueChange, agents }: { mode: AssignmentMode; onModeChange: (mode: AssignmentMode) => void; value: string; onValueChange: (value: string) => void; agents: Array<{ id: number; name: string }> }) {
+  const current = agentModes.find(item => item.id === mode)!;
+  return <section className="space-y-4 rounded-xl border border-border bg-muted/30 p-5"><div><h3 className="font-semibold text-foreground">Agent commercial</h3><p className="mt-1 text-sm text-muted-foreground">Commissionné sur les ventes qu’il apporte.</p></div>
+    <div className="grid grid-cols-1 gap-2">{agentModes.map(item => <Button key={item.id} type="button" variant="outline" onClick={() => onModeChange(item.id)} className={mode === item.id ? "justify-start border-primary bg-primary text-primary-foreground hover:bg-primary/90" : "justify-start border-border text-foreground"}>{item.label}</Button>)}</div>
+    <p className="text-sm text-muted-foreground">{current.hint}</p>
+    {mode === "default" && <div className="space-y-2"><Label className="text-sm text-muted-foreground">Agent prérempli</Label><Select value={value} onValueChange={onValueChange}><SelectTrigger aria-label="Agent par défaut"><SelectValue placeholder="Choisir un agent commercial" /></SelectTrigger><SelectContent><SelectItem value="none">Aucun</SelectItem>{agents.map(agent => <SelectItem key={agent.id} value={String(agent.id)}>{agent.name}</SelectItem>)}</SelectContent></Select></div>}
+    {!agents.length && mode !== "none" && <p className="text-xs text-warning">Aucun agent commercial actif : le champ restera masqué tant que vous n’en aurez pas créé.</p>}
+  </section>;
+}
+
+function CashierCard({ shared, onSharedChange, value, onValueChange, agents }: { shared: boolean; onSharedChange: (value: boolean) => void; value: string; onValueChange: (value: string) => void; agents: Array<{ id: number; name: string }> }) {
+  return <section className="space-y-4 rounded-xl border border-border bg-muted/30 p-5"><div><h3 className="font-semibold text-foreground">Caissier</h3><p className="mt-1 text-sm text-muted-foreground">Un caissier qui se connecte avec son compte est enregistré automatiquement sur ses encaissements. Les autres encaissements sont tracés au compte de la personne connectée.</p></div>
+    <div className="flex items-start justify-between gap-4 rounded-lg border border-border bg-card p-3"><div><Label className="text-sm text-foreground">Caisse partagée</Label><p className="mt-1 text-xs text-muted-foreground">Demander le caissier à chaque encaissement, pour un poste utilisé par plusieurs caissiers sans compte personnel.</p></div><Switch aria-label="Caisse partagée" checked={shared} onCheckedChange={onSharedChange} /></div>
+    {shared && !agents.length && <p className="text-xs text-warning">Aucun caissier actif : créez les fiches caissiers dans Équipe pour pouvoir les choisir.</p>}
+    {!shared && agents.length > 0 && <div className="space-y-2"><Label className="text-sm text-muted-foreground">Caissier rémunéré par défaut (facultatif)</Label><Select value={value} onValueChange={onValueChange}><SelectTrigger aria-label="Caissier par défaut"><SelectValue placeholder="Aucun" /></SelectTrigger><SelectContent><SelectItem value="none">Aucun</SelectItem>{agents.map(agent => <SelectItem key={agent.id} value={String(agent.id)}>{agent.name}</SelectItem>)}</SelectContent></Select><p className="text-xs text-muted-foreground">Utile seulement si un caissier sans compte doit être commissionné sur les encaissements faits par d’autres.</p></div>}
+  </section>;
+}
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <div className="space-y-2"><Label className="text-sm text-foreground">{label}</Label>{children}</div>; }
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) { return <div className="flex items-center justify-between gap-4 border-t border-border py-3"><Label className="text-sm text-foreground">{label}</Label><Switch checked={checked} onCheckedChange={onChange} /></div>; }

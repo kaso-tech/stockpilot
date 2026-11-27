@@ -31,7 +31,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { formatCurrency } from "@/lib/format";
-import { shouldPromptForAssignment } from "@/lib/assignmentRules";
+import { salesAgentField } from "@/lib/assignmentRules";
 import { priceForQuantityTier } from "@/lib/priceTiers";
 import { invoiceCustomerPrefill } from "@/lib/invoicePrefill";
 import { parseTicketInvoicePrefill } from "@/lib/ticketInvoicePrefill";
@@ -154,20 +154,15 @@ export default function InvoiceCreate({
   // Prix grossiste non défini (0) : le prix détail s’applique.
   const basePrice = (product: { retailPriceCents: number; wholesalePriceCents: number }) =>
     isWholesaleCustomer && product.wholesalePriceCents > 0 ? product.wholesalePriceCents : product.retailPriceCents;
-  const defaultSalesAgent = agents.find(
-    agent =>
-      agent.id === settings?.defaultSalesAgentId &&
-      agent.active &&
-      agent.type === "sales_agent"
-  );
-  const defaultCashier = agents.find(
-    agent =>
-      agent.id === settings?.defaultCashierId &&
-      agent.active &&
-      agent.type === "cashier"
-  );
-  const showSalesAgentSelect = shouldPromptForAssignment(settings?.defaultSalesAgentId) || Boolean(settings?.defaultSalesAgentId && !defaultSalesAgent);
-  const showCashierSelect = shouldPromptForAssignment(settings?.defaultCashierId) || Boolean(settings?.defaultCashierId && !defaultCashier);
+  // Agent commercial : masqué sans agent ou en mode « aucun », prérempli en mode « par défaut », obligatoire en mode « à chaque vente ».
+  // Le caissier est choisi à l’encaissement (caisse partagée uniquement), pas à la création du document.
+  const { data: checkoutSettings } = trpc.commerce.settings.checkout.useQuery();
+  const agentRule = salesAgentField(checkoutSettings, agents.filter(agent => agent.type === "sales_agent" && agent.active).length);
+  const showSalesAgentSelect = agentRule.show;
+  const defaultSalesAgent = agents.find(agent => agent.id === checkoutSettings?.defaultSalesAgentId && agent.active && agent.type === "sales_agent");
+  useEffect(() => {
+    if (agentRule.mode === "default" && defaultSalesAgent) setSalesAgentId(current => current || String(defaultSalesAgent.id));
+  }, [agentRule.mode, defaultSalesAgent?.id]);
   const { data: customerContext } =
     trpc.commerce.customers.invoiceContext.useQuery(
       { id: Number(customerId) },
@@ -408,13 +403,12 @@ export default function InvoiceCreate({
     warehouseId: selectedWarehouseId ?? undefined,
     customerId: customerId ? Number(customerId) : null,
     salesAgentId:
-      showSalesAgentSelect && salesAgentId !== "none"
+      salesAgentId && salesAgentId !== "none"
         ? Number(salesAgentId)
         : null,
-    cashierId:
-      showCashierSelect && cashierId !== "none" ? Number(cashierId) : null,
-    salesAgentSelectionMade: !showSalesAgentSelect || Boolean(salesAgentId),
-    cashierSelectionMade: !showCashierSelect || Boolean(cashierId),
+    cashierId: cashierId && cashierId !== "none" ? Number(cashierId) : null,
+    salesAgentSelectionMade: !agentRule.required || Boolean(salesAgentId),
+    cashierSelectionMade: true,
     note: null,
     deliveryAddress: deliveryEnabled ? deliveryAddress.trim() || null : null,
     deliveryFeeCents,
@@ -442,12 +436,8 @@ export default function InvoiceCreate({
       );
       return false;
     }
-    if (showSalesAgentSelect && !salesAgentId) {
+    if (agentRule.required && !salesAgentId) {
       toast.error("Sélectionnez un agent commercial ou l’option Aucun.");
-      return false;
-    }
-    if (showCashierSelect && !cashierId) {
-      toast.error("Sélectionnez un caissier ou l’option Aucun.");
       return false;
     }
     if (!cart.length) {
@@ -523,9 +513,6 @@ export default function InvoiceCreate({
   };
   const salesAgents = agents.filter(
     agent => agent.type === "sales_agent" && agent.active
-  );
-  const cashiers = agents.filter(
-    agent => agent.type === "cashier" && agent.active
   );
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -606,54 +593,29 @@ export default function InvoiceCreate({
               </div>
             </div>
           ) : null}
-          {(showSalesAgentSelect || showCashierSelect) && (
+          {showSalesAgentSelect && (
             <div className="grid gap-4 sm:grid-cols-2">
-              {showSalesAgentSelect && (
-                <div className="space-y-2">
-                  <Label>
-                    Agent commercial <span className="text-destructive">*</span>
-                  </Label>
-                  <Select
-                    value={salesAgentId}
-                    onValueChange={setSalesAgentId}
-                  >
-                    <SelectTrigger aria-label="Agent commercial">
-                      <SelectValue placeholder="Sélectionner un agent" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Aucun</SelectItem>
-                      {salesAgents.map(agent => (
-                        <SelectItem key={agent.id} value={String(agent.id)}>
-                          {agent.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-              {showCashierSelect && (
-                <div className="space-y-2">
-                  <Label>
-                    Caissier <span className="text-destructive">*</span>
-                  </Label>
-                  <Select
-                    value={cashierId}
-                    onValueChange={setCashierId}
-                  >
-                    <SelectTrigger aria-label="Caissier">
-                      <SelectValue placeholder="Sélectionner un caissier" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Aucun</SelectItem>
-                      {cashiers.map(agent => (
-                        <SelectItem key={agent.id} value={String(agent.id)}>
-                          {agent.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+              <div className="space-y-2">
+                <Label>
+                  Agent commercial {agentRule.required && <span className="text-destructive">*</span>}
+                </Label>
+                <Select
+                  value={salesAgentId}
+                  onValueChange={setSalesAgentId}
+                >
+                  <SelectTrigger aria-label="Agent commercial">
+                    <SelectValue placeholder="Sélectionner un agent ou Aucun" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Aucun</SelectItem>
+                    {salesAgents.map(agent => (
+                      <SelectItem key={agent.id} value={String(agent.id)}>
+                        {agent.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           )}
         </div>
