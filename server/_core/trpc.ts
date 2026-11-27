@@ -7,8 +7,24 @@ import { companies } from "../../drizzle/schema";
 import { getDb } from "../db";
 import { can, type Permission } from "@shared/permissions";
 
+/** Message lisible pour une erreur SQL : la requête brute (avec ses paramètres) reste dans les journaux du serveur. */
+export function databaseErrorMessage(error: { message: string; cause?: unknown }): string | null {
+  if (!error.message.startsWith("Failed query:")) return null;
+  const cause = error.cause as { code?: string; errno?: number; sqlMessage?: string } | undefined;
+  const code = cause?.code ?? "";
+  if (code === "WARN_DATA_TRUNCATED" || code === "ER_TRUNCATED_WRONG_VALUE_FOR_FIELD" || code === "ER_BAD_FIELD_ERROR" || code === "ER_NO_SUCH_TABLE" || /Data truncated|Unknown column|doesn't exist/i.test(cause?.sqlMessage ?? "")) return "La base de données n’est pas à jour pour cette fonctionnalité (mise à jour manquante). Contactez l’administrateur de la plateforme.";
+  if (code === "ER_DUP_ENTRY") return "Cet élément existe déjà.";
+  return "L’opération n’a pas pu être enregistrée dans la base de données. Réessayez ; si le problème persiste, contactez l’administrateur.";
+}
+
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
+  errorFormatter({ shape, error }) {
+    const friendly = databaseErrorMessage(error.cause instanceof Error ? (error.cause as Error & { cause?: unknown }) : error);
+    if (!friendly) return shape;
+    console.error("[DB]", error.message, (error.cause as any)?.cause?.sqlMessage ?? (error.cause as any)?.sqlMessage ?? "");
+    return { ...shape, message: friendly };
+  },
 });
 
 export const router = t.router;
