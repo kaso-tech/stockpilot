@@ -17,6 +17,7 @@ import {
   products,
   productPriceTiers,
   remunerationProfiles,
+  agents,
   purchaseOrderItems,
   purchaseOrders,
   saleCommissions,
@@ -1138,7 +1139,32 @@ export const appRouter = router({
   }),
 
   users: router({
-    list: permissionProcedure("users.manage").query(({ ctx }) => listUsers(ctx.user.companyId)),
+    // Comptes de l’entreprise avec leur statut, leurs rôles de dépôt et leur fiche d’équipe, pour une lecture cohérente avec Équipe et paie.
+    list: permissionProcedure("users.manage").query(async ({ ctx }) => {
+      const db = await requireDb();
+      const [rows, statusRows, depotRows, ficheRows] = await Promise.all([
+        listUsers(ctx.user.companyId),
+        db.select({ id: users.id, active: users.active }).from(users).where(companyScope(users.companyId, ctx.user.companyId)),
+        db.select({ userId: sellerWarehouseAssignments.sellerUserId, role: sellerWarehouseAssignments.warehouseRole, warehouseName: warehouses.name }).from(sellerWarehouseAssignments).leftJoin(warehouses, eq(warehouses.id, sellerWarehouseAssignments.warehouseId)).where(companyScope(sellerWarehouseAssignments.companyId, ctx.user.companyId)),
+        db.select({ userId: agents.userId, type: agents.type, jobTitle: agents.jobTitle, active: agents.active }).from(agents).where(companyScope(agents.companyId, ctx.user.companyId)),
+      ]);
+      return rows.map(row => ({
+        ...row,
+        active: statusRows.find(item => item.id === row.id)?.active ?? true,
+        depotRoles: depotRows.filter(item => item.userId === row.id).map(item => ({ role: item.role, warehouseName: item.warehouseName ?? "Entrepôt" })),
+        fiche: ficheRows.find(item => item.userId === row.id && item.active) ?? null,
+      }));
+    }),
+    /** Réactive un compte désactivé (ex. ancien vendeur) ; il réapparaît dans Équipe et paie selon son rôle. */
+    reactivate: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      const db = await requireDb();
+      const target = (await db.select({ id: users.id, name: users.name, role: users.role }).from(users).where(and(eq(users.id, input.id), companyScope(users.companyId, ctx.user.companyId))).limit(1))[0];
+      if (!target) throw new TRPCError({ code: "NOT_FOUND", message: "Utilisateur introuvable dans cette entreprise." });
+      await db.update(users).set({ active: true }).where(eq(users.id, target.id));
+      await db.update(agents).set({ active: true }).where(and(companyScope(agents.companyId, ctx.user.companyId), eq(agents.userId, target.id)));
+      await db.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Compte réactivé", entityType: "Utilisateur", entityId: String(target.id), detail: `${target.name ?? "Compte"} réactivé (${ROLE_LABELS[target.role as Role] ?? target.role})` });
+      return { success: true };
+    }),
     updateRole: adminProcedure.input(z.object({ id: z.number().int().positive(), role: z.enum(ROLES), customRoleId: z.number().int().positive().optional() })).mutation(async ({ ctx, input }) => {
       if (input.role === "agent" || input.role === "cashier") throw new TRPCError({ code: "BAD_REQUEST", message: "Les rôles Agent commercial et Caissier se donnent depuis la page Agents (bouton « Donner l’accès »)." });
       const db = await requireDb();
@@ -1160,6 +1186,24 @@ export const appRouter = router({
         const storedPassword = await findPasswordHash(tx, target);
         if (storedPassword) await storePasswordHash(tx, target, storedPassword.passwordHash, input.role, ctx.user.id);
         await tx.update(users).set({ role: input.role, customRoleId: customRole?.id ?? null }).where(and(eq(users.id, input.id), companyScope(users.companyId, ctx.user.companyId)));
+        // Cohérence avec Équipe et paie : le membre reste visible quel que soit son rôle.
+        const fiche = (await tx.select({ id: agents.id, active: agents.active }).from(agents).where(and(companyScope(agents.companyId, ctx.user.companyId), eq(agents.userId, target.id))).limit(1))[0];
+        if (input.role === "seller") {
+          // Devenu vendeur : il apparaît comme vendeur ; l’ancienne fiche est archivée et détachée du compte.
+          if (fiche) await tx.update(agents).set({ active: false, userId: null }).where(eq(agents.id, fiche.id));
+          const assignment = (await tx.select({ id: sellerWarehouseAssignments.id }).from(sellerWarehouseAssignments).where(and(companyScope(sellerWarehouseAssignments.companyId, ctx.user.companyId), eq(sellerWarehouseAssignments.sellerUserId, target.id))).limit(1))[0];
+          if (!assignment) { const main = (await tx.select({ id: warehouses.id }).from(warehouses).where(and(companyScope(warehouses.companyId, ctx.user.companyId), eq(warehouses.active, true), eq(warehouses.isDefault, true))).limit(1))[0]; if (main) await tx.insert(sellerWarehouseAssignments).values({ companyId: ctx.user.companyId!, sellerUserId: target.id, warehouseId: main.id, createdByUserId: ctx.user.id }); }
+        } else if (input.role !== "admin" && !fiche) {
+          // Vendeur (ou compte sans fiche) devenu gérant, comptable, magasinier… : fiche d’équipe créée et liée, rémunération reprise.
+          const account = (await tx.select({ name: users.name, email: users.email, phone: users.phone }).from(users).where(eq(users.id, target.id)).limit(1))[0];
+          const jobTitle = customRole?.name ?? ROLE_LABELS[input.role];
+          const result = await tx.insert(agents).values({ companyId: ctx.user.companyId!, name: account?.name || "Membre", type: "staff", jobTitle, email: account?.email ?? null, phone: account?.phone ?? null, userId: target.id, active: true });
+          const createdId = Number(result[0].insertId);
+          const previousProfile = (await tx.select().from(remunerationProfiles).where(and(companyScope(remunerationProfiles.companyId, ctx.user.companyId), eq(remunerationProfiles.beneficiaryType, "user"), eq(remunerationProfiles.beneficiaryId, target.id))).limit(1))[0];
+          await tx.insert(remunerationProfiles).values({ companyId: ctx.user.companyId, beneficiaryType: "agent", beneficiaryId: createdId, remunerationMode: previousProfile?.remunerationMode ?? "fixed", fixedMonthlyCents: previousProfile?.fixedMonthlyCents ?? 0, commissionBasis: previousProfile?.commissionBasis ?? "revenue", rateBasisPoints: previousProfile?.rateBasisPoints ?? 0, active: true });
+        } else if (fiche && input.role !== "admin") {
+          await tx.update(agents).set({ jobTitle: customRole?.name ?? ROLE_LABELS[input.role], active: true }).where(and(eq(agents.id, fiche.id), eq(agents.type, "staff")));
+        }
         await tx.update(userSessions).set({ revokedAt: new Date() }).where(and(eq(userSessions.userId, input.id), isNull(userSessions.revokedAt)));
         await tx.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Rôle modifié", entityType: "Utilisateur", entityId: String(input.id), detail: `Rôle défini sur ${customRole ? `« ${customRole.name} » (personnalisé)` : ROLE_LABELS[input.role]}; sessions révoquées` });
       });

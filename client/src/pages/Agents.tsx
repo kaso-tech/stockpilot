@@ -34,6 +34,15 @@ function suggestedRole(jobTitle: string | null | undefined): StaffRole {
 }
 type StaffRole = "admin" | "manager" | "accountant" | "viewer" | "storekeeper" | "purchaser" | "custom";
 const STAFF_ROLES: Exclude<StaffRole, "custom">[] = ["storekeeper", "purchaser", "accountant", "manager", "viewer", "admin"];
+/** Rôle affiché d’un vendeur selon ses dépôts : « Gérant de dépôt », « Caissier de dépôt » ou « Vendeur » (avec le dépôt si un seul). */
+function sellerRoleLabel(roles: Array<{ role: string; warehouseName: string }>) {
+  const labels: Record<string, string> = { manager: "Gérant de dépôt", cashier: "Caissier de dépôt", seller: "Vendeur" };
+  const best = roles.find(item => item.role === "manager") ?? roles.find(item => item.role === "cashier") ?? roles[0];
+  if (!best) return "Vendeur";
+  const sameRole = roles.filter(item => item.role === best.role);
+  return sameRole.length === 1 ? `${labels[best.role] ?? "Vendeur"} · ${best.warehouseName}` : `${labels[best.role] ?? "Vendeur"} · ${sameRole.length} dépôts`;
+}
+
 export type Beneficiary = { type: "user" | "agent"; id: number; name: string; role: string; kind: AgentKind; username?: string | null; email?: string | null; phone?: string | null; jobTitle?: string | null };
 export type AgentForm = { name: string; type: AgentKind; jobTitle: string; email: string; phone: string; username: string; password: string; remunerationMode: "fixed" | "commission" | "fixed_plus_commission"; fixed: string; basis: "revenue" | "net_profit"; rate: string; salaryTemplateId: string; salaryDueDay: string };
 
@@ -124,7 +133,7 @@ export default function Agents() {
   };
   const balanceFor = (beneficiary: Beneficiary) => payroll?.balances.find(item => item.beneficiaryType === beneficiary.type && item.beneficiaryId === beneficiary.id);
   const beneficiaries: Beneficiary[] = [
-    ...sellers.filter(item => item.active).map(item => ({ type: "user" as const, id: item.id, name: item.name || "Vendeur", role: "Vendeur", kind: "seller" as const, username: item.username, email: item.email, phone: item.phone })),
+    ...sellers.filter(item => item.active).map(item => ({ type: "user" as const, id: item.id, name: item.name || "Vendeur", role: sellerRoleLabel(item.warehouseRoles ?? []), kind: "seller" as const, username: item.username, email: item.email, phone: item.phone })),
     ...(payroll?.agents ?? []).filter(item => item.active).map(item => ({ type: "agent" as const, id: item.id, name: item.name, role: item.type === "cashier" ? "Caissier" : item.type === "staff" ? (item.jobTitle || "Autre fonction") : "Agent commercial", kind: item.type, email: item.email, phone: item.phone, jobTitle: item.jobTitle })),
   ];
   const edit = (beneficiary: Beneficiary) => {
