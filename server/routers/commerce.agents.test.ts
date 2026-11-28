@@ -24,6 +24,7 @@ describe("commerce agents et vendeurs", () => {
     const db: any = {
       insert: (table: unknown) => ({ values: async (values: unknown) => { inserts.push({ table, values }); return [{ insertId: table === agents ? 20 : table === users ? 30 : 1 }]; } }),
       update: (table: unknown) => ({ set: (values: unknown) => ({ where: async () => { updates.push({ table, values }); } }) }),
+      delete: () => ({ where: async () => undefined }),
       select: () => ({ from: (table: unknown) => { const rows: any = rowsFor(table); rows.limit = () => Object.assign(Promise.resolve(rows), { for: async () => rows }); rows.where = () => rows; rows.innerJoin = () => { const joined: any = rows.map((row: any) => ({ ...row, companyId: row.companyId ?? 1 })); joined.where = () => joined; joined.limit = () => Promise.resolve(joined); return joined; }; return rows; } }),
     };
     mockedGetDb.mockResolvedValue(db);
@@ -56,13 +57,17 @@ describe("commerce agents et vendeurs", () => {
     expect(inserts.filter(item => item.table === auditLogs)).toHaveLength(3);
   });
 
-  it("convertit un agent en vendeur puis un vendeur en agent tout en désactivant l’ancien profil", async () => {
+  it("convertit un agent en vendeur puis un vendeur en agent en conservant le même compte de connexion", async () => {
     const caller = commerceRouter.createCaller(adminContext());
     await caller.agents.convertToSeller({ id: 20, email: "awa.vendeuse@example.test", username: "awa.vendeuse", password: "Awa!2026", remuneration });
     await caller.agents.convertSellerToAgent({ id: 30, type: "cashier", phone: "+22670000000", remuneration });
     expect(inserts.find(item => item.table === users)?.values).toMatchObject({ name: "Awa Agent", role: "seller", active: true });
     expect(inserts.find(item => item.table === sellerCredentials)?.values).toMatchObject({ username: "awa.vendeuse" });
-    expect(inserts.filter(item => item.table === agents).map(item => item.values)).toEqual(expect.arrayContaining([expect.objectContaining({ name: "Vendeur Test", type: "cashier" })]));
-    expect(updates.filter(item => (item.values as any).active === false)).toHaveLength(2);
+    // Vendeur → caissier : la fiche est liée au même compte, qui change de rôle sans être désactivé.
+    expect(inserts.filter(item => item.table === agents).map(item => item.values)).toEqual(expect.arrayContaining([expect.objectContaining({ name: "Vendeur Test", type: "cashier", userId: 30 })]));
+    expect(updates.find(item => item.table === users && (item.values as any).role === "cashier")).toBeTruthy();
+    expect(updates.some(item => item.table === users && (item.values as any).active === false)).toBe(false);
+    // Agent → vendeur : l’ancienne fiche est archivée et détachée.
+    expect(updates.find(item => item.table === agents && (item.values as any).active === false)?.values).toMatchObject({ active: false, userId: null });
   });
 });
