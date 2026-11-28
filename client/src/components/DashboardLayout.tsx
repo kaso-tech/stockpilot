@@ -270,7 +270,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
         <SidebarHeader className="h-18 justify-center border-b border-sidebar-border px-3">
           <button
-            onClick={() => setLocation("/")}
+            onClick={() => navigateFromPalette("/")}
             className="flex w-full items-center gap-3 rounded-xl p-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-primary"
             aria-label="Aller au tableau de bord"
           >
@@ -287,7 +287,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         </SidebarHeader>
 
         <SidebarContent className="px-3 py-5">
-          <div className="space-y-4">{visibleMenuSections.map(section => <section key={section.label}>{!isCollapsed && <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-faint">{section.label}</p>}<SidebarMenu className="gap-0.5">{section.items.map(item => { const isActive = location === item.path || (item.path === "/produits" && location.startsWith("/produits/")) || (item.path === "/clients" && location.startsWith("/clients/")) || (item.path === "/fournisseurs" && location.startsWith("/fournisseurs/")) || (item.path === "/bons-commande" && location.startsWith("/bons-commande/")) || (item.path === "/devis" && location.startsWith("/devis/")) || (item.path === "/tickets" && location.startsWith("/tickets/")) || (item.path === "/factures" && location.startsWith("/factures/")); return <SidebarMenuItem key={item.path}><SidebarMenuButton isActive={isActive} tooltip={item.label} onClick={() => setLocation(item.path)} className="relative h-9 rounded-lg px-3 text-muted-foreground hover:bg-accent hover:text-primary-foreground data-[active=true]:bg-primary-soft data-[active=true]:font-semibold data-[active=true]:text-primary data-[active=true]:before:absolute data-[active=true]:before:inset-y-2 data-[active=true]:before:left-0 data-[active=true]:before:w-[3px] data-[active=true]:before:rounded-r-full data-[active=true]:before:bg-primary"><item.icon className="h-[18px] w-[18px]" /><span className="font-medium">{item.label}</span></SidebarMenuButton></SidebarMenuItem>; })}</SidebarMenu></section>)}</div>
+          <div className="space-y-4">{visibleMenuSections.map(section => <section key={section.label}>{!isCollapsed && <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-faint">{section.label}</p>}<SidebarMenu className="gap-0.5">{section.items.map(item => { const isActive = location === item.path || (item.path === "/produits" && location.startsWith("/produits/")) || (item.path === "/clients" && location.startsWith("/clients/")) || (item.path === "/fournisseurs" && location.startsWith("/fournisseurs/")) || (item.path === "/bons-commande" && location.startsWith("/bons-commande/")) || (item.path === "/devis" && location.startsWith("/devis/")) || (item.path === "/tickets" && location.startsWith("/tickets/")) || (item.path === "/factures" && location.startsWith("/factures/")); return <SidebarMenuItem key={item.path}><SidebarMenuButton isActive={isActive} tooltip={item.label} onClick={() => navigateFromPalette(item.path)} className="relative h-9 rounded-lg px-3 text-muted-foreground hover:bg-accent hover:text-primary-foreground data-[active=true]:bg-primary-soft data-[active=true]:font-semibold data-[active=true]:text-primary data-[active=true]:before:absolute data-[active=true]:before:inset-y-2 data-[active=true]:before:left-0 data-[active=true]:before:w-[3px] data-[active=true]:before:rounded-r-full data-[active=true]:before:bg-primary"><item.icon className="h-[18px] w-[18px]" /><span className="font-medium">{item.label}</span></SidebarMenuButton></SidebarMenuItem>; })}</SidebarMenu></section>)}</div>
         </SidebarContent>
 
         <SidebarFooter className="border-t border-sidebar-border p-3">
@@ -320,13 +320,13 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
                 <Badge className="border-0 bg-primary-soft text-primary hover:bg-primary-soft">{user?.role === "admin" ? "Administrateur" : "Opérateur"}</Badge>
               </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-border" />
-              <DropdownMenuItem onClick={() => setLocation("/aide")} className="cursor-pointer focus:bg-accent"><CircleHelp className="mr-2 h-4 w-4" />Aide</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setLocation("/tarifs")} className="cursor-pointer focus:bg-accent"><WalletCards className="mr-2 h-4 w-4" />Tarification</DropdownMenuItem>
-              {isAdmin && <DropdownMenuItem onClick={() => setLocation("/abonnement")} className="cursor-pointer focus:bg-accent"><CreditCard className="mr-2 h-4 w-4" />Mon abonnement</DropdownMenuItem>}
-              <DropdownMenuItem onClick={() => setLocation("/politique-securite")} className="cursor-pointer focus:bg-accent"><ShieldCheck className="mr-2 h-4 w-4" />Politique de sécurité</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setLocation("/contactez-nous")} className="cursor-pointer focus:bg-accent"><Mail className="mr-2 h-4 w-4" />Contactez-nous</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setLocation("/conditions-utilisation")} className="cursor-pointer focus:bg-accent"><FileText className="mr-2 h-4 w-4" />Conditions d’utilisation</DropdownMenuItem>
-              {platformAccess.data?.platformRole && <DropdownMenuItem onClick={() => setLocation("/plateforme")} className="cursor-pointer focus:bg-accent"><MonitorCog className="mr-2 h-4 w-4" />Console plateforme</DropdownMenuItem>}
+              <DropdownMenuItem onClick={() => navigateFromPalette("/aide")} className="cursor-pointer focus:bg-accent"><CircleHelp className="mr-2 h-4 w-4" />Aide</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigateFromPalette("/tarifs")} className="cursor-pointer focus:bg-accent"><WalletCards className="mr-2 h-4 w-4" />Tarification</DropdownMenuItem>
+              {isAdmin && <DropdownMenuItem onClick={() => navigateFromPalette("/abonnement")} className="cursor-pointer focus:bg-accent"><CreditCard className="mr-2 h-4 w-4" />Mon abonnement</DropdownMenuItem>}
+              <DropdownMenuItem onClick={() => navigateFromPalette("/politique-securite")} className="cursor-pointer focus:bg-accent"><ShieldCheck className="mr-2 h-4 w-4" />Politique de sécurité</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigateFromPalette("/contactez-nous")} className="cursor-pointer focus:bg-accent"><Mail className="mr-2 h-4 w-4" />Contactez-nous</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigateFromPalette("/conditions-utilisation")} className="cursor-pointer focus:bg-accent"><FileText className="mr-2 h-4 w-4" />Conditions d’utilisation</DropdownMenuItem>
+              {platformAccess.data?.platformRole && <DropdownMenuItem onClick={() => navigateFromPalette("/plateforme")} className="cursor-pointer focus:bg-accent"><MonitorCog className="mr-2 h-4 w-4" />Console plateforme</DropdownMenuItem>}
               <DropdownMenuSeparator className="bg-border" />
               <DropdownMenuItem onClick={logout} className="cursor-pointer text-destructive focus:bg-destructive-soft focus:text-destructive">
                 <LogOut className="mr-2 h-4 w-4" /> Se déconnecter

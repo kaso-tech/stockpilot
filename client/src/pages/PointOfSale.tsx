@@ -568,7 +568,7 @@ export default function PointOfSale() {
             <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center overflow-hidden rounded-lg border border-border bg-background">
                 <Button aria-label={`Retirer une unité de ${line.product.name}`} size="icon" variant="ghost" className="h-8 w-8 rounded-none" onClick={() => quantity(line.productId, line.quantity - 1)}><Minus className="h-3.5 w-3.5" /></Button>
-                <Input aria-label={`Quantité de ${line.product.name}`} type="number" inputMode="numeric" min="1" max={line.product.quantity} value={line.quantity} onChange={event => { const next = Number(event.target.value); if (Number.isSafeInteger(next) && next > 0) quantity(line.productId, next); }} className="h-8 w-12 rounded-none border-y-0 px-1 text-center text-sm font-semibold" />
+                <CartQuantityInput label={`Quantité de ${line.product.name}`} value={line.quantity} max={line.product.quantity} onChange={next => quantity(line.productId, next)} />
                 <Button aria-label={`Ajouter une unité de ${line.product.name}`} size="icon" variant="ghost" className="h-8 w-8 rounded-none" onClick={() => quantity(line.productId, line.quantity + 1)}><Plus className="h-3.5 w-3.5" /></Button>
               </div>
               <Button aria-label={`Retirer ${line.product.name} du panier`} size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:bg-destructive-soft hover:text-destructive" onClick={() => quantity(line.productId, 0)}><Trash2 className="h-4 w-4" /></Button>
@@ -774,4 +774,12 @@ export default function PointOfSale() {
       </Dialog>
     </div>
   );
+}
+
+/** Quantité du panier : le champ peut être vidé pendant la saisie ; une valeur vide ou nulle revient à l’ancienne quantité en quittant le champ. */
+function CartQuantityInput({ label, value, max, onChange }: { label: string; value: number; max?: number; onChange: (next: number) => void }) {
+  const [text, setText] = useState(String(value));
+  const [editing, setEditing] = useState(false);
+  useEffect(() => { if (!editing) setText(String(value)); }, [value, editing]);
+  return <Input aria-label={label} type="text" inputMode="numeric" pattern="[0-9]*" value={text} onFocus={event => { setEditing(true); event.target.select(); }} onChange={event => { const digits = event.target.value.replace(/\D/g, "").slice(0, 6); setText(digits); const next = Number(digits); if (digits && Number.isSafeInteger(next) && next > 0) onChange(max ? Math.min(next, Math.max(1, max)) : next); }} onBlur={() => { setEditing(false); setText(String(value)); }} onKeyDown={event => { if (event.key === "Enter") (event.target as HTMLInputElement).blur(); }} className="h-8 w-14 rounded-none border-y-0 px-1 text-center text-sm font-semibold" />;
 }

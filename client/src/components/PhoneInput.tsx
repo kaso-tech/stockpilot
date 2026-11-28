@@ -38,7 +38,9 @@ export function PhoneInput({ value, onChange, id, ariaLabel = "Numéro de télé
 
   const emit = (nextCountry: string, nextLocal: string) => { const next = formatPhone(nextCountry, nextLocal); lastEmitted.current = next; onChange(next); };
   const definition = countryByCode(country);
-  const placeholder = country === OTHER_PHONE_COUNTRY ? "+44 20 7946 0958" : definition?.example ?? "";
+  // Exemple clairement signalé comme tel, pour ne pas ressembler à un numéro déjà saisi.
+  const example = country === OTHER_PHONE_COUNTRY ? "+44 20 7946 0958" : definition?.example ?? "";
+  const placeholder = example ? `Ex. ${example}` : "Numéro de téléphone";
   return (
     <div className="space-y-1">
       <div className="flex gap-2">
@@ -51,7 +53,7 @@ export function PhoneInput({ value, onChange, id, ariaLabel = "Numéro de télé
           <option value={OTHER_PHONE_COUNTRY}>🌐 Autre indicatif</option>
         </select>
         </label>
-        <Input id={id} aria-label={ariaLabel} type="tel" inputMode="tel" autoComplete="tel-national" value={local} placeholder={placeholder} onChange={event => { setLocal(event.target.value); emit(country, event.target.value); }} className="min-w-0 flex-1" />
+        <Input id={id} aria-label={ariaLabel} type="tel" inputMode="tel" autoComplete="tel-national" value={local} placeholder={placeholder} onChange={event => { setLocal(event.target.value); emit(country, event.target.value); }} className="min-w-0 flex-1 placeholder:italic placeholder:text-muted-foreground/60" />
       </div>
       <p className="text-xs text-muted-foreground">{country === OTHER_PHONE_COUNTRY ? "Saisissez le numéro complet avec son indicatif (+…)." : `Sans l’indicatif : il est ajouté automatiquement (ex. +${definition?.dial} ${definition?.example}).`}</p>
     </div>

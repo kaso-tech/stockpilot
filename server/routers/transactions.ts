@@ -87,7 +87,7 @@ export const transactionsRouter = router({
   // Annule un document non encaissé. Une facture, qui a pu être remise au client, est
   // conservée avec le statut « annulée ». Un ticket de caisse ou un devis est supprimé
   // (trace dans le journal d'audit). Aucun stock n'est concerné : il ne sort qu'à l'encaissement.
-  removeDraft: permissionProcedure("sales.create").input(z.object({ saleId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+  removeDraft: permissionProcedure("sales.create").input(z.object({ saleId: z.number().int().positive(), abandonedCheckout: z.boolean().optional() })).mutation(async ({ ctx, input }) => {
     const db = await dbOrThrow();
     const settings = (ctx.user.role === "seller" || ctx.user.role === "cashier") ? (await db.select().from(saleSettings).where(companyScope(saleSettings.companyId, ctx.user.companyId)).limit(1))[0] : undefined;
     return db.transaction(async tx => {
@@ -96,12 +96,14 @@ export const transactionsRouter = router({
       if (sale.status !== "draft" || sale.amountPaidCents > 0) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Seuls les documents non encaissés peuvent être annulés." });
       // Un vendeur peut toujours abandonner le ticket de caisse qu'il vient d'ouvrir ;
       // annuler le document d'un autre reste soumis au réglage « annulation de facture ».
-      const ownPosTicket = sale.channel === "pos" && sale.sellerUserId === ctx.user.id;
+      // Facture que l’on vient de créer en cliquant « Encaisser », puis encaissement abandonné : elle n’a jamais été remise, on la supprime.
+      const abandonedOwnInvoice = input.abandonedCheckout === true && sale.channel === "invoice" && sale.sellerUserId === ctx.user.id && Date.now() - new Date(sale.createdAt).getTime() < 2 * 60 * 60 * 1000;
+      const ownPosTicket = (sale.channel === "pos" && sale.sellerUserId === ctx.user.id) || abandonedOwnInvoice;
       if ((ctx.user.role === "seller" || ctx.user.role === "cashier") && !ownPosTicket) { try { assertSellerSensitiveAction(settings, "invoice_cancellation"); } catch (error) { throw new TRPCError({ code: "FORBIDDEN", message: error instanceof Error ? error.message : "Annulation non autorisée." }); } }
       const entityType = sale.channel === "pos" ? "Ticket POS" : sale.channel === "quote" ? "Devis" : "Facture";
       // Ticket de caisse ou devis non encaissé : ni paiement, ni stock, ni écriture comptable.
       // Il est supprimé pour ne pas encombrer les listes ; le journal d'audit en garde la trace.
-      if (sale.channel === "quote" || sale.channel === "pos") {
+      if (sale.channel === "quote" || sale.channel === "pos" || abandonedOwnInvoice) {
         await tx.delete(saleItems).where(eq(saleItems.saleId, sale.id));
         await tx.delete(sales).where(and(eq(sales.id, sale.id), companyScope(sales.companyId, ctx.user.companyId)));
         await tx.insert(auditLogs).values({ companyId: ctx.user.companyId, actorUserId: ctx.user.id, action: "Suppression", entityType, entityId: String(sale.id), detail: `${sale.invoiceNumber} supprimé avant encaissement (${moneyLabel(sale.totalCents)})` });

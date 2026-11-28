@@ -1,3 +1,4 @@
+import { ProductImage } from "@/components/ProductImage";
 import { BarcodeCameraDialog } from "@/components/BarcodeCameraDialog";
 import { matchesSearch } from "@/lib/search";
 import { computeVatBreakdown, vatRatesLabel } from "@shared/pricing";
@@ -87,7 +88,10 @@ export default function InvoiceCreate({
   useEffect(() => { if (isAdmin && activeWarehouseId && activeWarehouseId !== selectedWarehouseId) { setCart([]); setSelectedWarehouseId(activeWarehouseId); } }, [activeWarehouseId, isAdmin, selectedWarehouseId]);
   const { data: products = [] } = trpc.products.list.useQuery(selectedWarehouseId ? { warehouseId: selectedWarehouseId } : undefined);
   const { data: customers = [] } = trpc.commerce.customers.list.useQuery();
-  const { data: agents = [] } = trpc.commerce.agents.list.useQuery(selectedWarehouseId ? { warehouseId: selectedWarehouseId } : undefined);
+  const { data: agentList } = trpc.commerce.agents.list.useQuery(selectedWarehouseId ? { warehouseId: selectedWarehouseId } : undefined, { enabled: isAdmin, retry: false });
+  // Les postes de vente non administrateurs lisent la liste réduite des agents actifs.
+  const { data: agentOptions } = trpc.commerce.agents.options.useQuery(undefined, { enabled: !isAdmin });
+  const agents = useMemo(() => (agentList ?? agentOptions ?? []) as Array<{ id: number; name: string; type: "sales_agent" | "cashier" | "staff"; active: boolean }>, [agentList, agentOptions]);
   const { data: settings } = trpc.commerce.settings.get.useQuery();
   const { data: sellerDiscountPermissions } = trpc.sellerDiscountPermissions.get.useQuery(undefined, { enabled: user?.role === "seller" });
   const { data: vatRatePresets = [] } = trpc.vatRates.list.useQuery();
@@ -479,6 +483,7 @@ export default function InvoiceCreate({
         ),
     });
   };
+  const abandonInvoice = trpc.transactions.removeDraft.useMutation({ onSuccess: () => { void utils.transactions.list.invalidate(); toast.info("Encaissement annulé : la facture n’a pas été enregistrée. Vos produits sont conservés."); }, onError: error => toast.error(error.message) });
   const collect = () => {
     if (documentType === "quote") return;
     if (!ensure()) return;
@@ -519,7 +524,7 @@ export default function InvoiceCreate({
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-[22px] font-bold tracking-tight text-foreground">
-            Créer un {documentType === "quote" ? "devis" : "facture"}
+            {documentType === "quote" ? "Créer un devis" : "Créer une facture"}
           </h1>
         </div>
         <Button variant="outline" onClick={() => setLocation(documentPath)}>
@@ -529,7 +534,8 @@ export default function InvoiceCreate({
       <section className="grid gap-5 lg:grid-cols-2">
         <div className="space-y-4 rounded-xl border border-border bg-card p-5">
           <h2 className="font-semibold">Client et intervenants</h2>
-          <div className="space-y-2"><Label>Entrepôt opérationnel</Label><Select value={selectedWarehouseId ? String(selectedWarehouseId) : "unselected"} onValueChange={value => { const nextId = value === "unselected" ? null : Number(value); if (nextId !== selectedWarehouseId && cart.length && !window.confirm("Changer d’entrepôt videra les produits ajoutés. Continuer ?")) return; if (nextId !== selectedWarehouseId) setCart([]); if (isAdmin && nextId) setActiveWarehouseId(nextId); setSelectedWarehouseId(nextId); }}><SelectTrigger><SelectValue placeholder="Sélectionner un entrepôt" /></SelectTrigger><SelectContent><SelectItem value="unselected">Sélectionner un entrepôt</SelectItem>{warehouses.filter(warehouse => warehouse.active).map(warehouse => <SelectItem key={warehouse.id} value={String(warehouse.id)}>{warehouse.name}{warehouse.isDefault ? " · Principal" : ""}</SelectItem>)}</SelectContent></Select><p className="text-xs text-faint">Les disponibilités et le mouvement de sortie seront enregistrés pour ce dépôt.</p></div>
+          {/* Un seul dépôt : le choix est implicite, la case n’est pas affichée. */}
+          {warehouses.filter(warehouse => warehouse.active).length > 1 && <div className="space-y-2"><Label>Entrepôt opérationnel</Label><Select value={selectedWarehouseId ? String(selectedWarehouseId) : "unselected"} onValueChange={value => { const nextId = value === "unselected" ? null : Number(value); if (nextId !== selectedWarehouseId && cart.length && !window.confirm("Changer d’entrepôt videra les produits ajoutés. Continuer ?")) return; if (nextId !== selectedWarehouseId) setCart([]); if (isAdmin && nextId) setActiveWarehouseId(nextId); setSelectedWarehouseId(nextId); }}><SelectTrigger><SelectValue placeholder="Sélectionner un entrepôt" /></SelectTrigger><SelectContent><SelectItem value="unselected">Sélectionner un entrepôt</SelectItem>{warehouses.filter(warehouse => warehouse.active).map(warehouse => <SelectItem key={warehouse.id} value={String(warehouse.id)}>{warehouse.name}{warehouse.isDefault ? " · Principal" : ""}</SelectItem>)}</SelectContent></Select><p className="text-xs text-faint">Les disponibilités et le mouvement de sortie seront enregistrés pour ce dépôt.</p></div>}
           <div className="space-y-2">
             <Label>
               Client <span className="text-destructive">*</span>
@@ -887,21 +893,31 @@ export default function InvoiceCreate({
             </div>
           </div>
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
-            {filtered.map(product => (
-              <button
-                key={product.id}
-                onClick={() => add(product.id)}
-                className="lift surface rounded-xl border border-border p-4 text-left hover:border-primary/50 hover:bg-primary/5"
-              >
-                <p className="font-medium">{product.name}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {product.reference} · Stock {product.quantity}
-                </p>
-                <p className="mt-3 font-semibold text-primary">
-                  {formatCurrency(basePrice(product))}
-                </p>
-              </button>
-            ))}
+            {filtered.map(product => {
+              // Comme en vente rapide : le produit déjà ajouté est mis en évidence avec sa quantité.
+              const inCart = cart.find(item => item.productId === product.id);
+              return (
+                <button
+                  key={product.id}
+                  type="button"
+                  onClick={() => add(product.id)}
+                  aria-pressed={Boolean(inCart)}
+                  className={`relative flex items-center gap-3 rounded-xl border p-3 text-left transition ${inCart ? "border-primary bg-primary/10 ring-1 ring-primary/40" : "border-border hover:border-primary/50 hover:bg-primary/5"}`}
+                >
+                  <ProductImage product={product} className="h-14 w-14 text-lg" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium">{product.name}</span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">{product.reference} · Stock {product.quantity}</span>
+                    <span className="mt-1 block font-semibold text-primary">{formatCurrency(basePrice(product))}</span>
+                  </span>
+                  {inCart && <span className="absolute right-2 top-2 grid h-6 min-w-6 place-items-center rounded-full bg-primary px-1.5 text-xs font-bold text-primary-foreground">{inCart.quantity}</span>}
+                </button>
+              );
+            })}
+          </div>
+          <div className="sticky bottom-0 -mx-6 -mb-6 mt-4 flex items-center justify-between gap-3 border-t border-border bg-background/95 px-6 py-3 backdrop-blur">
+            <span className="text-sm text-muted-foreground">{cart.length} produit(s) · {cart.reduce((sum, item) => sum + item.quantity, 0)} unité(s)</span>
+            <Button type="button" onClick={() => setPickerOpen(false)} className="bg-primary text-primary-foreground hover:bg-primary/90">Terminer</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -913,6 +929,12 @@ export default function InvoiceCreate({
       <CheckoutSheet
         open={documentType === "invoice" && Boolean(checkoutSale)}
         onOpenChange={open => !open && setCheckoutSale(null)}
+        onAbandon={() => {
+          // Encaissement abandonné : la facture créée par « Encaisser » est supprimée, le formulaire reste rempli.
+          const abandoned = checkoutSale;
+          setCheckoutSale(null);
+          if (abandoned?.id) abandonInvoice.mutate({ saleId: abandoned.id, abandonedCheckout: true });
+        }}
         sale={checkoutSale ? { ...checkoutSale, channel: "invoice" } : null}
         agents={agents}
         settings={settings}

@@ -29,8 +29,18 @@ function useAuthenticatedFallback(src: string | null | undefined) {
 }
 
 export function ProductImage({ product, full = false, className = "h-10 w-10", rounded = "rounded-lg", zoomable = false }: { product: ImageSource; full?: boolean; className?: string; rounded?: string; zoomable?: boolean }) {
-  const src = full ? (product.imageUrl ?? product.imageThumbUrl) : (product.imageThumbUrl ?? product.imageUrl);
-  const { displaySrc, failed, onError } = useAuthenticatedFallback(src);
+  // Variante préférée d’abord ; si elle est introuvable (miniature absente du stockage), l’autre variante est essayée.
+  const preferred = full ? [product.imageUrl, product.imageThumbUrl] : [product.imageThumbUrl, product.imageUrl];
+  const candidates = preferred.filter((value, index, list): value is string => Boolean(value) && list.indexOf(value) === index);
+  const [variant, setVariant] = useState(0);
+  const candidateKey = candidates.join("|");
+  useEffect(() => setVariant(0), [candidateKey]);
+  const src = candidates[Math.min(variant, Math.max(0, candidates.length - 1))];
+  const fallback = useAuthenticatedFallback(src);
+  const failed = fallback.failed && variant >= candidates.length - 1;
+  const displaySrc = fallback.displaySrc;
+  useEffect(() => { if (fallback.failed && variant < candidates.length - 1) setVariant(variant + 1); }, [fallback.failed, variant, candidates.length]);
+  const onError = () => { if (fallback.displaySrc !== src && variant < candidates.length - 1) { setVariant(variant + 1); return; } fallback.onError(); };
   const [viewerOpen, setViewerOpen] = useState(false);
   if (src && !failed) {
     const image = <img src={displaySrc ?? undefined} alt="" loading="lazy" decoding="async" onError={onError} className={`${className} ${rounded} shrink-0 bg-white object-contain ring-1 ring-inset ring-border/60`} />;

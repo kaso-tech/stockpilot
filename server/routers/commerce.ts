@@ -217,6 +217,8 @@ export const commerceRouter = router({
       return rows.filter(row => row.active);
     }),
     /** Comptes de connexion actifs sans fiche d’équipe (ex. fiche effacée par une ancienne réinitialisation d’entrepôt) : invisibles sinon. */
+    /** Agents commerciaux et caissiers actifs (nom seulement), pour les champs de rattachement à l’encaissement et sur les factures. */
+    options: permissionProcedure("sales.create").query(async ({ ctx }) => { const db = await dbOrThrow(); return db.select({ id: agents.id, name: agents.name, type: agents.type, active: agents.active }).from(agents).where(and(companyScope(agents.companyId, ctx.user.companyId), eq(agents.active, true), inArray(agents.type, ["sales_agent", "cashier"]))).orderBy(agents.name); }),
     orphanAccounts: permissionProcedure("team.view").query(async ({ ctx }) => {
       const db = await dbOrThrow();
       const [accountRows, linked, roleRows] = await Promise.all([
